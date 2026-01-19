@@ -1,9 +1,8 @@
-// Fix: Restored main application component here to resolve casing conflict with app.tsx.
+
 import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import GestionDocumentosL from './components/GestionDocumentosL';
-import ConsultasDocumentosL from './components/ConsultasDocumentosL';
 import RecibidoMaterial from './components/RecibidoMaterial';
 import RoutePlanner from './components/RoutePlanner';
 import FleetManager from './components/FleetManager';
@@ -28,8 +27,8 @@ const App: React.FC = () => {
   const [assignments, setAssignments] = useState<VehicleAssignment[]>([]);
   const [documents, setDocuments] = useState<DocumentL[]>([]);
   const [invoices] = useState<Invoice[]>([
-    { id: 'F-101', clientId: 'c1', docLId: 'doc-001', customerName: 'Ferretería El Martillo', address: 'Calle 10 #45-23, Bogotá', lat: 4.61, lng: -74.12, volumeM3: 5.5, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' },
-    { id: 'F-102', clientId: 'c1', docLId: 'doc-001', customerName: 'Construmax Norte', address: 'Av Boyacá #127-10, Bogotá', lat: 4.71, lng: -74.07, volumeM3: 12.2, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' },
+    { id: 'F-101', clientId: 'c1', docLId: 'doc-001', customerName: 'Ferretería El Martillo', address: 'Calle 10 #45-23, Bogotá', lat: 4.61, lng: -74.12, volumeM3: 5.5, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-03' },
+    { id: 'F-102', clientId: 'c1', docLId: 'doc-001', customerName: 'Construmax Norte', address: 'Av Boyacá #127-10, Bogotá', lat: 4.71, lng: -74.07, volumeM3: 12.2, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-03' },
   ]);
 
   useEffect(() => {
@@ -44,7 +43,8 @@ const App: React.FC = () => {
 
     initial['masterEstados'] = [
       { id: 'EST-01', name: 'ACTIVO', description: 'Habilitado', statusId: 'EST-01' },
-      { id: 'EST-02', name: 'INACTIVO', description: 'Deshabilitado', statusId: 'EST-01' }
+      { id: 'EST-02', name: 'INACTIVO', description: 'Deshabilitado', statusId: 'EST-01' },
+      { id: 'EST-03', name: 'PENDIENTE AUDITORÍA', description: 'Cargue inicial en espera', statusId: 'EST-01' }
     ];
 
     initial['masterTiposVehiculo'] = [
@@ -172,7 +172,7 @@ const App: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 animate-in fade-in duration-700">
            <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl border-b-4 border-b-emerald-500"><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Vehículos</p><p className="text-4xl font-black text-slate-900 mt-2">{vehicles.length}</p></div>
            <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl border-b-4 border-b-emerald-500"><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Conductores</p><p className="text-4xl font-black text-slate-900 mt-2">{drivers.length}</p></div>
-           <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl border-b-4 border-b-emerald-500"><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Doc. Pendientes</p><p className="text-4xl font-black text-slate-900 mt-2">{documents.filter(d=>d.status===DocStatus.PENDING).length}</p></div>
+           <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl border-b-4 border-b-emerald-500"><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Doc. Pendientes</p><p className="text-4xl font-black text-slate-900 mt-2">{documents.filter(d=>d.statusId==='EST-03').length}</p></div>
            <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl border-b-4 border-b-slate-900"><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Asignaciones</p><p className="text-4xl font-black text-slate-900 mt-2">{assignments.length}</p></div>
         </div>
       )}

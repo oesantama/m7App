@@ -141,6 +141,18 @@ export interface DocumentLItem {
   count2?: number; 
   novedad?: string;
   status: 'Pending' | 'Matches' | 'Mismatch' | 'OK' | 'Novedad';
+  volume?: string;
+  unit?: string;
+  detail?: string;
+  deliveryDate?: string;
+  invoice?: string;
+  address?: string;
+  city?: string;
+  observation?: string;
+  qty1?: number;
+  qty2?: number;
+  itemStatus?: string;
+  inventoryNote?: string;
 }
 
 export interface Invoice extends AuditBase {
