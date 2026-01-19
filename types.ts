@@ -131,6 +131,9 @@ export interface DocumentL extends AuditBase {
   address?: string;
   inventoryDate?: string;
   inventoryNotes?: string;
+  codplan?: string;
+  deliveryDate?: string;
+  inventoryUser?: string;
 }
 
 export interface DocumentLItem {
@@ -153,6 +156,7 @@ export interface DocumentLItem {
   qty2?: number;
   itemStatus?: string;
   inventoryNote?: string;
+  orderNumber?: string;
 }
 
 export interface Invoice extends AuditBase {

@@ -96,10 +96,10 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           <table className="w-full text-left">
             <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px]">
               <tr>
-                <th className="p-8">Identificador / Placa</th>
-                <th className="p-8">Ciudad de Destino</th>
-                <th className="p-8 text-center">Tipo de Plan</th>
-                <th className="p-8 text-center">Estado Logístico</th>
+                <th className="p-8">Documento / Placa</th>
+                <th className="p-8">CodPlan</th>
+                <th className="p-8">F. Envío</th>
+                <th className="p-8 text-center">Estado</th>
                 <th className="p-8 text-right">Acción</th>
               </tr>
             </thead>
@@ -110,12 +110,8 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     <p className="font-black text-slate-900 text-sm uppercase tracking-tight">{doc.externalDocId}</p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">PLACA: {doc.vehicleData}</p>
                   </td>
-                  <td className="p-8 font-black text-slate-600 text-[11px] uppercase tracking-tight">{doc.city || 'PENDIENTE'}</td>
-                  <td className="p-8 text-center">
-                    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase shadow-sm border ${doc.planType === 'Plan R' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                      {doc.planType || 'Normal'}
-                    </span>
-                  </td>
+                  <td className="p-8 font-black text-slate-600 text-[11px] uppercase tracking-tight">{doc.codplan || 'S/I'}</td>
+                  <td className="p-8 font-black text-slate-400 text-[10px] uppercase tracking-tight">{doc.deliveryDate || 'S/I'}</td>
                   <td className="p-8 text-center">
                     <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-inner ${doc.status === DocStatus.INVENTORED ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>{doc.status}</span>
                   </td>
@@ -130,48 +126,59 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
         </div>
       </div>
 
-      {/* MODAL DETALLE HISTÓRICO */}
       {selectedDoc && (
         <div className="fixed inset-0 z-[400] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 md:p-10 animate-in fade-in zoom-in-95">
-           <div className="bg-white w-full max-w-6xl rounded-[4rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white/10">
+           <div className="bg-white w-full max-w-[98vw] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white/10">
               <div className="bg-slate-900 p-10 text-white flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-8">
                     <div className="w-16 h-16 bg-emerald-500 rounded-[1.5rem] flex items-center justify-center text-slate-900 shadow-xl"><Icons.Audit /></div>
                     <div>
                       <h3 className="text-3xl font-black uppercase tracking-tighter">Historial M7: {selectedDoc.externalDocId}</h3>
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest mt-2 leading-none">Cierre de Inventario: <span className="text-emerald-400">{selectedDoc.inventoryDate ? new Date(selectedDoc.inventoryDate).toLocaleString() : 'PENDIENTE'}</span></p>
+                      <p className="text-[9px] font-black text-slate-500 uppercase mt-2">Expediente Digital M7 Global</p>
                     </div>
                  </div>
                  <button onClick={() => setSelectedDoc(null)} className="text-4xl font-thin hover:text-red-500 transition-all">×</button>
               </div>
               <div className="p-10 md:p-14 overflow-y-auto space-y-10 custom-scrollbar bg-slate-50/20 flex-1">
-                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Estado</p><p className="font-black text-slate-900 text-xs uppercase">{selectedDoc.status}</p></div>
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Placa Auditoría</p><p className="font-black text-slate-900 text-xs uppercase">{selectedDoc.vehicleData || 'S/I'}</p></div>
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Destino Final</p><p className="font-black text-emerald-600 text-xs uppercase">{selectedDoc.city || 'S/I'}</p></div>
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo Plan</p><p className="font-black text-slate-900 text-xs uppercase">{selectedDoc.planType || 'NORMAL'}</p></div>
+                 {/* ENCABEZADO SOLICITADO HISTORICO */}
+                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">CodPlan</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.codplan || 'S/I'}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.deliveryDate || 'S/I'}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Placa</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.vehicleData}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Documento L</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.externalDocId}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Cargue</p><p className="font-black text-slate-900 text-[10px] uppercase">{new Date(selectedDoc.createdAt).toLocaleDateString()}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Usuario Cargue</p><p className="font-black text-slate-900 text-[10px] uppercase truncate">{selectedDoc.createdBy}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Estado</p><p className="font-black text-emerald-600 text-[10px] uppercase">{selectedDoc.status}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Inventario</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.inventoryDate ? new Date(selectedDoc.inventoryDate).toLocaleDateString() : 'N/A'}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Usuario Inventario</p><p className="font-black text-slate-900 text-[10px] uppercase truncate">{selectedDoc.inventoryUser || selectedDoc.updatedBy}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p><p className="font-black text-slate-900 text-[10px] uppercase truncate">{selectedDoc.inventoryNotes || 'S/O'}</p></div>
                  </div>
+
                  <div className="bg-white rounded-[3rem] overflow-hidden shadow-2xl border-4 border-slate-100">
-                   <table className="w-full text-left text-[11px]">
+                   <table className="w-full text-left text-[10px]">
                       <thead className="bg-slate-900 text-white uppercase tracking-widest font-black">
                         <tr>
-                          <th className="p-8">Articulo / SKU</th>
-                          <th className="p-8 text-center">Esperado</th>
-                          <th className="p-8 text-center text-blue-400">Conteo 1</th>
-                          <th className="p-8 text-center text-amber-400">Conteo 2</th>
-                          <th className="p-8 text-center">Resultado</th>
+                          <th className="p-6">Articulo / SKU</th>
+                          <th className="p-6 text-center">Nº Ped</th>
+                          <th className="p-6 text-center">Esperado</th>
+                          <th className="p-6 text-center">Cont 1</th>
+                          <th className="p-6 text-center">Cont 2</th>
+                          <th className="p-6">Notas Inv.</th>
+                          <th className="p-6 text-center">Estado</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold">
                         {selectedDoc.items.map((it, idx) => (
                           <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                            <td className="p-8 font-black uppercase text-slate-800 tracking-tight">{it.articleId}</td>
-                            <td className="p-8 text-center text-slate-500">{it.expectedQty}</td>
-                            <td className="p-8 text-center font-black text-blue-600 bg-blue-50/20">{it.count1 || 0}</td>
-                            <td className="p-8 text-center font-black text-amber-600 bg-amber-50/20">{it.countedQty || 0}</td>
-                            <td className="p-8 text-center">
-                              <span className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase shadow-sm ${it.countedQty === it.expectedQty ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-                                {it.countedQty === it.expectedQty ? 'CERRADO ✓' : 'NOVEDAD ⚠️'}
+                            <td className="p-6 font-black uppercase text-slate-800 tracking-tight">{it.articleId}</td>
+                            <td className="p-6 text-center text-emerald-600 font-black">{it.orderNumber || 'S/I'}</td>
+                            <td className="p-6 text-center text-slate-400">{it.expectedQty}</td>
+                            <td className="p-6 text-center text-blue-600 font-black">{it.count1 || 0}</td>
+                            <td className="p-6 text-center text-amber-600 font-black">{it.count2 || it.countedQty || 0}</td>
+                            <td className="p-6 text-[9px] uppercase italic text-slate-400 truncate max-w-[150px]">{it.inventoryNote || 'S/N'}</td>
+                            <td className="p-6 text-center">
+                              <span className={`px-4 py-1 rounded-xl text-[8px] font-black uppercase ${it.countedQty === it.expectedQty ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                                {it.countedQty === it.expectedQty ? 'OK' : 'NOV'}
                               </span>
                             </td>
                           </tr>
@@ -181,7 +188,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                  </div>
               </div>
               <div className="p-10 border-t bg-white flex justify-end shrink-0">
-                 <button onClick={() => setSelectedDoc(null)} className="px-14 py-6 bg-red-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all shadow-2xl active:scale-95">Cerrar Historial</button>
+                 <button onClick={() => setSelectedDoc(null)} className="px-14 py-6 bg-red-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all shadow-2xl active:scale-95">Cerrar Expediente Histórico</button>
               </div>
            </div>
         </div>

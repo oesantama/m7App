@@ -18,10 +18,32 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [preview, setPreview] = useState<{ fileName: string; mapped: DocumentL[]; type: string } | null>(null);
   const [selectedPendingDoc, setSelectedPendingDoc] = useState<DocumentL | null>(null);
 
-  const pendingDocs = useMemo(() => 
-    documents.filter(d => d.statusId === 'EST-03' || d.status === DocStatus.PENDING),
-    [documents]
-  );
+  // Estados para búsqueda y paginación de Pendientes
+  const [searchTerm, setSearchTerm] = useState('');
+  const [pendingPage, setPendingPage] = useState(1);
+  const itemsPerPage = 6;
+
+  // Estados para búsqueda y paginación de la Previsualización
+  const [previewSearch, setPreviewSearch] = useState('');
+  const [previewPage, setPreviewPage] = useState(1);
+  const previewItemsPerPage = 10;
+
+  const pendingDocs = useMemo(() => {
+    const list = documents.filter(d => d.statusId === 'EST-03' || d.status === DocStatus.PENDING);
+    if (!searchTerm) return list;
+    return list.filter(d => 
+      d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.vehicleData || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.city || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [documents, searchTerm]);
+
+  const paginatedPending = useMemo(() => {
+    const start = (pendingPage - 1) * itemsPerPage;
+    return pendingDocs.slice(start, start + itemsPerPage);
+  }, [pendingDocs, pendingPage]);
+
+  const totalPendingPages = Math.ceil(pendingDocs.length / itemsPerPage);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = e.target.files?.[0];
@@ -38,22 +60,16 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         if (!rawData || rawData.length < 1) return;
 
         let headerRowIndex = -1;
-        // Términos para validar que la fila ES de encabezados
         const requiredTerms = ['placa', 'carga', 'articulo', 'item', 'un orig', 'un', 'cant env'];
         
         for (let i = 0; i < Math.min(rawData.length, 50); i++) {
           const row = (rawData[i] || []).map(c => String(c || '').toLowerCase().trim());
-          // Una fila de encabezado válida debe tener al menos 3 de nuestros términos clave
           const matches = row.filter(cell => requiredTerms.some(term => cell === term || cell.includes(term))).length;
-          
-          if (matches >= 3) {
-            headerRowIndex = i;
-            break;
-          }
+          if (matches >= 3) { headerRowIndex = i; break; }
         }
 
         if (headerRowIndex === -1) {
-          alert("M7 ERROR: No se detectó la fila de títulos. Asegúrese que las columnas (Placa, Carga, Articulo, etc.) estén presentes en el archivo.");
+          alert("M7 ERROR: No se detectó la fila de títulos. Verifique el formato.");
           return;
         }
 
@@ -64,23 +80,24 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           return terms.some(t => hLower === t.toLowerCase().trim() || hLower.includes(t.toLowerCase().trim()));
         });
 
-        // MAPEOS SEGÚN IMÁGENES PROPORCIONADAS
-        const iCodPlan = type === 'Plan Normal' ? findIdx(['un orig']) : findIdx(['un']);
+        const iCodPlan = type === 'Plan Normal' ? findIdx(['un orig', 'cod plan']) : findIdx(['un', 'cod plan']);
         const iPlaca = findIdx(['placa']);
-        const iCarga = findIdx(['carga']);
-        const iFechaEnvio = findIdx(['ship date', 'fecha envio']);
-
+        const iCarga = findIdx(['carga', 'nº carga']);
+        const iFechaEnvio = findIdx(['ship date', 'fecha envio', 'fecha despacho']);
         const iArticulo = type === 'Plan Normal' ? findIdx(['articulo']) : findIdx(['item']);
-        const iCant = findIdx(['cant env']);
+        const iCant = findIdx(['cant env', 'cantidad']);
         const iVol = type === 'Plan Normal' ? findIdx(['total volume']) : findIdx(['volumen']);
-        const iUnd = findIdx(['um', 'und']);
+        const iUnd = findIdx(['um', 'und', 'unid']);
         const iFactura = findIdx(['remision/transferencia', 'factura']);
-        const iCiudad = type === 'Plan Normal' ? findIdx(['destino']) : findIdx(['ciudad']);
+        const iCiudad = type === 'Plan Normal' ? findIdx(['destino', 'ciudad']) : findIdx(['ciudad']);
         const iDir = type === 'Plan Normal' ? findIdx(['dirección 1']) : findIdx(['dir 1']);
-        const iObs = type === 'Plan Normal' ? findIdx(['message']) : findIdx(['comentarios']);
+        const iObs = type === 'Plan Normal' ? findIdx(['message', 'observacion']) : findIdx(['comentarios', 'observacion']);
+        const iPed = findIdx(['nº ped', 'pedido', 'order']);
         
         const dataRows = rawData.slice(headerRowIndex + 1);
-        const docsMap = new Map<string, { codplan: string, placa: string, carga: string, city: string, address: string, items: DocumentLItem[] }>();
+        const docsMap = new Map<string, { codplan: string, placa: string, carga: string, city: string, address: string, deliveryDate: string, items: DocumentLItem[] }>();
+
+        let duplicatesFound: string[] = [];
 
         dataRows.forEach((row) => {
           if (!row || row.length === 0 || row.every(c => c === '')) return;
@@ -88,27 +105,33 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
           const placa = val(iPlaca);
           const carga = val(iCarga);
-          const codplan = val(iCodPlan);
-          const sku = val(iArticulo);
-          const ciudad = val(iCiudad);
           
-          if (!sku && !placa && !carga) return;
+          if (!placa && !carga) return;
 
-          // AGRUPACIÓN: Placa + Carga define el documento maestro
+          // VALIDACIÓN DE DUPLICADOS EN BASE
+          const isDuplicateInSystem = documents.some(d => d.vehicleData === placa && d.externalDocId === carga);
+          if (isDuplicateInSystem) {
+            const dupKey = `${placa}-${carga}`;
+            if (!duplicatesFound.includes(dupKey)) duplicatesFound.push(dupKey);
+            return;
+          }
+
           const groupKey = `${placa || 'S/A'}-${carga || 'S/C'}`;
 
           if (!docsMap.has(groupKey)) {
             docsMap.set(groupKey, { 
-              codplan: codplan || groupKey,
+              codplan: val(iCodPlan) || groupKey,
               placa: placa || 'S/A',
               carga: carga || 'S/C',
-              city: ciudad || 'S/D',
+              city: val(iCiudad) || 'S/D',
               address: val(iDir) || 'S/D',
+              deliveryDate: val(iFechaEnvio),
               items: [] 
             });
           }
           
           const group = docsMap.get(groupKey)!;
+          const sku = val(iArticulo);
           if (sku) {
             group.items.push({
               articleId: sku,
@@ -118,24 +141,32 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               volume: val(iVol),
               unit: val(iUnd),
               invoice: val(iFactura),
-              city: ciudad,
+              city: val(iCiudad),
               address: val(iDir),
               observation: val(iObs),
-              deliveryDate: val(iFechaEnvio)
+              deliveryDate: val(iFechaEnvio),
+              orderNumber: val(iPed)
             });
           }
         });
 
+        if (duplicatesFound.length > 0) {
+          alert(`M7 ALERTA: No se pudieron cargar ${duplicatesFound.length} documentos porque ya existen en el sistema (Duplicidad Placa/Carga detectada).\n\nConflictos: ${duplicatesFound.join(', ')}.\n\nPor favor valide en el Historial M7 para identificar quién y cuándo realizó el cargue previo.`);
+          if (docsMap.size === 0) return; 
+        }
+
         const mapped: DocumentL[] = Array.from(docsMap.entries()).map(([key, data]) => ({
           id: `doc-${Date.now()}-${key}`,
           clientId: user.clientId,
-          externalDocId: data.carga !== 'S/C' ? data.carga : data.codplan,
+          externalDocId: data.carga,
           vehicleData: data.placa,
+          codplan: data.codplan,
+          deliveryDate: data.deliveryDate,
           city: data.city,
           address: data.address,
           status: DocStatus.PENDING,
           planType: type as any,
-          inventoryNotes: `M7 Cargue Masivo: ${data.items.length} líneas bajo placa ${data.placa}.`,
+          inventoryNotes: `M7 Cargue: ${data.items.length} líneas`,
           items: data.items,
           createdAt: new Date().toISOString(),
           createdBy: user.name,
@@ -145,18 +176,39 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         }));
 
         if (mapped.length === 0) {
-          alert("No se encontraron datos procesables en las filas debajo de los encabezados.");
+          alert("No se encontraron datos nuevos procesables.");
         } else {
           setPreview({ fileName: file.name, mapped, type });
+          setPreviewPage(1);
+          setPreviewSearch('');
         }
       } catch (err) {
-        console.error("M7 Excel Crash:", err);
-        alert("Fallo crítico: No se pudo leer el archivo. Verifique que no esté abierto en Excel o protegido.");
+        console.error("M7 Error:", err);
+        alert("Fallo crítico en lectura de Excel.");
       }
       e.target.value = '';
     };
     reader.readAsArrayBuffer(file);
   };
+
+  // Filtrado y paginación para la previsualización
+  const filteredPreviewItems = useMemo(() => {
+    if (!preview) return [];
+    const allItems = preview.mapped.flatMap(doc => doc.items.map(it => ({ ...it, docId: doc.externalDocId, docVehicle: doc.vehicleData })));
+    if (!previewSearch) return allItems;
+    return allItems.filter(it => 
+      it.articleId.toLowerCase().includes(previewSearch.toLowerCase()) ||
+      it.docId.toLowerCase().includes(previewSearch.toLowerCase()) ||
+      it.docVehicle.toLowerCase().includes(previewSearch.toLowerCase())
+    );
+  }, [preview, previewSearch]);
+
+  const paginatedPreviewItems = useMemo(() => {
+    const start = (previewPage - 1) * previewItemsPerPage;
+    return filteredPreviewItems.slice(start, start + previewItemsPerPage);
+  }, [filteredPreviewItems, previewPage]);
+
+  const totalPreviewPages = Math.ceil(filteredPreviewItems.length / previewItemsPerPage);
 
   return (
     <div className="space-y-4 animate-in fade-in h-full flex flex-col overflow-hidden">
@@ -203,30 +255,43 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                   </div>
 
                   <div className="space-y-8">
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] shrink-0">Pendientes por Auditoría ({pendingDocs.length})</h4>
-                       <div className="h-[2px] w-full bg-slate-50"></div>
+                       <div className="flex-1 bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3">
+                         <Icons.Search className="w-3 h-3 text-slate-300" />
+                         <input type="text" placeholder="BUSCAR PENDIENTES..." value={searchTerm} onChange={e=>{setSearchTerm(e.target.value); setPendingPage(1);}} className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full" />
+                       </div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {pendingDocs.map(doc => (
+                      {paginatedPending.map(doc => (
                         <div key={doc.id} className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-xl flex flex-col group hover:border-emerald-500 transition-all">
                            <div className="flex justify-between items-start mb-6">
                               <div className={`px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${doc.planType === 'Plan R' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>{doc.planType}</div>
                               <button onClick={()=>setSelectedPendingDoc(doc)} className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-emerald-500 transition-all shadow-lg active:scale-90"><Icons.Eye /></button>
                            </div>
-                           <h5 className="text-base font-black text-slate-900 uppercase mb-2 tracking-tighter truncate">{doc.externalDocId}</h5>
-                           <div className="flex items-center gap-3 text-slate-400">
-                              <Icons.Truck className="w-3 h-3" />
-                              <span className="text-[10px] font-bold uppercase tracking-widest">{doc.vehicleData} • {doc.city}</span>
+                           <h5 className="text-base font-black text-slate-900 uppercase mb-1 tracking-tighter truncate">{doc.externalDocId}</h5>
+                           <div className="space-y-2 mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                              <p><span className="text-slate-900">CODPLAN:</span> {doc.codplan || 'S/I'}</p>
+                              <p><span className="text-slate-900">PLACA:</span> {doc.vehicleData}</p>
+                              <p><span className="text-slate-900">CARGUE:</span> {new Date(doc.createdAt).toLocaleDateString()}</p>
+                              <p><span className="text-slate-900">ESTADO:</span> {doc.status}</p>
                            </div>
                         </div>
                       ))}
                     </div>
+                    
+                    {totalPendingPages > 1 && (
+                      <div className="flex justify-center items-center gap-4 mt-8">
+                         <button disabled={pendingPage === 1} onClick={()=>setPendingPage(p => p-1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
+                         <span className="text-[10px] font-black uppercase">Página {pendingPage} de {totalPendingPages}</span>
+                         <button disabled={pendingPage >= totalPendingPages} onClick={()=>setPendingPage(p => p+1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 flex flex-col max-h-[80vh]">
+                <div className="bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 flex flex-col max-h-[85vh]">
                    <div className="bg-slate-950 p-8 text-white flex justify-between items-center shrink-0">
                       <div className="flex items-center gap-8">
                         <div className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl ${preview.type === 'Plan R' ? 'bg-blue-600' : 'bg-emerald-600'}`}>{preview.type}</div>
@@ -235,40 +300,51 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                       <button onClick={()=>setPreview(null)} className="w-10 h-10 rounded-full hover:bg-red-500 transition-all flex items-center justify-center text-3xl font-thin">×</button>
                    </div>
                    <div className="p-8 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 text-center"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Encabezados Detectados</p><p className="text-3xl font-black text-slate-900 leading-none">{preview.mapped.length}</p></div>
-                         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 text-center"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Total Ítems a Procesar</p><p className="text-3xl font-black text-slate-900 leading-none">{preview.mapped.reduce((acc, d) => acc + d.items.length, 0)}</p></div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 text-center"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Encabezados</p><p className="text-3xl font-black text-slate-900 leading-none">{preview.mapped.length}</p></div>
+                         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 text-center"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Total Líneas</p><p className="text-3xl font-black text-slate-900 leading-none">{filteredPreviewItems.length}</p></div>
+                         <div className="lg:col-span-2 bg-slate-50 p-4 rounded-[2rem] border border-slate-100 flex items-center gap-4">
+                            <Icons.Search className="w-4 h-4 text-slate-300 ml-4" />
+                            <input type="text" placeholder="FILTRAR TABLA DE CARGUE..." value={previewSearch} onChange={e=>{setPreviewSearch(e.target.value); setPreviewPage(1);}} className="bg-transparent border-none outline-none font-black text-[10px] uppercase w-full" />
+                         </div>
                       </div>
 
-                      <div className="space-y-4">
-                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Desglose de Líneas de Carga</h5>
-                        <div className="bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-200 shadow-inner">
-                          <table className="w-full text-left text-[10px]">
-                            <thead className="bg-slate-200 text-slate-600 font-black uppercase tracking-widest">
-                              <tr>
-                                <th className="px-6 py-4">Placa</th>
-                                <th className="px-6 py-4">Articulo</th>
-                                <th className="px-6 py-4 text-center">Cant.</th>
-                                <th className="px-6 py-4">Ciudad / Destino</th>
+                      <div className="bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-200">
+                        <table className="w-full text-left text-[9px]">
+                          <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
+                            <tr>
+                              <th className="px-6 py-4">Documento / Placa</th>
+                              <th className="px-6 py-4">Articulo</th>
+                              <th className="px-6 py-4 text-center">Cant.</th>
+                              <th className="px-6 py-4">Nº Ped</th>
+                              <th className="px-6 py-4">Ciudad</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {paginatedPreviewItems.map((it: any, idx) => (
+                              <tr key={idx} className="hover:bg-white transition-all font-bold text-slate-600">
+                                <td className="px-6 py-3 font-black text-slate-900 uppercase">{it.docId} <span className="text-slate-300 mx-2">|</span> {it.docVehicle}</td>
+                                <td className="px-6 py-3 uppercase">{it.articleId}</td>
+                                <td className="px-6 py-3 text-center font-black">{it.expectedQty}</td>
+                                <td className="px-6 py-3 uppercase text-emerald-600">{it.orderNumber || 'S/I'}</td>
+                                <td className="px-6 py-3 uppercase truncate max-w-[150px]">{it.city}</td>
                               </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {preview.mapped.slice(0, 50).map(doc => doc.items.map((it, idx) => (
-                                <tr key={`${doc.id}-${idx}`} className="hover:bg-white transition-all font-bold text-slate-600">
-                                  <td className="px-6 py-3 font-black text-slate-900">{doc.vehicleData}</td>
-                                  <td className="px-6 py-3 uppercase">{it.articleId}</td>
-                                  <td className="px-6 py-3 text-center font-black">{it.expectedQty}</td>
-                                  <td className="px-6 py-3 uppercase text-emerald-600 truncate max-w-[150px]">{it.city}</td>
-                                </tr>
-                              ))).flat().slice(0, 100)}
-                            </tbody>
-                          </table>
-                        </div>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
+                      
+                      {totalPreviewPages > 1 && (
+                        <div className="flex justify-center items-center gap-6 mt-4">
+                           <button disabled={previewPage === 1} onClick={()=>setPreviewPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
+                           <span className="text-[10px] font-black uppercase">Pág {previewPage} de {totalPreviewPages}</span>
+                           <button disabled={previewPage >= totalPreviewPages} onClick={()=>setPreviewPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
+                        </div>
+                      )}
                    </div>
                    <div className="p-8 border-t bg-slate-50 flex gap-6 shrink-0">
-                      <button onClick={()=>setPreview(null)} className="flex-1 py-5 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all">Anular</button>
-                      <button onClick={()=>{onAddDocuments(preview.mapped); setPreview(null);}} className="flex-[2] py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-4 active:scale-95">Sincronizar M7</button>
+                      <button onClick={()=>setPreview(null)} className="flex-1 py-5 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all">Anular Cargue</button>
+                      <button onClick={()=>{onAddDocuments(preview.mapped); setPreview(null);}} className="flex-[2] py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-4 active:scale-95">Sincronizar M7 Global</button>
                    </div>
                 </div>
               )}
@@ -281,55 +357,63 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
       {selectedPendingDoc && (
         <div className="fixed inset-0 z-[600] bg-slate-950/98 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
-           <div className="bg-white w-full max-w-[95vw] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-white/5">
+           <div className="bg-white w-full max-w-[98vw] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white/5">
               <div className="bg-slate-900 p-10 text-white flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-8">
                     <div className="w-16 h-16 bg-emerald-500 rounded-[1.8rem] flex items-center justify-center text-slate-950 shadow-2xl"><Icons.Audit /></div>
                     <div>
                       <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Expediente M7: {selectedPendingDoc.externalDocId}</h3>
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-2">AUDITORÍA DE CARGA</p>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-2">AUDITORÍA INTEGRAL DE CARGA</p>
                     </div>
                  </div>
                  <button onClick={()=>setSelectedPendingDoc(null)} className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
               </div>
               
-              <div className="p-12 overflow-y-auto space-y-12 custom-scrollbar flex-1 bg-slate-50/20">
-                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                    <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Unidad</p><p className="font-black text-slate-900 text-lg uppercase">{selectedPendingDoc.vehicleData}</p></div>
-                    <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Ciudad Base</p><p className="font-black text-slate-900 text-lg uppercase truncate">{selectedPendingDoc.city}</p></div>
-                    <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Operador</p><p className="font-black text-slate-900 text-lg uppercase truncate">{selectedPendingDoc.createdBy}</p></div>
-                    <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Plan</p><p className="font-black text-blue-600 text-lg uppercase">{selectedPendingDoc.planType}</p></div>
-                    <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Fecha</p><p className="font-black text-slate-900 text-lg uppercase">{new Date(selectedPendingDoc.createdAt).toLocaleDateString()}</p></div>
+              <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar flex-1 bg-slate-50/20">
+                 {/* ENCABEZADO SOLICITADO */}
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">CodPlan</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.codplan || 'S/I'}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.deliveryDate || 'S/I'}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Placa</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.vehicleData}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Documento L</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.externalDocId}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Cargue</p><p className="font-black text-slate-900 text-xs uppercase">{new Date(selectedPendingDoc.createdAt).toLocaleDateString()}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Usuario Cargue</p><p className="font-black text-slate-900 text-xs uppercase truncate">{selectedPendingDoc.createdBy}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Estado</p><p className="font-black text-emerald-600 text-xs uppercase">{selectedPendingDoc.status}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Inventario</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.inventoryDate ? new Date(selectedPendingDoc.inventoryDate).toLocaleDateString() : 'PENDIENTE'}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Usuario Inventario</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.inventoryUser || 'S/A'}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p><p className="font-black text-slate-900 text-[10px] uppercase truncate">{selectedPendingDoc.inventoryNotes || 'S/O'}</p></div>
                  </div>
 
                  <div className="space-y-6">
-                    <div className="flex items-center gap-4"><h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Detalle de Líneas de Carga</h4><div className="h-[2px] flex-1 bg-slate-100"></div></div>
+                    <div className="flex items-center gap-4"><h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Detalle de Líneas de Carga M7</h4><div className="h-[2px] flex-1 bg-slate-100"></div></div>
                     <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-100">
                        <div className="overflow-x-auto">
                           <table className="w-full text-left">
                              <thead className="bg-slate-900 text-white font-black uppercase text-[8px] tracking-widest">
                                 <tr>
                                    <th className="px-6 py-5">Articulo</th>
-                                   <th className="px-6 py-5 text-center">Cant.</th>
-                                   <th className="px-6 py-5 text-center">Volumen</th>
-                                   <th className="px-6 py-5 text-center">UM</th>
-                                   <th className="px-6 py-5">Ciudad</th>
+                                   <th className="px-6 py-5 text-center">Cant. Exp</th>
+                                   <th className="px-6 py-5 text-center">Cant 1</th>
+                                   <th className="px-6 py-5 text-center">Cant 2</th>
+                                   <th className="px-6 py-5">Nº Ped</th>
+                                   <th className="px-6 py-5">UM</th>
                                    <th className="px-6 py-5">Factura</th>
-                                   <th className="px-6 py-5">Dirección</th>
-                                   <th className="px-6 py-5">Observación</th>
+                                   <th className="px-6 py-5">Ciudad</th>
+                                   <th className="px-6 py-5">Notas Inv.</th>
                                 </tr>
                              </thead>
                              <tbody className="divide-y divide-slate-100">
                                 {selectedPendingDoc.items.map((it, idx) => (
-                                   <tr key={idx} className="hover:bg-slate-50 transition-all text-[10px] font-bold text-slate-600">
+                                   <tr key={idx} className="hover:bg-slate-50 transition-all text-[9px] font-bold text-slate-600">
                                       <td className="px-6 py-5 font-black text-slate-900 uppercase">{it.articleId}</td>
-                                      <td className="px-6 py-5 text-center font-black text-slate-900">{it.expectedQty}</td>
-                                      <td className="px-6 py-5 text-center">{it.volume || '0'}</td>
+                                      <td className="px-6 py-5 text-center font-black text-slate-900 bg-slate-50">{it.expectedQty}</td>
+                                      <td className="px-6 py-5 text-center font-black text-blue-600">{it.count1 || 0}</td>
+                                      <td className="px-6 py-5 text-center font-black text-amber-600">{it.count2 || it.countedQty || 0}</td>
+                                      <td className="px-6 py-5 text-emerald-600 font-black uppercase">{it.orderNumber || 'S/I'}</td>
                                       <td className="px-6 py-5 text-center">{it.unit || 'UND'}</td>
-                                      <td className="px-6 py-5 font-black text-emerald-600 uppercase">{it.city}</td>
-                                      <td className="px-6 py-5 uppercase">{it.invoice || 'N/A'}</td>
-                                      <td className="px-6 py-5 uppercase truncate max-w-[150px]">{it.address}</td>
-                                      <td className="px-6 py-5 uppercase truncate max-w-[150px]">{it.observation}</td>
+                                      <td className="px-6 py-5 uppercase truncate max-w-[100px]">{it.invoice || 'N/A'}</td>
+                                      <td className="px-6 py-5 uppercase font-black text-slate-800">{it.city}</td>
+                                      <td className="px-6 py-5 uppercase truncate max-w-[150px] italic text-slate-400">{it.inventoryNote || 'S/N'}</td>
                                    </tr>
                                 ))}
                              </tbody>
@@ -339,7 +423,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                  </div>
               </div>
 
-              <div className="p-10 border-t bg-white flex justify-end shrink-0"><button onClick={()=>setSelectedPendingDoc(null)} className="px-12 py-5 bg-slate-900 text-white rounded-[1.8rem] font-black text-xs uppercase hover:bg-emerald-600 transition-all shadow-xl">Cerrar Expediente</button></div>
+              <div className="p-10 border-t bg-white flex justify-end shrink-0"><button onClick={()=>setSelectedPendingDoc(null)} className="px-12 py-5 bg-slate-900 text-white rounded-[1.8rem] font-black text-xs uppercase hover:bg-emerald-600 transition-all shadow-xl">Cerrar Auditoría</button></div>
            </div>
         </div>
       )}
