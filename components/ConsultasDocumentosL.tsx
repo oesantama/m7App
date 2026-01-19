@@ -140,16 +140,15 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                  <button onClick={() => setSelectedDoc(null)} className="text-4xl font-thin hover:text-red-500 transition-all">×</button>
               </div>
               <div className="p-10 md:p-14 overflow-y-auto space-y-10 custom-scrollbar bg-slate-50/20 flex-1">
-                 {/* ENCABEZADO SOLICITADO HISTORICO */}
                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">CodPlan</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.codplan || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.deliveryDate || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Placa</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.vehicleData}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Documento L</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.externalDocId}</p></div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Cargue</p><p className="font-black text-slate-900 text-[10px] uppercase">{new Date(selectedDoc.createdAt).toLocaleDateString()}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Cargue</p><p className="font-black text-slate-900 text-[10px] uppercase">{new Date(selectedDoc.createdAt).toLocaleDateString('es-CO')}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Usuario Cargue</p><p className="font-black text-slate-900 text-[10px] uppercase truncate">{selectedDoc.createdBy}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Estado</p><p className="font-black text-emerald-600 text-[10px] uppercase">{selectedDoc.status}</p></div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Inventario</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.inventoryDate ? new Date(selectedDoc.inventoryDate).toLocaleDateString() : 'N/A'}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Inventario</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.inventoryDate ? new Date(selectedDoc.inventoryDate).toLocaleDateString('es-CO') : 'N/A'}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Usuario Inventario</p><p className="font-black text-slate-900 text-[10px] uppercase truncate">{selectedDoc.inventoryUser || selectedDoc.updatedBy}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p><p className="font-black text-slate-900 text-[10px] uppercase truncate">{selectedDoc.inventoryNotes || 'S/O'}</p></div>
                  </div>
@@ -160,11 +159,11 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                         <tr>
                           <th className="p-6">Articulo / SKU</th>
                           <th className="p-6 text-center">Nº Ped</th>
-                          <th className="p-6 text-center">Esperado</th>
-                          <th className="p-6 text-center">Cont 1</th>
-                          <th className="p-6 text-center">Cont 2</th>
+                          <th className="p-6 text-center">Cant. Exp</th>
+                          <th className="p-6 text-center">UM</th>
+                          <th className="p-6 text-center">Vol. Total</th>
+                          <th className="p-6 text-center">Vol. Unit</th>
                           <th className="p-6">Notas Inv.</th>
-                          <th className="p-6 text-center">Estado</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold">
@@ -172,15 +171,11 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                           <tr key={idx} className="hover:bg-slate-50 transition-colors">
                             <td className="p-6 font-black uppercase text-slate-800 tracking-tight">{it.articleId}</td>
                             <td className="p-6 text-center text-emerald-600 font-black">{it.orderNumber || 'S/I'}</td>
-                            <td className="p-6 text-center text-slate-400">{it.expectedQty}</td>
-                            <td className="p-6 text-center text-blue-600 font-black">{it.count1 || 0}</td>
-                            <td className="p-6 text-center text-amber-600 font-black">{it.count2 || it.countedQty || 0}</td>
+                            <td className="p-6 text-center text-slate-900">{it.expectedQty}</td>
+                            <td className="p-6 text-center text-blue-600 font-black">{it.unit || 'und'}</td>
+                            <td className="p-6 text-center">{it.volume || '0'}</td>
+                            <td className="p-6 text-center text-slate-400 italic">{it.unitVolume || '0'}</td>
                             <td className="p-6 text-[9px] uppercase italic text-slate-400 truncate max-w-[150px]">{it.inventoryNote || 'S/N'}</td>
-                            <td className="p-6 text-center">
-                              <span className={`px-4 py-1 rounded-xl text-[8px] font-black uppercase ${it.countedQty === it.expectedQty ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-                                {it.countedQty === it.expectedQty ? 'OK' : 'NOV'}
-                              </span>
-                            </td>
                           </tr>
                         ))}
                       </tbody>

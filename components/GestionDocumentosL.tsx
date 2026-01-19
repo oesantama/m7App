@@ -18,15 +18,23 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [preview, setPreview] = useState<{ fileName: string; mapped: DocumentL[]; type: string } | null>(null);
   const [selectedPendingDoc, setSelectedPendingDoc] = useState<DocumentL | null>(null);
 
-  // Estados para búsqueda y paginación de Pendientes
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingPage, setPendingPage] = useState(1);
   const itemsPerPage = 6;
 
-  // Estados para búsqueda y paginación de la Previsualización
   const [previewSearch, setPreviewSearch] = useState('');
   const [previewPage, setPreviewPage] = useState(1);
   const previewItemsPerPage = 10;
+
+  // Utilidad para convertir fechas de serie de Excel (45967.65 -> 19/01/2026)
+  const formatExcelDate = (val: any): string => {
+    if (!val) return 'S/I';
+    if (typeof val === 'number') {
+      const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+      return date.toLocaleDateString('es-CO');
+    }
+    return String(val).trim();
+  };
 
   const pendingDocs = useMemo(() => {
     const list = documents.filter(d => d.statusId === 'EST-03' || d.status === DocStatus.PENDING);
@@ -74,10 +82,19 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         }
 
         const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
+        
+        // Buscador de índices con prioridad de coincidencia exacta para evitar confusiones UM / Volumen
         const findIdx = (terms: string[]) => headers.findIndex(h => {
           if (!h) return false;
           const hLower = h.toLowerCase().trim();
-          return terms.some(t => hLower === t.toLowerCase().trim() || hLower.includes(t.toLowerCase().trim()));
+          // Prioridad exacta
+          if (terms.some(t => hLower === t.toLowerCase().trim())) return true;
+          // Inclusión (solo si no es conflicto con UM)
+          return terms.some(t => {
+            const tLower = t.toLowerCase().trim();
+            if (tLower === 'um' && (hLower.includes('volume') || hLower.includes('volum'))) return false;
+            return hLower.includes(tLower);
+          });
         });
 
         const iCodPlan = type === 'Plan Normal' ? findIdx(['un orig', 'cod plan']) : findIdx(['un', 'cod plan']);
@@ -86,7 +103,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iFechaEnvio = findIdx(['ship date', 'fecha envio', 'fecha despacho']);
         const iArticulo = type === 'Plan Normal' ? findIdx(['articulo']) : findIdx(['item']);
         const iCant = findIdx(['cant env', 'cantidad']);
-        const iVol = type === 'Plan Normal' ? findIdx(['total volume']) : findIdx(['volumen']);
+        const iVolTotal = findIdx(['total volume']);
+        const iVolUnidad = findIdx(['volumen']);
         const iUnd = findIdx(['um', 'und', 'unid']);
         const iFactura = findIdx(['remision/transferencia', 'factura']);
         const iCiudad = type === 'Plan Normal' ? findIdx(['destino', 'ciudad']) : findIdx(['ciudad']);
@@ -105,10 +123,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
           const placa = val(iPlaca);
           const carga = val(iCarga);
-          
           if (!placa && !carga) return;
 
-          // VALIDACIÓN DE DUPLICADOS EN BASE
           const isDuplicateInSystem = documents.some(d => d.vehicleData === placa && d.externalDocId === carga);
           if (isDuplicateInSystem) {
             const dupKey = `${placa}-${carga}`;
@@ -125,7 +141,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               carga: carga || 'S/C',
               city: val(iCiudad) || 'S/D',
               address: val(iDir) || 'S/D',
-              deliveryDate: val(iFechaEnvio),
+              deliveryDate: formatExcelDate(row[iFechaEnvio]),
               items: [] 
             });
           }
@@ -138,20 +154,21 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               expectedQty: Number(val(iCant).replace(/[^0-9.]/g, '') || 0),
               countedQty: 0,
               status: 'Pending',
-              volume: val(iVol),
+              volume: val(iVolTotal),
+              unitVolume: val(iVolUnidad),
               unit: val(iUnd),
               invoice: val(iFactura),
               city: val(iCiudad),
               address: val(iDir),
               observation: val(iObs),
-              deliveryDate: val(iFechaEnvio),
+              deliveryDate: formatExcelDate(row[iFechaEnvio]),
               orderNumber: val(iPed)
             });
           }
         });
 
         if (duplicatesFound.length > 0) {
-          alert(`M7 ALERTA: No se pudieron cargar ${duplicatesFound.length} documentos porque ya existen en el sistema (Duplicidad Placa/Carga detectada).\n\nConflictos: ${duplicatesFound.join(', ')}.\n\nPor favor valide en el Historial M7 para identificar quién y cuándo realizó el cargue previo.`);
+          alert(`M7 ALERTA: Duplicidad detectada en ${duplicatesFound.length} documentos. Revise el historial.`);
           if (docsMap.size === 0) return; 
         }
 
@@ -175,23 +192,18 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           statusId: 'EST-03' 
         }));
 
-        if (mapped.length === 0) {
-          alert("No se encontraron datos nuevos procesables.");
-        } else {
-          setPreview({ fileName: file.name, mapped, type });
-          setPreviewPage(1);
-          setPreviewSearch('');
-        }
+        setPreview({ fileName: file.name, mapped, type });
+        setPreviewPage(1);
+        setPreviewSearch('');
       } catch (err) {
         console.error("M7 Error:", err);
-        alert("Fallo crítico en lectura de Excel.");
+        alert("Fallo en lectura de Excel.");
       }
       e.target.value = '';
     };
     reader.readAsArrayBuffer(file);
   };
 
-  // Filtrado y paginación para la previsualización
   const filteredPreviewItems = useMemo(() => {
     if (!preview) return [];
     const allItems = preview.mapped.flatMap(doc => doc.items.map(it => ({ ...it, docId: doc.externalDocId, docVehicle: doc.vehicleData })));
@@ -280,14 +292,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                         </div>
                       ))}
                     </div>
-                    
-                    {totalPendingPages > 1 && (
-                      <div className="flex justify-center items-center gap-4 mt-8">
-                         <button disabled={pendingPage === 1} onClick={()=>setPendingPage(p => p-1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
-                         <span className="text-[10px] font-black uppercase">Página {pendingPage} de {totalPendingPages}</span>
-                         <button disabled={pendingPage >= totalPendingPages} onClick={()=>setPendingPage(p => p+1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
-                      </div>
-                    )}
                   </div>
                 </div>
               ) : (
@@ -300,15 +304,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                       <button onClick={()=>setPreview(null)} className="w-10 h-10 rounded-full hover:bg-red-500 transition-all flex items-center justify-center text-3xl font-thin">×</button>
                    </div>
                    <div className="p-8 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 text-center"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Encabezados</p><p className="text-3xl font-black text-slate-900 leading-none">{preview.mapped.length}</p></div>
-                         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 text-center"><p className="text-[9px] font-black text-slate-400 uppercase mb-2">Total Líneas</p><p className="text-3xl font-black text-slate-900 leading-none">{filteredPreviewItems.length}</p></div>
-                         <div className="lg:col-span-2 bg-slate-50 p-4 rounded-[2rem] border border-slate-100 flex items-center gap-4">
-                            <Icons.Search className="w-4 h-4 text-slate-300 ml-4" />
-                            <input type="text" placeholder="FILTRAR TABLA DE CARGUE..." value={previewSearch} onChange={e=>{setPreviewSearch(e.target.value); setPreviewPage(1);}} className="bg-transparent border-none outline-none font-black text-[10px] uppercase w-full" />
-                         </div>
-                      </div>
-
                       <div className="bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-200">
                         <table className="w-full text-left text-[9px]">
                           <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
@@ -317,7 +312,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                               <th className="px-6 py-4">Articulo</th>
                               <th className="px-6 py-4 text-center">Cant.</th>
                               <th className="px-6 py-4">Nº Ped</th>
-                              <th className="px-6 py-4">Ciudad</th>
+                              <th className="px-6 py-4">UM</th>
+                              <th className="px-6 py-4">Vol. Total</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -327,24 +323,17 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                 <td className="px-6 py-3 uppercase">{it.articleId}</td>
                                 <td className="px-6 py-3 text-center font-black">{it.expectedQty}</td>
                                 <td className="px-6 py-3 uppercase text-emerald-600">{it.orderNumber || 'S/I'}</td>
-                                <td className="px-6 py-3 uppercase truncate max-w-[150px]">{it.city}</td>
+                                <td className="px-6 py-3 text-blue-600 font-black">{it.unit || 'und'}</td>
+                                <td className="px-6 py-3">{it.volume || '0'}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
-                      
-                      {totalPreviewPages > 1 && (
-                        <div className="flex justify-center items-center gap-6 mt-4">
-                           <button disabled={previewPage === 1} onClick={()=>setPreviewPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
-                           <span className="text-[10px] font-black uppercase">Pág {previewPage} de {totalPreviewPages}</span>
-                           <button disabled={previewPage >= totalPreviewPages} onClick={()=>setPreviewPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
-                        </div>
-                      )}
                    </div>
                    <div className="p-8 border-t bg-slate-50 flex gap-6 shrink-0">
-                      <button onClick={()=>setPreview(null)} className="flex-1 py-5 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all">Anular Cargue</button>
-                      <button onClick={()=>{onAddDocuments(preview.mapped); setPreview(null);}} className="flex-[2] py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-4 active:scale-95">Sincronizar M7 Global</button>
+                      <button onClick={()=>setPreview(null)} className="flex-1 py-5 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all">Anular</button>
+                      <button onClick={()=>{onAddDocuments(preview.mapped); setPreview(null);}} className="flex-[2] py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-4 active:scale-95">Sincronizar</button>
                    </div>
                 </div>
               )}
@@ -370,16 +359,15 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               </div>
               
               <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar flex-1 bg-slate-50/20">
-                 {/* ENCABEZADO SOLICITADO */}
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">CodPlan</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.codplan || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.deliveryDate || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Placa</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.vehicleData}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Documento L</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.externalDocId}</p></div>
-                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Cargue</p><p className="font-black text-slate-900 text-xs uppercase">{new Date(selectedPendingDoc.createdAt).toLocaleDateString()}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Cargue</p><p className="font-black text-slate-900 text-xs uppercase">{new Date(selectedPendingDoc.createdAt).toLocaleDateString('es-CO')}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Usuario Cargue</p><p className="font-black text-slate-900 text-xs uppercase truncate">{selectedPendingDoc.createdBy}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Estado</p><p className="font-black text-emerald-600 text-xs uppercase">{selectedPendingDoc.status}</p></div>
-                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Inventario</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.inventoryDate ? new Date(selectedPendingDoc.inventoryDate).toLocaleDateString() : 'PENDIENTE'}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Inventario</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.inventoryDate ? new Date(selectedPendingDoc.inventoryDate).toLocaleDateString('es-CO') : 'PENDIENTE'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Usuario Inventario</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.inventoryUser || 'S/A'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p><p className="font-black text-slate-900 text-[10px] uppercase truncate">{selectedPendingDoc.inventoryNotes || 'S/O'}</p></div>
                  </div>
@@ -397,9 +385,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                    <th className="px-6 py-5 text-center">Cant 2</th>
                                    <th className="px-6 py-5">Nº Ped</th>
                                    <th className="px-6 py-5">UM</th>
+                                   <th className="px-6 py-5">Volumen Total</th>
+                                   <th className="px-6 py-5">Vol. Unidad</th>
                                    <th className="px-6 py-5">Factura</th>
                                    <th className="px-6 py-5">Ciudad</th>
-                                   <th className="px-6 py-5">Notas Inv.</th>
                                 </tr>
                              </thead>
                              <tbody className="divide-y divide-slate-100">
@@ -410,10 +399,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                       <td className="px-6 py-5 text-center font-black text-blue-600">{it.count1 || 0}</td>
                                       <td className="px-6 py-5 text-center font-black text-amber-600">{it.count2 || it.countedQty || 0}</td>
                                       <td className="px-6 py-5 text-emerald-600 font-black uppercase">{it.orderNumber || 'S/I'}</td>
-                                      <td className="px-6 py-5 text-center">{it.unit || 'UND'}</td>
+                                      <td className="px-6 py-5 font-black text-slate-900">{it.unit || 'und'}</td>
+                                      <td className="px-6 py-5">{it.volume || '0'}</td>
+                                      <td className="px-6 py-5 text-slate-400 italic">{it.unitVolume || '0'}</td>
                                       <td className="px-6 py-5 uppercase truncate max-w-[100px]">{it.invoice || 'N/A'}</td>
                                       <td className="px-6 py-5 uppercase font-black text-slate-800">{it.city}</td>
-                                      <td className="px-6 py-5 uppercase truncate max-w-[150px] italic text-slate-400">{it.inventoryNote || 'S/N'}</td>
                                    </tr>
                                 ))}
                              </tbody>

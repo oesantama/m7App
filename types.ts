@@ -145,6 +145,7 @@ export interface DocumentLItem {
   novedad?: string;
   status: 'Pending' | 'Matches' | 'Mismatch' | 'OK' | 'Novedad';
   volume?: string;
+  unitVolume?: string;
   unit?: string;
   detail?: string;
   deliveryDate?: string;
