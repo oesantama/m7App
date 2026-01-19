@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Icons } from '../constants';
 import { DocumentL, User, DocStatus, MasterRecord, Invoice } from '../types';
+import * as XLSX from 'xlsx';
 
 interface ConsultasDocumentosLProps {
   documents: DocumentL[];
@@ -24,6 +25,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [selectedDoc, setSelectedDoc] = useState<DocumentL | null>(null);
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Utilidad para exportar a Excel
+  const exportToExcel = (data: any[], fileName: string) => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "M7_Historial");
+    XLSX.writeFile(wb, `${fileName}_${new Date().getTime()}.xlsx`);
+  };
 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc => {
@@ -69,7 +78,6 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       {/* PANEL DE FILTROS OPTIMIZADO */}
       <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-slate-100 space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Fila 1 */}
           <div className="space-y-1">
             <label className={labelClass}>Placa</label>
             <input type="text" placeholder="PLACA..." value={filters.plate} onChange={e => {setFilters({...filters, plate: e.target.value}); setCurrentPage(1);}} className={inputClass} />
@@ -79,8 +87,8 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
             <input type="text" placeholder="DOCUMENTO L..." value={filters.docL} onChange={e => {setFilters({...filters, docL: e.target.value}); setCurrentPage(1);}} className={inputClass} />
           </div>
           <div className="space-y-1">
-            <label className={labelClass}>CodPlan</label>
-            <input type="text" placeholder="CODPLAN..." value={filters.codplan} onChange={e => {setFilters({...filters, codplan: e.target.value}); setCurrentPage(1);}} className={inputClass} />
+            <label className={labelClass}>UN Orig</label>
+            <input type="text" placeholder="UN ORIG..." value={filters.codplan} onChange={e => {setFilters({...filters, codplan: e.target.value}); setCurrentPage(1);}} className={inputClass} />
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Tipo Operación</label>
@@ -90,8 +98,6 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
               <option value="Plan R">PLAN R</option>
             </select>
           </div>
-
-          {/* Fila 2 */}
           <div className="space-y-1">
             <label className={labelClass}>Estado</label>
             <select value={filters.status} onChange={e => {setFilters({...filters, status: e.target.value}); setCurrentPage(1);}} className={inputClass}>
@@ -113,7 +119,10 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           </div>
         </div>
 
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end gap-4 pt-2">
+          <button onClick={() => exportToExcel(filteredDocs.map(d => ({ DocumentoL: d.externalDocId, UNOrig: d.codplan, Placa: d.vehicleData, FEnvio: d.deliveryDate, Status: d.status })), "M7_Historial")} className="px-10 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 shadow-xl transition-all flex items-center gap-3">
+             <Icons.Excel /> Exportar Excel
+          </button>
           <button onClick={clearFilters} className="px-10 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all active:scale-95 flex items-center gap-3">
              <Icons.X /> Limpiar Filtros
           </button>
@@ -144,7 +153,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
             <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px]">
               <tr>
                 <th className="p-8">Documento / Placa</th>
-                <th className="p-8">CodPlan</th>
+                <th className="p-8">UN Orig</th>
                 <th className="p-8">F. Envío</th>
                 <th className="p-8 text-center">Estado</th>
                 <th className="p-8 text-right">Acción</th>
@@ -184,11 +193,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                       <p className="text-[9px] font-black text-slate-500 uppercase mt-2">Detalle Histórico Global</p>
                     </div>
                  </div>
-                 <button onClick={() => setSelectedDoc(null)} className="text-4xl font-thin hover:text-red-500 transition-all">×</button>
+                 <div className="flex items-center gap-4">
+                    <button onClick={() => exportToExcel(selectedDoc.items, `M7_Hist_Detalle_${selectedDoc.externalDocId}`)} className="px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-all flex items-center gap-2 font-black text-[10px] uppercase"><Icons.Excel /> Exportar</button>
+                    <button onClick={() => setSelectedDoc(null)} className="text-4xl font-thin hover:text-red-500 transition-all">×</button>
+                 </div>
               </div>
               <div className="p-10 md:p-14 overflow-y-auto space-y-10 custom-scrollbar bg-slate-50/20 flex-1">
                  <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">CodPlan</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.codplan || 'S/I'}</p></div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">UN Orig</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.codplan || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.deliveryDate || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Placa</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.vehicleData}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Documento L</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.externalDocId}</p></div>

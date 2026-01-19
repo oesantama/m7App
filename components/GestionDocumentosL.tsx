@@ -26,7 +26,14 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [previewPage, setPreviewPage] = useState(1);
   const previewItemsPerPage = 10;
 
-  // Utilidad para convertir fechas de serie de Excel (45967.65 -> 19/01/2026)
+  // Utilidad para exportar a Excel
+  const exportToExcel = (data: any[], fileName: string) => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "M7_Datos");
+    XLSX.writeFile(wb, `${fileName}_${new Date().getTime()}.xlsx`);
+  };
+
   const formatExcelDate = (val: any): string => {
     if (!val) return 'S/I';
     if (typeof val === 'number') {
@@ -82,14 +89,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         }
 
         const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
-        
-        // Buscador de índices con prioridad de coincidencia exacta para evitar confusiones UM / Volumen
         const findIdx = (terms: string[]) => headers.findIndex(h => {
           if (!h) return false;
           const hLower = h.toLowerCase().trim();
-          // Prioridad exacta
           if (terms.some(t => hLower === t.toLowerCase().trim())) return true;
-          // Inclusión (solo si no es conflicto con UM)
           return terms.some(t => {
             const tLower = t.toLowerCase().trim();
             if (tLower === 'um' && (hLower.includes('volume') || hLower.includes('volum'))) return false;
@@ -115,8 +118,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const dataRows = rawData.slice(headerRowIndex + 1);
         const docsMap = new Map<string, { codplan: string, placa: string, carga: string, city: string, address: string, deliveryDate: string, items: DocumentLItem[] }>();
 
-        let duplicatesFound: string[] = [];
-
         dataRows.forEach((row) => {
           if (!row || row.length === 0 || row.every(c => c === '')) return;
           const val = (idx: number) => idx !== -1 ? String(row[idx] || '').trim() : '';
@@ -124,13 +125,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           const placa = val(iPlaca);
           const carga = val(iCarga);
           if (!placa && !carga) return;
-
-          const isDuplicateInSystem = documents.some(d => d.vehicleData === placa && d.externalDocId === carga);
-          if (isDuplicateInSystem) {
-            const dupKey = `${placa}-${carga}`;
-            if (!duplicatesFound.includes(dupKey)) duplicatesFound.push(dupKey);
-            return;
-          }
 
           const groupKey = `${placa || 'S/A'}-${carga || 'S/C'}`;
 
@@ -167,11 +161,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           }
         });
 
-        if (duplicatesFound.length > 0) {
-          alert(`M7 ALERTA: Duplicidad detectada en ${duplicatesFound.length} documentos. Revise el historial.`);
-          if (docsMap.size === 0) return; 
-        }
-
         const mapped: DocumentL[] = Array.from(docsMap.entries()).map(([key, data]) => ({
           id: `doc-${Date.now()}-${key}`,
           clientId: user.clientId,
@@ -196,7 +185,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         setPreviewPage(1);
         setPreviewSearch('');
       } catch (err) {
-        console.error("M7 Error:", err);
         alert("Fallo en lectura de Excel.");
       }
       e.target.value = '';
@@ -269,9 +257,12 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                   <div className="space-y-8">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] shrink-0">Pendientes por Auditoría ({pendingDocs.length})</h4>
-                       <div className="flex-1 bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3">
-                         <Icons.Search className="w-3 h-3 text-slate-300" />
-                         <input type="text" placeholder="BUSCAR PENDIENTES..." value={searchTerm} onChange={e=>{setSearchTerm(e.target.value); setPendingPage(1);}} className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full" />
+                       <div className="flex items-center gap-4">
+                          <button onClick={() => exportToExcel(pendingDocs.map(d => ({ DocumentoL: d.externalDocId, UNOrig: d.codplan, Placa: d.vehicleData, Ciudad: d.city, Status: d.status })), "M7_Pendientes")} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Excel /></button>
+                          <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3">
+                            <Icons.Search className="w-3 h-3 text-slate-300" />
+                            <input type="text" placeholder="BUSCAR PENDIENTES..." value={searchTerm} onChange={e=>{setSearchTerm(e.target.value); setPendingPage(1);}} className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full" />
+                          </div>
                        </div>
                     </div>
                     
@@ -284,7 +275,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                            </div>
                            <h5 className="text-base font-black text-slate-900 uppercase mb-1 tracking-tighter truncate">{doc.externalDocId}</h5>
                            <div className="space-y-2 mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-                              <p><span className="text-slate-900">CODPLAN:</span> {doc.codplan || 'S/I'}</p>
+                              <p><span className="text-slate-900">UN ORIG:</span> {doc.codplan || 'S/I'}</p>
                               <p><span className="text-slate-900">PLACA:</span> {doc.vehicleData}</p>
                               <p><span className="text-slate-900">CARGUE:</span> {new Date(doc.createdAt).toLocaleDateString()}</p>
                               <p><span className="text-slate-900">ESTADO:</span> {doc.status}</p>
@@ -292,6 +283,14 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                         </div>
                       ))}
                     </div>
+
+                    {totalPendingPages > 1 && (
+                      <div className="flex justify-center items-center gap-4 mt-8">
+                         <button disabled={pendingPage === 1} onClick={()=>setPendingPage(p => p-1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
+                         <span className="text-[10px] font-black uppercase">Pág {pendingPage} de {totalPendingPages}</span>
+                         <button disabled={pendingPage >= totalPendingPages} onClick={()=>setPendingPage(p => p+1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -301,9 +300,18 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                         <div className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl ${preview.type === 'Plan R' ? 'bg-blue-600' : 'bg-emerald-600'}`}>{preview.type}</div>
                         <div><h4 className="font-black uppercase text-2xl tracking-tighter leading-none">Pre-Validación M7</h4><p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2">{preview.fileName}</p></div>
                       </div>
-                      <button onClick={()=>setPreview(null)} className="w-10 h-10 rounded-full hover:bg-red-500 transition-all flex items-center justify-center text-3xl font-thin">×</button>
+                      <div className="flex items-center gap-4">
+                         <button onClick={() => exportToExcel(filteredPreviewItems, "M7_Prevalidacion")} className="p-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-all"><Icons.Excel /></button>
+                         <button onClick={()=>setPreview(null)} className="w-10 h-10 rounded-full hover:bg-red-500 transition-all flex items-center justify-center text-3xl font-thin">×</button>
+                      </div>
                    </div>
                    <div className="p-8 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
+                      <div className="flex justify-between items-center">
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3 flex-1 max-w-md">
+                          <Icons.Search className="w-3 h-3 text-slate-300" />
+                          <input type="text" placeholder="FILTRAR PRE-VALIDACIÓN..." value={previewSearch} onChange={e => {setPreviewSearch(e.target.value); setPreviewPage(1);}} className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full" />
+                        </div>
+                      </div>
                       <div className="bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-200">
                         <table className="w-full text-left text-[9px]">
                           <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
@@ -330,6 +338,13 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                           </tbody>
                         </table>
                       </div>
+                      {totalPreviewPages > 1 && (
+                        <div className="flex justify-center items-center gap-4 mt-4">
+                           <button disabled={previewPage === 1} onClick={()=>setPreviewPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
+                           <span className="text-[10px] font-black uppercase">Pág {previewPage} de {totalPreviewPages}</span>
+                           <button disabled={previewPage >= totalPreviewPages} onClick={()=>setPreviewPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
+                        </div>
+                      )}
                    </div>
                    <div className="p-8 border-t bg-slate-50 flex gap-6 shrink-0">
                       <button onClick={()=>setPreview(null)} className="flex-1 py-5 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all">Anular</button>
@@ -355,12 +370,15 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-2">AUDITORÍA INTEGRAL DE CARGA</p>
                     </div>
                  </div>
-                 <button onClick={()=>setSelectedPendingDoc(null)} className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
+                 <div className="flex items-center gap-4">
+                    <button onClick={() => exportToExcel(selectedPendingDoc.items, `M7_Detalles_${selectedPendingDoc.externalDocId}`)} className="px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-all flex items-center gap-2 font-black text-[10px] uppercase"><Icons.Excel /> Exportar</button>
+                    <button onClick={()=>setSelectedPendingDoc(null)} className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
+                 </div>
               </div>
               
               <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar flex-1 bg-slate-50/20">
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">CodPlan</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.codplan || 'S/I'}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">UN Orig</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.codplan || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.deliveryDate || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Placa</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.vehicleData}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Documento L</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.externalDocId}</p></div>
@@ -400,8 +418,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                       <td className="px-6 py-5 text-center font-black text-amber-600">{it.count2 || it.countedQty || 0}</td>
                                       <td className="px-6 py-5 text-emerald-600 font-black uppercase">{it.orderNumber || 'S/I'}</td>
                                       <td className="px-6 py-5 font-black text-slate-900">{it.unit || 'und'}</td>
-                                      <td className="px-6 py-5">{it.volume || '0'}</td>
-                                      <td className="px-6 py-5 text-slate-400 italic">{it.unitVolume || '0'}</td>
+                                      <td className="px-6 py-3">{it.volume || '0'}</td>
+                                      <td className="px-6 py-3 text-slate-400 italic">{it.unitVolume || '0'}</td>
                                       <td className="px-6 py-5 uppercase truncate max-w-[100px]">{it.invoice || 'N/A'}</td>
                                       <td className="px-6 py-5 uppercase font-black text-slate-800">{it.city}</td>
                                    </tr>
