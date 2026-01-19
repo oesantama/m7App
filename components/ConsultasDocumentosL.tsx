@@ -12,8 +12,14 @@ interface ConsultasDocumentosLProps {
 
 const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, invoices, user, masterEstados }) => {
   const [filters, setFilters] = useState({ 
-    plate: '', docL: '', status: '', planType: '', 
-    dateCargueFrom: '', dateCargueTo: '' 
+    plate: '', 
+    docL: '', 
+    codplan: '',
+    status: '', 
+    planType: '', 
+    deliveryDate: '', 
+    cargueDate: '',
+    inventoryDate: ''
   });
   const [selectedDoc, setSelectedDoc] = useState<DocumentL | null>(null);
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
@@ -23,14 +29,19 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     return documents.filter(doc => {
       const matchPlaca = !filters.plate || (doc.vehicleData || '').toLowerCase().includes(filters.plate.toLowerCase());
       const matchDocL = !filters.docL || doc.externalDocId.toLowerCase().includes(filters.docL.toLowerCase());
+      const matchCodPlan = !filters.codplan || (doc.codplan || '').toLowerCase().includes(filters.codplan.toLowerCase());
       const matchStatus = !filters.status || doc.status === filters.status;
       const matchPlanType = !filters.planType || doc.planType === filters.planType;
       
       const cargueDate = new Date(doc.createdAt).toISOString().split('T')[0];
-      const matchCargueFrom = !filters.dateCargueFrom || cargueDate >= filters.dateCargueFrom;
-      const matchCargueTo = !filters.dateCargueTo || cargueDate <= filters.dateCargueTo;
+      const matchCargue = !filters.cargueDate || cargueDate === filters.cargueDate;
+      
+      const matchDelivery = !filters.deliveryDate || (doc.deliveryDate || '').includes(filters.deliveryDate.split('-').reverse().join('/'));
+      
+      const invDate = doc.inventoryDate ? new Date(doc.inventoryDate).toISOString().split('T')[0] : '';
+      const matchInventory = !filters.inventoryDate || invDate === filters.inventoryDate;
 
-      return matchPlaca && matchDocL && matchStatus && matchPlanType && matchCargueFrom && matchCargueTo;
+      return matchPlaca && matchDocL && matchCodPlan && matchStatus && matchPlanType && matchCargue && matchDelivery && matchInventory;
     }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [documents, filters]);
 
@@ -43,41 +54,77 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(filteredDocs.length / rowsPerPage);
 
   const clearFilters = () => {
-    setFilters({ plate: '', docL: '', status: '', planType: '', dateCargueFrom: '', dateCargueTo: '' });
+    setFilters({ 
+      plate: '', docL: '', codplan: '', status: '', 
+      planType: '', deliveryDate: '', cargueDate: '', inventoryDate: '' 
+    });
     setCurrentPage(1);
   };
 
+  const inputClass = "w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all placeholder:text-slate-300";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block";
+
   return (
     <div className="space-y-8 animate-in fade-in">
-      <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 items-end">
-        <div className="space-y-1">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">ID Pedido / Carga</label>
-          <input type="text" placeholder="Buscar ID..." value={filters.docL} onChange={e => {setFilters({...filters, docL: e.target.value}); setCurrentPage(1);}} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold outline-none focus:border-emerald-500 transition-all" />
+      {/* PANEL DE FILTROS OPTIMIZADO */}
+      <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-slate-100 space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Fila 1 */}
+          <div className="space-y-1">
+            <label className={labelClass}>Placa</label>
+            <input type="text" placeholder="PLACA..." value={filters.plate} onChange={e => {setFilters({...filters, plate: e.target.value}); setCurrentPage(1);}} className={inputClass} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Documento L</label>
+            <input type="text" placeholder="DOCUMENTO L..." value={filters.docL} onChange={e => {setFilters({...filters, docL: e.target.value}); setCurrentPage(1);}} className={inputClass} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>CodPlan</label>
+            <input type="text" placeholder="CODPLAN..." value={filters.codplan} onChange={e => {setFilters({...filters, codplan: e.target.value}); setCurrentPage(1);}} className={inputClass} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Tipo Operación</label>
+            <select value={filters.planType} onChange={e => {setFilters({...filters, planType: e.target.value}); setCurrentPage(1);}} className={inputClass}>
+              <option value="">TODOS</option>
+              <option value="Plan Normal">PLAN NORMAL</option>
+              <option value="Plan R">PLAN R</option>
+            </select>
+          </div>
+
+          {/* Fila 2 */}
+          <div className="space-y-1">
+            <label className={labelClass}>Estado</label>
+            <select value={filters.status} onChange={e => {setFilters({...filters, status: e.target.value}); setCurrentPage(1);}} className={inputClass}>
+              <option value="">TODOS</option>
+              {Object.values(DocStatus).map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Fecha Envío</label>
+            <input type="date" value={filters.deliveryDate} onChange={e => {setFilters({...filters, deliveryDate: e.target.value}); setCurrentPage(1);}} className={inputClass} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Fecha Cargue</label>
+            <input type="date" value={filters.cargueDate} onChange={e => {setFilters({...filters, cargueDate: e.target.value}); setCurrentPage(1);}} className={inputClass} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Fecha Inventario</label>
+            <input type="date" value={filters.inventoryDate} onChange={e => {setFilters({...filters, inventoryDate: e.target.value}); setCurrentPage(1);}} className={inputClass} />
+          </div>
         </div>
-        <div className="space-y-1">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">F. Cargue (Desde)</label>
-          <input type="date" value={filters.dateCargueFrom} onChange={e => {setFilters({...filters, dateCargueFrom: e.target.value}); setCurrentPage(1);}} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold outline-none" />
+
+        <div className="flex justify-end pt-2">
+          <button onClick={clearFilters} className="px-10 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all active:scale-95 flex items-center gap-3">
+             <Icons.X /> Limpiar Filtros
+          </button>
         </div>
-        <div className="space-y-1">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">F. Cargue (Hasta)</label>
-          <input type="date" value={filters.dateCargueTo} onChange={e => {setFilters({...filters, dateCargueTo: e.target.value}); setCurrentPage(1);}} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold outline-none" />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Tipo de Operación</label>
-          <select value={filters.planType} onChange={e => {setFilters({...filters, planType: e.target.value}); setCurrentPage(1);}} className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold outline-none uppercase cursor-pointer">
-            <option value="">TODOS LOS PLANES</option>
-            <option value="Plan Normal">ENTREGAS (NORMAL)</option>
-            <option value="Plan R">RECOLECCIONES (R)</option>
-          </select>
-        </div>
-        <button onClick={clearFilters} className="w-full py-5 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all active:scale-95">Limpiar Filtros</button>
       </div>
 
       <div className="bg-white rounded-[3.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col min-h-[500px]">
         <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 px-10">
            <div className="flex items-center gap-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filas:</label>
-              <select value={rowsPerPage} onChange={e => {setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1);}} className="p-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase shadow-sm cursor-pointer outline-none focus:border-emerald-500">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mostrar:</label>
+              <select value={rowsPerPage} onChange={e => {setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1);}} className="p-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase shadow-sm outline-none">
                  <option value={5}>5</option>
                  <option value={10}>10</option>
                  <option value={20}>20</option>
@@ -87,8 +134,8 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
            </div>
            <div className="flex items-center gap-6">
               <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-30 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight className="rotate-180" /></button>
-              <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Página {currentPage} de {totalPages}</span>
-              <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-30 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight /></button>
+              <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Página {currentPage} de {totalPages || 1}</span>
+              <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-30 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight /></button>
            </div>
         </div>
         
@@ -120,7 +167,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                   </td>
                 </tr>
               ))}
-              {paginatedDocs.length === 0 && <tr><td colSpan={5} className="py-20 text-center text-xs font-bold text-slate-300 uppercase tracking-[0.4em]">Sin resultados de auditoría</td></tr>}
+              {paginatedDocs.length === 0 && <tr><td colSpan={5} className="py-20 text-center text-xs font-bold text-slate-300 uppercase tracking-[0.4em]">Sin resultados históricos</td></tr>}
             </tbody>
           </table>
         </div>
@@ -133,14 +180,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                  <div className="flex items-center gap-8">
                     <div className="w-16 h-16 bg-emerald-500 rounded-[1.5rem] flex items-center justify-center text-slate-900 shadow-xl"><Icons.Audit /></div>
                     <div>
-                      <h3 className="text-3xl font-black uppercase tracking-tighter">Historial M7: {selectedDoc.externalDocId}</h3>
-                      <p className="text-[9px] font-black text-slate-500 uppercase mt-2">Expediente Digital M7 Global</p>
+                      <h3 className="text-3xl font-black uppercase tracking-tighter">Expediente M7: {selectedDoc.externalDocId}</h3>
+                      <p className="text-[9px] font-black text-slate-500 uppercase mt-2">Detalle Histórico Global</p>
                     </div>
                  </div>
                  <button onClick={() => setSelectedDoc(null)} className="text-4xl font-thin hover:text-red-500 transition-all">×</button>
               </div>
               <div className="p-10 md:p-14 overflow-y-auto space-y-10 custom-scrollbar bg-slate-50/20 flex-1">
-                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                 <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">CodPlan</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.codplan || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.deliveryDate || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Placa</p><p className="font-black text-slate-900 text-[10px] uppercase">{selectedDoc.vehicleData}</p></div>
@@ -183,7 +230,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                  </div>
               </div>
               <div className="p-10 border-t bg-white flex justify-end shrink-0">
-                 <button onClick={() => setSelectedDoc(null)} className="px-14 py-6 bg-red-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all shadow-2xl active:scale-95">Cerrar Expediente Histórico</button>
+                 <button onClick={() => setSelectedDoc(null)} className="px-14 py-6 bg-red-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-red-700 shadow-2xl active:scale-95">Cerrar Expediente Histórico</button>
               </div>
            </div>
         </div>
