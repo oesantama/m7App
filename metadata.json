@@ -1,0 +1,8 @@
+{
+  "name": "Milla Siete (M7) - Sistema de Gestión Logística",
+  "description": "Una plataforma integral para la gestión de vehículos, inventarios de ingreso con conteo ciego, ruteo inteligente y seguimiento de entregas en tiempo real.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

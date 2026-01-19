@@ -1,0 +1,592 @@
+
+import React, { useState, useMemo } from 'react';
+import { Icons, AVATAR_GALLERY } from '../constants';
+import { MasterRecord, MasterCategory, User, Article } from '../types';
+import * as XLSX from 'xlsx';
+
+interface MasterModuleProps {
+  onAudit: (entity: string, action: string) => void;
+  activeMaster: MasterCategory;
+  allMasterData: { [key in MasterCategory]?: MasterRecord[] };
+  setAllMasterData: React.Dispatch<React.SetStateAction<{ [key in MasterCategory]?: MasterRecord[] }>>;
+  user: User;
+}
+
+const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData, setAllMasterData, user }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
+  const [formData, setFormData] = useState<any>({});
+  const [error, setError] = useState<string | null>(null);
+  
+  const [displayMode, setDisplayMode] = useState<'table' | 'grid'>('table');
+  const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Estados para el diálogo de cambio de rol
+  const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [pendingRoleId, setPendingRoleId] = useState('');
+
+  // Extracción de Maestros para Selectores
+  const roles = allMasterData['masterRol'] || [];
+  const modules = allMasterData['masterModulos'] || [];
+  const pages = allMasterData['masterPaginas'] || [];
+  const statuses = allMasterData['masterEstados'] || [];
+  const clients = allMasterData['masterClientes'] || [];
+  const docTypes = allMasterData['masterTipoDocumento'] || [];
+  const uoms = allMasterData['masterUnidadMedida'] || [];
+  const rolePermissions = allMasterData['masterPermisosRol'] || [];
+  const categoriesArt = allMasterData['masterCategorias'] || [];
+  const notificationTypes = allMasterData['masterTIpoNotificacion'] || [];
+
+  const iconKeys = Object.keys(Icons);
+
+  const filteredData = useMemo(() => {
+    const list = allMasterData[activeMaster] || [];
+    return list.filter(d => (d.name || d.email || d.id || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [allMasterData, activeMaster, searchTerm]);
+
+  const paginatedData = useMemo(() => {
+    if (rowsPerPage === 'all') return filteredData;
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredData.slice(start, start + rowsPerPage);
+  }, [filteredData, currentPage, rowsPerPage]);
+
+  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(filteredData.length / rowsPerPage);
+
+  // --- LÓGICA DE MATRIZ DE PERMISOS ---
+  const isAllPermsChecked = useMemo(() => {
+    if (activeMaster !== 'masterPermisosRol') return false;
+    const actions = ['view', 'create', 'edit', 'delete', 'active'];
+    return pages.length > 0 && pages.every(p => actions.every(a => !!formData[`page_${p.id}_${a}`]));
+  }, [formData, pages, activeMaster]);
+
+  const toggleAllPerms = () => {
+    const next = { ...formData };
+    const actions = ['view', 'create', 'edit', 'delete', 'active'];
+    const targetState = !isAllPermsChecked;
+    pages.forEach(p => actions.forEach(a => { next[`page_${p.id}_${a}`] = targetState; }));
+    setFormData(next);
+  };
+
+  const togglePageRow = (pageId: string) => {
+    const next = { ...formData };
+    const actions = ['view', 'create', 'edit', 'delete', 'active'];
+    const isRowChecked = actions.every(a => !!formData[`page_${pageId}_${a}`]);
+    const targetState = !isRowChecked;
+    actions.forEach(a => { next[`page_${pageId}_${a}`] = targetState; });
+    setFormData(next);
+  };
+
+  // --- LÓGICA DE CAMBIO DE ROL (USUARIOS) ---
+  const handleRoleChangeIntent = (newRoleId: string) => {
+    if (editingRecord && activeMaster === 'masterUsuarios' && newRoleId !== editingRecord.roleId) {
+      setPendingRoleId(newRoleId);
+      setShowRoleDialog(true);
+    } else {
+      setFormData({ ...formData, roleId: newRoleId });
+    }
+  };
+
+  const applyRoleChange = (inherit: boolean) => {
+    setFormData({ 
+      ...formData, 
+      roleId: pendingRoleId, 
+      inheritRolePerms: inherit 
+    });
+    setShowRoleDialog(false);
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (activeMaster === 'masterUsuarios') {
+      const emailExists = (allMasterData['masterUsuarios'] || []).some(u => 
+        u.email?.toLowerCase() === formData.email?.toLowerCase() && u.id !== editingRecord?.id
+      );
+      if (emailExists) {
+        setError("M7 CRITICAL: El correo electrónico ya pertenece a otro usuario registrado.");
+        return;
+      }
+    }
+
+    const now = new Date().toISOString();
+    const finalId = editingRecord?.id || `${activeMaster}-${Date.now()}`;
+    const newRecord = { ...formData, id: finalId, updatedAt: now, updatedBy: user.name };
+
+    setAllMasterData(prev => {
+      const list = prev[activeMaster] || [];
+      const exists = list.some(i => i.id === finalId);
+      return { 
+        ...prev, 
+        [activeMaster]: exists 
+          ? list.map(i => i.id === finalId ? newRecord : i) 
+          : [...list, { ...newRecord, createdAt: now, createdBy: user.name }]
+      };
+    });
+    setIsModalOpen(false);
+  };
+
+  const handleExportExcel = () => {
+    const dataToExport = filteredData.map(item => {
+      const flat: any = { ...item };
+      delete flat.avatar; delete flat.logoUrl; delete flat.photoUrl;
+      return flat;
+    });
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, activeMaster.replace('master', ''));
+    XLSX.writeFile(workbook, `M7_Export_${activeMaster}_${Date.now()}.xlsx`);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setFormData({ ...formData, [field]: reader.result });
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const commonInputStyle = "w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs outline-none focus:border-emerald-500 transition-all shadow-sm appearance-none cursor-pointer";
+
+  const renderStatusField = () => (
+    <div className="md:col-span-2 space-y-1 mt-4">
+      <label className="text-[10px] font-black text-emerald-500 uppercase ml-2 tracking-widest">Estado Operativo M7</label>
+      <div className="relative">
+        <select required value={formData.statusId || ''} onChange={e => setFormData({...formData, statusId: e.target.value})} className={commonInputStyle}>
+          <option value="">Seleccione Estado...</option>
+          {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400"><Icons.ChevronRight className="rotate-90 w-3 h-3" /></div>
+      </div>
+    </div>
+  );
+
+  const renderFormFields = () => {
+    switch (activeMaster) {
+      case 'masterUsuarios':
+        const currentRolePerms = rolePermissions.find(rp => rp.roleId === formData.roleId);
+        return (
+          <div className="space-y-10 animate-in fade-in relative">
+            {showRoleDialog && (
+              <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md rounded-[3rem] flex items-center justify-center p-8 text-center animate-in zoom-in-95">
+                <div className="max-w-md space-y-8">
+                  <div className="w-20 h-20 bg-emerald-500 text-slate-950 rounded-3xl mx-auto flex items-center justify-center shadow-2xl"><Icons.Alert /></div>
+                  <h4 className="text-white text-xl font-black uppercase tracking-tight">¿Heredar permisos del nuevo Rol?</h4>
+                  <p className="text-slate-400 text-xs font-bold leading-relaxed">Ha cambiado el Rol. ¿Desea resetear los permisos del usuario a los valores predeterminados del rol o conservar los actuales?</p>
+                  <div className="flex flex-col gap-4">
+                    <button type="button" onClick={() => applyRoleChange(true)} className="w-full py-4 bg-emerald-500 text-slate-900 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-emerald-400 transition-all">Heredar Permisos del Rol</button>
+                    <button type="button" onClick={() => applyRoleChange(false)} className="w-full py-4 bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase border border-white/10 hover:bg-white/20 transition-all">Conservar Actuales</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col md:flex-row items-center gap-10 p-8 bg-slate-50 rounded-[3.5rem] border-2 border-dashed border-slate-200">
+               <div className="relative group">
+                 <div className="w-32 h-32 rounded-full bg-white overflow-hidden border-4 border-emerald-500 shadow-2xl">
+                    <img src={formData.avatar || AVATAR_GALLERY[0]} className="w-full h-full object-cover" />
+                 </div>
+                 <label className="absolute bottom-0 right-0 bg-slate-900 text-white p-2.5 rounded-xl cursor-pointer hover:bg-emerald-500 transition-all shadow-lg">
+                    <Icons.Camera />
+                    <input type="file" className="hidden" accept="image/*" onChange={e => handlePhotoUpload(e, 'avatar')} />
+                 </label>
+               </div>
+               <div className="flex-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-2">Identidad Visual M7</p>
+                  <div className="flex flex-wrap gap-3">
+                    {AVATAR_GALLERY.map((av, i) => (
+                      <button key={i} type="button" onClick={() => setFormData({...formData, avatar: av})} className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all ${formData.avatar === av ? 'border-emerald-500 scale-110 shadow-lg' : 'border-transparent opacity-40 hover:opacity-100'}`}>
+                        <img src={av} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre Completo</label>
+                <input type="text" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value.toUpperCase()})} className={commonInputStyle} required />
+              </div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Email Corporativo</label>
+                <input type="email" value={formData.email || ''} onChange={e=>setFormData({...formData, email: e.target.value.toLowerCase()})} className={commonInputStyle} required />
+              </div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Teléfono de Contacto</label>
+                <input type="text" value={formData.phone || ''} onChange={e=>setFormData({...formData, phone: e.target.value})} className={commonInputStyle} />
+              </div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo Documento</label>
+                <select value={formData.documentType || ''} onChange={e=>setFormData({...formData, documentType: e.target.value})} className={commonInputStyle}>
+                  <option value="">Seleccione...</option>{docTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nro Documento</label>
+                <input type="text" value={formData.documentNumber || ''} onChange={e=>setFormData({...formData, documentNumber: e.target.value})} className={commonInputStyle} />
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl">
+               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 ml-2">Multicliente M7 (Seleccione Clientes Permitidos)</h4>
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {clients.map(c => (
+                    <label key={c.id} className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${formData.clientIds?.includes(c.id) ? 'bg-emerald-50 border-emerald-500' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
+                       <input type="checkbox" checked={formData.clientIds?.includes(c.id)} onChange={e => {
+                          const ids = formData.clientIds || [];
+                          setFormData({...formData, clientIds: e.target.checked ? [...ids, c.id] : ids.filter((id: string) => id !== c.id)});
+                        }} className="w-5 h-5 accent-emerald-500 rounded-lg" />
+                       <span className="text-[10px] font-black uppercase text-slate-900">{c.name}</span>
+                    </label>
+                  ))}
+               </div>
+            </div>
+
+            <div className="space-y-8">
+               <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Rol Operativo</label>
+                  <select value={formData.roleId || ''} onChange={e=>handleRoleChangeIntent(e.target.value)} className={commonInputStyle} required>
+                    <option value="">Seleccione Rol...</option>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+               </div>
+               {formData.roleId && (
+                 <div className="bg-slate-950 rounded-[2.5rem] overflow-hidden shadow-2xl">
+                    <div className="p-6 bg-white/5 border-b border-white/10 flex justify-between items-center">
+                       <h4 className="text-white font-black text-[10px] uppercase tracking-widest leading-none">Matriz de Permisos</h4>
+                       <span className="text-emerald-500 text-[8px] font-black uppercase px-4 py-1 bg-emerald-500/10 rounded-full">Vista Informativa</span>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                       <table className="w-full text-left text-[9px]">
+                          <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0">
+                             <tr><th className="p-4 bg-slate-950">Página</th>{['VER', 'CREAR', 'EDITAR', 'BORRAR', 'ACT'].map(a => <th key={a} className="p-4 text-center bg-slate-950">{a}</th>)}</tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                             {pages.map(p => (
+                               <tr key={p.id} className="hover:bg-white/5 transition-all">
+                                  <td className="p-4 text-slate-300 font-bold uppercase">{p.name}</td>
+                                  {['view', 'create', 'edit', 'delete', 'active'].map(a => (
+                                    <td key={a} className="p-4 text-center">
+                                       <div className={`w-4 h-4 mx-auto rounded flex items-center justify-center ${currentRolePerms?.[`page_${p.id}_${a}`] ? 'text-emerald-500' : 'text-red-500/20'}`}>
+                                          {currentRolePerms?.[`page_${p.id}_${a}`] ? <Icons.Check /> : <Icons.X />}
+                                       </div>
+                                    </td>
+                                  ))}
+                               </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
+                 </div>
+               )}
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterPermisosRol':
+        const availableRoles = editingRecord ? roles : roles.filter(r => !rolePermissions.some(rp => rp.roleId === r.id));
+        return (
+          <div className="space-y-10 animate-in fade-in">
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Seleccione Rol (Solo disponibles)</label>
+              <select required disabled={!!editingRecord} value={formData.roleId || ''} onChange={e=>setFormData({...formData, roleId: e.target.value})} className={commonInputStyle}>
+                <option value="">Seleccione Rol...</option>
+                {availableRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+            <div className="bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl">
+               <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+                  <h4 className="text-white font-black text-xs uppercase tracking-widest leading-none">Matriz M7</h4>
+                  <button type="button" onClick={toggleAllPerms} className={`${isAllPermsChecked ? 'bg-red-600' : 'bg-emerald-500'} text-white px-8 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg hover:opacity-80 transition-all`}>
+                    {isAllPermsChecked ? 'QUITAR TODO' : 'SELECCIONAR TODO'}
+                  </button>
+               </div>
+               <div className="overflow-x-auto max-h-[450px] custom-scrollbar">
+                  <table className="w-full text-left text-[10px]">
+                     <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20">
+                        <tr><th className="p-4 bg-slate-900">Página</th>{['VIEW', 'CREATE', 'EDIT', 'DELETE', 'ACTIVE'].map(a => <th key={a} className="p-4 text-center bg-slate-900">{a}</th>)}<th className="p-4 text-center bg-slate-900">Fila</th></tr>
+                     </thead>
+                     <tbody className="divide-y divide-white/5">
+                        {pages.map(p => (
+                          <tr key={p.id} className="hover:bg-white/5 transition-all">
+                             <td className="p-4 text-white font-bold uppercase">{p.name}</td>
+                             {['view', 'create', 'edit', 'delete', 'active'].map(a => (
+                               <td key={a} className="p-4 text-center">
+                                  <input type="checkbox" checked={!!formData[`page_${p.id}_${a}`]} onChange={e => setFormData({...formData, [`page_${p.id}_${a}`]: e.target.checked})} className="w-5 h-5 rounded-lg border-2 border-white/10 bg-transparent checked:bg-emerald-500 checked:border-emerald-500 transition-all cursor-pointer appearance-none flex items-center justify-center after:content-['✓'] after:text-white after:font-black after:hidden checked:after:block" />
+                               </td>
+                             ))}
+                             <td className="p-4 text-center">
+                                <button type="button" onClick={()=>togglePageRow(p.id)} className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-emerald-500 transition-all">
+                                  <Icons.Check />
+                                </button>
+                             </td>
+                          </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterArticulo':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 flex flex-col items-center p-6 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+               <div className="w-24 h-24 bg-white rounded-2xl overflow-hidden shadow-md border-2 border-emerald-500 mb-3 flex items-center justify-center">
+                  {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" /> : <Icons.Package className="text-slate-300 w-10 h-10" />}
+               </div>
+               <label className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-black text-[9px] uppercase cursor-pointer hover:bg-emerald-600 transition-all">
+                  Subir Foto Art.
+                  <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'photoUrl')} />
+               </label>
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">SKU / Identificador</label>
+              <input type="text" value={formData.sku || ''} onChange={e=>setFormData({...formData, sku: e.target.value.toUpperCase()})} className={commonInputStyle} required />
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre Comercial</label>
+              <input type="text" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value.toUpperCase()})} className={commonInputStyle} required />
+            </div>
+
+            {/* Selectores de Unidades (Triple UOM) */}
+            <div className="md:col-span-2 bg-slate-100 p-8 rounded-[3rem] grid grid-cols-1 md:grid-cols-3 gap-6 border border-slate-200">
+               <div className="space-y-1"><label className="text-[9px] font-black text-emerald-600 uppercase ml-2 tracking-widest">Unidad General</label>
+                 <select value={formData.uomGeneralId || ''} onChange={e=>setFormData({...formData, uomGeneralId: e.target.value})} className={commonInputStyle}>
+                   <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                 </select>
+               </div>
+               <div className="space-y-1"><label className="text-[9px] font-black text-blue-600 uppercase ml-2 tracking-widest">Unidad Intermedia</label>
+                 <select value={formData.uomInterId || ''} onChange={e=>setFormData({...formData, uomInterId: e.target.value})} className={commonInputStyle}>
+                   <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                 </select>
+               </div>
+               <div className="space-y-1"><label className="text-[9px] font-black text-slate-900 uppercase ml-2 tracking-widest">Unidad Estándar</label>
+                 <select value={formData.uomStdId || ''} onChange={e=>setFormData({...formData, uomStdId: e.target.value})} className={commonInputStyle}>
+                   <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                 </select>
+               </div>
+            </div>
+
+            {/* Selectores Restaurados: Cliente y Categoría */}
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Cliente Dueño del Articulo</label>
+              <select value={formData.clientId || ''} onChange={e=>setFormData({...formData, clientId: e.target.value})} className={commonInputStyle} required>
+                <option value="">Seleccione Cliente...</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Categoría del Articulo</label>
+              <select value={formData.categoryArticuloId || ''} onChange={e=>setFormData({...formData, categoryArticuloId: e.target.value})} className={commonInputStyle} required>
+                <option value="">Seleccione Categoría...</option>{categoriesArt.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+              </select>
+            </div>
+            
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterClientes':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 flex flex-col items-center p-6 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+               <div className="w-48 h-24 bg-white rounded-2xl overflow-hidden shadow-md border-2 border-emerald-500 mb-3 flex items-center justify-center">
+                  {formData.logoUrl ? <img src={formData.logoUrl} className="w-full h-full object-contain p-2" /> : <Icons.Truck className="text-slate-300 w-10 h-10" />}
+               </div>
+               <label className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-black text-[9px] uppercase cursor-pointer hover:bg-emerald-600 transition-all">
+                  Subir Logo Corporativo
+                  <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'logoUrl')} />
+               </label>
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Cliente</label>
+              <input type="text" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value.toUpperCase()})} className={commonInputStyle} required />
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterModulos':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Módulo</label>
+              <input type="text" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value.toUpperCase()})} className={commonInputStyle} required />
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Icono Visual M7</label>
+              <select value={formData.iconClass || ''} onChange={e=>setFormData({...formData, iconClass: e.target.value})} className={commonInputStyle}>
+                <option value="">Seleccione Icono...</option>{iconKeys.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center justify-center bg-slate-100 rounded-3xl">
+              <div className="w-14 h-14 bg-slate-900 text-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
+                {formData.iconClass ? React.createElement((Icons as any)[formData.iconClass]) : <Icons.Settings />}
+              </div>
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterPaginas':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de la Página Web</label>
+              <input type="text" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value.toUpperCase()})} className={commonInputStyle} required />
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Ruta de Sistema (Route)</label>
+              <input type="text" value={formData.route || ''} onChange={e=>setFormData({...formData, route: e.target.value})} className={commonInputStyle} />
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Módulo Padre</label>
+              <select value={formData.parentId || ''} onChange={e=>setFormData({...formData, parentId: e.target.value})} className={commonInputStyle}>
+                <option value="">Seleccione Módulo...</option>{modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterNotificaciones':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de Alerta / Grupo</label>
+              <input type="text" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value.toUpperCase()})} className={commonInputStyle} required />
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Email de Notificación</label>
+              <input type="email" placeholder="ejemplo@correo.com" value={formData.notificationEmail || ''} onChange={e=>setFormData({...formData, notificationEmail: e.target.value.toLowerCase()})} className={commonInputStyle} required />
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo de Notificación</label>
+              <select value={formData.tipoNotificacionId || ''} onChange={e=>setFormData({...formData, tipoNotificacionId: e.target.value})} className={commonInputStyle} required>
+                <option value="">Seleccione Tipo...</option>
+                {notificationTypes.map(nt => <option key={nt.id} value={nt.id}>{nt.name}</option>)}
+              </select>
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      default:
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Registro</label>
+              <input type="text" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value.toUpperCase()})} className={commonInputStyle} required />
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4 h-full animate-in fade-in duration-500 overflow-hidden">
+      <div className="bg-white px-6 py-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
+        <div className="flex items-center gap-4">
+           <div className="w-10 h-10 bg-slate-900 rounded-[1.2rem] flex items-center justify-center text-emerald-500 shadow-md"><Icons.Settings /></div>
+           <div>
+             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">{activeMaster.replace('master', '')}</h2>
+             <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">Auditoría M7</p>
+           </div>
+        </div>
+        <div className="flex flex-1 max-w-xl bg-slate-50 px-5 py-2.5 rounded-2xl items-center gap-3 border border-slate-100 focus-within:border-emerald-500 transition-all">
+          <Icons.Search className="text-slate-300 w-4 h-4" />
+          <input type="text" placeholder="Filtrar..." value={searchTerm} onChange={e=>{setSearchTerm(e.target.value); setCurrentPage(1);}} className="bg-transparent outline-none font-black text-[10px] uppercase w-full" />
+        </div>
+        <div className="flex items-center gap-3">
+           <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-11 relative">
+             <button onClick={()=>setDisplayMode('table')} className={`p-2.5 rounded-xl transition-all relative z-10 ${displayMode === 'table' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.List /></button>
+             <button onClick={()=>setDisplayMode('grid')} className={`p-2.5 rounded-xl transition-all relative z-10 ${displayMode === 'grid' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.Grid /></button>
+             <div className={`absolute top-1 bottom-1 w-[40px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayMode === 'table' ? 'left-1' : 'left-[44px]'}`}></div>
+           </div>
+           <button onClick={handleExportExcel} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel /><span className="hidden xl:inline">Excel</span></button>
+           <button onClick={()=>{setEditingRecord(null); setFormData({statusId: 'EST-01', clientIds: []}); setError(null); setIsModalOpen(true);}} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all">Nuevo</button>
+        </div>
+      </div>
+
+      <div className="flex-1 bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {displayMode === 'table' ? (
+             <table className="w-full text-left">
+                <thead className="sticky top-0 z-10 bg-slate-900 text-white font-black uppercase tracking-widest text-[8px]">
+                   <tr><th className="px-8 py-4">Descripción Registro</th><th className="px-8 py-4 text-center">Estado</th><th className="px-8 py-4 text-right">Auditoría</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginatedData.map(item => (
+                    <tr key={item.id} className="hover:bg-slate-50 transition-all group">
+                      <td className="px-8 py-4">
+                         <div className="flex items-center gap-4">
+                           <div className="w-10 h-10 bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center border border-slate-100 shrink-0 shadow-sm">
+                              {item.avatar ? <img src={item.avatar} className="w-full h-full object-cover" /> : (item.logoUrl ? <img src={item.logoUrl} className="w-full h-full object-contain p-1" /> : (item.photoUrl ? <img src={item.photoUrl} className="w-full h-full object-cover" /> : <Icons.Package className="text-slate-300 w-5 h-5" />))}
+                           </div>
+                           <div>
+                             <p className="font-black text-slate-900 text-[12px] uppercase">{item.name || item.id}</p>
+                             <p className="text-[8px] text-slate-400 font-bold uppercase">{item.email || item.id}</p>
+                           </div>
+                         </div>
+                      </td>
+                      <td className="px-8 py-4 text-center">
+                         <span className={`px-4 py-1 rounded-full text-[8px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{statuses.find(s=>s.id===item.statusId)?.name || 'ACTIVO'}</span>
+                      </td>
+                      <td className="px-8 py-4 text-right">
+                         <button onClick={()=>{setEditingRecord(item); setFormData({...item}); setError(null); setIsModalOpen(true);}} className="p-3 bg-emerald-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md active:scale-90"><Icons.Audit /></button>
+                      </td>
+                    </tr>
+                  ))}
+                  {paginatedData.length === 0 && <tr><td colSpan={3} className="py-20 text-center font-black text-slate-200 uppercase text-[10px] tracking-widest">Sin registros encontrados</td></tr>}
+                </tbody>
+             </table>
+          ) : (
+            <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {paginatedData.map(item => (
+                <div key={item.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl hover:border-emerald-500 transition-all group overflow-hidden">
+                   <div className="flex justify-between items-start mb-4">
+                      <div className="w-10 h-10 bg-slate-900 text-emerald-500 rounded-xl flex items-center justify-center shadow-lg group-hover:bg-emerald-500 group-hover:text-white transition-all overflow-hidden">
+                         {item.avatar ? <img src={item.avatar} className="w-full h-full object-cover" /> : (item.logoUrl ? <img src={item.logoUrl} className="w-full h-full object-contain p-1" /> : <Icons.Package />)}
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-[7px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{statuses.find(s=>s.id===item.statusId)?.name || 'ACTIVO'}</span>
+                   </div>
+                   <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">{item.name || item.id}</h3>
+                   <button onClick={()=>{setEditingRecord(item); setFormData({...item}); setError(null); setIsModalOpen(true);}} className="w-full py-3 bg-emerald-500 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md">Auditar</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t border-slate-50 bg-slate-50/20 flex justify-between items-center shrink-0">
+           <div className="flex items-center gap-3">
+              <label className="text-[8px] font-black text-slate-400 uppercase">Filas:</label>
+              <select value={rowsPerPage} onChange={e => {setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1);}} className="p-1.5 bg-white border border-slate-200 rounded-lg text-[8px] font-black outline-none focus:border-emerald-500 transition-all">
+                 {[5, 10, 20, 50].map(v => <option key={v} value={v}>{v}</option>)}
+                 <option value="all">Todas</option>
+              </select>
+           </div>
+           <div className="flex items-center gap-4">
+              <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-300 disabled:opacity-20 hover:text-emerald-500 transition-all"><Icons.ChevronRight className="rotate-180 w-3 h-3" /></button>
+              <span className="text-[8px] font-black text-slate-900 uppercase">Pág {currentPage} de {totalPages}</span>
+              <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-300 disabled:opacity-20 hover:text-emerald-500 transition-all"><Icons.ChevronRight className="w-3 h-3" /></button>
+           </div>
+        </div>
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
+           <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white/10">
+              <div className="bg-slate-900 p-8 text-white flex justify-between items-center shrink-0">
+                 <div className="flex items-center gap-6">
+                    <div className="w-12 h-12 bg-emerald-500 text-slate-950 rounded-[1.5rem] flex items-center justify-center shadow-xl"><Icons.Audit /></div>
+                    <div>
+                      <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">{editingRecord ? 'Auditoría' : 'Nuevo'} {activeMaster.replace('master', '')}</h3>
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2">Módulo: Configuración Segura M7</p>
+                    </div>
+                 </div>
+                 <button onClick={()=>setIsModalOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
+              </div>
+              <form onSubmit={handleSave} className="p-10 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/20">
+                 {error && (
+                   <div className="mb-8 p-6 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-4 animate-in shake"><Icons.Alert /> {error}</div>
+                 )}
+                 {renderFormFields()}
+                 <div className="pt-10 border-t border-slate-200 flex flex-col md:flex-row gap-6 mt-10">
+                    <button type="button" onClick={()=>setIsModalOpen(false)} className="px-12 py-5 bg-red-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all active:scale-95">Descartar</button>
+                    <button type="submit" className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-xl transition-all active:scale-95">Confirmar Operación M7</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MasterModule;
