@@ -27,8 +27,10 @@ const App: React.FC = () => {
   const [assignments, setAssignments] = useState<VehicleAssignment[]>([]);
   const [documents, setDocuments] = useState<DocumentL[]>([]);
   const [invoices] = useState<Invoice[]>([
-    { id: 'F-101', clientId: 'c1', docLId: 'doc-001', customerName: 'Ferretería El Martillo', address: 'Calle 10 #45-23, Bogotá', lat: 4.61, lng: -74.12, volumeM3: 5.5, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-03' },
-    { id: 'F-102', clientId: 'c1', docLId: 'doc-001', customerName: 'Construmax Norte', address: 'Av Boyacá #127-10, Bogotá', lat: 4.71, lng: -74.07, volumeM3: 12.2, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-03' },
+    { id: 'F-101', clientId: 'c1', docLId: 'doc-001', customerName: 'Ferretería El Martillo', address: 'Calle 10 #45-23, Bogotá', city: 'BOGOTÁ', lat: 4.61, lng: -74.12, volumeM3: 5.5, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-03' },
+    { id: 'F-102', clientId: 'c1', docLId: 'doc-001', customerName: 'Construmax Norte', address: 'Av Boyacá #127-10, Bogotá', city: 'BOGOTÁ', lat: 4.71, lng: -74.07, volumeM3: 12.2, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-03' },
+    { id: 'F-103', clientId: 'c1', docLId: 'doc-001', customerName: 'Pinturas Global', address: 'Calle 80 #15-30, Medellín', city: 'MEDELLÍN', lat: 6.24, lng: -75.58, volumeM3: 8.5, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-03' },
+    { id: 'F-104', clientId: 'c1', docLId: 'doc-001', customerName: 'Casa del Constructor', address: 'Carrera 45 #10-10, Medellín', city: 'MEDELLÍN', lat: 6.26, lng: -75.56, volumeM3: 15.0, status: DocStatus.PENDING, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-03' },
   ]);
 
   useEffect(() => {
@@ -138,7 +140,6 @@ const App: React.FC = () => {
     ];
     initial['masterPaginas'] = pages;
 
-    // Matriz de permisos inicial para el superusuario
     const superPerms: any = { id: 'PERM-ROL-01', roleId: 'ROL-01', statusId: 'EST-01' };
     pages.forEach(p => {
       ['view', 'create', 'edit', 'delete', 'active'].forEach(a => { superPerms[`page_${p.id}_${a}`] = true; });
@@ -178,7 +179,7 @@ const App: React.FC = () => {
       )}
       {activeTab === 'inventory' && <GestionDocumentosL documents={documents} invoices={invoices} user={currentUser!} masterEstados={allMasterData['masterEstados'] || []} onAddDocuments={(newDocs) => setDocuments([...documents, ...newDocs])} />}
       {activeTab === 'receiving' && <RecibidoMaterial documents={documents} user={currentUser!} masterEstados={allMasterData['masterEstados'] || []} masterNotificaciones={allMasterData['masterNotificaciones'] || []} masterArticulo={allMasterData['masterArticulo'] || []} onUpdateDocuments={setDocuments} onAddArticleToMaster={(a) => {}} />}
-      {activeTab === 'routing' && <RoutePlanner invoices={invoices} vehicles={vehicles} drivers={drivers} assignments={assignments} onAssign={(vId, dId, cId) => setAssignments([...assignments, { id: `ass-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, date: new Date().toISOString(), isActive: true, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' }])} onSaveRoute={() => {}} />}
+      {activeTab === 'routing' && <RoutePlanner invoices={invoices} vehicles={vehicles} drivers={drivers} assignments={assignments} documents={documents} user={currentUser!} onAssign={(vId, dId, cId) => setAssignments([...assignments, { id: `ass-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, date: new Date().toISOString(), isActive: true, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' }])} onSaveRoute={() => {}} />}
       {activeTab === 'fleet' && <FleetManager vehicles={vehicles} drivers={drivers} user={currentUser!} masterData={allMasterData} onAddVehicle={v => setVehicles([...vehicles, {...v, id: `v-${Date.now()}`} as any])} onAddDriver={d => setDrivers([...drivers, {...d, id: `d-${Date.now()}`} as any])} onUpdateVehicle={(id, data) => setVehicles(vehicles.map(v => v.id === id ? {...v, ...data} : v))} onUpdateDriver={(id, data) => setDrivers(drivers.map(d => d.id === id ? {...d, ...data} : d))} />}
       {activeTab === 'assignments' && <AssignmentManager vehicles={vehicles} drivers={drivers} assignments={assignments} user={currentUser!} onAssign={(vId, dId, cId) => setAssignments([...assignments, { id: `ass-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, date: new Date().toISOString(), isActive: true, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' }])} onEndAssignment={id => setAssignments(assignments.map(a => a.id === id ? {...a, isActive: false} : a))} />}
       {(activeTab === 'master' || activeTab === 'access') && <MasterModule key={activeMasterCategory} onAudit={() => {}} activeMaster={activeMasterCategory} allMasterData={allMasterData} setAllMasterData={setAllMasterData} user={currentUser!} />}

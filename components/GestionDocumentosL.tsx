@@ -5,6 +5,17 @@ import { DocumentL, User, DocStatus, MasterRecord, Invoice, DocumentLItem } from
 import ConsultasDocumentosL from './ConsultasDocumentosL';
 import * as XLSX from 'xlsx';
 
+// Extendemos DocumentL localmente para manejar el estado de duplicado en la UI
+interface PreviewDocument extends DocumentL {
+  isDuplicate?: boolean;
+}
+
+interface SyncError {
+  title: string;
+  message: string;
+  duplicates: { placa: string; carga: string }[];
+}
+
 interface GestionDocumentosLProps {
   documents: DocumentL[];
   invoices: Invoice[];
@@ -15,8 +26,9 @@ interface GestionDocumentosLProps {
 
 const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invoices, user, masterEstados, onAddDocuments }) => {
   const [activeTab, setActiveTab] = useState<'cargue' | 'consultas'>('cargue');
-  const [preview, setPreview] = useState<{ fileName: string; mapped: DocumentL[]; type: string } | null>(null);
+  const [preview, setPreview] = useState<{ fileName: string; mapped: PreviewDocument[]; type: string } | null>(null);
   const [selectedPendingDoc, setSelectedPendingDoc] = useState<DocumentL | null>(null);
+  const [syncError, setSyncError] = useState<SyncError | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingPage, setPendingPage] = useState(1);
@@ -84,7 +96,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         }
 
         if (headerRowIndex === -1) {
-          alert("M7 ERROR: No se detectó la fila de títulos. Verifique el formato.");
+          setSyncError({
+            title: "M7 FORMAT ERROR",
+            message: "No se detectó la fila de títulos. Verifique el formato del archivo Excel.",
+            duplicates: []
+          });
           return;
         }
 
@@ -161,31 +177,43 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           }
         });
 
-        const mapped: DocumentL[] = Array.from(docsMap.entries()).map(([key, data]) => ({
-          id: `doc-${Date.now()}-${key}`,
-          clientId: user.clientId,
-          externalDocId: data.carga,
-          vehicleData: data.placa,
-          codplan: data.codplan,
-          deliveryDate: data.deliveryDate,
-          city: data.city,
-          address: data.address,
-          status: DocStatus.PENDING,
-          planType: type as any,
-          inventoryNotes: `M7 Cargue: ${data.items.length} líneas`,
-          items: data.items,
-          createdAt: new Date().toISOString(),
-          createdBy: user.name,
-          updatedAt: new Date().toISOString(),
-          updatedBy: user.name,
-          statusId: 'EST-03' 
-        }));
+        // VALIDACIÓN DE DUPLICADOS: Placa y Carga
+        const mapped: PreviewDocument[] = Array.from(docsMap.entries()).map(([key, data]) => {
+          const isDuplicate = documents.some(d => 
+            d.externalDocId === data.carga && d.vehicleData === data.placa
+          );
+
+          return {
+            id: `doc-${Date.now()}-${key}`,
+            clientId: user.clientId,
+            externalDocId: data.carga,
+            vehicleData: data.placa,
+            codplan: data.codplan,
+            deliveryDate: data.deliveryDate,
+            city: data.city,
+            address: data.address,
+            status: DocStatus.PENDING,
+            planType: type as any,
+            inventoryNotes: `M7 Cargue: ${data.items.length} líneas`,
+            items: data.items,
+            createdAt: new Date().toISOString(),
+            createdBy: user.name,
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.name,
+            statusId: 'EST-03',
+            isDuplicate: isDuplicate
+          };
+        });
 
         setPreview({ fileName: file.name, mapped, type });
         setPreviewPage(1);
         setPreviewSearch('');
       } catch (err) {
-        alert("Fallo en lectura de Excel.");
+        setSyncError({
+          title: "M7 ERROR",
+          message: "Fallo crítico en lectura de Excel.",
+          duplicates: []
+        });
       }
       e.target.value = '';
     };
@@ -194,7 +222,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
   const filteredPreviewItems = useMemo(() => {
     if (!preview) return [];
-    const allItems = preview.mapped.flatMap(doc => doc.items.map(it => ({ ...it, docId: doc.externalDocId, docVehicle: doc.vehicleData })));
+    const allItems = preview.mapped.flatMap(doc => doc.items.map(it => ({ ...it, docId: doc.externalDocId, docVehicle: doc.vehicleData, isDuplicate: doc.isDuplicate })));
     if (!previewSearch) return allItems;
     return allItems.filter(it => 
       it.articleId.toLowerCase().includes(previewSearch.toLowerCase()) ||
@@ -209,6 +237,32 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   }, [filteredPreviewItems, previewPage]);
 
   const totalPreviewPages = Math.ceil(filteredPreviewItems.length / previewItemsPerPage);
+
+  const handleSync = () => {
+    if (!preview) return;
+    
+    // Filtrar los que no son duplicados
+    const newDocs = preview.mapped.filter(d => !d.isDuplicate);
+    const duplicatedDocs = preview.mapped.filter(d => d.isDuplicate);
+
+    if (newDocs.length > 0) {
+      onAddDocuments(newDocs);
+      if (duplicatedDocs.length > 0) {
+        setSyncError({
+          title: "Sincronización con Excepciones",
+          message: `Se sincronizaron ${newDocs.length} documentos, pero se detectaron ${duplicatedDocs.length} registros que ya existen.`,
+          duplicates: duplicatedDocs.map(d => ({ placa: d.vehicleData || 'S/I', carga: d.externalDocId }))
+        });
+      }
+      setPreview(null);
+    } else {
+      setSyncError({
+        title: "Bloqueo de Sincronización",
+        message: "No se puede guardar porque todos los documentos en el archivo ya existen en el sistema (Misma Placa y Carga).",
+        duplicates: duplicatedDocs.map(d => ({ placa: d.vehicleData || 'S/I', carga: d.externalDocId }))
+      });
+    }
+  };
 
   return (
     <div className="space-y-4 animate-in fade-in h-full flex flex-col overflow-hidden">
@@ -306,6 +360,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                       </div>
                    </div>
                    <div className="p-8 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
+                      {preview.mapped.some(d => d.isDuplicate) && (
+                        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
+                          <p className="text-[10px] font-black text-amber-800 uppercase">Se detectaron documentos duplicados (Placa/Carga). Éstos serán omitidos automáticamente al sincronizar.</p>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center">
                         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3 flex-1 max-w-md">
                           <Icons.Search className="w-3 h-3 text-slate-300" />
@@ -322,17 +381,25 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                               <th className="px-6 py-4">Nº Ped</th>
                               <th className="px-6 py-4">UM</th>
                               <th className="px-6 py-4">Vol. Total</th>
+                              <th className="px-6 py-4 text-center">Validación</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {paginatedPreviewItems.map((it: any, idx) => (
-                              <tr key={idx} className="hover:bg-white transition-all font-bold text-slate-600">
+                              <tr key={idx} className={`hover:bg-white transition-all font-bold ${it.isDuplicate ? 'bg-red-50/50 opacity-60' : 'text-slate-600'}`}>
                                 <td className="px-6 py-3 font-black text-slate-900 uppercase">{it.docId} <span className="text-slate-300 mx-2">|</span> {it.docVehicle}</td>
                                 <td className="px-6 py-3 uppercase">{it.articleId}</td>
                                 <td className="px-6 py-3 text-center font-black">{it.expectedQty}</td>
                                 <td className="px-6 py-3 uppercase text-emerald-600">{it.orderNumber || 'S/I'}</td>
                                 <td className="px-6 py-3 text-blue-600 font-black">{it.unit || 'und'}</td>
                                 <td className="px-6 py-3">{it.volume || '0'}</td>
+                                <td className="px-6 py-3 text-center">
+                                  {it.isDuplicate ? (
+                                    <span className="bg-red-600 text-white px-3 py-1 rounded-full text-[7px] font-black uppercase tracking-widest shadow-sm">YA EXISTE</span>
+                                  ) : (
+                                    <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-[7px] font-black uppercase tracking-widest shadow-sm">NUEVO</span>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -348,7 +415,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                    </div>
                    <div className="p-8 border-t bg-slate-50 flex gap-6 shrink-0">
                       <button onClick={()=>setPreview(null)} className="flex-1 py-5 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all">Anular</button>
-                      <button onClick={()=>{onAddDocuments(preview.mapped); setPreview(null);}} className="flex-[2] py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-4 active:scale-95">Sincronizar</button>
+                      <button onClick={handleSync} className="flex-[2] py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-4 active:scale-95">Sincronizar</button>
                    </div>
                 </div>
               )}
@@ -358,6 +425,47 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           )}
         </div>
       </div>
+
+      {/* MODAL DE ERROR PREMIUM M7 */}
+      {syncError && (
+        <div className="fixed inset-0 z-[1000] bg-slate-950/98 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
+           <div className="bg-white w-full max-w-lg rounded-[4rem] shadow-2xl overflow-hidden flex flex-col border border-white/5">
+              <div className="bg-red-600 p-10 text-white flex justify-between items-center shrink-0">
+                 <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 bg-white rounded-[1.8rem] flex items-center justify-center text-red-600 shadow-2xl"><Icons.Alert /></div>
+                    <div>
+                      <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{syncError.title}</h3>
+                      <p className="text-[10px] font-black text-red-200 uppercase tracking-widest mt-2">CONFLICTO DE INTEGRIDAD</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setSyncError(null)} className="text-4xl font-thin hover:opacity-70 transition-all">×</button>
+              </div>
+              <div className="p-10 space-y-8 bg-slate-50/20 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                 <p className="text-slate-600 font-bold text-sm leading-relaxed">{syncError.message}</p>
+                 
+                 {syncError.duplicates.length > 0 && (
+                    <div className="space-y-4">
+                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] ml-2">Registros Duplicados Encontrados</h4>
+                       <div className="space-y-3">
+                          {syncError.duplicates.map((dup, i) => (
+                             <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-6">
+                                <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl flex items-center justify-center"><Icons.X /></div>
+                                <div>
+                                   <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-2">PLACA: {dup.placa}</p>
+                                   <p className="text-lg font-black text-slate-900 uppercase leading-none">CARGA: {dup.carga}</p>
+                                </div>
+                             </div>
+                          ))}
+                       </div>
+                    </div>
+                 )}
+              </div>
+              <div className="p-8 border-t bg-white flex justify-end shrink-0">
+                 <button onClick={() => setSyncError(null)} className="w-full py-6 bg-slate-900 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl">Entendido</button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {selectedPendingDoc && (
         <div className="fixed inset-0 z-[600] bg-slate-950/98 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">

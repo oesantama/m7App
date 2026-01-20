@@ -43,54 +43,100 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
   const handleFinishCount = (finalItems: DocumentLItem[], updateEmail?: string) => {
     if (!selectedDocForCount) return;
-    const updatedDocs = documents.map(d => d.id === selectedDocForCount.id ? { ...d, items: finalItems, status: DocStatus.INVENTORED, updatedBy: user.name, updatedAt: new Date().toISOString() } : d);
+
+    // Si el usuario ingresó un correo manual, se debería persistir en la lógica del sistema (opcional según el backend)
+    if (updateEmail && onUpdateNotificationEmail) {
+      onUpdateNotificationEmail(updateEmail);
+    }
+
+    const updatedDocs = documents.map(d => 
+      d.id === selectedDocForCount.id 
+        ? { 
+            ...d, 
+            items: finalItems, 
+            status: DocStatus.INVENTORED, 
+            inventoryDate: new Date().toISOString(),
+            inventoryUser: user.name,
+            updatedBy: user.name, 
+            updatedAt: new Date().toISOString() 
+          } 
+        : d
+    );
+    
     onUpdateDocuments(updatedDocs);
     setSelectedDocForCount(null);
   };
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700 pb-20">
-      <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-slate-100 flex justify-between items-center">
+    <div className="space-y-10 animate-in fade-in duration-700 pb-20 h-full flex flex-col overflow-hidden">
+      <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-slate-100 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-8">
           <div className="w-20 h-20 bg-slate-900 rounded-[2.5rem] flex items-center justify-center text-emerald-500 shadow-2xl"><Icons.Scan /></div>
-          <div><h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none">M7 Recibo Físico</h2></div>
+          <div>
+            <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none">M7 Recibo Físico</h2>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">Auditoría de Mercancía con Soporte Offline</p>
+          </div>
         </div>
       </div>
 
-      <div className="min-h-[700px]">
+      <div className="flex-1 min-h-0">
         {selectedDocForCount ? (
-          <BlindCount document={selectedDocForCount} masterNotificaciones={masterNotificaciones} masterArticulo={masterArticulo} onConfirm={handleFinishCount} onCancel={() => setSelectedDocForCount(null)} onAddArticleToMaster={onAddArticleToMaster} />
+          <BlindCount 
+            document={selectedDocForCount} 
+            masterNotificaciones={masterNotificaciones} 
+            masterArticulo={masterArticulo} 
+            onConfirm={handleFinishCount} 
+            onCancel={() => setSelectedDocForCount(null)} 
+            onAddArticleToMaster={onAddArticleToMaster} 
+          />
         ) : (
-          <div className="bg-white rounded-[4rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[700px] flex flex-col">
-            <div className="p-10 border-b border-slate-50 bg-slate-50/20 flex justify-between items-center">
-               <h3 className="text-xl font-black text-slate-900 uppercase">Planes para Auditoría</h3>
+          <div className="bg-white rounded-[4rem] shadow-2xl border border-slate-100 overflow-hidden h-full flex flex-col">
+            <div className="p-10 border-b border-slate-50 bg-slate-50/20 flex justify-between items-center shrink-0">
                <div className="flex items-center gap-4">
-                  <select value={rowsPerPage} onChange={e => {setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1);}} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase">
-                     <option value={5}>5 Filas</option><option value={10}>10 Filas</option><option value={20}>20 Filas</option><option value="all">Todas</option>
+                  <h3 className="text-xl font-black text-slate-900 uppercase">Planes en Espera</h3>
+                  <span className="px-4 py-1.5 bg-emerald-500 text-slate-950 rounded-full text-[9px] font-black uppercase">{pendingRecibo.length} CARGUES</span>
+               </div>
+               <div className="flex items-center gap-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filas:</label>
+                  <select value={rowsPerPage} onChange={e => {setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1);}} className="p-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm">
+                     <option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value="all">Todas</option>
                   </select>
                </div>
             </div>
+            
             <div className="p-10 flex-1 overflow-y-auto custom-scrollbar">
-              <div className="max-w-5xl mx-auto space-y-6">
+              <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
                 {paginatedPending.map(doc => (
-                  <div key={doc.id} className="flex flex-col xl:flex-row items-center justify-between p-8 bg-white border-4 border-slate-50 rounded-[3rem] hover:border-emerald-500 transition-all group shadow-sm">
-                    <div className="flex items-center gap-8">
-                      <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-inner ${doc.status === DocStatus.COUNTING ? 'bg-blue-900 text-blue-400' : 'bg-slate-100 text-slate-300 group-hover:bg-slate-900 group-hover:text-emerald-500'}`}><Icons.Package /></div>
-                      <div>
-                        <h4 className="font-black text-slate-900 uppercase text-2xl">{doc.externalDocId}</h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Placa: {doc.vehicleData || 'S/I'}</p>
+                  <div key={doc.id} className="flex flex-col p-10 bg-white border-2 border-slate-100 rounded-[3.5rem] hover:border-emerald-500 transition-all group shadow-xl hover:shadow-emerald-500/10">
+                    <div className="flex justify-between items-start mb-8">
+                      <div className={`w-20 h-20 rounded-[2.2rem] flex items-center justify-center shadow-2xl ${doc.status === DocStatus.COUNTING ? 'bg-blue-900 text-blue-400 animate-pulse' : 'bg-slate-900 text-emerald-500'}`}><Icons.Package /></div>
+                      <div className="text-right">
+                         <span className={`px-4 py-2 rounded-full text-[8px] font-black uppercase border tracking-widest ${doc.status === DocStatus.COUNTING ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>{doc.status}</span>
+                         <p className="text-[9px] text-slate-400 font-black uppercase mt-3 tracking-widest">{new Date(doc.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <button onClick={() => handleStartCount(doc)} className="w-full xl:w-auto px-10 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl">INICIAR VALIDACIÓN</button>
+                    <div>
+                        <h4 className="font-black text-slate-900 uppercase text-3xl tracking-tighter truncate">{doc.externalDocId}</h4>
+                        <div className="flex items-center gap-4 mt-2">
+                           <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PLACA: {doc.vehicleData || 'S/I'}</p>
+                        </div>
+                    </div>
+                    <div className="mt-10 pt-8 border-t border-slate-50">
+                       <button onClick={() => handleStartCount(doc)} className="w-full px-10 py-5 bg-slate-900 text-white rounded-[1.8rem] font-black text-[11px] uppercase tracking-[0.2em] hover:bg-emerald-600 transition-all shadow-xl active:scale-95">
+                          {doc.status === DocStatus.COUNTING ? 'CONTINUAR AUDITORÍA' : 'INICIAR VALIDACIÓN'}
+                       </button>
+                    </div>
                   </div>
                 ))}
-                {pendingRecibo.length === 0 && <div className="p-40 text-center"><h4 className="text-2xl font-black text-slate-200 uppercase tracking-[0.5em]">Operación al día</h4></div>}
+                {pendingRecibo.length === 0 && <div className="col-span-full py-40 text-center"><h4 className="text-2xl font-black text-slate-200 uppercase tracking-[0.5em] animate-pulse">Operación al día</h4></div>}
               </div>
             </div>
-            <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-center gap-4">
-               <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-3 bg-white border border-slate-200 rounded-xl disabled:opacity-30"><Icons.ChevronRight className="rotate-180" /></button>
-               <span className="text-[11px] font-black uppercase mt-2">Página {currentPage} de {totalPages}</span>
-               <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 bg-white border border-slate-200 rounded-xl disabled:opacity-30"><Icons.ChevronRight /></button>
+
+            <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-center items-center gap-8 shrink-0">
+               <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight className="rotate-180" /></button>
+               <span className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Página {currentPage} de {totalPages || 1}</span>
+               <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight /></button>
             </div>
           </div>
         )}

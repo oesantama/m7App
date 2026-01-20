@@ -41,6 +41,16 @@ export interface AuditBase {
   statusId: string;
 }
 
+export interface RouteLog extends AuditBase {
+  id: string;
+  routeId?: string;
+  action: 'ADD_INVOICE' | 'REMOVE_INVOICE' | 'ASSIGN_ROUTE' | 'REJECT_SUGGESTION';
+  entityId: string; // ID de factura o vehículo
+  comment: string;
+  previousState: string;
+  newState: string;
+}
+
 export interface User extends AuditBase {
   id: string;
   email: string;
@@ -170,6 +180,7 @@ export interface Invoice extends AuditBase {
   lng: number;
   volumeM3: number;
   status: DocStatus;
+  city?: string;
 }
 
 export interface Route extends AuditBase {
