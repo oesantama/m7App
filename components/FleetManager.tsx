@@ -92,13 +92,6 @@ const FleetManager: React.FC<FleetManagerProps> = ({
   const [aiError, setAiError] = useState<string | null>(null);
   const [uploadMode, setUploadMode] = useState<'photos' | 'pdf'>('photos');
 
-  const years = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return Array.from({ length: 40 }, (_, i) => currentYear + 1 - i);
-  }, []);
-
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-
   const normalizePlate = (plate: string) => (plate || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
   const validateDate = (dateStr: string) => {
@@ -121,21 +114,6 @@ const FleetManager: React.FC<FleetManagerProps> = ({
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, viewTab === 'vehicles' ? 'Flota' : 'Conductores');
     XLSX.writeFile(workbook, `M7_${viewTab}_${Date.now()}.xlsx`);
-  };
-
-  const handleFileAction = (action: 'view' | 'download', base64: string, filename: string) => {
-    if (!base64) return;
-    if (action === 'download') {
-      const link = document.createElement('a');
-      link.href = base64;
-      link.download = filename;
-      link.click();
-    } else {
-      const win = window.open();
-      if (win) {
-        win.document.write(`<iframe src="${base64}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-      }
-    }
   };
 
   const processVehicleDocument = async (field: 'soatPdfUrl' | 'technoPdfUrl', base64: string, type: string) => {
@@ -200,18 +178,24 @@ const FleetManager: React.FC<FleetManagerProps> = ({
     reader.onloadend = async () => {
       const base64 = reader.result as string;
       const mimeType = file.type;
-      setFormData(prev => {
-        const next = { ...prev, [field]: base64 };
-        if (viewTab === 'vehicles') { if (field === 'soatPdfUrl' || field === 'technoPdfUrl') processVehicleDocument(field as any, base64, mimeType); }
-        else if (viewTab === 'drivers') {
-          if (uploadMode === 'pdf' && field === 'licensePdf') processLicenseFlow([{ data: base64, mimeType }]);
-          else if (uploadMode === 'photos') {
-             if (field === 'licenseSideA' && next.licenseSideB) processLicenseFlow([{ data: base64, mimeType }, { data: next.licenseSideB, mimeType: 'image/jpeg' }]);
-             else if (field === 'licenseSideB' && next.licenseSideA) processLicenseFlow([{ data: next.licenseSideA, mimeType: 'image/jpeg' }, { data: base64, mimeType }]);
+      
+      const nextData = { ...formData, [field]: base64 };
+      setFormData(nextData);
+
+      if (viewTab === 'vehicles') {
+        if (field === 'soatPdfUrl' || field === 'technoPdfUrl') processVehicleDocument(field as any, base64, mimeType);
+      } else if (viewTab === 'drivers') {
+        if (uploadMode === 'pdf' && field === 'licensePdf') {
+          processLicenseFlow([{ data: base64, mimeType }]);
+        } else if (uploadMode === 'photos') {
+          // ANALIZA SOLO SI AMBAS CARAS ESTÁN PRESENTES
+          if (field === 'licenseSideA' && nextData.licenseSideB) {
+            processLicenseFlow([{ data: base64, mimeType }, { data: nextData.licenseSideB, mimeType: 'image/jpeg' }]);
+          } else if (field === 'licenseSideB' && nextData.licenseSideA) {
+            processLicenseFlow([{ data: nextData.licenseSideA, mimeType: 'image/jpeg' }, { data: base64, mimeType }]);
           }
         }
-        return next;
-      });
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -233,20 +217,24 @@ const FleetManager: React.FC<FleetManagerProps> = ({
   const canEdit = isSuperUser || fleetPerms?.actions.includes('edit');
 
   const statusOptions = masterData['masterEstados'] || [];
-  const vehicleTypeOptions = masterData['masterTiposVehiculo'] || [];
-  const clientsOptions = masterData['masterClientes'] || INITIAL_CLIENTS;
+  const docTypeOptions = masterData['masterTipoDocumento'] || [];
 
+  // Fix: Explicitly separate filtering logic for Vehicle and Driver types to avoid union type access errors.
   const activeData = useMemo(() => {
-    const list = viewTab === 'vehicles' ? vehicles : drivers;
-    return list.filter(item => (item.plate || item.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+    const term = searchTerm.toLowerCase();
+    if (viewTab === 'vehicles') {
+      return vehicles.filter(v => (v.plate || '').toLowerCase().includes(term));
+    } else {
+      return drivers.filter(d => (d.name || '').toLowerCase().includes(term));
+    }
   }, [viewTab, vehicles, drivers, searchTerm]);
 
-  const totalPages = useMemo(() => Math.ceil(activeData.length / 10), [activeData]);
+  const commonInputClass = "w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-inner";
 
   return (
     <div className="flex flex-col gap-4 animate-in fade-in h-full overflow-hidden">
-      {/* HEADER COMPACTO TIPO IMAGEN 2 */}
-      <div className="bg-white px-6 py-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0 transition-all">
+      {/* HEADER COMPACTO */}
+      <div className="bg-white px-6 py-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
         <div className="flex items-center gap-4 shrink-0">
           <div className="w-10 h-10 bg-slate-900 rounded-[1.2rem] flex items-center justify-center text-emerald-500 shadow-md">
             {viewTab === 'vehicles' ? <Icons.Truck /> : <Icons.Users />}
@@ -259,7 +247,6 @@ const FleetManager: React.FC<FleetManagerProps> = ({
           </div>
         </div>
 
-        {/* BUSCADOR COMPACTO */}
         <div className="flex flex-1 max-w-xl bg-slate-50 px-5 py-2.5 rounded-2xl items-center gap-3 border border-slate-100 focus-within:border-emerald-500 transition-all">
           <Icons.Search className="text-slate-300 w-4 h-4" />
           <input 
@@ -272,28 +259,23 @@ const FleetManager: React.FC<FleetManagerProps> = ({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          {/* TOGGLE TABS (Vehiculos/Conductores) */}
           <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-11 relative">
             <button onClick={() => setViewTab('vehicles')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewTab === 'vehicles' ? 'text-slate-900' : 'text-slate-400'}`}>Vehículos</button>
             <button onClick={() => setViewTab('drivers')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewTab === 'drivers' ? 'text-slate-900' : 'text-slate-400'}`}>Conductores</button>
             <div className={`absolute top-1 bottom-1 bg-white rounded-xl shadow-md transition-all duration-300 ${viewTab === 'vehicles' ? 'left-1 w-[80px]' : 'left-[84px] w-[95px]'}`}></div>
           </div>
 
-          {/* TOGGLE GRID/TABLE */}
           <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-11 relative">
             <button onClick={() => setDisplayType('table')} className={`p-2.5 rounded-xl transition-all relative z-10 ${displayType === 'table' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.List /></button>
             <button onClick={() => setDisplayType('grid')} className={`p-2.5 rounded-xl transition-all relative z-10 ${displayType === 'grid' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.Grid /></button>
             <div className={`absolute top-1 bottom-1 w-[40px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayType === 'table' ? 'left-1' : 'left-[44px]'}`}></div>
           </div>
 
-          <button onClick={handleExportExcel} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase">
-            <Icons.Excel />
-            <span className="hidden xl:inline">Excel</span>
-          </button>
+          <button onClick={handleExportExcel} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><Icons.Excel /></button>
 
           {canCreate && (
             <button 
-              onClick={() => { setModalMode('single'); setFormData({ statusId: 'EST-01', clientId: INITIAL_CLIENTS[0].id }); setAiError(null); setIsModalOpen(true); }} 
+              onClick={() => { setModalMode('single'); setFormData({ statusId: 'EST-01', clientId: user.clientId || INITIAL_CLIENTS[0].id }); setAiError(null); setIsModalOpen(true); }} 
               className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all active:scale-95"
             >
               NUEVO
@@ -312,7 +294,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                     <th className="px-8 py-4">Identificación</th>
                     <th className="px-8 py-4">Documentación</th>
                     <th className="px-8 py-4 text-center">Estado</th>
-                    <th className="px-8 py-4 text-right">Auditoría</th>
+                    <th className="px-8 py-4 text-right pr-12">Opciones</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -339,143 +321,172 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                             {statusOptions.find(s => s.id === item.statusId)?.name || 'ACTIVO'}
                          </span>
                       </td>
-                      <td className="px-8 py-4 text-right">
+                      <td className="px-8 py-4 text-right pr-12 flex items-center justify-end gap-2">
+                         {/* OPCIONES DE VISTA Y DESCARGA PARA CONDUCTORES (COMO EN VEHICULOS) */}
+                         <button className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all"><Icons.Eye /></button>
+                         <button className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Link /></button>
                          {canEdit && (
-                           <button onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setAiError(null); setIsModalOpen(true); }} className="p-3 bg-emerald-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md active:scale-90"><Icons.Audit /></button>
+                           <button onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setAiError(null); setIsModalOpen(true); }} className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md active:scale-90"><Icons.Audit /></button>
                          )}
                       </td>
                     </tr>
                   ))}
-                  {activeData.length === 0 && <tr><td colSpan={4} className="py-20 text-center font-black text-slate-200 uppercase text-[10px] tracking-widest">Sin registros encontrados</td></tr>}
                 </tbody>
              </table>
           ) : (
-            <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                {activeData.map((item: any) => (
                  <div key={item.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl hover:border-emerald-500 transition-all group overflow-hidden">
                     <div className="flex justify-between items-start mb-4">
                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg ${viewTab === 'vehicles' ? 'bg-slate-900' : 'bg-emerald-500'}`}>
                           {viewTab === 'vehicles' ? <Icons.Truck /> : <Icons.Users />}
                        </div>
-                       <span className={`px-3 py-1 rounded-full text-[7px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                          {statusOptions.find(s => s.id === item.statusId)?.name || 'ACTIVO'}
-                       </span>
+                       <div className="flex gap-1">
+                          <button className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-slate-900 hover:text-white"><Icons.Eye /></button>
+                          <button className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-emerald-500 hover:text-white"><Icons.Link /></button>
+                       </div>
                     </div>
                     <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">{viewTab === 'vehicles' ? item.plate : item.name}</h3>
                     <p className={`text-[8px] font-black uppercase mb-4 ${!validateDate(item.soatExpiry || item.licenseExpiry) ? 'text-red-500' : 'text-slate-400'}`}>
                       {viewTab === 'vehicles' ? `SOAT: ${item.soatExpiry || 'N/A'}` : `LIC: ${item.licenseExpiry || 'N/A'}`}
                     </p>
-                    <button onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setAiError(null); setIsModalOpen(true); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md">Auditar</button>
+                    <button onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setAiError(null); setIsModalOpen(true); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 transition-all">Auditar</button>
                  </div>
                ))}
             </div>
           )}
         </div>
-        <div className="p-4 border-t border-slate-50 bg-slate-50/20 flex justify-between items-center shrink-0">
-           <div className="flex items-center gap-3">
-              <label className="text-[8px] font-black text-slate-400 uppercase">Página 1 de {totalPages || 1}</label>
-           </div>
-           <div className="flex items-center gap-4">
-              <button disabled className="p-2 bg-white border border-slate-200 rounded-lg text-slate-300 disabled:opacity-20"><Icons.ChevronRight className="rotate-180 w-3 h-3" /></button>
-              <button disabled className="p-2 bg-white border border-slate-200 rounded-lg text-slate-300 disabled:opacity-20"><Icons.ChevronRight className="w-3 h-3" /></button>
-           </div>
-        </div>
       </div>
 
-      {/* MODAL FORMULARIO */}
+      {/* MODAL M7 REGISTRO SEGURO */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 overflow-y-auto">
-          <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl overflow-hidden flex flex-col my-auto max-h-[95vh] border border-white/10">
+          <div className="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl overflow-hidden flex flex-col my-auto border border-white/10">
             <div className="bg-slate-900 p-8 text-white flex justify-between items-center shrink-0">
                <div className="flex items-center gap-6">
                   <div className="w-12 h-12 bg-emerald-500 text-slate-950 rounded-[1.5rem] flex items-center justify-center shadow-xl"><Icons.Scan /></div>
                   <div>
-                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">{modalMode === 'edit' ? 'Auditoría' : 'Registro'} M7</h3>
-                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2">CONFIGURACIÓN SEGURA</p>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">REGISTRO M7</h3>
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2">OPERACIÓN SEGURA</p>
                   </div>
                </div>
                <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
             </div>
 
-            <div className="p-10 space-y-8 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/20">
+            <div className="p-10 space-y-8 flex-1 bg-slate-50/20">
               {aiError && (
-                <div className="p-6 bg-red-600 text-white rounded-[2rem] text-xs font-black uppercase flex items-center gap-4 animate-in shake">
+                <div className="p-6 bg-red-600 text-white rounded-[2rem] text-[10px] font-black uppercase flex items-center gap-4 animate-in shake">
                   <Icons.Alert /> {aiError}
                 </div>
               )}
 
               {isProcessingAI && (
-                <div className="p-10 bg-emerald-50 border-4 border-dashed border-emerald-500 rounded-[3rem] flex flex-col items-center justify-center gap-4 animate-pulse">
-                   <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="p-8 bg-emerald-50 border-4 border-dashed border-emerald-500 rounded-[3rem] flex flex-col items-center justify-center gap-4 animate-pulse">
+                   <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                    <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">M7 VISION ANALIZANDO SOPORTES...</p>
                 </div>
               )}
 
               {viewTab === 'vehicles' ? (
-                <div className="space-y-10">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                /* FORMULARIO DE VEHICULOS INTACTO */
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Placa</label>
-                      <input type="text" required value={formData.plate || ''} onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})} className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs" />
+                      <input type="text" value={formData.plate || ''} onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})} className={commonInputClass} />
                     </div>
                     <SearchableSelect label="Marca" value={formData.brand} options={MASTER_BRANDS} onChange={(val: string) => setFormData({...formData, brand: val})} />
-                    <SearchableSelect label="Tipo Vehículo" value={formData.vehicleTypeId} options={vehicleTypeOptions} onChange={(val: string) => setFormData({...formData, vehicleTypeId: val})} />
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Capacidad (m³)</label>
-                      <input type="number" required value={formData.capacityM3 || ''} onChange={e => setFormData({...formData, capacityM3: parseFloat(e.target.value)})} className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs" />
-                    </div>
                   </div>
-
-                  <div className="bg-slate-900 p-8 rounded-[3rem] space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-4">
-                        <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest text-center">SOAT (PDF)</p>
-                        <div className="relative h-32 bg-white/5 border border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 overflow-hidden">
-                           {formData.soatPdfUrl ? <Icons.Excel /> : <Icons.Excel />}
-                           <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="application/pdf" onChange={e => handleFileUpload(e, 'soatPdfUrl')} />
-                        </div>
-                        <input type="date" value={formData.soatExpiry || ''} onChange={e => setFormData({...formData, soatExpiry: e.target.value})} className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white text-[10px] font-bold" />
-                      </div>
-                      <div className="space-y-4">
-                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest text-center">TÉCNICA (PDF)</p>
-                        <div className="relative h-32 bg-white/5 border border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 overflow-hidden">
-                           <Icons.Excel />
-                           <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="application/pdf" onChange={e => handleFileUpload(e, 'technoPdfUrl')} />
-                        </div>
-                        <input type="date" value={formData.technoExpiry || ''} onChange={e => setFormData({...formData, technoExpiry: e.target.value})} className="w-full p-3 bg-white/10 border border-white/10 rounded-xl text-white text-[10px] font-bold" />
-                      </div>
+                  <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-inner space-y-6">
+                    <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest text-center">Soportes Legales</p>
+                    <div className="grid grid-cols-2 gap-4">
+                       <label className={`h-24 bg-white/5 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.soatPdfUrl ? 'border-emerald-500' : 'border-white/10'}`}>
+                          <Icons.Excel className="text-white/20 w-6 h-6 mb-1" />
+                          <span className="text-[8px] font-black text-white/30 uppercase">SOAT PDF</span>
+                          <input type="file" className="hidden" accept="application/pdf" onChange={e => handleFileUpload(e, 'soatPdfUrl')} />
+                       </label>
+                       <label className={`h-24 bg-white/5 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.technoPdfUrl ? 'border-blue-500' : 'border-white/10'}`}>
+                          <Icons.Excel className="text-white/20 w-6 h-6 mb-1" />
+                          <span className="text-[8px] font-black text-white/30 uppercase">TECNO PDF</span>
+                          <input type="file" className="hidden" accept="application/pdf" onChange={e => handleFileUpload(e, 'technoPdfUrl')} />
+                       </label>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-10">
+                /* ACTUALIZACIÓN DEL FORMULARIO DE CONDUCTORES */
+                <div className="space-y-10 animate-in fade-in">
                   <div className="flex bg-slate-200 p-1 rounded-2xl shadow-inner w-full max-w-xs mx-auto">
-                     <button type="button" onClick={() => setUploadMode('photos')} className={`flex-1 py-2 rounded-xl font-black text-[9px] uppercase transition-all ${uploadMode === 'photos' ? 'bg-white shadow-md text-slate-900' : 'text-slate-500'}`}>Fotos A/B</button>
+                     <button type="button" onClick={() => setUploadMode('photos')} className={`flex-1 py-2 rounded-xl font-black text-[9px] uppercase transition-all ${uploadMode === 'photos' ? 'bg-white shadow-md text-slate-900' : 'text-slate-500'}`}>FOTOS A/B</button>
                      <button type="button" onClick={() => setUploadMode('pdf')} className={`flex-1 py-2 rounded-xl font-black text-[9px] uppercase transition-all ${uploadMode === 'pdf' ? 'bg-white shadow-md text-slate-900' : 'text-slate-500'}`}>PDF</button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="md:col-span-2 space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre Completo</label>
-                       <input type="text" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs" />
-                    </div>
+                  <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-inner">
+                    {uploadMode === 'photos' ? (
+                       <div className="grid grid-cols-2 gap-6">
+                          <div className="space-y-4 text-center">
+                             <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Cara Frontal (A)</p>
+                             <label className={`relative h-40 bg-white/5 border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.licenseSideA ? 'border-emerald-500' : 'border-white/10'}`}>
+                                {formData.licenseSideA ? <img src={formData.licenseSideA} className="w-full h-full object-cover rounded-[2.2rem]" /> : <Icons.Camera className="text-white/20 w-8 h-8" />}
+                                <input type="file" className="hidden" accept="image/*" onChange={e => handleFileUpload(e, 'licenseSideA')} />
+                             </label>
+                          </div>
+                          <div className="space-y-4 text-center">
+                             <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Cara Posterior (B)</p>
+                             <label className={`relative h-40 bg-white/5 border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.licenseSideB ? 'border-emerald-500' : 'border-white/10'}`}>
+                                {formData.licenseSideB ? <img src={formData.licenseSideB} className="w-full h-full object-cover rounded-[2.2rem]" /> : <Icons.Camera className="text-white/20 w-8 h-8" />}
+                                <input type="file" className="hidden" accept="image/*" onChange={e => handleFileUpload(e, 'licenseSideB')} />
+                             </label>
+                          </div>
+                       </div>
+                    ) : (
+                       <div className="space-y-4 text-center">
+                          <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Licencia Digital (PDF)</p>
+                          <label className={`relative h-40 bg-white/5 border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.licensePdf ? 'border-blue-500' : 'border-white/10'}`}>
+                             <div className="flex flex-col items-center gap-3">
+                                <Icons.Excel className="text-white/20 w-8 h-8" />
+                                <span className="text-[10px] font-black text-white/40 uppercase">Vincular Documento</span>
+                             </div>
+                             <input type="file" className="hidden" accept="application/pdf" onChange={e => handleFileUpload(e, 'licensePdf')} />
+                          </label>
+                       </div>
+                    )}
+                    {uploadMode === 'photos' && (!formData.licenseSideA || !formData.licenseSideB) && (
+                      <p className="text-center text-amber-500 text-[8px] font-black uppercase mt-4 animate-pulse tracking-widest">Cargue ambas fotos para iniciar análisis M7 Vision</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-6">
                     <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nro Documento</label>
-                       <input type="text" value={formData.documentNumber || ''} onChange={e => setFormData({...formData, documentNumber: e.target.value})} className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs" />
+                       <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Nombre Completo</label>
+                       <input type="text" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} placeholder="Ingrese nombre..." className={commonInputClass} />
                     </div>
-                    <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Vencimiento Licencia</label>
-                       <input type="date" value={formData.licenseExpiry || ''} onChange={e => setFormData({...formData, licenseExpiry: e.target.value})} className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs" />
+
+                    <div className="grid grid-cols-2 gap-6">
+                      <SearchableSelect label="Tipo Documento" value={formData.documentType} options={docTypeOptions} onChange={(val: string) => setFormData({...formData, documentType: val})} />
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Nro Documento</label>
+                        <input type="text" value={formData.documentNumber || ''} onChange={e => setFormData({...formData, documentNumber: e.target.value})} placeholder="ID..." className={commonInputClass} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Vencimiento Licencia</label>
+                        <input type="date" value={formData.licenseExpiry || ''} onChange={e => setFormData({...formData, licenseExpiry: e.target.value})} className={commonInputClass} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Número Telefónico</label>
+                        <input type="text" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+57 ..." className={commonInputClass} />
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="pt-8 border-t border-slate-200 flex flex-col md:flex-row gap-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-12 py-5 bg-red-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all">DESCARTAR</button>
-                <button onClick={handleSave} className="flex-1 bg-slate-900 text-white py-5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-xl transition-all flex items-center justify-center gap-4">
-                   CONFIRMAR OPERACIÓN
-                </button>
+              <div className="pt-8 flex flex-col md:flex-row gap-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all">DESCARTAR</button>
+                <button onClick={handleSave} className="flex-[2] bg-slate-900 text-white py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-2xl transition-all active:scale-95">CONFIRMAR OPERACIÓN</button>
               </div>
             </div>
           </div>

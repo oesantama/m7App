@@ -26,6 +26,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [tableSearch, setTableSearch] = useState('');
   const [counts, setCounts] = useState<{ [articleId: string]: number }>({});
   const [count1Data, setCount1Data] = useState<{ [articleId: string]: number }>({});
+  const [mismatchIds, setMismatchIds] = useState<string[]>([]); // IDS de novedades fijas para Fase 2
   const [validationAttempts, setValidationAttempts] = useState(0); 
   const [lastScan, setLastScan] = useState<{ article: Article | null, message: string, status: 'success' | 'error' | 'new' } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -57,15 +58,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
         setCounts(data.counts || {});
         setCount1Data(data.count1Data || {});
         setValidationAttempts(data.validationAttempts || 0);
+        setMismatchIds(data.mismatchIds || []);
       } catch (e) { console.error("Error cargando caché M7", e); }
     }
   }, [docL.id]);
 
   useEffect(() => {
     localStorage.setItem(`m7_offline_count_${docL.id}`, JSON.stringify({
-      counts, count1Data, validationAttempts
+      counts, count1Data, validationAttempts, mismatchIds
     }));
-  }, [counts, count1Data, validationAttempts, docL.id]);
+  }, [counts, count1Data, validationAttempts, mismatchIds, docL.id]);
 
   const handleScan = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +112,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (mismatches.length > 0 && validationAttempts === 0) {
       setCount1Data({ ...counts });
       setValidationAttempts(1);
+      setMismatchIds(mismatches.map(m => m.articleId)); // Fijamos qué items mostramos en pantalla de revisión
       setLastScan({ article: null, message: "NOVEDADES DETECTADAS. REVISIÓN ACTIVADA.", status: 'error' });
       return;
     }
@@ -160,22 +163,20 @@ const BlindCount: React.FC<BlindCountProps> = ({
     }, 1500);
   };
 
-  // Lógica de filtrado: 
-  // 1. Si validationAttempts es 0, mostramos los que tienen algún conteo (conteo ciego).
-  // 2. Si validationAttempts es 1, mostramos ÚNICAMENTE los que tienen novedad.
   const filteredItems = useMemo(() => {
-    let baseList = groupedItems;
     if (validationAttempts === 0) {
-      // En conteo inicial, solo mostramos lo que se ha escaneado para mantener el ciego
-      baseList = groupedItems.filter(it => (counts[it.articleId] || 0) > 0);
+      // Fase 1: Solo mostramos lo que se ha escaneado para mantener el ciego
+      const list = groupedItems.filter(it => (counts[it.articleId] || 0) > 0);
+      if (!tableSearch) return list;
+      return list.filter(it => it.articleId.toLowerCase().includes(tableSearch.toLowerCase()));
     } else {
-      // Tras validar, ocultamos los OK y solo mostramos NOVEDADES
-      baseList = groupedItems.filter(it => (counts[it.articleId] || 0) !== it.expectedQty);
+      // Fase 2: Mostramos los que presentaron novedad al inicio de la fase. 
+      // NO DESAPARECEN aunque se llegue al número correcto para evitar confusión.
+      const list = groupedItems.filter(it => mismatchIds.includes(it.articleId));
+      if (!tableSearch) return list;
+      return list.filter(it => it.articleId.toLowerCase().includes(tableSearch.toLowerCase()));
     }
-
-    if (!tableSearch) return baseList;
-    return baseList.filter(it => it.articleId.toLowerCase().includes(tableSearch.toLowerCase()));
-  }, [groupedItems, tableSearch, validationAttempts, counts]);
+  }, [groupedItems, tableSearch, validationAttempts, counts, mismatchIds]);
 
   return (
     <div className="bg-white rounded-[2.5rem] shadow-[0_20px_100px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden w-full max-w-[98%] mx-auto animate-in fade-in zoom-in-95 duration-500 flex flex-col h-full relative">
@@ -294,7 +295,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                  {validationAttempts === 1 && (
                     <div className="ml-4 flex items-center gap-2 text-red-600 animate-pulse">
                        <Icons.Alert className="w-3 h-3" />
-                       <span className="text-[8px] font-black uppercase">Mostrando únicamente novedades por resolver</span>
+                       <span className="text-[8px] font-black uppercase">Mostrando únicamente novedades registradas</span>
                     </div>
                  )}
               </div>
@@ -312,22 +313,21 @@ const BlindCount: React.FC<BlindCountProps> = ({
                     <tbody className="divide-y divide-slate-50">
                        {filteredItems.map(it => {
                          const currentCount = counts[it.articleId] || 0;
-                         const isNovedad = currentCount !== it.expectedQty;
                          return (
-                           <tr key={it.articleId} className={`hover:bg-slate-50/50 transition-all font-bold group ${isNovedad && validationAttempts === 1 ? 'bg-red-50/50' : ''}`}>
+                           <tr key={it.articleId} className={`hover:bg-slate-50/50 transition-all font-bold group ${validationAttempts === 1 ? 'bg-red-50/10' : ''}`}>
                               <td className="px-8 py-3">
                                  <p className="font-black text-slate-950 text-sm uppercase tracking-tight leading-none">{it.articleId}</p>
                                  <p className="text-[8px] text-slate-400 uppercase tracking-widest mt-1">Línea Auditoría M7</p>
                               </td>
                               <td className="px-8 py-3 text-center">
-                                 {validationAttempts === 1 && isNovedad ? (
-                                   <span className="px-3 py-1 bg-red-500 text-white rounded-lg text-[7px] font-black uppercase tracking-widest shadow-md">NOVEDAD</span>
+                                 {validationAttempts === 1 ? (
+                                   <span className="px-3 py-1 bg-red-500 text-white rounded-lg text-[7px] font-black uppercase tracking-widest shadow-md">REVISIÓN M7</span>
                                  ) : (
                                    <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[7px] font-black uppercase tracking-widest">EN CONTEO</span>
                                  )}
                               </td>
                               <td className="px-8 py-3 text-center">
-                                 <div className={`inline-flex items-center justify-center min-w-[60px] h-10 rounded-xl text-lg font-black shadow-inner transition-all ${currentCount > 0 ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-slate-100 text-slate-300'}`}>
+                                 <div className={`inline-flex items-center justify-center min-w-[60px] h-10 rounded-xl text-lg font-black shadow-inner transition-all ${currentCount > 0 ? (validationAttempts === 1 ? 'bg-slate-800 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-300'}`}>
                                     {currentCount}
                                  </div>
                               </td>
@@ -347,7 +347,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                          <tr>
                             <td colSpan={4} className="py-24 text-center">
                                <p className="font-black text-slate-300 uppercase text-[10px] tracking-[0.3em]">
-                                  {validationAttempts === 0 ? 'Escanee para iniciar inventario' : 'Sin novedades pendientes ✓'}
+                                  {validationAttempts === 0 ? 'Escanee para iniciar inventario' : 'Sin novedades registradas ✓'}
                                </p>
                             </td>
                          </tr>

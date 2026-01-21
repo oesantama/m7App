@@ -5,7 +5,8 @@ import Login from './components/Login';
 import GestionDocumentosL from './components/GestionDocumentosL';
 import RecibidoMaterial from './components/RecibidoMaterial';
 import RoutePlanner from './components/RoutePlanner';
-import FleetManager from './components/FleetManager';
+import VehicleManager from './components/VehicleManager';
+import DriverManager from './components/DriverManager';
 import AssignmentManager from './components/AssignmentManager';
 import MasterModule from './components/MasterModule';
 import HelpChat from './components/HelpChat';
@@ -19,6 +20,7 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<PageModule | 'receiving'>('dashboard');
+  const [fleetSubTab, setFleetSubTab] = useState<'vehicles' | 'drivers'>('vehicles');
   const [activeMasterCategory, setActiveMasterCategory] = useState<MasterCategory>('masterTiposVehiculo');
   const [allMasterData, setAllMasterData] = useState<{ [key in MasterCategory]?: MasterRecord[] }>({});
   
@@ -194,7 +196,35 @@ const App: React.FC = () => {
       {activeTab === 'inventory' && <GestionDocumentosL documents={documents} invoices={invoices} user={currentUser!} masterEstados={allMasterData['masterEstados'] || []} onAddDocuments={(newDocs) => setDocuments([...documents, ...newDocs])} />}
       {activeTab === 'receiving' && <RecibidoMaterial documents={documents} user={currentUser!} masterEstados={allMasterData['masterEstados'] || []} masterNotificaciones={allMasterData['masterNotificaciones'] || []} masterArticulo={allMasterData['masterArticulo'] || []} onUpdateDocuments={setDocuments} onAddArticleToMaster={(a) => {}} onAddNotificationToMaster={handleAddNotificationToMaster} />}
       {activeTab === 'routing' && <RoutePlanner invoices={invoices} vehicles={vehicles} drivers={drivers} assignments={assignments} documents={documents} user={currentUser!} onAssign={(vId, dId, cId) => setAssignments([...assignments, { id: `ass-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, date: new Date().toISOString(), isActive: true, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' }])} onSaveRoute={() => {}} />}
-      {activeTab === 'fleet' && <FleetManager vehicles={vehicles} drivers={drivers} user={currentUser!} masterData={allMasterData} onAddVehicle={v => setVehicles([...vehicles, {...v, id: `v-${Date.now()}`} as any])} onAddDriver={d => setDrivers([...drivers, {...d, id: `d-${Date.now()}`} as any])} onUpdateVehicle={(id, data) => setVehicles(vehicles.map(v => v.id === id ? {...v, ...data} : v))} onUpdateDriver={(id, data) => setDrivers(drivers.map(d => d.id === id ? {...d, ...data} : d))} />}
+      
+      {activeTab === 'fleet' && (
+        <div className="space-y-8 animate-in fade-in">
+          <div className="bg-slate-900 p-2 rounded-[2.5rem] flex max-w-md mx-auto shadow-2xl relative">
+            <button onClick={() => setFleetSubTab('vehicles')} className={`flex-1 py-4 rounded-[2rem] font-black text-[11px] uppercase transition-all relative z-10 ${fleetSubTab === 'vehicles' ? 'text-slate-900' : 'text-slate-500'}`}>M7 FLOTA</button>
+            <button onClick={() => setFleetSubTab('drivers')} className={`flex-1 py-4 rounded-[2rem] font-black text-[11px] uppercase transition-all relative z-10 ${fleetSubTab === 'drivers' ? 'text-slate-900' : 'text-slate-500'}`}>M7 TALENTO</button>
+            <div className={`absolute top-2 bottom-2 bg-emerald-500 rounded-[2rem] shadow-xl transition-all duration-300 ${fleetSubTab === 'vehicles' ? 'left-2 w-[48%]' : 'left-[50%] w-[48%]'}`}></div>
+          </div>
+
+          {fleetSubTab === 'vehicles' ? (
+            <VehicleManager 
+              vehicles={vehicles} 
+              user={currentUser!} 
+              masterData={allMasterData}
+              onAdd={v => setVehicles([...vehicles, {...v, id: `v-${Date.now()}`} as any])}
+              onUpdate={(id, data) => setVehicles(vehicles.map(v => v.id === id ? {...v, ...data} : v))}
+            />
+          ) : (
+            <DriverManager 
+              drivers={drivers} 
+              user={currentUser!} 
+              masterData={allMasterData}
+              onAdd={d => setDrivers([...drivers, {...d, id: `d-${Date.now()}`} as any])}
+              onUpdate={(id, data) => setDrivers(drivers.map(d => d.id === id ? {...d, ...data} : d))}
+            />
+          )}
+        </div>
+      )}
+
       {activeTab === 'assignments' && <AssignmentManager vehicles={vehicles} drivers={drivers} assignments={assignments} user={currentUser!} onAssign={(vId, dId, cId) => setAssignments([...assignments, { id: `ass-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, date: new Date().toISOString(), isActive: true, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' }])} onEndAssignment={id => setAssignments(assignments.map(a => a.id === id ? {...a, isActive: false} : a))} />}
       {(activeTab === 'master' || activeTab === 'access') && <MasterModule key={activeMasterCategory} onAudit={() => {}} activeMaster={activeMasterCategory} allMasterData={allMasterData} setAllMasterData={setAllMasterData} user={currentUser!} />}
       <HelpChat />
