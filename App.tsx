@@ -97,11 +97,6 @@ const App: React.FC = () => {
       { id: 'NT-01', name: 'LOGISTICA AJOVER', notificationEmail: 'logistica@ajover.com', tipoNotificacionId: 'TN-01', statusId: 'EST-01' }
     ];
 
-    initial['masterRol'] = [
-      { id: 'ROL-01', name: 'SUPERUSUARIO', description: 'Acceso Total M7', statusId: 'EST-01' },
-      { id: 'ROL-02', name: 'ADMINISTRADOR', description: 'Gestión Administrativa', statusId: 'EST-01' }
-    ];
-
     initial['masterUsuarios'] = INITIAL_USERS_DATA;
     initial['masterClientes'] = INITIAL_CLIENTS;
     initial['masterArticulo'] = INITIAL_ARTICLES;
@@ -160,6 +155,25 @@ const App: React.FC = () => {
     return false;
   };
 
+  const handleAddNotificationToMaster = (notif: Partial<MasterRecord>) => {
+    const now = new Date().toISOString();
+    const newId = `NT-${Date.now()}`;
+    const newRecord: MasterRecord = {
+      ...notif,
+      id: newId,
+      createdBy: currentUser?.name || 'SYSTEM',
+      createdAt: now,
+      updatedBy: currentUser?.name || 'SYSTEM',
+      updatedAt: now,
+      statusId: 'EST-01'
+    } as MasterRecord;
+
+    setAllMasterData(prev => ({
+      ...prev,
+      masterNotificaciones: [...(prev.masterNotificaciones || []), newRecord]
+    }));
+  };
+
   if (!isAuthenticated) return <Login onLogin={handleLogin} />;
 
   return (
@@ -178,7 +192,7 @@ const App: React.FC = () => {
         </div>
       )}
       {activeTab === 'inventory' && <GestionDocumentosL documents={documents} invoices={invoices} user={currentUser!} masterEstados={allMasterData['masterEstados'] || []} onAddDocuments={(newDocs) => setDocuments([...documents, ...newDocs])} />}
-      {activeTab === 'receiving' && <RecibidoMaterial documents={documents} user={currentUser!} masterEstados={allMasterData['masterEstados'] || []} masterNotificaciones={allMasterData['masterNotificaciones'] || []} masterArticulo={allMasterData['masterArticulo'] || []} onUpdateDocuments={setDocuments} onAddArticleToMaster={(a) => {}} />}
+      {activeTab === 'receiving' && <RecibidoMaterial documents={documents} user={currentUser!} masterEstados={allMasterData['masterEstados'] || []} masterNotificaciones={allMasterData['masterNotificaciones'] || []} masterArticulo={allMasterData['masterArticulo'] || []} onUpdateDocuments={setDocuments} onAddArticleToMaster={(a) => {}} onAddNotificationToMaster={handleAddNotificationToMaster} />}
       {activeTab === 'routing' && <RoutePlanner invoices={invoices} vehicles={vehicles} drivers={drivers} assignments={assignments} documents={documents} user={currentUser!} onAssign={(vId, dId, cId) => setAssignments([...assignments, { id: `ass-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, date: new Date().toISOString(), isActive: true, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' }])} onSaveRoute={() => {}} />}
       {activeTab === 'fleet' && <FleetManager vehicles={vehicles} drivers={drivers} user={currentUser!} masterData={allMasterData} onAddVehicle={v => setVehicles([...vehicles, {...v, id: `v-${Date.now()}`} as any])} onAddDriver={d => setDrivers([...drivers, {...d, id: `d-${Date.now()}`} as any])} onUpdateVehicle={(id, data) => setVehicles(vehicles.map(v => v.id === id ? {...v, ...data} : v))} onUpdateDriver={(id, data) => setDrivers(drivers.map(d => d.id === id ? {...d, ...data} : d))} />}
       {activeTab === 'assignments' && <AssignmentManager vehicles={vehicles} drivers={drivers} assignments={assignments} user={currentUser!} onAssign={(vId, dId, cId) => setAssignments([...assignments, { id: `ass-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, date: new Date().toISOString(), isActive: true, createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01' }])} onEndAssignment={id => setAssignments(assignments.map(a => a.id === id ? {...a, isActive: false} : a))} />}
