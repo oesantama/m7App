@@ -3,8 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    ports:
-      - "8090:8080"
+#    ports:
+#      - "8090:8080"
     volumes:
       - ./.wwebjs_auth:/app/.wwebjs_auth
     env_file:
@@ -17,8 +17,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    ports:
-      - "3010:80"
+#    ports:
+#      - "3010:80"
     depends_on:
       - m7app-backend
     restart: always
@@ -27,8 +27,8 @@ services:
     image: atendai/evolution-api:latest
     container_name: m7-evolution-api
     restart: always
-    ports:
-      - "8080:8080"
+#    ports:
+#      - "8080:8080"
     depends_on:
       - postgres
     environment:
