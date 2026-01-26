@@ -1,0 +1,31 @@
+# Dockerfile para el Backend
+FROM node:20-slim
+
+# Instalar dependencias para Puppeteer/Chromium
+RUN apt-get update && apt-get install -y \
+    chromium \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm-dev \
+    libasound2 \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+WORKDIR /app
+
+# Copiar package.json del root (ya que las dependencias están ahí)
+COPY package*.json ./
+RUN npm install
+
+# Copiar todo el código (incluyendo la carpeta backend)
+COPY . .
+
+EXPOSE 8080
+
+CMD ["npx", "tsx", "backend/server.ts"]

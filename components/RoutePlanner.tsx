@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
 import { Invoice, Vehicle, Route, VehicleStatus, Driver, VehicleAssignment, DocumentL, DocStatus, RouteLog, User } from '../types';
 import { Icons, INITIAL_CLIENTS } from '../constants';
+import { toast } from 'sonner';
 
 interface RoutePlannerProps {
   invoices: Invoice[];
@@ -227,10 +228,23 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   </div>
                </div>
              ) : (
-               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pb-10">
-                 {suggestedRoutes.map((route, rIdx) => {
-                    return (
-                      <div key={route.id} className="bg-white rounded-[3.5rem] shadow-2xl border-2 border-slate-100 overflow-hidden flex flex-col group hover:border-emerald-500 transition-all animate-in slide-in-from-bottom-8">
+                <div className="flex flex-col gap-8">
+                   {/* Banner IA */}
+                   <div className="bg-emerald-500 p-8 rounded-[3rem] shadow-xl flex flex-col md:flex-row items-center gap-8 animate-in zoom-in duration-500">
+                      <div className="w-20 h-20 bg-slate-950 rounded-3xl flex items-center justify-center shrink-0 shadow-2xl">
+                          <Icons.Brain className="text-emerald-500 w-10 h-10" />
+                      </div>
+                      <div className="flex-1">
+                          <h4 className="text-slate-950 font-black text-xs uppercase tracking-[0.3em] mb-2">Análisis de Optimización M7 Intelligence</h4>
+                          <p className="text-slate-900 text-sm font-bold leading-relaxed">
+                             He logrado una optimización promedio del {Math.round(suggestedRoutes.reduce((acc, r) => acc + r.utilization, 0) / suggestedRoutes.length)}% consolidando {validInvoices.length} facturas.
+                          </p>
+                      </div>
+                   </div>
+
+                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pb-10">
+                    {suggestedRoutes.map((route, rIdx) => (
+                      <div key={route.id} className="bg-white rounded-[3.5rem] shadow-2xl border-2 border-slate-100 overflow-hidden flex flex-col group hover:border-emerald-500 transition-all">
                           <div className="p-8 bg-slate-950 text-white flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-5">
                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${route.utilization >= 90 ? 'bg-emerald-500 text-slate-950' : 'bg-amber-500 text-slate-950'}`}><Icons.Truck /></div>
@@ -272,16 +286,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                           </div>
 
                           <div className="p-8 border-t bg-white flex gap-4 shrink-0">
-                            <button 
-                              className="flex-1 py-5 bg-slate-950 text-white rounded-[1.8rem] font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-2xl"
-                            >
-                              Confirmar Despacho M7
-                            </button>
+                            <button className="flex-1 py-5 bg-slate-950 text-white rounded-[1.8rem] font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-2xl">Confirmar Despacho M7</button>
                           </div>
                       </div>
-                    );
-                 })}
-               </div>
+                    ))}
+                   </div>
+                </div>
              )}
           </div>
         )}

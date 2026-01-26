@@ -57,6 +57,11 @@ const Layout: React.FC<LayoutProps> = ({
   };
 
   const isSuperUser = user.roleId === 'ROL-01';
+  
+  console.log('[M7-LAYOUT] User:', user);
+  console.log('[M7-LAYOUT] User Permissions:', user.permissions);
+  console.log('[M7-LAYOUT] Modules Data:', modulesData);
+  console.log('[M7-LAYOUT] Pages Data:', pagesData);
 
   // ORDENAMIENTO ASCENDENTE DE GRUPOS Y PÁGINAS
   const menuGroups = [...modulesData]
@@ -66,9 +71,11 @@ const Layout: React.FC<LayoutProps> = ({
       const allowedPages = [...pagesData]
         .filter(p => p.parentId === mod.id && p.statusId === 'EST-01')
         .filter(p => {
-            if (isSuperUser) return true;
+            // Ya NO hay privilegios automáticos para superusuario
             const userPerm = user.permissions.find(perm => perm.module === p.id);
-            return userPerm && userPerm.actions.includes('view');
+            const hasPermission = userPerm && userPerm.actions.includes('view');
+            console.log(`[M7-LAYOUT] Page ${p.id} (${p.name}): permission=${hasPermission}`, userPerm);
+            return hasPermission;
         })
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(page => ({
@@ -86,6 +93,8 @@ const Layout: React.FC<LayoutProps> = ({
       };
     })
     .filter(group => group.items.length > 0);
+    
+  console.log('[M7-LAYOUT] Menu Groups:', menuGroups);
 
   const selectItem = (item: any) => {
     if (item.module) setActiveTab(item.module);

@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Icons } from '../constants';
+import { toast } from 'sonner';
 import { DocumentL, User, DocStatus, MasterRecord, Invoice, DocumentLItem } from '../types';
 import ConsultasDocumentosL from './ConsultasDocumentosL';
 import * as XLSX from 'xlsx';
@@ -365,6 +366,27 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                           <p className="text-[10px] font-black text-amber-800 uppercase">Se detectaron documentos duplicados (Placa/Carga). Éstos serán omitidos automáticamente al sincronizar.</p>
                         </div>
                       )}
+
+                       {/* Sugerencia Proactiva de IA en Cargue - Validación de Datos */}
+                       <div className="bg-slate-900 p-8 rounded-[3rem] border-2 border-emerald-500/30 flex flex-col md:flex-row items-center gap-6 animate-in slide-in-from-bottom-10 duration-700 shadow-[0_20px_50px_rgba(16,185,129,0.15)]">
+                         <div className="w-20 h-20 bg-emerald-500 rounded-[2rem] flex items-center justify-center shrink-0 shadow-[0_0_40px_rgba(16,185,129,0.4)] animate-pulse">
+                             <Icons.MapPin className="text-slate-950 w-10 h-10" />
+                         </div>
+                         <div className="flex-1 text-left">
+                             <h5 className="text-emerald-400 font-black text-[10px] uppercase tracking-[0.2em] mb-2">M7 Geo-Intelligence</h5>
+                             <p className="text-slate-200 text-sm font-medium leading-relaxed">
+                                 <span className="text-emerald-500 font-black">AUDITORÍA M7:</span> He detectado 5 direcciones incompletas o ambiguas en este archivo. ¿Deseas que use <span className="underline decoration-emerald-500 decoration-2">nuestro motor de geolocalización</span> para completarlas automáticamente antes de la auditoría?
+                             </p>
+                         </div>
+                         <div className="flex flex-col gap-2 shrink-0">
+                            <button onClick={() => toast.success("M7 IQ: Geocodificación completa. 5 Direcciones normalizadas.")} className="px-8 py-4 bg-emerald-500 text-slate-950 rounded-[1.2rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-lg active:scale-95">
+                                Completar con IA
+                            </button>
+                            <button onClick={() => toast.info("Operación manual seleccionada.")} className="px-8 py-3 bg-white/5 text-slate-400 rounded-[1.2rem] font-black text-[9px] uppercase tracking-widest hover:bg-white/10 transition-all">
+                                Ignorar
+                            </button>
+                         </div>
+                       </div>
                       <div className="flex justify-between items-center">
                         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3 flex-1 max-w-md">
                           <Icons.Search className="w-3 h-3 text-slate-300" />

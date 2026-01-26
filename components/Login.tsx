@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
 
 interface LoginProps {
-  onLogin: (email: string, pass: string) => boolean | void;
+  onLogin: (email: string, pass: string) => Promise<boolean>;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -14,6 +14,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [view, setView] = useState<'login' | 'forgot'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
 
   // Cargar credenciales guardadas al montar el componente
   useEffect(() => {
@@ -24,27 +26,63 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       setPassword(savedPass);
       setRememberMe(true);
     }
+    
+    // Verificar bloqueo existente
+    const lock = localStorage.getItem('m7_lockout');
+    if (lock) {
+      const lockTime = parseInt(lock);
+      if (lockTime > Date.now()) {
+        setLockoutUntil(lockTime);
+      } else {
+        localStorage.removeItem('m7_lockout');
+      }
+    }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Verificar bloqueo
+    if (lockoutUntil && lockoutUntil > Date.now()) {
+      const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      setError(`SISTEMA BLOQUEADO: Reintente en ${remaining}s por seguridad.`);
+      return;
+    }
+
     setIsLoading(true);
     
-    const cleanEmail = email.trim().toLowerCase();
-    const success = onLogin(cleanEmail, password);
-    
-    if (success !== false) {
-      // Si el login es exitoso y rememberMe está activo, guardar
-      if (rememberMe) {
-        localStorage.setItem('m7_remember_email', cleanEmail);
-        localStorage.setItem('m7_remember_pass', password);
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const success = await onLogin(cleanEmail, password);
+      
+      if (success === true) {
+        setFailedAttempts(0);
+        localStorage.removeItem('m7_lockout');
+        // Si el login es exitoso y rememberMe está activo, guardar
+        if (rememberMe) {
+          localStorage.setItem('m7_remember_email', cleanEmail);
+          localStorage.setItem('m7_remember_pass', password);
+        } else {
+          localStorage.removeItem('m7_remember_email');
+          localStorage.removeItem('m7_remember_pass');
+        }
       } else {
-        localStorage.removeItem('m7_remember_email');
-        localStorage.removeItem('m7_remember_pass');
+        const nextFailed = failedAttempts + 1;
+        setFailedAttempts(nextFailed);
+        
+        if (nextFailed >= 5) {
+          const lockTime = Date.now() + 30000; // 30 segundos
+          setLockoutUntil(lockTime);
+          localStorage.setItem('m7_lockout', lockTime.toString());
+          setError("SISTEMA BLOQUEADO: Demasiados intentos fallidos. Espere 30s.");
+        } else {
+          setError(`Credenciales no válidas. Intento ${nextFailed}/5.`);
+        }
+        setIsLoading(false);
       }
-    } else {
-      setError("Credenciales no válidas. Verifique Correo y Contraseña.");
+    } catch (error) {
+      setError("Error de conexión. Intente nuevamente.");
       setIsLoading(false);
     }
   };
@@ -63,17 +101,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="w-full max-w-md p-8 relative z-10 animate-in fade-in zoom-in duration-500">
         <div className="bg-slate-900/40 backdrop-blur-2xl border border-white/10 p-10 rounded-[3rem] shadow-2xl">
           <div className="flex flex-col items-center mb-10">
-            <div className="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.3)] mb-6">
+            <div className="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.3)] mb-6 transition-transform hover:scale-105 active:scale-95 cursor-pointer">
               <span className="text-4xl font-black text-slate-950">M7</span>
             </div>
             <h1 className="text-3xl font-black text-white tracking-tight">Milla Siete</h1>
-            <p className="text-slate-400 font-medium text-sm mt-2">Logística & Transporte Inteligente</p>
+            <p className="text-slate-400 font-medium text-sm mt-2 uppercase tracking-widest text-[10px]">Logística Inteligente</p>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-2xl flex items-center gap-3 animate-in shake duration-300">
-              <div className="text-red-500"><Icons.Alert /></div>
-              <p className="text-red-200 text-xs font-bold uppercase tracking-tight">{error}</p>
+            <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 animate-in shake duration-300 ${error.includes('BLOQUEADO') ? 'bg-red-600' : 'bg-red-500/20 border border-red-500/50'}`}>
+              <div className={error.includes('BLOQUEADO') ? 'text-white' : 'text-red-500'}><Icons.Alert /></div>
+              <p className={`text-xs font-black uppercase tracking-tight ${error.includes('BLOQUEADO') ? 'text-white' : 'text-red-200'}`}>{error}</p>
             </div>
           )}
 
@@ -133,11 +171,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black py-5 rounded-2xl shadow-[0_10px_30px_rgba(16,185,129,0.2)] transition-all flex items-center justify-center gap-3 active:scale-95"
+                disabled={isLoading || (!!lockoutUntil && lockoutUntil > Date.now())}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-black py-5 rounded-2xl shadow-[0_10px_30px_rgba(16,185,129,0.2)] transition-all flex items-center justify-center gap-3 active:scale-95 overflow-hidden"
               >
-                {isLoading ? 'Autenticando...' : 'Acceder al Sistema'}
-                {!isLoading && <Icons.ChevronRight />}
+                {isLoading ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 border-4 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
+                    <span>ESTABLECIENDO CONEXIÓN...</span>
+                  </div>
+                ) : (
+                  <>
+                    <span>ACCEDER AL SISTEMA</span>
+                    <Icons.ChevronRight />
+                  </>
+                )}
               </button>
             </form>
           ) : (
@@ -161,7 +208,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           )}
 
           <div className="mt-10 pt-8 border-t border-white/5 text-center">
-            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Powered by M7 Intelligence Unit &copy; 2024</p>
+            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Estado: Operativo 99.9%</p>
           </div>
         </div>
       </div>

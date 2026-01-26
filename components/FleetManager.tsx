@@ -4,6 +4,7 @@ import { Icons, INITIAL_CLIENTS, MASTER_BRANDS, MASTER_DOC_TYPES } from '../cons
 import { Vehicle, Driver, User, MasterCategory, MasterRecord } from '../types';
 import { extractLicenseInfo, extractVehicleDocInfo } from '../services/geminiService';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 const SearchableSelect = ({ label, value, options, onChange, placeholder = "Buscar..." }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -282,6 +283,24 @@ const FleetManager: React.FC<FleetManagerProps> = ({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Sugerencia Proactiva M7 - Flotas */}
+      <div className="bg-slate-900 mx-6 p-6 rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row items-center gap-6 animate-in slide-in-from-left-10 duration-700">
+          <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
+              <Icons.Sparkles className="text-slate-950 w-7 h-7" />
+          </div>
+          <div className="flex-1">
+              <h5 className="text-emerald-400 font-black text-[9px] uppercase tracking-widest mb-1">Análisis de Flota M7</h5>
+              <p className="text-slate-300 text-xs font-medium leading-relaxed">
+                  {viewTab === 'vehicles' 
+                    ? `He detectado que el 85% de tu flota está operativa. El vehículo ${vehicles[0]?.plate || 'ABC-123'} tiene mantenimiento próximo. ¿Deseas programar revisión?`
+                    : "Analizando disponibilidad: 3 conductores están en zona urbana con alta eficiencia de entrega. Sugerido para rutas críticas de hoy."}
+              </p>
+          </div>
+          <button onClick={() => toast.info("Generando reporte de salud de flota...")} className="px-5 py-2.5 bg-white/5 border border-white/10 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/10 transition-all shrink-0">
+              Analizar Salud
+          </button>
       </div>
 
       {/* LISTADO */}

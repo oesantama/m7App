@@ -140,6 +140,34 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
     XLSX.writeFile(workbook, `M7_Export_${activeMaster}_${Date.now()}.xlsx`);
   };
 
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      
+      const newRecords = data.map((item: any) => ({
+        ...item,
+        id: item.id || `${activeMaster}-${Math.random().toString(36).substr(2, 9)}`,
+        statusId: item.statusId || 'EST-01',
+        createdAt: new Date().toISOString(),
+        createdBy: user.name
+      }));
+
+      setAllMasterData(prev => ({
+        ...prev,
+        [activeMaster]: [...(prev[activeMaster] || []), ...newRecords]
+      }));
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -489,6 +517,13 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
              <button onClick={()=>setDisplayMode('grid')} className={`p-2.5 rounded-xl transition-all relative z-10 ${displayMode === 'grid' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.Grid /></button>
              <div className={`absolute top-1 bottom-1 w-[40px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayMode === 'table' ? 'left-1' : 'left-[44px]'}`}></div>
            </div>
+           
+           <label className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase cursor-pointer">
+              <Icons.Excel />
+              <span className="hidden xl:inline">Importar</span>
+              <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} />
+           </label>
+
            <button onClick={handleExportExcel} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel /><span className="hidden xl:inline">Excel</span></button>
            <button onClick={()=>{setEditingRecord(null); setFormData({statusId: 'EST-01', clientIds: []}); setError(null); setIsModalOpen(true);}} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all">Nuevo</button>
         </div>

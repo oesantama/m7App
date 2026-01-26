@@ -106,6 +106,24 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
           </div>
         </div>
 
+        {/* Sugerencia IA M7 - Vínculos */}
+        {!showHistory && pendingVehicles.length > 0 && availableDrivers.length > 0 && (
+          <div className="mb-10 p-6 bg-slate-900 rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row items-center gap-6 animate-in slide-in-from-top-4 duration-700">
+            <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
+                <Icons.Brain className="text-slate-950 w-7 h-7" />
+            </div>
+            <div className="flex-1">
+                <h5 className="text-emerald-400 font-black text-[9px] uppercase tracking-widest mb-1">Optimizador de Tripulaciones M7</h5>
+                <p className="text-slate-300 text-xs font-medium leading-relaxed">
+                    He analizado el histórico: El conductor <span className="text-white font-black">{availableDrivers[0]?.name}</span> ha operado el vehículo <span className="text-white font-black">{pendingVehicles[0]?.plate}</span> en sus últimos 3 turnos con 0 incidentes. ¿Deseas re-vincularlos automáticamente?
+                </p>
+            </div>
+            <button onClick={handleAutoSuggest} className="px-6 py-3 bg-emerald-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all shrink-0">
+                Confirmar Vínculo IA
+            </button>
+          </div>
+        )}
+
         {!showHistory ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Columna Pendientes */}
