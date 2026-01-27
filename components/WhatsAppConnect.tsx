@@ -3,22 +3,48 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Icons } from '../constants';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 
 const WhatsAppConnect: React.FC = () => {
     const [status, setStatus] = useState<'DISCONNECTED' | 'QR_READY' | 'CONNECTED'>('DISCONNECTED');
     const [qr, setQr] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [reconnecting, setReconnecting] = useState(false);
 
     const fetchStatus = async () => {
         try {
             setLoading(true);
+            setError(null);
             const data = await api.getWhatsAppStatus();
             setStatus(data.status);
-            setQr(data.qr);
-        } catch (error) {
+            setQr(data.qr || null);
+        } catch (error: any) {
             console.error("Error fetching WA status", error);
+            setError("No se pudo conectar con Evolution API. Verifica que esté activo.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleReconnect = async () => {
+        try {
+            setReconnecting(true);
+            toast.info("Iniciando reconexión...");
+            const data = await api.connectWhatsApp();
+            
+            if (data.success) {
+                setStatus(data.status);
+                setQr(data.qr || null);
+                toast.success("Reconexión iniciada correctamente");
+            } else {
+                toast.error("Error al reconectar: " + (data.error || "Error desconocido"));
+            }
+        } catch (error: any) {
+            console.error("Error reconnecting", error);
+            toast.error("Error al reconectar con Evolution API");
+        } finally {
+            setReconnecting(false);
         }
     };
 
@@ -40,6 +66,12 @@ const WhatsAppConnect: React.FC = () => {
                 <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-2">Conexión Asistente M7</h2>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Estado Actual: <span className={status === 'CONNECTED' ? 'text-emerald-500' : 'text-orange-500'}>{status}</span></p>
 
+                {error && (
+                    <div className="bg-red-50 border border-red-200 p-4 rounded-2xl mb-6 animate-in fade-in">
+                        <p className="text-red-700 text-xs font-medium">{error}</p>
+                    </div>
+                )}
+
                 {status === 'CONNECTED' ? (
                     <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-3xl animate-in zoom-in">
                         <Icons.Check className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
@@ -60,6 +92,14 @@ const WhatsAppConnect: React.FC = () => {
                         <p className="text-slate-500 text-xs max-w-xs mx-auto leading-relaxed">
                             Abre WhatsApp en tu teléfono, ve a <strong className="text-slate-700">Dispositivos Vinculados</strong> y escanea este código para activar la IA.
                         </p>
+                        
+                        <button 
+                            onClick={handleReconnect}
+                            disabled={reconnecting}
+                            className="px-6 py-3 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {reconnecting ? 'Reconectando...' : 'Forzar Reconexión'}
+                        </button>
                     </div>
                 )}
 

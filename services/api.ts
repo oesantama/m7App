@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8090/api';
 
@@ -47,6 +48,9 @@ export const api = {
   }).then(r => r.json()),
   
   getWhatsAppStatus: () => fetch(`${API_URL}/whatsapp/status`).then(r => r.json()),
+  connectWhatsApp: () => fetch(`${API_URL}/whatsapp/connect`, {
+    method: 'POST'
+  }).then(r => r.json()),
   
   aiChat: async (prompt: string, context: any) => {
     const res = await fetch(`${API_URL}/ai/chat`, {

@@ -3,8 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-#    ports:
-#      - "8090:8080"
+    ports:
+      - "8090:8080"
     volumes:
       - ./.wwebjs_auth:/app/.wwebjs_auth
     env_file:
@@ -12,27 +12,33 @@ services:
     depends_on:
       - evolution-api
     restart: always
+    networks:
+      - m7-network
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-#    ports:
-#      - "3010:80"
+    ports:
+      - "3010:80"
     depends_on:
       - m7app-backend
     restart: always
+    networks:
+      - m7-network
+    environment:
+      - VITE_API_URL=http://m7app-backend:8080/api
 
   evolution-api:
     image: atendai/evolution-api:latest
     container_name: m7-evolution-api
     restart: always
-#    ports:
-#      - "8080:8080"
+    ports:
+      - "8080:8080"
     depends_on:
       - postgres
     environment:
-      - SERVER_URL=${EVO_API_URL:-http://localhost:8080}
+      - SERVER_URL=${EVO_API_URL:-http://evolution-api:8080}
       - AUTH_PROVIDER=apikey
       - AUTH_API_KEY=422A978DE701-44B0-A2B2-D3D6C22765A1
       - DATABASE_ENABLED=true
@@ -43,6 +49,8 @@ services:
       - LOG_COLOR=true
     volumes:
       - m7_evolution_instances:/evolution/instances
+    networks:
+      - m7-network
 
   postgres:
     image: postgres:15-alpine
@@ -53,6 +61,12 @@ services:
       - POSTGRES_DB=evolution
     volumes:
       - m7_evolution_db:/var/lib/postgresql/data
+    networks:
+      - m7-network
+
+networks:
+  m7-network:
+    driver: bridge
 
 volumes:
   m7_evolution_instances:

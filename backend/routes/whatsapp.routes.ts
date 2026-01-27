@@ -1,9 +1,10 @@
 
 import { Router } from 'express';
-import { getStatus } from '../controllers/whatsapp.controller.js';
+import { getStatus, reconnect } from '../controllers/whatsapp.controller.js';
 
 const router = Router();
 
 router.get('/status', getStatus);
+router.post('/connect', reconnect);
 
 export default router;
