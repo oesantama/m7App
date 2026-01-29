@@ -7,7 +7,7 @@ export const login = async (req: Request, res: Response) => {
   
   // Validación de credenciales (demo - en producción usar hash)
   const validUsers = [
-    { email: 'admin@millasiete.com', password: 'admin123', id: 'U-001', name: 'ADMINISTRADOR PRINCIPAL', role_id: 'ROL-01' },
+    { email: 'admin@millasiete.com', password: 'admin123', id: 'USR-01', name: 'ADMINISTRADOR PRINCIPAL', role_id: 'ROL-01' },
     { email: 'operaciones@millasiete.com', password: 'operaciones', id: 'U-002', name: 'OPERADOR LOGÍSTICO', role_id: 'ROL-03' },
     { email: 'calidad@millasiete.com', password: 'calidad', id: 'U-003', name: 'AUDITOR CALIDAD', role_id: 'ROL-04' }
   ];

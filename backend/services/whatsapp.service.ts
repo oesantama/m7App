@@ -1,189 +1,192 @@
 
 import dotenv from 'dotenv';
+import pg from 'pg';
 
 dotenv.config();
 
-const EVO_URL = process.env.EVO_API_URL || 'http://localhost:8080';
-const EVO_KEY = process.env.EVO_API_KEY || '';
-const EVO_INSTANCE = process.env.EVO_INSTANCE || 'Milla7';
+const WAHA_URL = process.env.EVO_API_URL || 'http://localhost:3000';
+const SESSION_NAME = process.env.WAHA_SESSION_NAME || 'default';
+const API_KEY = process.env.WAHA_API_KEY || '';
 
-let connectionStatus: 'DISCONNECTED' | 'QR_READY' | 'CONNECTED' = 'DISCONNECTED';
-let cachedQRCode: string | null = null;
-let lastQRUpdate: number = 0;
+const getHeaders = () => {
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+    };
+    if (API_KEY) {
+        headers['X-Api-Key'] = API_KEY;
+    }
+    return headers;
+};
 
-/**
- * Obtiene el código QR para vincular WhatsApp
- */
+const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+});
+
+interface WahaSessionStatus {
+    name: string;
+    status: 'STOPPED' | 'STARTING' | 'SCAN_QR_CODE' | 'WORKING' | 'FAILED';
+}
+
 export const getQRCode = async (): Promise<string | null> => {
     try {
-        // Si tenemos un QR cacheado y es reciente (menos de 30 segundos), retornarlo
-        const now = Date.now();
-        if (cachedQRCode && (now - lastQRUpdate) < 30000) {
-            return cachedQRCode;
-        }
-
-        const response = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
-            headers: { 'apikey': EVO_KEY }
+        // Mejorado: Obtener JSON del endpoint de Auth QR que es más confiable
+        const response = await fetch(`${WAHA_URL}/api/${SESSION_NAME}/auth/qr?format=image`, {
+            headers: getHeaders()
         });
-
-        if (!response.ok) {
-            console.error('[M7-WHATSAPP] Error obteniendo QR:', response.statusText);
-            return null;
-        }
-
-        const data: any = await response.json();
+        if (!response.ok) return null;
         
-        // Evolution API puede retornar el QR en diferentes formatos
-        if (data.qrcode?.base64) {
-            cachedQRCode = data.qrcode.base64;
-            lastQRUpdate = now;
-            connectionStatus = 'QR_READY';
-            return cachedQRCode;
-        } else if (data.base64) {
-            cachedQRCode = data.base64;
-            lastQRUpdate = now;
-            connectionStatus = 'QR_READY';
-            return cachedQRCode;
-        } else if (data.code) {
-            cachedQRCode = data.code;
-            lastQRUpdate = now;
-            connectionStatus = 'QR_READY';
-            return cachedQRCode;
-        }
-
-        return null;
+        // WAHA puede devolver la imagen binaria directamente
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64 = buffer.toString('base64');
+        return `data:image/png;base64,${base64}`;
     } catch (error) {
-        console.error('[M7-WHATSAPP] Error al obtener QR code:', error);
         return null;
     }
 };
 
-/**
- * Verifica el estado de conexión de la instancia
- */
-export const checkEvolutionConnection = async () => {
+const ensureSessionStarted = async () => {
     try {
-        const response = await fetch(`${EVO_URL}/instance/connectionState/${EVO_INSTANCE}`, {
-            headers: { 'apikey': EVO_KEY }
+        // 1. Verificar si existe
+        const checkRes = await fetch(`${WAHA_URL}/api/sessions/${SESSION_NAME}`, {
+            headers: getHeaders()
         });
         
-        if (!response.ok) {
-            console.error('[M7-WHATSAPP] Error verificando conexión:', response.statusText);
-            connectionStatus = 'DISCONNECTED';
-            return connectionStatus;
+        if (checkRes.status === 404) {
+            console.log(`[M7-WAHA] Sesión no encontrada. Creando...`);
+            await fetch(`${WAHA_URL}/api/sessions`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ name: SESSION_NAME, config: { proxy: null } })
+            });
+            return; // Esperar siguiente ciclo
         }
 
-        const data: any = await response.json();
+        const session = await checkRes.json();
         
-        if (data.instance?.state === 'open') {
-            connectionStatus = 'CONNECTED';
-            cachedQRCode = null; // Limpiar QR si ya está conectado
-        } else if (data.instance?.state === 'connecting') {
-            connectionStatus = 'QR_READY';
-        } else {
-            connectionStatus = 'DISCONNECTED';
+        if (session.status === 'STOPPED') {
+            console.log(`[M7-WAHA] Sesión detenida. Iniciando...`);
+            await fetch(`${WAHA_URL}/api/sessions/${SESSION_NAME}/start`, { 
+                method: 'POST',
+                headers: getHeaders()
+            });
+        } else if (session.status === 'FAILED') {
+            console.log(`[M7-WAHA] Sesión fallida. Reiniciando...`);
+            // Stop first just in case
+            await fetch(`${WAHA_URL}/api/sessions/${SESSION_NAME}/stop`, { 
+                method: 'POST',
+                headers: getHeaders()
+            });
+            await fetch(`${WAHA_URL}/api/sessions/${SESSION_NAME}/start`, { 
+                method: 'POST',
+                headers: getHeaders()
+            });
         }
-    } catch (error) {
-        console.error('[M7-WHATSAPP] Error al verificar conexión con Evolution:', error);
-        connectionStatus = 'DISCONNECTED';
+    } catch (e) {
+        console.error('[M7-WAHA] Error ensureSessionStarted:', e);
     }
-    return connectionStatus;
 };
 
-/**
- * Obtiene el estado completo de la conexión incluyendo QR si está disponible
- */
 export const getConnectionStatus = async () => {
-    const status = await checkEvolutionConnection();
-    
-    let qr: string | null = null;
-    
-    // Si no está conectado, intentar obtener el QR
-    if (status !== 'CONNECTED') {
-        qr = await getQRCode();
-    }
-    
-    return {
-        status,
-        qr
-    };
-};
-
-/**
- * Fuerza la reconexión de la instancia
- */
-export const connectInstance = async () => {
     try {
-        console.log('[M7-WHATSAPP] Iniciando conexión de instancia...');
-        
-        const response = await fetch(`${EVO_URL}/instance/connect/${EVO_INSTANCE}`, {
-            headers: { 'apikey': EVO_KEY }
-        });
+        // AUTO-ARRANQUE: Intentar asegurar que la sesión exista y corra
+        await ensureSessionStarted();
 
-        if (!response.ok) {
-            throw new Error(`Error al conectar instancia: ${response.statusText}`);
+        // Dar un breve respiro si acabamos de iniciar algo
+        // await new Promise(r => setTimeout(r, 1000));
+
+        const response = await fetch(`${WAHA_URL}/api/sessions?all=true`, {
+            headers: getHeaders()
+        });
+        if (!response.ok) return { status: 'DISCONNECTED', qr: null };
+        
+        const sessions: WahaSessionStatus[] = await response.json();
+        const session = sessions.find(s => s.name === SESSION_NAME);
+        
+        if (!session) return { status: 'DISCONNECTED', qr: null };
+
+        let status: 'DISCONNECTED' | 'QR_READY' | 'CONNECTED' = 'DISCONNECTED';
+        let qr: string | null = null;
+
+        if (session.status === 'WORKING') {
+            status = 'CONNECTED';
+        } else if (session.status === 'SCAN_QR_CODE') {
+            status = 'QR_READY';
+            qr = await getQRCode();
+        } else if (session.status === 'STARTING') {
+             // Si está iniciando, podemos decir que está casi listo para QR
+             status = 'DISCONNECTED'; // El frontend mostrará "Cargando..." si el status es null/loading o podemos manejar un estado intermedio
         }
 
-        const data = await response.json();
-        console.log('[M7-WHATSAPP] Respuesta de conexión:', data);
-        
-        return await getConnectionStatus();
+        return { status, qr };
     } catch (error) {
-        console.error('[M7-WHATSAPP] Error al conectar instancia:', error);
-        throw error;
+        console.error('[M7-WAHA] Error status:', error);
+        return { status: 'DISCONNECTED', qr: null };
     }
 };
 
-/**
- * Envía un mensaje de WhatsApp
- */
-export const sendWhatsAppMessage = async (number: string, text: string) => {
-    // Limpiar número (solo dígitos y código de país)
-    const cleanNumber = number.replace(/\D/g, '');
-    
+export const startSession = async () => {
+    // Ya está cubierto por ensureSessionStarted, pero mantenemos por compatibilidad
+    await ensureSessionStarted();
+    return await getConnectionStatus();
+};
+
+export const logoutSession = async () => {
     try {
-        const response = await fetch(`${EVO_URL}/message/sendText/${EVO_INSTANCE}`, {
+        await fetch(`${WAHA_URL}/api/sessions/${SESSION_NAME}/logout`, { 
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': EVO_KEY
-            },
-            body: JSON.stringify({
-                number: cleanNumber,
-                text: text,
-                delay: 1200,
-                linkPreview: true
-            })
+            headers: getHeaders()
         });
-
-        const data = await response.json();
-        console.log('[M7-WHATSAPP] Resultado envío:', data);
-        return data;
+        return { success: true };
     } catch (error) {
-        console.error('[M7-WHATSAPP] Error enviando mensaje:', error);
         throw error;
     }
 };
 
-/**
- * Inicializa el servicio de WhatsApp
- */
-export const initWhatsApp = async () => {
-    console.log('[M7-WHATSAPP] Iniciando integración con Evolution API...');
-    console.log(`[M7-WHATSAPP] URL: ${EVO_URL}`);
-    console.log(`[M7-WHATSAPP] Instancia: ${EVO_INSTANCE}`);
-    
-    const statusInfo = await getConnectionStatus();
-    console.log(`[M7-WHATSAPP] Estado inicial: ${statusInfo.status}`);
-    
-    if (statusInfo.status !== 'CONNECTED') {
-        console.log('[M7-WHATSAPP] ⚠️  Instancia no conectada. Escanea el QR desde el panel de administración.');
-    } else {
-        console.log('[M7-WHATSAPP] ✅ Instancia conectada y lista para enviar mensajes.');
+export const sendWhatsAppMessage = async (number: string, text: string) => {
+    const cleanNumber = number.replace(/\D/g, '');
+    const chatId = `${cleanNumber}@c.us`;
+    try {
+        const response = await fetch(`${WAHA_URL}/api/send/text`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ session: SESSION_NAME, chatId: chatId, text: text })
+        });
+        
+        const data = await response.json().catch(() => ({})); // Handle non-json errors
+        
+        if (!response.ok) {
+            console.error('[M7-WAHA-ERROR] Response:', { status: response.status, body: data });
+            const errorDetail = data.details || data.error || data.message || `HTTP ${response.status}`;
+            throw new Error(`Waha Error: ${errorDetail}`);
+        }
+        
+        await logMessage(cleanNumber, text, 'SENT', 'OUTBOUND', data.id);
+        return data;
+    } catch (error: any) {
+        console.error(`[M7-WAHA-FAIL] Failed sending to ${chatId}:`, error.message);
+        await logMessage(cleanNumber, text, 'FAILED', 'OUTBOUND', null, error.message);
+        throw error;
     }
 };
 
-/**
- * Obtiene el estado simple del bot (legacy)
- */
-export const getBotStatus = () => ({ status: connectionStatus });
+const logMessage = async (phone: string, body: string, status: string, direction: string, wahaId: string | null = null, error: string | null = null) => {
+    try {
+        const query = `INSERT INTO whatsapp_logs (phone_number, message_body, status, direction, waha_message_id, error_message) VALUES ($1, $2, $3, $4, $5, $6)`;
+        await pool.query(query, [phone, body, status, direction, wahaId, error]);
+    } catch (dbError) {}
+};
+
+export const getMessageHistory = async (limit = 50) => {
+    try {
+        const result = await pool.query(`SELECT * FROM whatsapp_logs ORDER BY sent_at DESC LIMIT $1`, [limit]);
+        return result.rows;
+    } catch (error) {
+        return [];
+    }
+};
+
+export const initWhatsApp = async () => {
+    console.log('[M7-WHATSAPP] Re-inicializando servicio WAHA...');
+    startSession().catch(() => {});
+};

@@ -36,6 +36,17 @@ const App: React.FC = () => {
   const [waStatus, setWaStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
   const [isLoading, setIsLoading] = useState(false);
   
+  const normalize = (data: any[]) => {
+    return data.map(item => ({
+      ...item,
+      statusId: item.statusId || item.status_id,
+      parentId: item.parentId || item.parent_id,
+      moduleId: item.moduleId || item.module_id,
+      iconClass: item.iconClass || item.icon_class,
+      roleId: item.roleId || item.role_id
+    }));
+  };
+  
   // Estados Operativos
   const [documents, setDocuments] = useState<any[]>([
     { 
@@ -93,27 +104,133 @@ const App: React.FC = () => {
   const [vehicles, setVehicles] = useState<any[]>(INITIAL_VEHICLES);
   const [assignments, setAssignments] = useState<any[]>([]);
 
+  const [isRestoring, setIsRestoring] = useState(true);
+  
+  // Timeout - 10 Minutos (600,000 ms)
+  const TIMEOUT_MS = 10 * 60 * 1000;
+  const WARNING_MS = 1 * 60 * 1000; // Aviso 1 minuto antes
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(60); // Segundos para el aviso
+  let inactivityTimer: any;
+  let warningTimer: any;
+  let countdownInterval: any;
+
+  const resetInactivityTimer = () => {
+    setShowTimeoutWarning(false);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    if (warningTimer) clearTimeout(warningTimer);
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    if (isAuthenticated) {
+        // Timer principal de 10 minutos
+        inactivityTimer = setTimeout(() => {
+            console.log('[M7-AUTH] Timeout por inactividad');
+            handleLogout(true);
+        }, TIMEOUT_MS);
+
+        // Timer de aviso a los 9 minutos
+        warningTimer = setTimeout(() => {
+            setShowTimeoutWarning(true);
+            setTimeLeft(60);
+            countdownInterval = setInterval(() => {
+                setTimeLeft(prev => prev > 0 ? prev - 1 : 0);
+            }, 1000);
+        }, TIMEOUT_MS - WARNING_MS);
+    }
+  };
+
+  useEffect(() => {
+      // Eventos de actividad
+      window.addEventListener('mousemove', resetInactivityTimer);
+      window.addEventListener('keydown', resetInactivityTimer);
+      window.addEventListener('click', resetInactivityTimer);
+      
+      resetInactivityTimer(); // Iniciar timer
+
+      return () => {
+          if (inactivityTimer) clearTimeout(inactivityTimer);
+          window.removeEventListener('mousemove', resetInactivityTimer);
+          window.removeEventListener('keydown', resetInactivityTimer);
+          window.removeEventListener('click', resetInactivityTimer);
+      };
+  }, [isAuthenticated]);
+
   // Efecto para restaurar sesión
   useEffect(() => {
-    const savedUser = localStorage.getItem('m7_user_session');
-    const savedMaster = localStorage.getItem('m7_master_data');
+    console.log('%c [M7-VERSION] FRONTEND V1.0.2 - FE-SYNC-FIX ', 'background: #10b981; color: #fff; font-weight: bold;');
     
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-        setIsAuthenticated(true);
+    const restoreSession = async () => {
+        const savedUser = localStorage.getItem('m7_user_session');
+        const savedMaster = localStorage.getItem('m7_master_data');
         
-        if (savedMaster) {
-          setAllMasterData(JSON.parse(savedMaster));
+        if (savedUser) {
+          try {
+            const parsedUser = JSON.parse(savedUser);
+            // FORZAR LOGOUT SI EL ID ES VIEJO O INCOMPLETO
+            if (parsedUser && (parsedUser.id === 'U-001' || !parsedUser.permissions)) {
+                 console.warn('[M7-AUTH] Sesión antigua detectada, forzando limpieza...');
+                 handleLogout();
+                 return;
+            }
+
+            if (parsedUser && parsedUser.id) {
+                // SOLUCIÓN REAL: Forzar refresco de permisos para Admin en cada restauración
+                if (parsedUser.roleId === 'ROL-01' || parsedUser.id === 'USR-01') {
+                    console.log('[M7-AUTH] Refrescando permisos para Admin...');
+                    const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
+                    if (freshPerms && Array.isArray(freshPerms)) {
+                        parsedUser.permissions = freshPerms;
+                    }
+                }
+
+                setUser(parsedUser);
+                setIsAuthenticated(true);
+                
+                // CARGAR DATOS MAESTROS FRESCOS (IGNORAR CACHÉ SI ES POSIBLE)
+                // CARGAR DATOS MAESTROS FRESCOS (IGNORAR CACHÉ SI ES POSIBLE)
+                console.log('[M7-AUTH] Obteniendo datos maestros frescos...');
+                const [modules, pages, genericMasters] = await Promise.all([
+                    api.getModules().then(normalize).catch(() => []),
+                    api.getPages().then(normalize).catch(() => []),
+                    api.getGenericMasters().catch(() => [])
+                ]);
+
+                // Agrupar maestros genéricos
+                const groupedMasters: any = {};
+                if (Array.isArray(genericMasters)) {
+                    genericMasters.forEach((m: any) => {
+                        if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
+                        groupedMasters[m.category].push(m);
+                    });
+                }
+
+                setAllMasterData(prev => ({
+                    ...prev,
+                    ...groupedMasters,
+                    masterModulos: modules,
+                    masterPaginas: pages
+                }));
+
+                if (savedMaster) {
+                  try {
+                      // Solo restaurar del caché lo que NO sea crítico/dinámico
+                      const parsedMaster = JSON.parse(savedMaster);
+                      setAllMasterData(prev => ({
+                          ...parsedMaster, 
+                          ...groupedMasters, // Prioridad a lo fresco de DB
+                          masterModulos: modules, 
+                          masterPaginas: pages
+                      }));
+                  } catch (e) { console.warn('Master data corrupto'); }
+                }
+          } catch (e) {
+            localStorage.removeItem('m7_user_session');
+          }
         }
-        
-        console.log('[M7-AUTH] Sesión restaurada para:', parsedUser.name);
-      } catch (e) {
-        console.error('Error restaurando sesión:', e);
-        localStorage.removeItem('m7_user_session');
-      }
-    }
+        setIsRestoring(false);
+    };
+    
+    restoreSession();
   }, []);
 
   // Efecto para persistir pestaña activa
@@ -152,37 +269,43 @@ const App: React.FC = () => {
         console.log('[M7-LOGIN] User Permissions:', userPermissions);
         
         // 3. Carga de Datos Iniciales (Parciales/Mock desde Backend)
-        const [clients, users, roles, modules, pages, permissions] = await Promise.all([
+        const [clients, users, roles, modules, pages, permissions, genericMasters] = await Promise.all([
             api.getClients().catch(() => []),
             api.getUsers().catch(() => []),
             api.getRoles().catch(() => []),
-            api.getModules().catch(() => []),
-            api.getPages().catch(() => []),
-            api.getPermissions().catch(() => [])
+            api.getModules().then(normalize).catch(() => []),
+            api.getPages().then(normalize).catch(() => []),
+            api.getPermissions().catch(() => []),
+            api.getGenericMasters().catch(() => [])
         ]);
         
         console.log('[M7-LOGIN] Modules:', modules);
         console.log('[M7-LOGIN] Pages:', pages);
+        console.log('[M7-LOGIN] Generic Masters Loaded:', genericMasters.length);
+
+        // Agrupar maestros genéricos por categoría
+        const groupedMasters: any = {};
+        if (Array.isArray(genericMasters)) {
+            genericMasters.forEach((m: any) => {
+                if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
+                groupedMasters[m.category].push(m);
+            });
+        }
 
         // 4. Mapear permisos del usuario al formato esperado
-        const mappedPermissions: any[] = [];
-        if (userPermissions) {
+        let mappedPermissions: any[] = [];
+        if (Array.isArray(userPermissions)) {
+            mappedPermissions = userPermissions;
+        } else if (userPermissions) {
             pages.forEach((page: any) => {
                 const pageId = page.id;
                 const actions: string[] = [];
-                
                 if (userPermissions[`page_${pageId}_view`]) actions.push('view');
                 if (userPermissions[`page_${pageId}_create`]) actions.push('create');
                 if (userPermissions[`page_${pageId}_edit`]) actions.push('edit');
                 if (userPermissions[`page_${pageId}_delete`]) actions.push('delete');
                 if (userPermissions[`page_${pageId}_active`]) actions.push('active');
-                
-                if (actions.length > 0) {
-                    mappedPermissions.push({
-                        module: pageId,
-                        actions: actions
-                    });
-                }
+                if (actions.length > 0) mappedPermissions.push({ module: pageId, actions });
             });
         }
         
@@ -191,6 +314,7 @@ const App: React.FC = () => {
         // 5. Configuración de Maestros con datos reales
         setAllMasterData(prev => ({
             ...prev,
+            ...groupedMasters, // Fusionar maestros dinámicos (TipoDocumento, Notificaciones, etc.)
             masterClientes: clients,
             masterUsuarios: users,
             masterRol: roles,
@@ -248,15 +372,31 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = (expired = false) => {
     setIsAuthenticated(false);
     setUser(null);
     localStorage.removeItem('m7_user_session');
     localStorage.removeItem('m7_active_tab');
     localStorage.removeItem('m7_master_data');
-    toast.info("Sesión finalizada");
-    window.location.reload(); 
+    if (expired) {
+        toast.error("Sesión expirada por inactividad");
+    } else {
+        toast.info("Sesión finalizada");
+    }
+    // No recargar para permitir mostrar el toast y volver al login limpiamente
+    // window.location.reload(); 
   };
+
+  if (isRestoring) {
+      return (
+          <div className="flex h-screen w-full items-center justify-center bg-slate-950">
+              <div className="flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-emerald-500 font-bold uppercase tracking-widest text-xs animate-pulse">Restaurando Sistema M7...</p>
+              </div>
+          </div>
+      );
+  }
 
   const renderContent = () => {
     const availableVehiclesCount = vehicles.filter(v => v.status === 'Disponible' || v.status === 'Available').length;
@@ -492,7 +632,19 @@ const App: React.FC = () => {
         setActiveTab={setActiveTab}
         activeMasterCategory={activeMasterCategory}
         setActiveMasterCategory={setActiveMasterCategory}
-        onUpdateUser={(data) => setUser({ ...user, ...data })}
+        onUpdateUser={async (data) => {
+             try {
+                 const updatedUser = { ...user, ...data };
+                 setUser(updatedUser);
+                 // Persistir en Backend
+                 console.log('[M7-APP] Persistiendo usuario...', updatedUser);
+                 await api.saveUser(updatedUser);
+                 localStorage.setItem('m7_user_session', JSON.stringify(updatedUser));
+             } catch (e) {
+                 console.error('[M7-APP] Error al guardar perfil:', e);
+                 toast.error("Error al guardar en servidor", { description: "Los cambios son locales temporalmente." });
+             }
+        }}
         onLogout={handleLogout}
         modulesData={allMasterData.masterModulos}
         pagesData={allMasterData.masterPaginas}
@@ -511,6 +663,26 @@ const App: React.FC = () => {
             recentAssignments: assignments.slice(-5)
           }} 
       />
+      {showTimeoutWarning && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in zoom-in duration-300">
+            <div className="bg-white max-w-md w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6">
+                <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto animate-bounce">
+                    <Icons.Alert style={{ width: '40px', height: '40px' }} />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 uppercase">¿Sigues ahí?</h3>
+                <p className="text-slate-500 font-medium">Tu sesión se cerrará por inactividad en:</p>
+                <div className="text-6xl font-black text-emerald-500 tabular-nums">
+                    00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+                </div>
+                <button 
+                  onClick={resetInactivityTimer}
+                  className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl"
+                >
+                    Continuar Trabajando
+                </button>
+            </div>
+        </div>
+      )}
     </>
   );
 };

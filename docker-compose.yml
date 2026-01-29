@@ -9,8 +9,6 @@ services:
       - ./.wwebjs_auth:/app/.wwebjs_auth
     env_file:
       - .env
-    depends_on:
-      - evolution-api
     restart: always
     networks:
       - m7-network
@@ -29,26 +27,23 @@ services:
     environment:
       - VITE_API_URL=http://m7app-backend:8080/api
 
-  evolution-api:
-    image: atendai/evolution-api:latest
-    container_name: m7-evolution-api
+
+  waha:
+    image: devlikeapro/waha
+    container_name: waha
     restart: always
     ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
+      - "3000:3000"
     environment:
-      - SERVER_URL=${EVO_API_URL:-http://evolution-api:8080}
-      - AUTH_PROVIDER=apikey
-      - AUTH_API_KEY=422A978DE701-44B0-A2B2-D3D6C22765A1
-      - DATABASE_ENABLED=true
-      - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://evolution:evolution@postgres:5432/evolution
-      - DATABASE_CONNECTION_CLIENT_NAME=evolution_exchange
-      - LOG_LEVEL=ERROR
-      - LOG_COLOR=true
+      - WHATSAPP_DEFAULT_ENGINE=WEBJS
+      - WAHA_LOG_LEVEL=info
+      - WAHA_PRINT_QR=false
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WAHA_DASHBOARD_USERNAME=admin
+      - WAHA_DASHBOARD_PASSWORD=admin
     volumes:
-      - m7_evolution_instances:/evolution/instances
+      - ./.wwebjs_auth:/app/.wwebjs_auth
+      - ./.wwebjs_cache:/app/.wwebjs_cache
     networks:
       - m7-network
 
@@ -56,11 +51,11 @@ services:
     image: postgres:15-alpine
     restart: always
     environment:
-      - POSTGRES_USER=evolution
-      - POSTGRES_PASSWORD=evolution
-      - POSTGRES_DB=evolution
+      - POSTGRES_USER=m7_admin
+      - POSTGRES_PASSWORD=m7_master_password
+      - POSTGRES_DB=m7_logistica
     volumes:
-      - m7_evolution_db:/var/lib/postgresql/data
+      - m7_logistica_data:/var/lib/postgresql/data
     networks:
       - m7-network
 
@@ -69,5 +64,4 @@ networks:
     driver: bridge
 
 volumes:
-  m7_evolution_instances:
-  m7_evolution_db:
+  m7_logistica_data:

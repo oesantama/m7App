@@ -4,7 +4,11 @@ import pool from '../config/database.js';
 
 export const getModules = async (req: Request, res: Response) => {
   try {
-    const result = await pool.query('SELECT * FROM modules ORDER BY name ASC');
+    const result = await pool.query(`
+      SELECT id, name, icon_class AS "iconClass", status_id AS "statusId" 
+      FROM modules 
+      ORDER BY name ASC
+    `);
     if (result.rows.length > 0) {
         res.json(result.rows);
         return;
@@ -18,7 +22,8 @@ export const getModules = async (req: Request, res: Response) => {
         { id: 'MOD-04', name: 'SEGURIDAD & ACCESO', iconClass: 'Shield', statusId: 'EST-01' }
     ]); 
   } catch (err: any) {
-    res.status(500).json({ error: "Error fatal en controlador" });
+    console.error('[MODULES-ERROR]', err);
+    res.status(500).json({ error: "Error fatal en controlador", details: err.message });
   }
 };
 

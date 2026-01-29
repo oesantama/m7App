@@ -20,6 +20,20 @@ export const api = {
 
   // Maestros
   getUsers: () => fetch(`${API_URL}/users`).then(r => r.json()),
+  saveUser: (data: any) => fetch(`${API_URL}/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+  }).then(r => r.json()),
+  
+  saveMaster: (category: string, data: any) => fetch(`${API_URL}/masters/${category}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+  }).then(r => r.json()),
+  
+  getGenericMasters: () => fetch(`${API_URL}/masters`).then(r => r.json()),
+
   getClients: () => fetch(`${API_URL}/clients`).then(r => r.json()),
   getRoles: () => fetch(`${API_URL}/roles`).then(r => r.json()),
   getModules: () => fetch(`${API_URL}/modules`).then(r => r.json()),
@@ -59,5 +73,17 @@ export const api = {
       body: JSON.stringify({ prompt, context })
     });
     return res.json();
-  }
+  },
+
+  disconnectWhatsApp: () => fetch(`${API_URL}/whatsapp/disconnect`, {
+      method: 'POST'
+  }).then(r => r.json()),
+
+  getWhatsAppHistory: () => fetch(`${API_URL}/whatsapp/history`).then(r => r.json()),
+  
+  sendWhatsAppNotification: (data: { phones: string[], message: string }) => fetch(`${API_URL}/whatsapp/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json())
 };

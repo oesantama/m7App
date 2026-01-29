@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Icons, AVATAR_GALLERY } from '../constants';
 import { MasterRecord, MasterCategory, User, Article } from '../types';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 interface MasterModuleProps {
   onAudit: (entity: string, action: string) => void;
@@ -97,7 +98,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
     setShowRoleDialog(false);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -115,18 +116,48 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
     const finalId = editingRecord?.id || `${activeMaster}-${Date.now()}`;
     const newRecord = { ...formData, id: finalId, updatedAt: now, updatedBy: user.name };
 
-    setAllMasterData(prev => {
-      const list = prev[activeMaster] || [];
-      const exists = list.some(i => i.id === finalId);
-      return { 
-        ...prev, 
-        [activeMaster]: exists 
-          ? list.map(i => i.id === finalId ? newRecord : i) 
-          : [...list, { ...newRecord, createdAt: now, createdBy: user.name }]
-      };
-    });
-    setIsModalOpen(false);
+    try {
+        // --- PERSISTENCIA BACKEND ---
+        const { api } = await import('../services/api');
+        
+        // Determinar qué endpoint usar
+        if (activeMaster === 'masterUsuarios') {
+            await api.saveUser(newRecord);
+        } else if (activeMaster === 'masterArticulo') {
+            await api.saveArticle(newRecord);
+        // } else if (activeMaster === 'masterClientes') {
+        //     await api.saveClient(newRecord); // TODO: Agregar saveClient si falta
+        } else {
+            // Guardado Genérico para el resto de tablas maestras (masterTipoDocumento, etc.)
+            await api.saveMaster(activeMaster, newRecord);
+        }
+        
+        toast.success("Registro Guardado", { description: "Datos sincronizados con el núcleo M7." });
+
+        setAllMasterData(prev => {
+          const list = prev[activeMaster] || [];
+          const exists = list.some(i => i.id === finalId);
+          return { 
+            ...prev, 
+            [activeMaster]: exists 
+              ? list.map(i => i.id === finalId ? newRecord : i) 
+              : [...list, { ...newRecord, createdAt: now, createdBy: user.name }]
+          };
+        });
+        setIsModalOpen(false);
+
+    } catch (err: any) {
+        console.error('[M7-MASTER] Save error:', err);
+        setError("Error de Sincronización: " + (err.message || 'Fallo desconocido'));
+        toast.error("Error al guardar", { description: "Verifique su conexión con el servidor." });
+    }
   };
+
+  // Estados para Notification Sender
+  const [isNotificationSenderOpen, setIsNotificationSenderOpen] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   const handleExportExcel = () => {
     const dataToExport = filteredData.map(item => {
@@ -138,6 +169,54 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, activeMaster.replace('master', ''));
     XLSX.writeFile(workbook, `M7_Export_${activeMaster}_${Date.now()}.xlsx`);
+  };
+
+  const handleSendNotification = async () => {
+      if (selectedUserIds.length === 0) {
+          toast.error("Por favor seleccione al menos un destinatario.");
+          return;
+      }
+      
+      setIsSending(true);
+      
+      const phones = (allMasterData.masterUsuarios || [])
+          .filter(u => selectedUserIds.includes(u.id) && u.phone && u.phone.length > 5)
+          .map(u => u.phone) as string[];
+
+      const uniquePhones = [...new Set(phones)]; // Eliminar duplicados
+
+      if (uniquePhones.length === 0) {
+          toast.warning("Los usuarios seleccionados no tienen número de teléfono registrado.");
+          setIsSending(false);
+          return;
+      }
+
+      try {
+          // Import dynamic to avoid cycles or ensure loading
+          const { api } = await import('../services/api');
+          const res = await api.sendWhatsAppNotification({
+              phones: uniquePhones,
+              message: notificationMessage
+          });
+
+          if (res.success) {
+              toast.success("Difusión Enviada Correctamente", {
+                  description: `Se enviaron mensajes a ${res.results?.sent} destinatarios. (${res.results?.failed} fallidos)`,
+                  duration: 5000
+              });
+              
+              setIsNotificationSenderOpen(false);
+              setNotificationMessage('');
+              setSelectedUserIds([]);
+          } else {
+              toast.error("Error en el envío", { description: res.error || 'Ocurrió un error desconocido' });
+          }
+      } catch (e: any) {
+          console.error('[NotificationSender] Error:', e);
+          toast.error("Error de Conexión", { description: e.message });
+      } finally {
+          setIsSending(false);
+      }
   };
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -441,7 +520,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
             </div>
             <div className="flex items-center justify-center bg-slate-100 rounded-3xl">
               <div className="w-14 h-14 bg-slate-900 text-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
-                {formData.iconClass ? React.createElement((Icons as any)[formData.iconClass]) : <Icons.Settings />}
+                {formData.iconClass && (Icons as any)[formData.iconClass] ? React.createElement((Icons as any)[formData.iconClass]) : <Icons.Settings />}
               </div>
             </div>
             {renderStatusField()}
@@ -525,6 +604,14 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
            </label>
 
            <button onClick={handleExportExcel} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel /><span className="hidden xl:inline">Excel</span></button>
+           
+           {activeMaster === 'masterNotificaciones' && (
+               <button onClick={()=>setIsNotificationSenderOpen(true)} className="bg-emerald-500 text-slate-900 px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all flex items-center gap-2">
+                   <Icons.Chat className="w-4 h-4" />
+                   <span className="hidden md:inline">Difusión</span>
+               </button>
+           )}
+
            <button onClick={()=>{setEditingRecord(null); setFormData({statusId: 'EST-01', clientIds: []}); setError(null); setIsModalOpen(true);}} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all">Nuevo</button>
         </div>
       </div>
@@ -593,6 +680,89 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
            </div>
         </div>
       </div>
+
+      {/* NOTIFICATION SENDER MODAL */}
+       {isNotificationSenderOpen && (
+          <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
+             <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] border border-white/10">
+                <div className="bg-slate-900 p-8 text-white flex justify-between items-center shrink-0">
+                   <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-emerald-500 text-slate-950 rounded-[1.5rem] flex items-center justify-center shadow-xl"><Icons.Chat /></div>
+                      <div>
+                        <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">Centro de Difusión M7</h3>
+                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mt-1">Envío Masivo de WhatsApp</p>
+                      </div>
+                   </div>
+                   <button onClick={() => setIsNotificationSenderOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
+                </div>
+                
+                <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                   {/* USER SELECTOR */}
+                   <div className="w-full md:w-1/3 bg-slate-50 border-r border-slate-200 flex flex-col">
+                      <div className="p-6 border-b border-slate-200">
+                         <div className="flex justify-between items-center mb-4">
+                             <h4 className="font-black text-xs uppercase text-slate-400 tracking-widest">Destinatarios</h4>
+                             <span className="bg-slate-200 text-slate-600 px-2 py-1 rounded-lg text-[10px] font-bold">{selectedUserIds.length} Seleccionados</span>
+                         </div>
+                         <div className="flex gap-2">
+                             <button onClick={() => setSelectedUserIds(allMasterData.masterUsuarios?.map(u => u.id) || [])} className="flex-1 py-2 bg-slate-200 hover:bg-emerald-500 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">Todos</button>
+                             <button onClick={() => setSelectedUserIds([])} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-red-100 hover:text-red-500 rounded-xl text-[10px] font-black uppercase transition-all">Ninguno</button>
+                         </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
+                         {(allMasterData.masterUsuarios || []).map(u => (
+                             <div key={u.id} onClick={() => {
+                                 if (selectedUserIds.includes(u.id)) setSelectedUserIds(selectedUserIds.filter(id => id !== u.id));
+                                 else setSelectedUserIds([...selectedUserIds, u.id]);
+                             }} className={`p-3 rounded-2xl border-2 cursor-pointer transition-all flex items-center gap-3 ${selectedUserIds.includes(u.id) ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-transparent hover:border-slate-200'}`}>
+                                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedUserIds.includes(u.id) ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'}`}>
+                                     {selectedUserIds.includes(u.id) && <Icons.Check className="text-white w-3 h-3" />}
+                                 </div>
+                                 <div className="min-w-0">
+                                     <p className="text-[10px] font-black uppercase text-slate-900 truncate">{u.name}</p>
+                                     <p className="text-[9px] text-slate-400 truncate">{u.phone || 'Sin Teléfono'}</p>
+                                 </div>
+                             </div>
+                         ))}
+                      </div>
+                   </div>
+
+                   {/* MESSAGE COMPOSER */}
+                   <div className="flex-1 flex flex-col p-8 bg-white relative">
+                      <div className="flex-1 flex flex-col gap-4">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Mensaje a difundir</label>
+                          <textarea 
+                             value={notificationMessage}
+                             onChange={(e) => setNotificationMessage(e.target.value)}
+                             placeholder="Escribe tu mensaje aquí... (Soporta formato WhatsApp: *negrita*, _cursiva_)"
+                             className="flex-1 w-full bg-slate-50 border-2 border-slate-100 rounded-[2rem] p-6 resize-none outline-none focus:border-emerald-500 transition-all font-medium text-sm text-slate-700 placeholder:text-slate-300"
+                          />
+                      </div>
+                      
+                      <div className="mt-6 flex justify-end">
+                          <button 
+                             onClick={handleSendNotification}
+                             disabled={isSending || selectedUserIds.length === 0 || !notificationMessage.trim()}
+                             className="px-10 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl transition-all flex items-center gap-4"
+                          >
+                             {isSending ? (
+                                <>
+                                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                  <span>Enviando...</span>
+                                </>
+                             ) : (
+                                <>
+                                  <span>Enviar Difusión</span>
+                                  <Icons.ChevronRight className="w-4 h-4" />
+                                </>
+                             )}
+                          </button>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+       )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95">

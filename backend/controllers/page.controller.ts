@@ -4,7 +4,16 @@ import pool from '../config/database.js';
 
 export const getPages = async (req: Request, res: Response) => {
   try {
-    const result = await pool.query('SELECT * FROM pages ORDER BY name ASC');
+    const result = await pool.query(`
+      SELECT 
+        id, name, route, 
+        module_id AS "moduleId", 
+        parent_id AS "parentId", 
+        status_id AS "statusId" 
+      FROM pages 
+      ORDER BY name ASC
+    `);
+    console.log(`[DEBUG-PAGES] Query returned ${result.rows.length} rows`);
     if (result.rows.length > 0) {
         res.json(result.rows);
         return;
@@ -39,10 +48,12 @@ export const getPages = async (req: Request, res: Response) => {
         { id: 'PAG-18', name: 'PERMISOS POR ROL', route: 'master', moduleId: 'masterPermisosRol', parentId: 'MOD-04', statusId: 'EST-01' },
         { id: 'PAG-19', name: 'PERMISOS POR USUARIO', route: 'master', moduleId: 'masterPermisosUsuario', parentId: 'MOD-04', statusId: 'EST-01' },
         { id: 'PAG-20', name: 'ROLES DE SISTEMA', route: 'master', moduleId: 'masterRol', parentId: 'MOD-04', statusId: 'EST-01' },
-        { id: 'PAG-21', name: 'USUARIOS', route: 'master', moduleId: 'masterUsuarios', parentId: 'MOD-04', statusId: 'EST-01' }
+        { id: 'PAG-21', name: 'USUARIOS', route: 'master', moduleId: 'masterUsuarios', parentId: 'MOD-04', statusId: 'EST-01' },
+        { id: 'PAG-22', name: 'CONEXIÓN WHATSAPP', route: 'whatsapp-status', moduleId: 'masterWhatsApp', parentId: 'MOD-04', statusId: 'EST-01' }
     ]); 
   } catch (err: any) {
-    res.status(500).json({ error: "Error fatal en controlador" });
+    console.error('[PAGES-ERROR]', err);
+    res.status(500).json({ error: "Error fatal en controlador", details: err.message });
   }
 };
 

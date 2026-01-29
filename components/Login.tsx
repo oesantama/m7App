@@ -14,11 +14,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [view, setView] = useState<'login' | 'forgot'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [failedAttempts, setFailedAttempts] = useState(() => {
+    return parseInt(localStorage.getItem('m7_login_attempts') || '0');
+  });
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
 
   // Cargar credenciales guardadas al montar el componente
   useEffect(() => {
+    setError(null); // Limpiar error al montar
     const savedEmail = localStorage.getItem('m7_remember_email');
     const savedPass = localStorage.getItem('m7_remember_pass');
     if (savedEmail && savedPass) {
@@ -57,8 +60,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       const success = await onLogin(cleanEmail, password);
       
       if (success === true) {
+        // ÉXITO: Limpiar todo rastro de error
+        setError(null); 
         setFailedAttempts(0);
+        localStorage.removeItem('m7_login_attempts');
         localStorage.removeItem('m7_lockout');
+        
         // Si el login es exitoso y rememberMe está activo, guardar
         if (rememberMe) {
           localStorage.setItem('m7_remember_email', cleanEmail);
@@ -68,8 +75,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           localStorage.removeItem('m7_remember_pass');
         }
       } else {
-        const nextFailed = failedAttempts + 1;
+        // FALLO: Incrementar contador persistente
+        const currentFailed = parseInt(localStorage.getItem('m7_login_attempts') || '0');
+        const nextFailed = currentFailed + 1;
         setFailedAttempts(nextFailed);
+        localStorage.setItem('m7_login_attempts', nextFailed.toString());
         
         if (nextFailed >= 5) {
           const lockTime = Date.now() + 30000; // 30 segundos

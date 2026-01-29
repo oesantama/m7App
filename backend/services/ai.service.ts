@@ -4,11 +4,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI(process.env.API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export const aiService = {
   async generateResponse(prompt: string, context?: any) {
     try {
+      if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.includes('YOUR_GEMINI')) {
+        return "⚠️ La IA no está configurada. Por favor define la variable GEMINI_API_KEY en el archivo .env";
+      }
+
       const model = genAI.getGenerativeModel({ model: process.env.AI_MODEL || "gemini-1.5-flash" });
 
       const systemPrompt = `
@@ -30,8 +34,9 @@ export const aiService = {
       const response = await result.response;
       return response.text();
     } catch (error: any) {
-      console.error("[M7-AI-SERVICE] Error:", error);
-      throw new Error("No se pudo procesar la solicitud de IA: " + error.message);
+      console.error("[M7-AI-SERVICE] Error/Quota:", error.message);
+      // Fallback amigable en lugar de error 500
+      return "Lo siento, mi núcleo de inteligencia está experimentando alta latencia o problemas de credenciales. Intenta más tarde.";
     }
   }
 };

@@ -35,6 +35,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
   console.log(`[M7-SYSTEM] Servidor Operacional en Puerto ${PORT}`);
+  console.log(`[M7-SYSTEM] Versión: 1.0.2 - BK-SYNC-FIX`);
   console.log(`[M7-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
   

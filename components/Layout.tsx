@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Icons, INITIAL_CLIENTS, AVATAR_GALLERY } from '../constants';
+import { Toaster, toast } from 'sonner';
 import { User, PageModule, MasterCategory, MasterRecord } from '../types';
 
 interface LayoutProps {
@@ -23,6 +24,7 @@ const Layout: React.FC<LayoutProps> = ({
   onBack, showBack, user, onUpdateUser, onLogout, modulesData = [], pagesData = []
 }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isHelpMode, setIsHelpMode] = useState(false); // NEW: Help Mode State
   const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 1024);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [profileData, setProfileData] = useState({ name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || AVATAR_GALLERY[0] });
@@ -56,25 +58,29 @@ const Layout: React.FC<LayoutProps> = ({
     return IconComponent ? <IconComponent /> : <Icons.Alert />;
   };
 
-  const isSuperUser = user.roleId === 'ROL-01';
+  const isSuperUser = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
   
   console.log('[M7-LAYOUT] User:', user);
   console.log('[M7-LAYOUT] User Permissions:', user.permissions);
   console.log('[M7-LAYOUT] Modules Data:', modulesData);
   console.log('[M7-LAYOUT] Pages Data:', pagesData);
 
-  // ORDENAMIENTO ASCENDENTE DE GRUPOS Y PÁGINAS
+  // ORDENAMIENTO ASCENDENTE DE GRUPOS Y PÁGINAS - ROBUSTECIMIENTO DE PROPIEDADES
+  console.log('[M7-LAYOUT-DEBUG] Raw Modules:', modulesData);
+  console.log('[M7-LAYOUT-DEBUG] Raw Pages:', pagesData);
+
   const menuGroups = [...modulesData]
-    .filter(m => m.statusId === 'EST-01')
+    .filter(m => (m.statusId || m.status_id) === 'EST-01')
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(mod => {
+      const modId = mod.id;
       const allowedPages = [...pagesData]
-        .filter(p => p.parentId === mod.id && p.statusId === 'EST-01')
+        .filter(p => (p.parentId || p.parent_id) === modId && (p.statusId || p.status_id) === 'EST-01')
         .filter(p => {
-            // Ya NO hay privilegios automáticos para superusuario
-            const userPerm = user.permissions.find(perm => perm.module === p.id);
+            if (isSuperUser) return true; // BYPASS REAL PARA EL ADMINISTRADOR
+            const pId = p.id;
+            const userPerm = user.permissions.find(perm => perm.module === pId);
             const hasPermission = userPerm && userPerm.actions.includes('view');
-            console.log(`[M7-LAYOUT] Page ${p.id} (${p.name}): permission=${hasPermission}`, userPerm);
             return hasPermission;
         })
         .sort((a, b) => a.name.localeCompare(b.name))
@@ -82,13 +88,13 @@ const Layout: React.FC<LayoutProps> = ({
           id: page.id,
           label: page.name,
           module: page.route as PageModule,
-          masterCat: page.moduleId as MasterCategory
+          masterCat: (page.moduleId || page.module_id) as MasterCategory
         }));
 
       return {
         id: mod.id,
         label: mod.name,
-        icon: getIcon(mod.iconClass || 'Settings'),
+        icon: getIcon((mod.iconClass || mod.icon_class || 'Settings')),
         items: allowedPages
       };
     })
@@ -97,6 +103,13 @@ const Layout: React.FC<LayoutProps> = ({
   console.log('[M7-LAYOUT] Menu Groups:', menuGroups);
 
   const selectItem = (item: any) => {
+    if (isHelpMode) {
+        toast.info(`Módulo: ${item.label}`, {
+            description: `Este módulo permite gestionar ${item.label.toLowerCase()} y sus operaciones relacionadas.`,
+            duration: 4000
+        });
+        return;
+    }
     if (item.module) setActiveTab(item.module);
     if (item.masterCat && setActiveMasterCategory) setActiveMasterCategory(item.masterCat);
     if (window.innerWidth < 768) setIsCollapsed(true);
@@ -104,7 +117,12 @@ const Layout: React.FC<LayoutProps> = ({
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[M7-LAYOUT] Updating profile:', profileData);
     onUpdateUser(profileData);
+    toast.success("Perfil Actualizado Correctamente", {
+        description: "Los cambios se han guardado con éxito.",
+        duration: 3000
+    });
     setIsProfileModalOpen(false);
   };
 
@@ -157,7 +175,29 @@ const Layout: React.FC<LayoutProps> = ({
           ))}
         </nav>
 
-        <div className="mt-auto p-4 border-t border-slate-800">
+        <div className="mt-auto p-4 border-t border-slate-800 space-y-3">
+          {/* BOTÓN MESA DE AYUDA (HELP DESK) */}
+          {/* BOTÓN MESA DE AYUDA (HELP DESK) INTERACTIVO */}
+          <button 
+            onClick={() => {
+               if (isHelpMode) {
+                 setIsHelpMode(false);
+                 toast.dismiss();
+                 toast.info("Mesa de Ayuda Desactivada");
+               } else {
+                 setIsHelpMode(true);
+                 toast.info("Mesa de Ayuda ACTIVADA", { 
+                   description: "Haga clic en cualquier módulo del menú para ver su descripción sin navegar.",
+                   duration: Infinity 
+                 });
+               }
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 border rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all group ${isCollapsed ? 'justify-center px-0' : ''} ${isHelpMode ? 'bg-emerald-500 text-slate-900 border-emerald-500 animate-pulse' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500 hover:text-slate-900'}`}
+          >
+            <Icons.Alert style={{ width: '16px', height: '16px' }} />
+            {!isCollapsed && <span>{isHelpMode ? 'SALIR DE AYUDA' : 'MESA DE AYUDA'}</span>}
+          </button>
+
           <div className={`bg-slate-800/40 rounded-3xl flex items-center p-4 gap-4 relative`}>
              <button onClick={() => setIsProfileModalOpen(true)} className="absolute inset-0 z-10 opacity-0 cursor-pointer"></button>
              <div className="w-10 h-10 rounded-full bg-slate-700 overflow-hidden border-2 border-emerald-500 shrink-0">

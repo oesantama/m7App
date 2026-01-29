@@ -22,6 +22,22 @@ export const syncInventory = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
     
+    // 1. Bloqueo FOR UPDATE para concurrencia
+    const checkStatus = await client.query('SELECT status FROM documents_l WHERE id = $1 FOR UPDATE', [docId]);
+    
+    if (checkStatus.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Documento no encontrado" });
+    }
+
+    if (checkStatus.rows[0].status === 'Inventariado') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ 
+        error: "Conflicto de Concurrencia", 
+        message: "Este documento ya ha sido procesado por otro usuario." 
+      });
+    }
+
     await client.query(`
       UPDATE documents_l 
       SET status = 'Inventariado', inventory_date = NOW(), inventory_user = $1, inventory_notes = $2
@@ -38,9 +54,9 @@ export const syncInventory = async (req: Request, res: Response) => {
 
     await client.query('COMMIT');
     res.json({ success: true });
-  } catch (err) {
+  } catch (err: any) {
     await client.query('ROLLBACK');
-    res.status(500).json({ error: "Error de sincronización operacional" });
+    res.status(500).json({ error: "Error de sincronización operacional", details: err.message });
   } finally {
     client.release();
   }
