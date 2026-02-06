@@ -11,6 +11,8 @@ import RecibidoMaterial from './components/RecibidoMaterial';
 import FleetManager from './components/FleetManager';
 import AssignmentManager from './components/AssignmentManager';
 import AIChat from './components/AIChat';
+import DigitalSignature from './components/DigitalSignature';
+import ApprovalManager from './components/ApprovalManager';
 import { api } from './services/api';
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
@@ -31,12 +33,14 @@ const App: React.FC = () => {
         { id: 'EST-02', name: 'INACTIVO', statusId: 'EST-01' } as any
     ],
     masterModulos: [],
-    masterPaginas: []
+    masterPaginas: [],
+    masterMarcas: []
   });
   const [waStatus, setWaStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
   const [isLoading, setIsLoading] = useState(false);
   
-  const normalize = (data: any[]) => {
+  const normalize = (data: any) => {
+    if (!Array.isArray(data)) return [];
     return data.map(item => ({
       ...item,
       statusId: item.statusId || item.status_id,
@@ -48,60 +52,10 @@ const App: React.FC = () => {
   };
   
   // Estados Operativos
-  const [documents, setDocuments] = useState<any[]>([
-    { 
-        id: 'DOC-MOCK-01', 
-        externalDocId: 'CARGA-123', 
-        vehicleData: 'XYZ-123', 
-        status: 'Pendiente', 
-        statusId: 'EST-03', 
-        clientId: 'c1',
-        codplan: 'UN-999',
-        city: 'BOGOTÁ',
-        createdAt: new Date().toISOString(),
-        items: [] 
-    },
-    { 
-        id: 'DOC-MOCK-02', 
-        externalDocId: 'PLAN-456', 
-        vehicleData: 'ABC-789', 
-        status: 'Inventariado', // IMPORTANTE para RoutePlanner
-        statusId: 'EST-01', 
-        clientId: 'c1',
-        codplan: 'UN-888',
-        city: 'BOGOTÁ',
-        createdAt: new Date().toISOString(),
-        items: [] 
-    }
-  ]);
-  const [invoices, setInvoices] = useState<any[]>([
-    {
-        id: 'INV-01',
-        clientId: 'c1',
-        docLId: 'DOC-MOCK-02',
-        customerName: 'FERRETERIA EL MARTILLO',
-        address: 'Calle 80 # 45-67',
-        lat: 4.6823,
-        lng: -74.0567,
-        volumeM3: 12.5,
-        status: 'Pendiente',
-        city: 'BOGOTÁ'
-    },
-    {
-        id: 'INV-02',
-        clientId: 'c1',
-        docLId: 'DOC-MOCK-02',
-        customerName: 'CONSTRUCTORA BOLIVAR',
-        address: 'Av Boyaca # 12-34',
-        lat: 4.6543,
-        lng: -74.1234,
-        volumeM3: 8.2,
-        status: 'Pendiente',
-        city: 'BOGOTÁ'
-    }
-  ]);
-  const [drivers, setDrivers] = useState<any[]>(INITIAL_DRIVERS);
-  const [vehicles, setVehicles] = useState<any[]>(INITIAL_VEHICLES);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
 
   const [isRestoring, setIsRestoring] = useState(true);
@@ -157,22 +111,14 @@ const App: React.FC = () => {
 
   // Efecto para restaurar sesión
   useEffect(() => {
-    console.log('%c [M7-VERSION] FRONTEND V1.0.2 - FE-SYNC-FIX ', 'background: #10b981; color: #fff; font-weight: bold;');
+    console.log('%c [M7-VERSION] FRONTEND V1.0.3 - DB-SYNC-AUDIT ', 'background: #10b981; color: #fff; font-weight: bold;');
     
     const restoreSession = async () => {
         const savedUser = localStorage.getItem('m7_user_session');
-        const savedMaster = localStorage.getItem('m7_master_data');
         
         if (savedUser) {
           try {
             const parsedUser = JSON.parse(savedUser);
-            // FORZAR LOGOUT SI EL ID ES VIEJO O INCOMPLETO
-            if (parsedUser && (parsedUser.id === 'U-001' || !parsedUser.permissions)) {
-                 console.warn('[M7-AUTH] Sesión antigua detectada, forzando limpieza...');
-                 handleLogout();
-                 return;
-            }
-
             if (parsedUser && parsedUser.id) {
                 // SOLUCIÓN REAL: Forzar refresco de permisos para Admin en cada restauración
                 if (parsedUser.roleId === 'ROL-01' || parsedUser.id === 'USR-01') {
@@ -186,44 +132,11 @@ const App: React.FC = () => {
                 setUser(parsedUser);
                 setIsAuthenticated(true);
                 
-                // CARGAR DATOS MAESTROS FRESCOS (IGNORAR CACHÉ SI ES POSIBLE)
-                // CARGAR DATOS MAESTROS FRESCOS (IGNORAR CACHÉ SI ES POSIBLE)
-                console.log('[M7-AUTH] Obteniendo datos maestros frescos...');
-                const [modules, pages, genericMasters] = await Promise.all([
-                    api.getModules().then(normalize).catch(() => []),
-                    api.getPages().then(normalize).catch(() => []),
-                    api.getGenericMasters().catch(() => [])
-                ]);
-
-                // Agrupar maestros genéricos
-                const groupedMasters: any = {};
-                if (Array.isArray(genericMasters)) {
-                    genericMasters.forEach((m: any) => {
-                        if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
-                        groupedMasters[m.category].push(m);
-                    });
-                }
-
-                setAllMasterData(prev => ({
-                    ...prev,
-                    ...groupedMasters,
-                    masterModulos: modules,
-                    masterPaginas: pages
-                }));
-
-                if (savedMaster) {
-                  try {
-                      // Solo restaurar del caché lo que NO sea crítico/dinámico
-                      const parsedMaster = JSON.parse(savedMaster);
-                      setAllMasterData(prev => ({
-                          ...parsedMaster, 
-                          ...groupedMasters, // Prioridad a lo fresco de DB
-                          masterModulos: modules, 
-                          masterPaginas: pages
-                      }));
-                  } catch (e) { console.warn('Master data corrupto'); }
-                }
-          } catch (e) {
+                // CARGAR DATOS MAESTROS FRESCOS CON EL CLIENTE RESTAURADO
+                refreshAppData(parsedUser.clientId);
+            }
+          } catch (e: any) {
+            console.error('[SESSION-RESTORE] Error:', e);
             localStorage.removeItem('m7_user_session');
           }
         }
@@ -232,6 +145,152 @@ const App: React.FC = () => {
     
     restoreSession();
   }, []);
+
+  const refreshAppData = async (forcedClientId?: string) => {
+    const targetClientId = forcedClientId || user?.clientId || 'c1';
+    console.log(`[M7-SYNC] Sincronizando datos para cliente: ${targetClientId || 'TODOS'}...`);
+    try {
+        const [modules, pages, genericMasters, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData] = await Promise.all([
+            api.getModules().then(normalize).catch(() => []),
+            api.getPages().then(normalize).catch(() => []),
+            api.getGenericMasters().catch(() => []),
+            api.getArticles().catch(() => []),
+            api.getVehicles().catch(() => []),
+            api.getDrivers().catch(() => []),
+            api.getUsers().catch(() => []),
+            api.getRoles().catch(() => []),
+            api.getPermissions().catch(() => []),
+            api.getAllUserPermissions().catch(() => []),
+            api.getClients().catch(() => []),
+            api.getAssignments().catch(() => []),
+            api.getInvoices(targetClientId).catch(() => [])
+        ]);
+
+        const groupedMasters: any = {};
+        if (Array.isArray(genericMasters)) {
+            genericMasters.forEach((m: any) => {
+                if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
+                groupedMasters[m.category].push(m);
+            });
+        }
+
+        const mappedArticles = Array.isArray(articles) ? articles.map((a: any) => ({
+            ...a,
+            statusId: a.status_id,
+            clientId: a.client_id,
+            factorInter: a.factor_inter,
+            factorStd: a.factor_std,
+            uomGeneralId: a.uom_general_id,
+            uomInterId: a.uom_inter_id,
+            uomStdId: a.uom_std_id,
+            categoryArticuloId: a.category_articulo_id
+        })) : [];
+
+        const mappedVehicles = Array.isArray(vehicles) ? vehicles.map((v: any) => ({
+            ...v,
+            clientId: v.client_id,
+            statusId: v.status_id,
+            capacityM3: parseFloat(v.capacity_m3 || '0'),
+            soatExpiry: v.soat_expiry,
+            technoExpiry: v.techno_expiry,
+            soatPdfUrl: v.soat_pdf,
+            technoPdfUrl: v.techno_pdf,
+            modelYear: v.model_year,
+            color: v.color,
+            vehicleTypeId: v.vehicle_type
+        })) : [];
+
+        const mappedDrivers = Array.isArray(drivers) ? drivers.map((d: any) => ({
+            ...d,
+            status: (d.status_id === 'EST-01' || d.status_id === '1' || d.status === 'Activo') ? 'Activo' : 'Inactivo', 
+            documentType: d.document_type,
+            documentNumber: d.document_number,
+            licenseExpiry: d.license_expiry,
+            licensePdf: d.license_pdf,
+            licenseSideA: d.license_side_a,
+            licenseSideB: d.license_side_b,
+            licenseCategory: d.license_category
+        })) : [];
+
+        setAllMasterData({
+            ...groupedMasters,
+            masterUsuarios: usersData,
+            masterRol: rolesData,
+            masterPermisosRol: permsData,
+            masterPermisosUsuario: userPermsData,
+            masterClientes: clientsData,
+            masterModulos: modules,
+            masterPaginas: pages,
+            masterArticulo: mappedArticles,
+            masterVehiculos: mappedVehicles,
+            masterConductores: mappedDrivers
+        });
+
+        setVehicles(mappedVehicles);
+        setDrivers(mappedDrivers);
+        
+        const mappedAssignments = Array.isArray(assignmentsData) ? assignmentsData.map((a: any) => ({
+            id: a.id,
+            vehicleId: a.vehicle_id,
+            driverId: a.driver_id,
+            clientId: a.client_id,
+            isActive: a.is_active,
+            statusId: 'EST-01',
+            createdAt: a.created_at,
+            updatedAt: a.updated_at
+        })) : [];
+        setAssignments(mappedAssignments);
+
+        const mappedInvoices = Array.isArray(invoicesData) ? invoicesData.map((i: any) => ({
+            ...i,
+            externalDocId: i.external_doc_id || i.externalDocId,
+            clientId: i.clientId || i.client_id,
+            statusId: i.status_id,
+            volumeM3: Number(i.volume_m3 || i.volumeM3 || 0),
+            invoiceValue: Number(i.invoice_value || i.invoiceValue || 0),
+            planType: (i.codplan === 'AJI01' || i.planType === 'AJI01') ? 'Plan Normal' : (i.codplan === 'AJV20' || i.planType === 'AJV20') ? 'Plan R' : (i.planType || 'Plan Normal'),
+            status: i.status || 'Pendiente',
+            items: (i.items || []).map((it: any) => ({
+                ...it,
+                articleId: it.article_id,
+                expectedQty: Number(it.expected_qty || 0),
+                unCode: it.un_code,
+                clientRef: it.client_ref
+            }))
+        })) : [];
+        setInvoices(mappedInvoices);
+        console.log(`[M7-SYNC] Sincronización Exitosa. Facturas Recibidas: ${invoicesData?.length || 0}. Mapeadas: ${mappedInvoices.length}`);
+
+        // Fetch operational data too
+        api.getDocuments(targetClientId).then(docs => {
+            if (Array.isArray(docs)) {
+                setDocuments(docs.map(d => ({
+                    ...d,
+                    externalDocId: d.external_doc_id || d.externalDocId,
+                    vehicleData: d.vehicle_plate || d.vehicleData,
+                    // Mapeo Robusto M7
+                    planType: (d.codplan === 'AJI01' || d.plan_type === 'AJI01' || d.planType === 'AJI01') ? 'Plan Normal' : 
+                              (d.codplan === 'AJV20' || d.plan_type === 'AJV20' || d.planType === 'AJV20') ? 'Plan R' : 
+                              (d.plan_type || d.planType || 'Plan Normal'),
+                    createdAt: d.created_at || d.createdAt,
+                    items: (d.items || []).map((it: any) => ({
+                        ...it,
+                        articleId: it.article_id,
+                        expectedQty: it.expected_qty,
+                        unCode: it.un_code,
+                        clientRef: it.client_ref,
+                        orderNumber: it.order_number,
+                        peso: Number(it.peso || 0),
+                        countedQty: it.count_2 || it.counted_qty
+                    }))
+                })));
+            }
+        });
+        
+    } catch (err) {
+        console.error('[M7-SYNC] Error:', err);
+    }
+  };
 
   // Efecto para persistir pestaña activa
   useEffect(() => {
@@ -242,14 +301,19 @@ const App: React.FC = () => {
 
   // Polling global para indicador
   useEffect(() => {
-    if (!isAuthenticated) return;
-    const checkWa = async () => { try { const res = await api.getWhatsAppStatus(); setWaStatus(res.status === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED'); } catch {} };
+    if (!isAuthenticated || !user?.id) return;
+    const checkWa = async () => { 
+      try { 
+        const res = await api.getWhatsAppStatus(user.id); 
+        setWaStatus(res.status === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED'); 
+      } catch {} 
+    };
     checkWa();
     const timer = setInterval(checkWa, 30000);
     return () => clearInterval(timer);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 
-  const handleLogin = async (email: string, pass: string): Promise<boolean> => {
+  const handleLogin = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     try {
         setIsLoading(true);
         // 1. Autenticación Real
@@ -258,32 +322,32 @@ const App: React.FC = () => {
         
         if (!authRes.success) {
             console.log('[M7-LOGIN] Login failed - invalid credentials');
-            return false;
+            return { success: false, error: authRes.error || 'Credenciales no válidas' };
         }
         
         const userData = authRes.user;
-        console.log('[M7-LOGIN] User Data:', userData);
+        // ... (rest of the logic remains the same)
+        
+        // Simulo el resto para no repetir todo el bloque si es idéntico, 
+        // pero necesito asegurar que retorno {success: true} al final.
+        // (Volveré a pegar el bloque completo para evitar errores de contexto incompleto)
         
         // 2. Cargar permisos del usuario
         const userPermissions = await api.getUserPermissions(userData.id).catch(() => null);
-        console.log('[M7-LOGIN] User Permissions:', userPermissions);
         
-        // 3. Carga de Datos Iniciales (Parciales/Mock desde Backend)
-        const [clients, users, roles, modules, pages, permissions, genericMasters] = await Promise.all([
+        // 3. Carga de Datos Iniciales
+        const [clients, users, roles, modules, pages, permissions, userPermissionsAll, genericMasters, articData] = await Promise.all([
             api.getClients().catch(() => []),
             api.getUsers().catch(() => []),
             api.getRoles().catch(() => []),
             api.getModules().then(normalize).catch(() => []),
             api.getPages().then(normalize).catch(() => []),
             api.getPermissions().catch(() => []),
-            api.getGenericMasters().catch(() => [])
+            api.getAllUserPermissions().catch(() => []),
+            api.getGenericMasters().catch(() => []),
+            api.getArticles().catch(() => [])
         ]);
         
-        console.log('[M7-LOGIN] Modules:', modules);
-        console.log('[M7-LOGIN] Pages:', pages);
-        console.log('[M7-LOGIN] Generic Masters Loaded:', genericMasters.length);
-
-        // Agrupar maestros genéricos por categoría
         const groupedMasters: any = {};
         if (Array.isArray(genericMasters)) {
             genericMasters.forEach((m: any) => {
@@ -292,81 +356,69 @@ const App: React.FC = () => {
             });
         }
 
-        // 4. Mapear permisos del usuario al formato esperado
         let mappedPermissions: any[] = [];
         if (Array.isArray(userPermissions)) {
             mappedPermissions = userPermissions;
-        } else if (userPermissions) {
-            pages.forEach((page: any) => {
-                const pageId = page.id;
-                const actions: string[] = [];
-                if (userPermissions[`page_${pageId}_view`]) actions.push('view');
-                if (userPermissions[`page_${pageId}_create`]) actions.push('create');
-                if (userPermissions[`page_${pageId}_edit`]) actions.push('edit');
-                if (userPermissions[`page_${pageId}_delete`]) actions.push('delete');
-                if (userPermissions[`page_${pageId}_active`]) actions.push('active');
-                if (actions.length > 0) mappedPermissions.push({ module: pageId, actions });
-            });
         }
-        
-        console.log('[M7-LOGIN] Mapped Permissions:', mappedPermissions);
 
-        // 5. Configuración de Maestros con datos reales
         setAllMasterData(prev => ({
             ...prev,
-            ...groupedMasters, // Fusionar maestros dinámicos (TipoDocumento, Notificaciones, etc.)
-            masterClientes: clients,
-            masterUsuarios: users,
-            masterRol: roles,
-            masterModulos: modules,
-            masterPaginas: pages,
-            masterPermisosRol: permissions
+            ...groupedMasters,
+            masterClientes: Array.isArray(clients) ? clients : [],
+            masterUsuarios: Array.isArray(users) ? users : [],
+            masterRol: Array.isArray(roles) ? roles : [],
+            masterModulos: Array.isArray(modules) ? modules : [],
+            masterPaginas: Array.isArray(pages) ? pages : [],
+            masterPermisosRol: Array.isArray(permissions) ? permissions : [],
+            masterPermisosUsuario: Array.isArray(userPermissionsAll) ? userPermissionsAll : [],
+            masterArticulo: Array.isArray(articData) ? articData.map((a: any) => ({
+                ...a,
+                statusId: a.status_id,
+                clientId: a.client_id,
+                factorInter: a.factor_inter,
+                factorStd: a.factor_std,
+                uomGeneralId: a.uom_general_id,
+                uomInterId: a.uom_inter_id,
+                uomStdId: a.uom_std_id,
+                categoryArticuloId: a.category_articulo_id
+            })) : []
         }));
 
-        // 6. Cargar Datos Operativos
-        const [docsData, vehData] = await Promise.all([
-            api.getDocuments().catch(() => []),
-            api.getVehicles().catch(() => [])
+        const [docsData, vehData, driversData] = await Promise.all([
+            api.getDocuments(userData.client_id || 'c1').catch(() => []),
+            api.getVehicles().catch(() => []),
+            api.getDrivers().catch(() => [])
         ]);
-        setDocuments(docsData);
-        setVehicles(vehData);
-        // Podríamos cargar mas aquí si existieran los endpoints
+        
+        setDocuments(Array.isArray(docsData) ? docsData.map((d: any) => ({
+            ...d,
+            externalDocId: d.external_doc_id,
+            vehicleData: d.vehicle_plate,
+            createdAt: d.created_at,
+            items: (d.items || []).map((it: any) => ({ ...it, articleId: it.article_id }))
+        })) : []);
+        setVehicles(Array.isArray(vehData) ? vehData : []);
+        setDrivers(Array.isArray(driversData) ? driversData : []);
 
         const finalUser = {
             id: userData.id,
             email: userData.email,
             name: userData.name,
-            role: userData.role_id === 'ROL-01' ? 'Administrador' : 'Usuario',
             roleId: userData.role_id,
             permissions: mappedPermissions,
-            createdAt: '', updatedAt: '', createdBy: '', updatedBy: '', statusId: 'EST-01',
-            clientId: 'c1' // Debe coincidir con INITIAL_CLIENTS
+            clientId: 'c1'
         } as any;
 
         setUser(finalUser);
-        
-        // Persistir sesión
         localStorage.setItem('m7_user_session', JSON.stringify(finalUser));
-        localStorage.setItem('m7_master_data', JSON.stringify({
-            ...allMasterData,
-            masterClientes: clients,
-            masterUsuarios: users,
-            masterRol: roles,
-            masterModulos: modules,
-            masterPaginas: pages,
-            masterPermisosRol: permissions
-        }));
-
         setIsAuthenticated(true);
-        toast.success(`Bienvenido, ${userData.name}`, {
-          description: 'Conexión exitosa al sistema M7 Intelligence.',
-          duration: 3000
-        });
-        return true;
+        
+        toast.success(`Bienvenido, ${userData.name}`);
+        return { success: true };
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("[M7-LOGIN] Login Error:", error);
-        return false;
+        return { success: false, error: 'Error de conexión con el núcleo M7' };
     } finally {
         setIsLoading(false);
     }
@@ -526,11 +578,11 @@ const App: React.FC = () => {
             allMasterData={allMasterData}
             setAllMasterData={setAllMasterData}
             user={user!}
-            onAudit={() => {}}
+            onAudit={refreshAppData}
           />
         );
       case 'whatsapp-status':
-          return <WhatsAppConnect />;
+          return <WhatsAppConnect user={user} />;
       case 'documentos':
           return (
             <GestionDocumentosL 
@@ -538,7 +590,7 @@ const App: React.FC = () => {
               invoices={invoices} 
               user={user!} 
               masterEstados={allMasterData.masterEstados || []}
-              onAddDocuments={(newDocs) => setDocuments([...newDocs, ...documents])}
+              onDocumentsChange={setDocuments}
             />
           );
       case 'rutas':
@@ -550,6 +602,7 @@ const App: React.FC = () => {
               assignments={assignments}
               documents={documents}
               user={user!}
+              onRefresh={() => refreshAppData()}
               onAssign={(vId, dId, cId) => {
                 const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, statusId: 'EST-01' };
                 setAssignments([...assignments, newAssign]);
@@ -569,8 +622,15 @@ const App: React.FC = () => {
               masterEstados={allMasterData.masterEstados || []}
               masterNotificaciones={allMasterData.masterNotificaciones || []}
               masterArticulo={allMasterData.masterArticulo || []}
-              onAddArticleToMaster={() => {}}
-              onAddNotificationToMaster={() => {}}
+              onAddArticleToMaster={async (article) => {
+                await api.saveArticle(article);
+                setAllMasterData(prev => ({ ...prev, masterArticulo: [...(prev.masterArticulo || []), article as MasterRecord] }));
+              }}
+              onAddNotificationToMaster={async (notif) => {
+                const newNotif = { ...notif, id: `not-${Date.now()}` }; 
+                await api.saveMaster('masterNotificaciones', newNotif);
+                setAllMasterData(prev => ({ ...prev, masterNotificaciones: [...(prev.masterNotificaciones || []), newNotif as MasterRecord] }));
+              }}
             />
           );
       case 'flotas':
@@ -580,10 +640,68 @@ const App: React.FC = () => {
               drivers={drivers} 
               user={user!} 
               masterData={allMasterData}
-              onAddVehicle={(v) => setVehicles([...vehicles, { ...v, id: `v-${Date.now()}` }])}
-              onAddDriver={(d) => setDrivers([...drivers, { ...d, id: `d-${Date.now()}` }])}
-              onUpdateVehicle={(id, data) => setVehicles(vehicles.map(v => v.id === id ? { ...v, ...data } : v))}
-              onUpdateDriver={(id, data) => setDrivers(drivers.map(d => d.id === id ? { ...d, ...data } : d))}
+              onAddVehicle={async (v) => {
+                  try {
+                    const res = await api.saveMaster('masterVehiculos', v);
+                    // Normalización local inmediata para reactividad
+                    const newVeh = { 
+                      ...v, 
+                      id: res.id || `v-${Date.now()}`,
+                      capacityM3: Number(v.capacityM3 || 0)
+                    };
+                    // @ts-ignore
+                    setVehicles(prev => [...prev, newVeh]);
+                    toast.success("Vehículo registrado");
+                  } catch (e) {
+                    toast.error("Error al guardar vehículo");
+                  }
+                }}
+                onUpdateVehicle={async (id, data) => {
+                  try {
+                    await api.saveMaster('masterVehiculos', { ...data, id });
+                    // @ts-ignore
+                    setVehicles(prev => prev.map(v => v.id === id ? { ...v, ...data, capacityM3: Number(data.capacityM3 || v.capacityM3) } : v));
+                    toast.success("Vehículo actualizado");
+                  } catch (e) {
+                    toast.error("Error al actualizar vehículo");
+                  }
+                }}
+                onAddDriver={async (d) => {
+                    try {
+                      const res = await api.saveMaster('masterConductores', d);
+                      // Normalización: AssignmentManager requiere 'status'
+                      const statusName = allMasterData.masterEstados?.find(s => s.id === (d.statusId || 'EST-01'))?.name || 'Activo';
+                      const newDriver = { 
+                        ...d, 
+                        id: res.id || `d-${Date.now()}`,
+                        status: statusName 
+                      };
+                      // @ts-ignore
+                      setDrivers(prev => [...prev, newDriver]);
+                      toast.success("Conductor registrado");
+                    } catch (e) {
+                      toast.error("Error al guardar conductor");
+                    }
+                }}
+                onUpdateDriver={async (id, data) => {
+                    try {
+                      await api.saveMaster('masterConductores', { ...data, id });
+                      const statusName = allMasterData.masterEstados?.find(s => s.id === (data.statusId || 'EST-01'))?.name || 'Activo';
+                      // @ts-ignore
+                      setDrivers(prev => prev.map(d => d.id === id ? { ...d, ...data, status: statusName } : d));
+                      toast.success("Conductor actualizado");
+                    } catch (e) {
+                      toast.error("Error al actualizar conductor");
+                    }
+                }}
+              onDeleteVehicle={async (id) => {
+                await api.deleteVehicle(id, user?.name);
+                setVehicles(prev => prev.filter(v => v.id !== id));
+              }}
+              onDeleteDriver={async (id) => {
+                await api.deleteDriver(id, user?.name);
+                setDrivers(prev => prev.filter(d => d.id !== id));
+              }}
             />
           );
       case 'vinculo':
@@ -593,15 +711,29 @@ const App: React.FC = () => {
               drivers={drivers} 
               assignments={assignments} 
               user={user!} 
-              onAssign={(vId, dId, cId) => {
+              onAssign={async (vId, dId, cId) => {
                 const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-                setAssignments([...assignments, newAssign]);
+                setAssignments(prev => [...prev, newAssign]);
+                try {
+                    await api.saveAssignment(newAssign);
+                } catch (e) {
+                    console.error("Error saving assignment:", e);
+                }
               }}
-              onEndAssignment={(aId) => {
-                setAssignments(assignments.map(a => a.id === aId ? { ...a, isActive: false, updatedAt: new Date().toISOString() } : a));
+              onEndAssignment={async (aId) => {
+                setAssignments(prev => prev.map(a => a.id === aId ? { ...a, isActive: false, updatedAt: new Date().toISOString() } : a));
+                try {
+                    await api.endAssignment(aId, user?.name);
+                } catch (e) {
+                    console.error("Error ending assignment:", e);
+                }
               }}
             />
           );
+      case 'firmas':
+          return <DigitalSignature user={user!} />;
+      case 'aprobar-firma':
+          return <ApprovalManager user={user!} allUsers={allMasterData.masterUsuarios || []} />;
       default:
         return (
           <div className="p-10 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
@@ -639,6 +771,11 @@ const App: React.FC = () => {
                  // Persistir en Backend
                  console.log('[M7-APP] Persistiendo usuario...', updatedUser);
                  await api.saveUser(updatedUser);
+                 
+                 // Actualizar también la lista de maestros para que se vea en Auditoría/Difusión
+                 const freshUsers = await api.getUsers().catch(() => []);
+                 setAllMasterData(prev => ({ ...prev, masterUsuarios: freshUsers }));
+                 
                  localStorage.setItem('m7_user_session', JSON.stringify(updatedUser));
              } catch (e) {
                  console.error('[M7-APP] Error al guardar perfil:', e);
