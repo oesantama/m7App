@@ -15,14 +15,20 @@ interface AssignmentManagerProps {
 const AssignmentManager: React.FC<AssignmentManagerProps> = ({ 
   vehicles, drivers, assignments, user, onAssign, onEndAssignment 
 }) => {
-  const [selectedClient, setSelectedClient] = useState(user.clientId !== 'GLOBAL' ? user.clientId : 'c1');
+  // Estado local para almacenar la selección de cliente temporal por cada vehículo (fila)
+  // Clave: vehicleId, Valor: clientId seleccionado
+  const [rowClients, setRowClients] = useState<{[key: string]: string}>({});
+  
+  // Estado local para selección de conductor (fila)
+  const [rowDrivers, setRowDrivers] = useState<{[key: string]: string}>({});
+  
   const [showHistory, setShowHistory] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
 
+  // ... (perms and memo logic remains same)
   const isSuperUser = user.roleId === 'ROL-01';
   const assignmentPerms = user.permissions.find(p => p.module === 'PAG-OP-05');
   const canCreate = isSuperUser || assignmentPerms?.actions.includes('create');
-  const canEdit = isSuperUser || assignmentPerms?.actions.includes('edit');
 
   const activeAssignments = useMemo(() => 
     assignments.filter(a => a.isActive && (user.clientId === 'GLOBAL' || a.clientId === user.clientId)),
@@ -34,28 +40,60 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
     [assignments, user.clientId]
   );
 
-  // Vehículos del cliente actual que no tienen conductor hoy
+  // Vehículos pendientes: TODOS los que no tienen asignación activa actualmente
   const pendingVehicles = useMemo(() => 
-    vehicles.filter(v => v.clientId === selectedClient && !activeAssignments.some(a => a.vehicleId === v.id)),
-    [vehicles, selectedClient, activeAssignments]
+    vehicles.filter(v => !activeAssignments.some(a => a.vehicleId === v.id)),
+    [vehicles, activeAssignments]
   );
 
-  // Conductores del cliente actual que están libres hoy
+  // Conductores disponibles: TODOS los activos y sin asignación
   const availableDrivers = useMemo(() => 
-    drivers.filter(d => d.clientId === selectedClient && d.status === 'Activo' && !activeAssignments.some(a => a.driverId === d.id)),
-    [drivers, selectedClient, activeAssignments]
+    drivers.filter(d => d.status === 'Activo' && !activeAssignments.some(a => a.driverId === d.id)),
+    [drivers, activeAssignments]
   );
+
+  const handleAssignClick = (vehicleId: string) => {
+    // Buscar cliente seleccionado para esa fila
+    const selectedClientId = rowClients[vehicleId];
+    const selectedDriverId = rowDrivers[vehicleId];
+    
+    // Si no ha seleccionado conductor
+    if (!selectedDriverId) {
+       alert("Por favor seleccione un CONDUCTOR para asignar.");
+       return;
+    }
+
+    // Si no ha seleccionado cliente, intentar usar el del vehículo o el del conductor como fallback
+    let finalClientId = selectedClientId;
+    if (!finalClientId) {
+      const v = vehicles.find(x => x.id === vehicleId);
+      if (v && v.clientId) {
+         finalClientId = v.clientId;
+      } else {
+        alert("Por favor seleccione el CLIENTE para esta operación.");
+        return;
+      }
+    }
+    
+    onAssign(vehicleId, selectedDriverId, finalClientId);
+    
+    // Limpiar selección de esa fila
+    setRowDrivers(prev => { const n = {...prev}; delete n[vehicleId]; return n; });
+    setRowClients(prev => { const n = {...prev}; delete n[vehicleId]; return n; });
+  };
 
   const handleAutoSuggest = () => {
     setIsSuggesting(true);
-    // Simulación de lógica inteligente: busca en el historial la última pareja exitosa
     setTimeout(() => {
       pendingVehicles.forEach(v => {
+        // Buscar última asignación exitosa en historial
         const lastAssigned = historyAssignments.find(h => h.vehicleId === v.id);
-        const driverStillAvailable = availableDrivers.find(d => d.id === lastAssigned?.driverId);
-        
-        if (driverStillAvailable) {
-          onAssign(v.id, driverStillAvailable.id, selectedClient);
+        if (lastAssigned) {
+          const driverStillAvailable = availableDrivers.find(d => d.id === lastAssigned.driverId);
+          if (driverStillAvailable) {
+             // Usar el mismo cliente que tenía en el historial
+             onAssign(v.id, driverStillAvailable.id, lastAssigned.clientId);
+          }
         }
       });
       setIsSuggesting(false);
@@ -76,17 +114,9 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
               <p className="text-slate-500 font-bold mt-2 uppercase text-[10px] tracking-widest">Planificación de Tripulaciones y Activos</p>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-4 w-full xl:w-auto">
-            <select 
-              value={selectedClient} 
-              onChange={(e) => setSelectedClient(e.target.value)}
-              className="px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500"
-            >
-              {INITIAL_CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-
-            {canCreate && !showHistory && (
+          
+          <div className="flex gap-4">
+             {canCreate && !showHistory && (
               <button 
                 onClick={handleAutoSuggest}
                 disabled={isSuggesting || pendingVehicles.length === 0}
@@ -115,7 +145,8 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
             <div className="flex-1">
                 <h5 className="text-emerald-400 font-black text-[9px] uppercase tracking-widest mb-1">Optimizador de Tripulaciones M7</h5>
                 <p className="text-slate-300 text-xs font-medium leading-relaxed">
-                    He analizado el histórico: El conductor <span className="text-white font-black">{availableDrivers[0]?.name}</span> ha operado el vehículo <span className="text-white font-black">{pendingVehicles[0]?.plate}</span> en sus últimos 3 turnos con 0 incidentes. ¿Deseas re-vincularlos automáticamente?
+                    M7 Analysis: Detecto <span className="text-white font-black">{pendingVehicles.length} vehículos</span> listos para operación.
+                    Puedo sugerir tripulaciones basadas en los últimos despachos exitosos para ahorrar tiempo.
                 </p>
             </div>
             <button onClick={handleAutoSuggest} className="px-6 py-3 bg-emerald-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all shrink-0">
@@ -134,21 +165,43 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
               </div>
               <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 {pendingVehicles.map(v => (
-                  <div key={v.id} className="bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-200 flex justify-between items-center group hover:bg-white hover:border-emerald-500 transition-all">
+                  <div key={v.id} className="bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col gap-4 group hover:bg-white hover:border-emerald-500 transition-all">
                     <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 font-black text-xs shadow-sm group-hover:bg-slate-900 group-hover:text-white transition-all">{v.plate.slice(0,3)}</div>
+                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 font-black text-xs shadow-sm group-hover:bg-slate-900 group-hover:text-white transition-all shrink-0">{v.plate.slice(0,3)}</div>
                        <div>
                           <p className="font-black text-slate-900 uppercase">{v.plate}</p>
                           <p className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">{v.brand} • {v.capacityM3}m³</p>
                        </div>
                     </div>
-                    <select 
-                      onChange={(e) => onAssign(v.id, e.target.value, selectedClient)}
-                      className="bg-white border-2 border-slate-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
-                    >
-                      <option value="">Asignar Conductor...</option>
-                      {availableDrivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
+                    
+                    {/* CONTROLES DE ASIGNACIÓN EN FILA (USER REQUEST) */}
+                    <div className="flex flex-col gap-2 w-full">
+                        <div className="flex gap-2">
+                            <select 
+                                value={rowClients[v.id] || (v.clientId || '')} 
+                                onChange={(e) => setRowClients(prev => ({...prev, [v.id]: e.target.value}))}
+                                className="flex-1 bg-white border border-slate-200 px-3 py-3 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
+                            >
+                                <option value="">1. CLIENTE...</option>
+                                {INITIAL_CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+
+                            <select 
+                                value={rowDrivers[v.id] || ''}
+                                onChange={(e) => setRowDrivers(prev => ({...prev, [v.id]: e.target.value}))}
+                                className="flex-[1.5] bg-white border border-slate-200 px-3 py-3 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
+                            >
+                                <option value="">2. CONDUCTOR...</option>
+                                {availableDrivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                        </div>
+                        <button 
+                            onClick={() => handleAssignClick(v.id)}
+                            className="w-full bg-slate-900 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
+                        >
+                            Confirmar Asignación
+                        </button>
+                    </div>
                   </div>
                 ))}
                 {pendingVehicles.length === 0 && <p className="text-center py-10 text-xs font-bold text-slate-300 italic uppercase">Toda la flota está vinculada ✓</p>}
@@ -166,15 +219,21 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
                   const v = vehicles.find(veh => veh.id === a.vehicleId);
                   const d = drivers.find(drv => drv.id === a.driverId);
                   return (
-                    <div key={a.id} className="bg-white p-6 rounded-3xl border-2 border-emerald-100 shadow-xl flex justify-between items-center group animate-in slide-in-from-right-4">
-                      <div className="flex items-center gap-6">
+                    <div key={a.id} className="bg-white p-6 rounded-3xl border-2 border-emerald-100 shadow-xl flex justify-between items-center group animate-in slide-in-from-right-4 relative overflow-hidden">
+                      <div className="flex items-center gap-6 relative z-10">
                         <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg"><Icons.Truck /></div>
                         <div>
                           <p className="font-black text-slate-900 uppercase text-sm">{v?.plate} <span className="text-emerald-500 mx-2">↔</span> {d?.name.split(' ')[0]}</p>
                           <p className="text-[9px] text-slate-400 font-black uppercase mt-1">Vínculo Activo M7 Operaciones</p>
                         </div>
                       </div>
-                      <button onClick={() => onEndAssignment(a.id)} className="p-3 bg-slate-50 text-slate-300 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Icons.X /></button>
+                      <button 
+                        onClick={() => onEndAssignment(a.id)} 
+                        className="relative z-10 w-10 h-10 bg-red-100 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
+                        title="Finalizar Turno"
+                      >
+                        <Icons.X className="w-5 h-5" />
+                      </button>
                     </div>
                   );
                 })}

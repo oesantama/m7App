@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Icons, INITIAL_CLIENTS, AVATAR_GALLERY } from '../constants';
 import { Toaster, toast } from 'sonner';
 import { User, PageModule, MasterCategory, MasterRecord } from '../types';
+import { api } from '../services/api';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,10 +25,18 @@ const Layout: React.FC<LayoutProps> = ({
   onBack, showBack, user, onUpdateUser, onLogout, modulesData = [], pagesData = []
 }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isHelpMode, setIsHelpMode] = useState(false); // NEW: Help Mode State
-  const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 1024);
+  const [isHelpMode, setIsHelpMode] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [profileData, setProfileData] = useState({ name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || AVATAR_GALLERY[0] });
+  
+  // Estados para 2FA Flow
+  const [twoFactorStep, setTwoFactorStep] = useState<'none' | 'qr'>('none');
+  const [twoFactorQR, setTwoFactorQR] = useState('');
+  const [twoFactorSecret, setTwoFactorSecret] = useState('');
+  const [twoFactorVerifyCode, setTwoFactorVerifyCode] = useState('');
+
   const client = INITIAL_CLIENTS.find(c => c.id === user.clientId);
 
   useEffect(() => {
@@ -36,14 +45,24 @@ const Layout: React.FC<LayoutProps> = ({
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024) setIsCollapsed(true);
-      else setIsCollapsed(false);
+      if (window.innerWidth >= 768 && window.innerWidth < 1024) {
+        setIsCollapsed(true);
+      } else if (window.innerWidth >= 1024) {
+        // Optional: Auto expand on large screens if desired, or keep user preference
+      }
+      if (window.innerWidth >= 768) setIsMobileMenuOpen(false);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const toggleSidebar = () => setIsCollapsed(!isCollapsed);
+  const toggleSidebar = () => {
+    if (window.innerWidth < 768) {
+      setIsMobileMenuOpen(!isMobileMenuOpen);
+    } else {
+      setIsCollapsed(!isCollapsed);
+    }
+  };
   const toggleGroup = (groupId: string) => {
     if (isCollapsed) {
       setIsCollapsed(false);
@@ -112,7 +131,7 @@ const Layout: React.FC<LayoutProps> = ({
     }
     if (item.module) setActiveTab(item.module);
     if (item.masterCat && setActiveMasterCategory) setActiveMasterCategory(item.masterCat);
-    if (window.innerWidth < 768) setIsCollapsed(true);
+    if (window.innerWidth < 768) setIsMobileMenuOpen(false);
   };
 
   const handleUpdateProfile = (e: React.FormEvent) => {
@@ -139,7 +158,15 @@ const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-inter">
-      <aside className={`bg-slate-900 text-white flex flex-col transition-all duration-300 shrink-0 z-30 shadow-2xl ${isCollapsed ? 'w-20 md:w-24' : 'w-72'}`}>
+      {/* MOBILE BACKDROP */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/50 z-20 md:hidden backdrop-blur-sm animate-in fade-in"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      <aside className={`fixed inset-y-0 left-0 z-30 bg-slate-900 text-white flex flex-col transition-all duration-300 shadow-2xl md:static md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-24' : 'md:w-72'} w-72`}>
         <div className={`flex items-center gap-4 mb-10 px-4 py-6 ${isCollapsed ? 'justify-center' : ''}`}>
           <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
             <span className="text-2xl font-black text-slate-900">M7</span>
@@ -147,7 +174,7 @@ const Layout: React.FC<LayoutProps> = ({
           {!isCollapsed && (
             <div className="animate-in fade-in overflow-hidden">
               <h1 className="font-black text-xl tracking-tighter">MILLA SIETE</h1>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">M7 GLOBAL</span>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">M7 GLOBAL V1.0.3-FIX</span>
             </div>
           )}
         </div>
@@ -223,22 +250,21 @@ const Layout: React.FC<LayoutProps> = ({
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{activeTab.replace('-', ' ')}</h2>
              </div>
           </div>
-          <div className="text-right border-r border-slate-100 pr-4">
-             <p className="text-[10px] font-black text-slate-400 uppercase">Operación Activa</p>
-             <span className="text-sm font-black text-slate-800">{client?.name || 'M7 GLOBAL'}</span>
-          </div>
+           <div id="m7-header-chat-target" className="flex items-center gap-4 transition-all pr-4">
+              {/* Aquí se inyectará el disparador de M7 IQ vía Portal */}
+           </div>
         </header>
         <section className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar">{children}</section>
       </main>
 
       {isProfileModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="bg-slate-900 p-8 text-white flex justify-between items-center shrink-0">
-               <h3 className="text-xl font-black uppercase tracking-tight">Mi Identidad M7</h3>
-               <button onClick={() => setIsProfileModalOpen(false)} className="text-2xl font-thin hover:text-red-500 transition-colors">×</button>
+          <div className="bg-white w-[90vw] h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
+            <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+               <h3 className="text-lg font-black uppercase tracking-tight">Mi Identidad M7</h3>
+               <button onClick={() => setIsProfileModalOpen(false)} className="text-2xl font-thin hover:text-red-500 transition-colors">&times;</button>
             </div>
-            <form onSubmit={handleUpdateProfile} className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleUpdateProfile} className="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
               <div className="flex flex-col items-center gap-6">
                 <div className="relative group">
                   <div className="w-28 h-28 rounded-[2rem] bg-slate-100 overflow-hidden border-4 border-emerald-500 shadow-xl">
@@ -274,6 +300,118 @@ const Layout: React.FC<LayoutProps> = ({
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Corporativo</label>
                   <input type="email" value={profileData.email} disabled className="w-full p-4 bg-slate-100 border border-slate-200 rounded-2xl font-bold text-sm text-slate-500" />
+                </div>
+
+                {/* SECCIÓN 2FA (Hallazgo QA: Seguridad 10/10) */}
+                <div className="pt-4 border-t border-slate-100 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl ${(user as any).twoFactorEnabled ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                        <Icons.Shield style={{ width: '18px', height: '18px' }} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-tight">Doble Factor (2FA)</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Seguridad TOTP Estándar</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <span className={`text-[10px] font-black px-3 py-1 rounded-full ${(user as any).twoFactorEnabled ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                        {(user as any).twoFactorEnabled ? 'ACTIVO' : 'INACTIVO'}
+                       </span>
+                    </div>
+                  </div>
+
+                  {!(user as any).twoFactorEnabled ? (
+                    <div className="space-y-4">
+                      {twoFactorStep === 'none' && (
+                        <button 
+                          type="button"
+                          onClick={async () => {
+                             try {
+                               const res = await api.setup2FA(user.id);
+                               if (res.success) {
+                                 setTwoFactorQR(res.qrCode);
+                                 setTwoFactorSecret(res.secret);
+                                 setTwoFactorStep('qr');
+                                 toast.info("Configuración de 2FA Iniciada");
+                               }
+                             } catch (e) {
+                               toast.error("Error al iniciar 2FA");
+                             }
+                          }}
+                          className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 hover:border-emerald-500 hover:text-emerald-500 transition-all uppercase tracking-widest"
+                        >
+                          Configurar Segundo Factor
+                        </button>
+                      )}
+
+                      {twoFactorStep === 'qr' && (
+                        <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200 animate-in zoom-in-95">
+                           <p className="text-[9px] font-black text-slate-500 uppercase text-center mb-4">1. Escanea este código con Google Authenticator o Authy</p>
+                           <div className="w-40 h-40 bg-white mx-auto p-2 rounded-2xl border border-slate-200 mb-4">
+                              <img src={twoFactorQR} alt="QR 2FA" className="w-full h-full" />
+                           </div>
+                           <p className="text-[9px] font-black text-slate-500 uppercase text-center mb-2">2. Ingrese el código de 6 dígitos</p>
+                           <input 
+                              type="text" 
+                              maxLength={6}
+                              placeholder="000000"
+                              value={twoFactorVerifyCode}
+                              onChange={e => setTwoFactorVerifyCode(e.target.value)}
+                              className="w-full p-3 bg-white border border-slate-200 rounded-xl text-center font-black text-lg tracking-[0.5em] focus:border-emerald-500 outline-none"
+                           />
+                           <div className="flex gap-2 mt-4">
+                              <button 
+                                type="button" 
+                                onClick={() => setTwoFactorStep('none')}
+                                className="flex-1 py-3 bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase"
+                              >
+                                Cancelar
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={async () => {
+                                   if (twoFactorVerifyCode.length !== 6) return toast.error("Código incompleto");
+                                   try {
+                                      const res = await api.activate2FA({
+                                        userId: user.id,
+                                        secret: twoFactorSecret,
+                                        token: twoFactorVerifyCode
+                                      });
+                                      if (res.success) {
+                                         toast.success("2FA Activado con éxito");
+                                         // Actualizar estado local y forzar refresco si es necesario
+                                         onUpdateUser({ ...user, twoFactorEnabled: true } as any);
+                                         setTwoFactorStep('none');
+                                         setIsProfileModalOpen(false);
+                                      } else {
+                                         toast.error(res.error || "Código inválido");
+                                      }
+                                   } catch (e) {
+                                      toast.error("Error de verificación");
+                                   }
+                                }}
+                                className="flex-1 py-3 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase shadow-lg shadow-emerald-500/20"
+                              >
+                                Activar Ahora
+                              </button>
+                           </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (confirm("¿Estás seguro de desactivar el 2FA? Esto reducirá la seguridad de tu cuenta.")) {
+                           api.deactivate2FA(user.id).then(() => window.location.reload());
+                        }
+                      }}
+                      className="w-full py-3 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black hover:bg-red-600 hover:text-white transition-all uppercase tracking-widest"
+                    >
+                      Desactivar 2FA
+                    </button>
+                  )}
                 </div>
               </div>
 

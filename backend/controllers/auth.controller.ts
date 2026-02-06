@@ -5,26 +5,35 @@ import pool from '../config/database.js';
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   
-  // Validación de credenciales (demo - en producción usar hash)
-  const validUsers = [
-    { email: 'admin@millasiete.com', password: 'admin123', id: 'USR-01', name: 'ADMINISTRADOR PRINCIPAL', role_id: 'ROL-01' },
-    { email: 'operaciones@millasiete.com', password: 'operaciones', id: 'U-002', name: 'OPERADOR LOGÍSTICO', role_id: 'ROL-03' },
-    { email: 'calidad@millasiete.com', password: 'calidad', id: 'U-003', name: 'AUDITOR CALIDAD', role_id: 'ROL-04' }
-  ];
-  
-  const user = validUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-  
-  console.log(`[M7-AUTH] Intento de login: ${email} - Encontrado: ${!!user}`);
-  
-  if (user) {
-    console.log(`[M7-AUTH] Login exitoso para: ${email}`);
-    res.json({ 
-        success: true, 
-        user: { id: user.id, email: user.email, name: user.name, role_id: user.role_id } 
-    });
-  } else {
-    console.log(`[M7-AUTH] Login fallido para: ${email} - Contraseña incorrecta o usuario no existe`);
-    res.status(401).json({ success: false, error: 'Credenciales inválidas' });
+  try {
+    const result = await pool.query(
+      'SELECT id, email, password, name, role_id, two_factor_enabled, two_factor_secret FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+
+    const user = result.rows[0];
+
+    if (user && user.password === password) { // En prod usar bcrypt.compare
+      console.log(`[M7-AUTH] Credenciales válidas para: ${email}`);
+
+      if (user.two_factor_enabled) {
+        return res.json({ 
+          success: true, 
+          require2FA: true, 
+          userId: user.id 
+        });
+      }
+
+      res.json({ 
+          success: true, 
+          user: { id: user.id, email: user.email, name: user.name, role_id: user.role_id } 
+      });
+    } else {
+      console.log(`[M7-AUTH] Login fallido para: ${email}`);
+      res.status(401).json({ success: false, error: 'Credenciales inválidas' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 

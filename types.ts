@@ -135,12 +135,14 @@ export interface DocumentL extends AuditBase {
   externalDocId: string;
   status: DocStatus;
   items: DocumentLItem[];
+  consolidatedItems?: any[]; 
   vehicleData?: string;
-  planType?: 'Plan Normal' | 'Plan R';
+  planType?: string;
   city?: string;
   address?: string;
   inventoryDate?: string;
   inventoryNotes?: string;
+  inventory_observation?: string; 
   codplan?: string;
   deliveryDate?: string;
   inventoryUser?: string;
@@ -163,11 +165,14 @@ export interface DocumentLItem {
   address?: string;
   city?: string;
   observation?: string;
+  batch?: string;
   qty1?: number;
   qty2?: number;
   itemStatus?: string;
   inventoryNote?: string;
   orderNumber?: string;
+  unCode?: string;
+  clientRef?: string;
 }
 
 export interface Invoice extends AuditBase {
@@ -181,6 +186,11 @@ export interface Invoice extends AuditBase {
   volumeM3: number;
   status: DocStatus;
   city?: string;
+  invoiceValue: number;
+  orderNumber?: string;
+  notes?: string;
+  externalDocId?: string;
+  invoiceNumber?: string;
 }
 
 export interface Route extends AuditBase {
@@ -197,7 +207,7 @@ export type MasterCategory =
   | 'masterTiposVehiculo' 
   | 'masterMarcas' 
   | 'masterNotificaciones' 
-  | 'masterTIpoNotificacion' 
+  | 'masterTipoNotificacion' 
   | 'masterUnidadMedida' 
   | 'masterArticulo' 
   | 'masterClientes' 

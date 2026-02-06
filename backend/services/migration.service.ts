@@ -28,6 +28,21 @@ export const restoreSystem = async () => {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS digital_signatures (
+          id SERIAL PRIMARY KEY,
+          document_number TEXT UNIQUE NOT NULL,
+          digital_signature TEXT NOT NULL,
+          encrypted_password TEXT NOT NULL,
+          policy_accepted BOOLEAN DEFAULT FALSE,
+          approved BOOLEAN DEFAULT FALSE,
+          approved_at TIMESTAMP WITH TIME ZONE,
+          approved_by TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS roles (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
@@ -66,17 +81,34 @@ export const restoreSystem = async () => {
       ON CONFLICT (id) DO NOTHING;
     `);
 
-    // 3. Insertar Pestaña WhatsApp
+    // 3. Insertar Pestañas de Firma y WhatsApp
+    // Limpieza de duplicados previos (PAG-SIG era un ID temporal)
+    await client.query(`DELETE FROM pages WHERE id = 'PAG-SIG';`);
+    await client.query(`DELETE FROM master_records WHERE id = 'PAG-SIG';`);
+
     await client.query(`
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
-      VALUES ('PAG-22', 'CONEXIÓN WHATSAPP', 'whatsapp-status', 'masterWhatsApp', 'MOD-04', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET module_id = 'masterWhatsApp', parent_id = 'MOD-04';
+      VALUES 
+      ('PAG-22', 'CONEXIÓN WHATSAPP', 'whatsapp-status', 'masterWhatsApp', 'MOD-04', 'EST-01'),
+      ('PAG-FIRMAS', 'FIRMAS DIGITALES', 'firmas', 'masterPaginas', 'MOD-04', 'EST-01'),
+      ('PAG-FIRMAS-APR', 'APROBAR FIRMA', 'aprobar-firma', 'masterPaginas', 'MOD-04', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET module_id = EXCLUDED.module_id, parent_id = EXCLUDED.parent_id;
+    `);
+
+    // Asegurar en master_records para visibilidad en administradores de maestros
+    await client.query(`
+      INSERT INTO master_records (id, category, name, parent_id, status_id)
+      VALUES 
+      ('PAG-FIRMAS', 'masterPaginas', 'FIRMAS DIGITALES', 'MOD-04', 'EST-01'),
+      ('PAG-FIRMAS-APR', 'masterPaginas', 'APROBAR FIRMA', 'MOD-04', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET parent_id = EXCLUDED.parent_id;
     `);
 
     // 4. Restaurar Permisos Admin
     const allPages = [
         'PAG-01', 'PAG-02', 'PAG-03', 'PAG-04', 'PAG-05', 'PAG-06', 'PAG-07', 'PAG-08', 'PAG-09', 'PAG-10',
-        'PAG-11', 'PAG-12', 'PAG-13', 'PAG-14', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-18', 'PAG-19', 'PAG-20', 'PAG-21', 'PAG-22'
+        'PAG-11', 'PAG-12', 'PAG-13', 'PAG-14', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-18', 'PAG-19', 'PAG-20', 'PAG-21', 'PAG-22',
+        'PAG-FIRMAS', 'PAG-FIRMAS-APR'
     ];
 
     const perms: any = {

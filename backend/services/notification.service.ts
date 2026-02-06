@@ -1,7 +1,7 @@
 
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-import { sendWhatsAppMessage } from './whatsapp.service.js';
+import { evolutionService } from './evolution.service.js';
 
 dotenv.config();
 
@@ -36,9 +36,9 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
   }
 };
 
-export const sendWhatsApp = async (number: string, text: string) => {
+export const sendWhatsApp = async (number: string, text: string, userId: string = 'USR-01') => {
   try {
-    const result = await sendWhatsAppMessage(number, text);
+    const result = await evolutionService.sendMessage(userId, number, text);
     return { success: true, result };
   } catch (error: any) {
     console.error('[M7-WHATSAPP] Error en notificación:', error.message);

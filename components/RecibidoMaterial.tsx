@@ -1,6 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Icons } from '../constants';
+import { toast } from 'sonner';
+import { api } from '../services/api';
 import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem } from '../types';
 import BlindCount from './BlindCount';
 
@@ -37,38 +39,83 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(pendingRecibo.length / rowsPerPage);
 
   const handleStartCount = (doc: DocumentL) => {
+    api.updateDocumentStatus(doc.id, DocStatus.COUNTING, user.name);
     const updatedDocs = documents.map(d => d.id === doc.id ? { ...d, status: DocStatus.COUNTING, updatedBy: user.name, updatedAt: new Date().toISOString() } : d);
     onUpdateDocuments(updatedDocs);
     setSelectedDocForCount({ ...doc, status: DocStatus.COUNTING });
   };
 
-  const handleFinishCount = (finalItems: DocumentLItem[], updateEmail?: string) => {
+  const handlePartialSave = (currentItems: DocumentLItem[], generalObs: string) => {
+    if (!selectedDocForCount) return;
+    
+    api.syncInventory({
+      docId: selectedDocForCount.id,
+      items: currentItems,
+      user: user.name,
+      notes: generalObs,
+      isPartial: true
+    }).then(res => {
+      if (res.success) {
+        const updatedDocs = documents.map(d => 
+          d.id === selectedDocForCount.id ? { ...d, items: currentItems, updatedAt: new Date().toISOString() } : d
+        );
+        onUpdateDocuments(updatedDocs);
+        toast.info("Progreso guardado en el servidor.");
+      }
+    }).catch(err => {
+      console.error('[M7-PARTIAL-SYNC] Error:', err);
+    });
+  };
+
+  const handleFinishCount = (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => {
     if (!selectedDocForCount) return;
 
     if (updateEmail && onUpdateNotificationEmail) {
       onUpdateNotificationEmail(updateEmail);
     }
 
-    const updatedDocs = documents.map(d => 
-      d.id === selectedDocForCount.id 
-        ? { 
-            ...d, 
-            items: finalItems, 
-            status: DocStatus.INVENTORED, 
-            inventoryDate: new Date().toISOString(),
-            inventoryUser: user.name,
-            updatedBy: user.name, 
-            updatedAt: new Date().toISOString() 
-          } 
-        : d
-    );
-    
-    onUpdateDocuments(updatedDocs);
-    setSelectedDocForCount(null);
+    // Persistir en el servidor
+    api.syncInventory({
+      docId: selectedDocForCount.id,
+      items: finalItems,
+      user: user.name,
+      notes: generalObs,
+      isPartial: false
+    }).then(res => {
+      if (res.success) {
+        toast.success("Inventario finalizado y sincronizado.");
+        
+        // SOLO SI HAY ÉXITO: Actualizar localmente y cerrar modal
+        const updatedDocs = documents.map(d => 
+          d.id === selectedDocForCount.id 
+            ? { 
+                ...d, 
+                items: finalItems, 
+                status: DocStatus.INVENTORED, 
+                inventoryDate: new Date().toISOString(),
+                inventoryUser: user.name,
+                inventoryNotes: generalObs, // Persistencia local de las notas
+                updatedBy: user.name, 
+                updatedAt: new Date().toISOString() 
+              } 
+            : d
+        );
+        
+        localStorage.removeItem(`m7_offline_count_${selectedDocForCount.id}`);
+        onUpdateDocuments(updatedDocs);
+        setSelectedDocForCount(null);
+      } else {
+        toast.error("Error al sincronizar: " + (res.error || "Desconocido"));
+        // El modal permanece abierto para que el usuario NO pierda el trabajo
+      }
+    }).catch(err => {
+      console.error('[M7-FINISH-SYNC] Error:', err);
+      toast.error("Error de conexión al finalizar.");
+    });
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-700 pb-6 h-full flex flex-col overflow-hidden">
+    <div className="space-y-4 animate-in fade-in duration-700 pb-4 h-full flex flex-col overflow-hidden max-h-screen">
       {/* HEADER PRINCIPAL COMPACTO */}
       <div className="bg-white p-5 rounded-[2.5rem] shadow-lg border border-slate-100 flex justify-between items-center shrink-0 transition-all">
         <div className="flex items-center gap-4">
@@ -82,15 +129,18 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
       <div className="flex-1 min-h-0">
         {selectedDocForCount ? (
-          <BlindCount 
-            document={selectedDocForCount} 
-            masterNotificaciones={masterNotificaciones} 
-            masterArticulo={masterArticulo} 
-            onConfirm={handleFinishCount} 
-            onCancel={() => setSelectedDocForCount(null)} 
-            onAddArticleToMaster={onAddArticleToMaster}
-            onAddNotificationToMaster={onAddNotificationToMaster}
-          />
+          <div className="h-full w-full overflow-hidden flex flex-col">
+            <BlindCount 
+              document={selectedDocForCount} 
+              masterNotificaciones={masterNotificaciones} 
+              masterArticulo={masterArticulo} 
+              onConfirm={handleFinishCount} 
+              onPartialSave={handlePartialSave}
+              onCancel={() => setSelectedDocForCount(null)} 
+              onAddArticleToMaster={onAddArticleToMaster}
+              onAddNotificationToMaster={onAddNotificationToMaster}
+            />
+          </div>
         ) : (
           <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden h-full flex flex-col">
             {/* SUBHEADER DE CONTROL */}

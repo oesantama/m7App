@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Planilla de Despacho M7 - Estilo Corporativo</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        @page {
+            size: letter;
+            margin: 10mm;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background-color: #fff;
+            font-size: 9px; /* Fuente más pequeña para que todo quepa */
+        }
+
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        .header-table td {
+            border: 1px solid #000;
+            padding: 4px 8px;
+        }
+
+        .logo-cell {
+            width: 20%;
+            text-align: center;
+        }
+
+        .title-cell {
+            width: 40%;
+            text-align: center;
+            font-weight: 800;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .info-cell {
+            width: 40%;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #eee;
+            padding: 2px 0;
+        }
+
+        .info-row:last-child { border-bottom: none; }
+
+        .label {
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 8px;
+        }
+
+        /* Tabla Principal de Transacciones */
+        .main-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        .main-table th {
+            border: 1px solid #000;
+            background-color: #f2f2f2;
+            padding: 4px;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 7.5px;
+        }
+
+        .main-table td {
+            border: 1px solid #000;
+            padding: 4px;
+            text-align: center;
+        }
+
+        .text-left { text-align: left !important; }
+        .text-right { text-align: right !important; }
+
+        /* Sección de Acumulados de Artículos */
+        .summary-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .summary-table {
+            width: 50%;
+            border-collapse: collapse;
+        }
+
+        .summary-table th {
+            border: 1px solid #000;
+            background-color: #e6e6e6;
+            padding: 4px;
+            text-transform: uppercase;
+            font-size: 8px;
+        }
+
+        .summary-table td {
+            border: 1px solid #000;
+            padding: 4px;
+        }
+
+        /* Totales Finales */
+        .totals-box {
+            width: 40%;
+            margin-left: auto;
+            border: 2px solid #000;
+            padding: 10px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .total-row.grand-total {
+            border-top: 2px solid #000;
+            padding-top: 5px;
+            font-weight: 800;
+            font-size: 14px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .signature-line {
+            width: 200px;
+            border-top: 1px solid #000;
+            text-align: center;
+            padding-top: 5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 8px;
+        }
+
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Encabezado Estilo Foto -->
+    <table class="header-table">
+        <tr>
+            <td class="logo-cell">
+                <div style="font-weight: 800; font-style: italic; font-size: 18px;">Ajover</div>
+            </td>
+            <td class="title-cell">PLANILLA DE DESPACHO M7</td>
+            <td class="info-cell">
+                <div class="info-row"><span class="label">NÚMERO DE L:</span> <span>L010904012</span></div>
+                <div class="info-row"><span class="label">FECHA ENVÍO:</span> <span>02/05/2026</span></div>
+                <div class="info-row"><span class="label">PLACA:</span> <span>STY 099</span></div>
+                <div class="info-row"><span class="label">CONDUCTOR:</span> <span>MATEO LOAIZA</span></div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Tabla Detalle de Facturas -->
+    <table class="main-table">
+        <thead>
+            <tr>
+                <th>U. NEG</th>
+                <th>FACTURA</th>
+                <th># INTERNO</th>
+                <th>CLIENTE / DESTINO</th>
+                <th>VALOR</th>
+                <th>CANT</th>
+                <th>VOL (m³)</th>
+                <th>PESO (KG)</th>
+                <th>C.PAG</th>
+                <th>F.PAGO</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>AJV21</td>
+                <td>AFE7427138</td>
+                <td>12.658.610</td>
+                <td class="text-left">FERRETERIA EL MARTILLO</td>
+                <td class="text-right">639.030</td>
+                <td>45</td>
+                <td>4.50</td>
+                <td>120.0</td>
+                <td>EF</td>
+                <td>EF</td>
+            </tr>
+            <tr>
+                <td>AJV21</td>
+                <td>AFE7427205</td>
+                <td>12.658.677</td>
+                <td class="text-left">CONSTRUCTORA BOLIVAR</td>
+                <td class="text-right">78.659</td>
+                <td>12</td>
+                <td>1.20</td>
+                <td>40.5</td>
+                <td>EF</td>
+                <td>EF</td>
+            </tr>
+            <!-- Mas filas dinámicas aquí -->
+             <tr><td>...</td><td>...</td><td>...</td><td class="text-left">...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+             <tr><td>...</td><td>...</td><td>...</td><td class="text-left">...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+             <tr><td>...</td><td>...</td><td>...</td><td class="text-left">...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+        </tbody>
+    </table>
+
+    <div class="summary-container">
+        <!-- Acumulado de Artículos -->
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th colspan="2">RESUMEN DE ARTÍCULOS</th>
+                </tr>
+                <tr>
+                    <th class="text-left">DESCRIPCIÓN</th>
+                    <th style="width: 60px;">TOTAL CANT</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>TEJA ONDULADA AJOVER</td>
+                    <td class="text-center">150</td>
+                </tr>
+                <tr>
+                    <td>TANQUE 1000L</td>
+                    <td class="text-center">5</td>
+                </tr>
+                <tr>
+                    <td>TUBERIA PVC 1/2</td>
+                    <td class="text-center">80</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Totales de la Planilla -->
+        <div class="totals-box">
+            <div class="total-row"><span class="label">Subtotal Facturas:</span> <span>$ 717.689</span></div>
+            <div class="total-row"><span class="label">Total Volumen:</span> <span>5.70 m³</span></div>
+            <div class="total-row"><span class="label">Total Peso:</span> <span>160.5 Kg</span></div>
+            <div class="total-row grand-total"><span class="label">TOTAL A RECAUDAR:</span> <span>$ 717.689</span></div>
+        </div>
+    </div>
+
+    <!-- Firmas -->
+    <div class="footer">
+        <div class="signature-line">DESPACHADO POR</div>
+        <div class="signature-line">CONDUCTOR (RECIBE CONFORME)</div>
+    </div>
+
+    <div class="footer-note" style="margin-top: 15px; text-align: center; color: #666; font-size: 7px;">
+        ESTE DOCUMENTO ES UNA REPRESENTACIÓN DIGITAL DE LA PLANILLA DE CARGA M7 - GENERADO: 2026-02-03 10:28
+    </div>
+</body>
+</html>

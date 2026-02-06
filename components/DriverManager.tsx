@@ -88,7 +88,7 @@ const DriverManager: React.FC<DriverManagerProps> = ({ drivers, user, masterData
   return (
     <div className="space-y-6 animate-in fade-in">
       {/* HEADER DINÁMICO */}
-      <div className="bg-white px-8 py-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col lg:flex-row justify-between items-center gap-6">
+      <div className="bg-white px-8 py-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex items-center gap-4">
           <div className="bg-slate-50 h-12 px-5 rounded-2xl flex items-center gap-3 border border-slate-100">
             <Icons.Search className="text-slate-300 w-4 h-4" />
@@ -168,19 +168,19 @@ const DriverManager: React.FC<DriverManagerProps> = ({ drivers, user, masterData
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[600] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl overflow-hidden my-auto border border-white/10 animate-in zoom-in-95">
-            <div className="bg-slate-900 p-10 text-white flex justify-between items-center">
-              <div className="flex items-center gap-6">
-                <div className="w-14 h-14 bg-emerald-500 text-slate-900 rounded-[1.5rem] flex items-center justify-center shadow-xl"><Icons.Scan /></div>
+          <div className="bg-white w-[90vw] h-[90vh] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col my-auto border border-white/10 animate-in zoom-in-95">
+            <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-emerald-500 text-slate-900 rounded-xl flex items-center justify-center shadow-xl"><Icons.Scan /></div>
                 <div>
-                  <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">REGISTRO M7</h3>
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-2">IDENTIDAD SEGURA</p>
+                  <h3 className="text-xl font-black uppercase tracking-tighter leading-none">REGISTRO M7</h3>
+                  <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">IDENTIDAD SEGURA</p>
                 </div>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-4xl font-thin hover:text-red-500 transition-all">&times;</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-3xl font-thin hover:text-red-500 transition-all">&times;</button>
             </div>
 
-            <div className="p-10 space-y-10 bg-slate-50/30">
+            <div className="p-10 space-y-10 bg-slate-50/30 overflow-y-auto flex-1 custom-scrollbar">
               <div className="flex bg-slate-200 p-1 rounded-2xl shadow-inner w-full max-w-xs mx-auto">
                 <button type="button" onClick={() => setUploadMode('photos')} className={`flex-1 py-2 rounded-xl font-black text-[9px] uppercase transition-all ${uploadMode === 'photos' ? 'bg-white shadow-md text-slate-900' : 'text-slate-500'}`}>FOTOS A/B</button>
                 <button type="button" onClick={() => setUploadMode('pdf')} className={`flex-1 py-2 rounded-xl font-black text-[9px] uppercase transition-all ${uploadMode === 'pdf' ? 'bg-white shadow-md text-slate-900' : 'text-slate-500'}`}>PDF</button>
@@ -188,7 +188,7 @@ const DriverManager: React.FC<DriverManagerProps> = ({ drivers, user, masterData
 
               <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-inner">
                 {uploadMode === 'photos' ? (
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4 text-center">
                       <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Cara Frontal (A)</p>
                       <label className={`relative h-40 bg-white/5 border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.licenseSideA ? 'border-emerald-500' : 'border-white/10'}`}>
@@ -222,7 +222,7 @@ const DriverManager: React.FC<DriverManagerProps> = ({ drivers, user, masterData
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-4">Nombre Completo</label>
                   <input type="text" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} placeholder="Nombre..." className={commonInput} />
                 </div>
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase ml-4">Tipo Documento</label>
                     <select value={formData.documentType || ''} onChange={e => setFormData({...formData, documentType: e.target.value})} className={commonInput}>
@@ -240,14 +240,32 @@ const DriverManager: React.FC<DriverManagerProps> = ({ drivers, user, masterData
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase ml-4">Vencimiento Licencia</label>
                     <input type="date" value={formData.licenseExpiry || ''} readOnly className="w-full p-4 bg-slate-100 border border-slate-200 rounded-2xl text-[11px] font-black text-emerald-600 cursor-not-allowed" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-4">Número Telefónico</label>
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-4">Categoría de Licencia</label>
+                    <select value={formData.licenseCategory || ''} onChange={e => setFormData({...formData, licenseCategory: e.target.value})} className={commonInput}>
+                      <option value="">Seleccione...</option>
+                      <option value="A1">A1</option><option value="A2">A2</option>
+                      <option value="B1">B1</option><option value="B2">B2</option><option value="B3">B3</option>
+                      <option value="C1">C1</option><option value="C2">C2</option><option value="C3">C3</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Número Telefónico</label>
                     <input type="text" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+57 ..." className={commonInput} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Estado Operativo</label>
+                    <select value={formData.statusId || 'EST-01'} onChange={e => setFormData({...formData, statusId: e.target.value})} className={commonInput}>
+                      <option value="EST-01">ACTIVO</option>
+                      <option value="EST-02">INACTIVO</option>
+                    </select>
                   </div>
                 </div>
               </div>

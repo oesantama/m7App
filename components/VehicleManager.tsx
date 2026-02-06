@@ -13,7 +13,7 @@ interface VehicleManagerProps {
   onUpdate: (id: string, data: Partial<Vehicle>) => void;
 }
 
-const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterData, onAdd, onUpdate }) => {
+const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterData, onAdd, onUpdate, onDelete }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [displayType, setDisplayType] = useState<'table' | 'grid'>('table');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,6 +21,8 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
   const [formData, setFormData] = useState<any>({});
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<Vehicle | null>(null);
 
   const vehicleTypeOptions = masterData['masterTiposVehiculo'] || [];
 
@@ -65,6 +67,14 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
       setIsProcessingAI(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDelete = () => {
+    if (recordToDelete) {
+      onDelete(recordToDelete.id);
+      setShowDeleteConfirm(false);
+      setRecordToDelete(null);
+    }
   };
 
   const filtered = vehicles.filter(v => v.plate.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -127,6 +137,7 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
                     <button className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all"><Icons.Eye /></button>
                     <button className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Link /></button>
                     <button onClick={() => { setEditingItem(v); setFormData(v); setIsModalOpen(true); }} className="p-3 bg-emerald-500 text-white rounded-xl hover:bg-blue-600 shadow-md"><Icons.Audit /></button>
+                    <button onClick={() => { setRecordToDelete(v); setShowDeleteConfirm(true); }} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><Icons.Trash /></button>
                   </td>
                 </tr>
               ))}
@@ -141,6 +152,7 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
                   <div className="flex gap-1.5">
                     <button className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-900 hover:text-white"><Icons.Eye /></button>
                     <button className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-emerald-500 hover:text-white"><Icons.Link /></button>
+                    <button onClick={() => { setRecordToDelete(v); setShowDeleteConfirm(true); }} className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all"><Icons.Trash /></button>
                   </div>
                 </div>
                 <h3 className="font-black text-slate-900 text-xl uppercase mb-1">{v.plate}</h3>
@@ -159,19 +171,19 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
       {/* MODAL M7 REGISTRO SEGURO */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[600] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl overflow-hidden my-auto border border-white/10 animate-in zoom-in-95">
-            <div className="bg-slate-900 p-10 text-white flex justify-between items-center">
-              <div className="flex items-center gap-6">
-                <div className="w-14 h-14 bg-emerald-500 text-slate-900 rounded-[1.5rem] flex items-center justify-center shadow-xl"><Icons.Scan /></div>
+          <div className="bg-white w-[90vw] h-[90vh] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col my-auto border border-white/10 animate-in zoom-in-95">
+            <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-emerald-500 text-slate-900 rounded-xl flex items-center justify-center shadow-xl"><Icons.Scan /></div>
                 <div>
-                  <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">REGISTRO M7</h3>
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-2">OPERACIÓN SEGURA</p>
+                  <h3 className="text-xl font-black uppercase tracking-tighter leading-none">REGISTRO M7</h3>
+                  <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">OPERACIÓN SEGURA</p>
                 </div>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-4xl font-thin hover:text-red-500 transition-all">&times;</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-3xl font-thin hover:text-red-500 transition-all">&times;</button>
             </div>
 
-            <div className="p-10 space-y-10 bg-slate-50/30">
+            <div className="p-10 space-y-10 bg-slate-50/30 overflow-y-auto flex-1 custom-scrollbar">
               {aiError && <div className="p-6 bg-red-600 text-white rounded-[2rem] text-[10px] font-black uppercase text-center animate-in shake">{aiError}</div>}
               {isProcessingAI && <div className="p-8 bg-emerald-50 border-4 border-dashed border-emerald-500 rounded-[3rem] text-center font-black text-[10px] text-emerald-700 animate-pulse uppercase tracking-widest">M7 Vision Analizando Documentos...</div>}
               
@@ -199,8 +211,27 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
                   </select>
                 </div>
                 <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Cliente Asignado</label>
+                  <select 
+                    value={formData.clientId || ''} 
+                    onChange={e => setFormData({...formData, clientId: e.target.value})} 
+                    className={commonInput}
+                  >
+                    <option value="">-- FLOTA GLOBAL (TODOS) --</option>
+                    {(masterData['masterClientes'] || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Capacidad (m³)</label>
                   <input type="number" value={formData.capacityM3 || ''} onChange={e => setFormData({...formData, capacityM3: Number(e.target.value)})} className={commonInput} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Año Modelo</label>
+                  <input type="number" value={formData.modelYear || ''} onChange={e => setFormData({...formData, modelYear: Number(e.target.value)})} placeholder="Ej: 2024" className={commonInput} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Color</label>
+                  <input type="text" value={formData.color || ''} onChange={e => setFormData({...formData, color: e.target.value.toUpperCase()})} placeholder="Blanco, Gris..." className={commonInput} />
                 </div>
                 <div className="md:col-span-2 space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Propietario / Dueño</label>

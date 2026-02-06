@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Icons, INITIAL_CLIENTS, MASTER_BRANDS, MASTER_DOC_TYPES } from '../constants';
+import { Icons, INITIAL_CLIENTS, MASTER_DOC_TYPES } from '../constants';
 import { Vehicle, Driver, User, MasterCategory, MasterRecord } from '../types';
 import { extractLicenseInfo, extractVehicleDocInfo } from '../services/geminiService';
 import * as XLSX from 'xlsx';
@@ -76,22 +76,27 @@ interface FleetManagerProps {
   onAddDriver: (d: Partial<Driver>) => void;
   onUpdateVehicle: (id: string, data: Partial<Vehicle>) => void;
   onUpdateDriver: (id: string, data: Partial<Driver>) => void;
+  onDeleteVehicle?: (id: string) => void;
+  onDeleteDriver?: (id: string) => void;
 }
 
 const FleetManager: React.FC<FleetManagerProps> = ({ 
   vehicles, drivers, user, masterData,
-  onAddVehicle, onAddDriver, onUpdateVehicle, onUpdateDriver 
+  onAddVehicle, onAddDriver, onUpdateVehicle, onUpdateDriver,
+  onDeleteVehicle, onDeleteDriver
 }) => {
   const [viewTab, setViewTab] = useState<'vehicles' | 'drivers'>('vehicles');
   const [displayType, setDisplayType] = useState<'table' | 'grid'>('table');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'single' | 'edit'>('single');
+  const [modalMode, setModalMode] = useState<'single' | 'edit' | 'detail'>('single');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [uploadMode, setUploadMode] = useState<'photos' | 'pdf'>('photos');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<any>(null);
 
   const normalizePlate = (plate: string) => (plate || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
@@ -117,29 +122,64 @@ const FleetManager: React.FC<FleetManagerProps> = ({
     XLSX.writeFile(workbook, `M7_${viewTab}_${Date.now()}.xlsx`);
   };
 
-  const processVehicleDocument = async (field: 'soatPdfUrl' | 'technoPdfUrl', base64: string, type: string) => {
-    if (!formData.plate) {
-      setAiError("ERROR: Ingrese la PLACA primero.");
-      setFormData(prev => ({ ...prev, [field]: null }));
-      return;
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete) return;
+    try {
+      if (viewTab === 'vehicles') {
+        if (onDeleteVehicle) await onDeleteVehicle(recordToDelete.id);
+      } else {
+        if (onDeleteDriver) await onDeleteDriver(recordToDelete.id);
+      }
+      toast.success("Registro eliminado exitosamente");
+      setShowDeleteConfirm(false);
+      setRecordToDelete(null);
+    } catch (e) {
+      console.error("Delete error:", e);
+      toast.error("Error al eliminar el registro");
     }
+  };
+
+  const processVehicleDocument = async (field: 'soatPdfUrl' | 'technoPdfUrl', base64: string, type: string) => {
     setIsProcessingAI(true);
     setAiError(null);
     const docType = field === 'soatPdfUrl' ? 'SOAT' : 'Techno';
     const expiryField = field === 'soatPdfUrl' ? 'soatExpiry' : 'technoExpiry';
     try {
-      const result = await extractVehicleDocInfo({ data: base64, mimeType: type }, formData.plate, docType);
+      const result = await extractVehicleDocInfo({ data: base64, mimeType: type }, formData.plate || '', docType);
       const normalizedFound = normalizePlate(result.plateFound);
-      const normalizedExpected = normalizePlate(formData.plate);
-      if (result && (normalizedFound === normalizedExpected || result.plateMatches)) {
-        if (!validateDate(result.expiryDate)) {
+      const normalizedExpected = normalizePlate(formData.plate || '');
+
+      // Si la placa está vacia, aceptamos lo que encuentre la IA. Si no, validamos coincidencia.
+      const isMatch = !formData.plate || (normalizedFound === normalizedExpected || result.plateMatches);
+
+      if (result && isMatch) {
+        // Validar vencimiento para alertar pero permitir poblar otros campos si es el vehículo correcto
+        const isExpired = result.expiryDate && !validateDate(result.expiryDate);
+        
+        // Mapear marca a ID del maestro si es posible
+        const brands = masterData['masterMarcas'] || [];
+        const brandMatch = brands.find(b => (b.name || '').toUpperCase() === (result.brand || '').toUpperCase());
+
+        if (isExpired) {
           setAiError(`ALERTA: El ${docType} está VENCIDO (${result.expiryDate}).`);
-          setFormData(prev => ({ ...prev, [field]: null, [expiryField]: '' }));
+          setFormData(prev => ({ 
+            ...prev, 
+            plate: prev.plate || normalizedFound, 
+            [field]: null, 
+            [expiryField]: result.expiryDate 
+          }));
         } else {
-          setFormData(prev => ({ ...prev, [expiryField]: result.expiryDate, brand: docType === 'SOAT' ? (result.brand || prev.brand) : prev.brand, modelYear: docType === 'SOAT' ? (result.modelYear || prev.modelYear) : prev.modelYear }));
+          setFormData(prev => ({
+            ...prev,
+            plate: prev.plate || normalizedFound,
+            [expiryField]: result.expiryDate || prev[expiryField],
+            brand: docType === 'SOAT' ? (brandMatch ? brandMatch.id : (result.brand || prev.brand)) : prev.brand,
+            modelYear: docType === 'SOAT' ? (result.modelYear || prev.modelYear) : prev.modelYear
+          }));
+          toast.success(`${docType} analizado con éxito.`);
         }
       } else {
-        setAiError(`ERROR: Placa ${normalizedFound || 'DESCONOCIDA'} no coincide.`);
+        setAiError(`ERROR: La placa detectada [${normalizedFound || 'NO ENCONTRADA'}] no coincide.`);
         setFormData(prev => ({ ...prev, [field]: null, [expiryField]: '' }));
       }
     } catch (e) {
@@ -207,40 +247,57 @@ const FleetManager: React.FC<FleetManagerProps> = ({
 
   const handleAnalyze = () => {
       setAnalyzing(true);
+      setShowAnalysis(false); // Reset to ensure animation triggers if it was already open
       toast.info("Generando reporte de salud de flota...");
       setTimeout(() => {
           setAnalyzing(false);
           setShowAnalysis(true);
-      }, 2000);
+      }, 2500);
   };
 
-  const handleSave = () => {
-    // 1. VALIDACIÓN DE CAMPOS REQUERIDOS
-    if (viewTab === 'vehicles') {
-        if (!formData.plate) { setAiError("ERROR CAMPO: La PLACA es obligatoria."); return; }
-        if (!formData.brand) { setAiError("ERROR CAMPO: La MARCA es obligatoria."); return; }
-        if (!formData.capacityM3) { setAiError("ERROR CAMPO: La CAPACIDAD es obligatoria."); return; }
-        
-        if (formData.soatExpiry && !validateDate(formData.soatExpiry)) { setAiError("ERROR: SOAT vencido."); return; }
-        if (formData.technoExpiry && !validateDate(formData.technoExpiry)) { setAiError("ERROR: Técnico-Mecánica vencida."); return; }
-    }
-    
-    if (viewTab === 'drivers') { 
-        if (!formData.name) { setAiError("ERROR CAMPO: El NOMBRE es obligatorio."); return; }
-        if (!formData.documentNumber) { setAiError("ERROR CAMPO: El DOCUMENTO es obligatorio."); return; }
-        
-        if (formData.licenseExpiry && !validateDate(formData.licenseExpiry)) { setAiError("ERROR: Licencia vencida."); return; } 
-    }
+  const handleSave = async () => {
+    try {
+      // 1. VALIDACIÓN DE CAMPOS REQUERIDOS
+      if (viewTab === 'vehicles') {
+          if (!formData?.plate?.trim()) { setAiError("ERROR CAMPO: La PLACA es obligatoria."); return; }
+          if (!formData?.brand) { setAiError("ERROR CAMPO: La MARCA es obligatoria."); return; }
+          if (!formData?.capacityM3) { setAiError("ERROR CAMPO: La CAPACIDAD es obligatoria."); return; }
+      }
+      
+      if (viewTab === 'drivers') { 
+          if (!formData?.name?.trim()) { setAiError("ERROR CAMPO: El NOMBRE es obligatorio."); return; }
+          if (!formData?.documentNumber?.trim()) { setAiError("ERROR CAMPO: El DOCUMENTO es obligatorio."); return; }
+      }
 
-    if (modalMode === 'single') { viewTab === 'vehicles' ? onAddVehicle(formData) : onAddDriver(formData); }
-    else { viewTab === 'vehicles' ? onUpdateVehicle(selectedItem.id, formData) : onUpdateDriver(selectedItem.id, formData); }
-    setIsModalOpen(false); setFormData({}); setAiError(null);
+      setIsProcessingAI(true); // Reutilizamos el estado de carga
+      
+      if (modalMode === 'single') { 
+        if (viewTab === 'vehicles') await onAddVehicle(formData);
+        else await onAddDriver(formData);
+      } else { 
+        if (!selectedItem?.id) throw new Error("No hay item seleccionado para editar");
+        if (viewTab === 'vehicles') await onUpdateVehicle(selectedItem.id, formData);
+        else await onUpdateDriver(selectedItem.id, formData);
+      }
+
+      setIsModalOpen(false); 
+      setFormData({}); 
+      setAiError(null);
+      toast.success("Datos sincronizados con éxito");
+    } catch (error: any) {
+      console.error("Error en handleSave:", error);
+      setAiError(`ERROR SISTEMA: ${error.message || "Fallo inesperado"}`);
+      toast.error("Error al guardar en el servidor");
+    } finally {
+      setIsProcessingAI(false);
+    }
   };
 
   const isSuperUser = user.roleId === 'ROL-01';
   const fleetPerms = user.permissions.find(p => p.module === 'PAG-OP-04');
   const canCreate = isSuperUser || fleetPerms?.actions.includes('create');
   const canEdit = isSuperUser || fleetPerms?.actions.includes('edit');
+  const canDelete = isSuperUser || fleetPerms?.actions.includes('delete');
 
   const statusOptions = masterData['masterEstados'] || [];
   const docTypeOptions = masterData['masterTipoDocumento'] || [];
@@ -320,7 +377,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
               <p className="text-slate-300 text-xs font-medium leading-relaxed">
                   {viewTab === 'vehicles' 
                     ? (vehicles.length > 0 
-                        ? `He detectado que el 90% de tu flota está operativa. El vehículo ${vehicles[0].plate} ha mostrado alta eficiencia esta semana.` 
+                        ? `He detectado que el 90% de tu flota está operativa. El vehículo ${vehicles[0].brand} [${vehicles[0].plate}] ha mostrado alta eficiencia esta semana.` 
                         : "No se detectan vehículos activos. Registre su flota para iniciar análisis.")
                     : "Analizando disponibilidad: 3 conductores están en zona urbana con alta eficiencia de entrega. Sugerido para rutas críticas de hoy."}
               </p>
@@ -334,7 +391,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
       {/* MODAL RESULTADOS ANÁLISIS */}
       {showAnalysis && (
         <div className="fixed inset-0 z-[700] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-8 relative animate-in zoom-in-95">
+            <div className="bg-white w-[90vw] h-[90vh] max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col relative animate-in zoom-in-95">
                 <button onClick={() => setShowAnalysis(false)} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full transition-all"><Icons.EyeOff className="text-slate-400" /></button>
                 <div className="text-center mb-8">
                     <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
@@ -402,14 +459,31 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                             {statusOptions.find(s => s.id === item.statusId)?.name || 'ACTIVO'}
                          </span>
                       </td>
-                      <td className="px-8 py-4 text-right pr-12 flex items-center justify-end gap-2">
-                         {/* OPCIONES DE VISTA Y DESCARGA PARA CONDUCTORES (COMO EN VEHICULOS) */}
-                         <button className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all"><Icons.Eye /></button>
-                         <button className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Link /></button>
-                         {canEdit && (
-                           <button onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setAiError(null); setIsModalOpen(true); }} className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md active:scale-90"><Icons.Audit /></button>
-                         )}
-                      </td>
+                       <td className="px-8 py-4 text-right pr-12 flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('detail'); setIsModalOpen(true); }}
+                            className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm" 
+                            title="Ver Detalles"
+                          >
+                             <Icons.Eye />
+                          </button>
+                          <button 
+                            onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setIsModalOpen(true); }} 
+                            className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-md"
+                            title="Editar"
+                          >
+                            <Icons.Audit />
+                          </button>
+                           {canDelete && (
+                            <button 
+                              onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }}
+                              className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-md"
+                              title="Eliminar"
+                            >
+                              <Icons.Trash />
+                            </button>
+                          )}
+                       </td>
                     </tr>
                   ))}
                 </tbody>
@@ -422,16 +496,46 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg ${viewTab === 'vehicles' ? 'bg-slate-900' : 'bg-emerald-500'}`}>
                           {viewTab === 'vehicles' ? <Icons.Truck /> : <Icons.Users />}
                        </div>
-                       <div className="flex gap-1">
-                          <button className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-slate-900 hover:text-white"><Icons.Eye /></button>
-                          <button className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-emerald-500 hover:text-white"><Icons.Link /></button>
-                       </div>
-                    </div>
-                    <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">{viewTab === 'vehicles' ? item.plate : item.name}</h3>
-                    <p className={`text-[8px] font-black uppercase mb-4 ${!validateDate(item.soatExpiry || item.licenseExpiry) ? 'text-red-500' : 'text-slate-400'}`}>
-                      {viewTab === 'vehicles' ? `SOAT: ${item.soatExpiry || 'N/A'}` : `LIC: ${item.licenseExpiry || 'N/A'}`}
-                    </p>
-                    <button onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setAiError(null); setIsModalOpen(true); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 transition-all">Auditar</button>
+                     <div className="flex gap-1">
+                        <button 
+                          onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('detail'); setIsModalOpen(true); }}
+                          className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-slate-900 hover:text-white" 
+                          title="Ver Detalle"
+                        >
+                          <Icons.Eye />
+                        </button>
+                         {canEdit && (
+                            <button 
+                              onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setAiError(null); setIsModalOpen(true); }} 
+                              className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white"
+                              title="Editar"
+                            >
+                              <Icons.Audit />
+                            </button>
+                         )}
+                         {canDelete && (
+                            <button 
+                              onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }}
+                              className="p-1.5 bg-red-100 text-red-500 rounded-lg hover:bg-red-600 hover:text-white"
+                              title="Eliminar"
+                            >
+                              <Icons.Trash />
+                            </button>
+                         )}
+                     </div>
+                  </div>
+                  <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">{viewTab === 'vehicles' ? item.plate : item.name}</h3>
+                  <p className={`text-[8px] font-black uppercase mb-4 ${!validateDate(item.soatExpiry || item.licenseExpiry) ? 'text-red-500' : 'text-slate-400'}`}>
+                    {viewTab === 'vehicles' ? `SOAT: ${item.soatExpiry || 'N/A'}` : `LIC: ${item.licenseExpiry || 'N/A'}`}
+                  </p>
+                   <div className="flex gap-2">
+                    {canEdit && (
+                      <button onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setIsModalOpen(true); }} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 transition-all">Editar</button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }} className="w-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-600 hover:text-white transition-all"><Icons.Trash /></button>
+                    )}
+                  </div>
                  </div>
                ))}
             </div>
@@ -442,19 +546,21 @@ const FleetManager: React.FC<FleetManagerProps> = ({
       {/* MODAL M7 REGISTRO SEGURO */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 overflow-y-auto">
-          <div className="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl overflow-hidden flex flex-col my-auto border border-white/10">
-            <div className="bg-slate-900 p-8 text-white flex justify-between items-center shrink-0">
-               <div className="flex items-center gap-6">
-                  <div className="w-12 h-12 bg-emerald-500 text-slate-950 rounded-[1.5rem] flex items-center justify-center shadow-xl"><Icons.Scan /></div>
-                  <div>
-                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">REGISTRO M7</h3>
-                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2">OPERACIÓN SEGURA</p>
-                  </div>
-               </div>
-               <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
+          <div className="bg-white w-[90vw] h-[90vh] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col my-auto border border-white/10">
+            <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+               <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-emerald-500 text-slate-950 rounded-xl flex items-center justify-center shadow-xl"><Icons.Scan /></div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tighter leading-none">REGISTRO M7</h3>
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2">
+                    {modalMode === 'edit' ? 'EDITANDO INFORMACIÓN' : modalMode === 'detail' ? 'VISTA DE DETALLES (LECTURA)' : 'OPERACIÓN SEGURA'}
+                  </p>
+                </div>
+             </div>
+             <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 hover:text-white transition-all text-4xl font-thin" title="Cerrar">×</button>
             </div>
 
-            <div className="p-10 space-y-8 flex-1 bg-slate-50/20">
+            <div className={`p-10 space-y-8 flex-1 bg-slate-50/20 max-h-[70vh] overflow-y-auto custom-scrollbar ${modalMode === 'detail' ? 'pointer-events-none opacity-90' : ''}`}>
               {aiError && (
                 <div className="p-6 bg-red-600 text-white rounded-[2rem] text-[10px] font-black uppercase flex items-center gap-4 animate-in shake">
                   <Icons.Alert /> {aiError}
@@ -471,28 +577,84 @@ const FleetManager: React.FC<FleetManagerProps> = ({
               {viewTab === 'vehicles' ? (
                 /* FORMULARIO DE VEHICULOS INTACTO */
                 <div className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Placa</label>
-                      <input type="text" value={formData.plate || ''} onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})} className={commonInputClass} />
+                    {/* 1. IDENTIFICACIÓN Y MARCA (DINÁMICA DESDE MASTER) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-900 p-8 rounded-[3rem] shadow-xl border border-white/5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-emerald-400 font-bold uppercase ml-2 tracking-widest">Placa de Vehículo</label>
+                        <input type="text" value={formData.plate || ''} onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})} className={`${commonInputClass} !bg-white/5 !text-white !border-white/10`} />
+                      </div>
+                      <SearchableSelect 
+                        label="Marca Fabricante" 
+                        value={formData.brand} 
+                        options={masterData['masterMarcas'] || []} 
+                        onChange={(val: string) => setFormData({...formData, brand: val})} 
+                      />
                     </div>
-                    <SearchableSelect label="Marca" value={formData.brand} options={MASTER_BRANDS} onChange={(val: string) => setFormData({...formData, brand: val})} />
-                  </div>
-                  <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-inner space-y-6">
-                    <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest text-center">Soportes Legales</p>
-                    <div className="grid grid-cols-2 gap-4">
-                       <label className={`h-24 bg-white/5 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.soatPdfUrl ? 'border-emerald-500' : 'border-white/10'}`}>
-                          <Icons.Excel className="text-white/20 w-6 h-6 mb-1" />
-                          <span className="text-[8px] font-black text-white/30 uppercase">SOAT PDF</span>
-                          <input type="file" className="hidden" accept="application/pdf" onChange={e => handleFileUpload(e, 'soatPdfUrl')} />
-                       </label>
-                       <label className={`h-24 bg-white/5 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.technoPdfUrl ? 'border-blue-500' : 'border-white/10'}`}>
-                          <Icons.Excel className="text-white/20 w-6 h-6 mb-1" />
-                          <span className="text-[8px] font-black text-white/30 uppercase">TECNO PDF</span>
-                          <input type="file" className="hidden" accept="application/pdf" onChange={e => handleFileUpload(e, 'technoPdfUrl')} />
-                       </label>
+
+                    {/* 2. SOPORTES LEGALES (ARRIBA COMO SOLICITADO) */}
+                    <div className="bg-emerald-500/5 p-8 rounded-[3.5rem] border-2 border-dashed border-emerald-500/20 space-y-6">
+                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest text-center">Gestión de Soportes Legales (Importación M7)</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* SECCIÓN SOAT */}
+                        <div className="space-y-4">
+                           <label className={`h-32 bg-white border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-all ${formData.soatPdfUrl ? 'border-emerald-500' : 'border-slate-200'}`}>
+                              <Icons.Excel className="text-slate-300 w-8 h-8 mb-2" />
+                              <span className="text-[9px] font-black text-slate-400 uppercase">Vincular SOAT (PDF)</span>
+                              <input type="file" className="hidden" accept="application/pdf" onChange={e => handleFileUpload(e, 'soatPdfUrl')} />
+                           </label>
+                           <div className="space-y-1">
+                              <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Vencimiento SOAT</label>
+                              <input type="date" value={formData.soatExpiry || ''} onChange={e => setFormData({...formData, soatExpiry: e.target.value})} className={commonInputClass} />
+                           </div>
+                        </div>
+
+                        {/* SECCIÓN TECNO */}
+                        <div className="space-y-4">
+                           <label className={`h-32 bg-white border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-all ${formData.technoPdfUrl ? 'border-blue-500' : 'border-slate-200'}`}>
+                              <Icons.Excel className="text-slate-300 w-8 h-8 mb-2" />
+                              <span className="text-[9px] font-black text-slate-400 uppercase">Vincular TECNO (PDF)</span>
+                              <input type="file" className="hidden" accept="application/pdf" onChange={e => handleFileUpload(e, 'technoPdfUrl')} />
+                           </label>
+                           <div className="space-y-1">
+                              <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Vencimiento Técnico-Mec.</label>
+                              <input type="date" value={formData.technoExpiry || ''} onChange={e => setFormData({...formData, technoExpiry: e.target.value})} className={commonInputClass} />
+                           </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+
+                    {/* 3. CAPACIDAD Y ESPECIFICACIONES TÉCNICAS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-8 bg-white rounded-[3rem] border-2 border-slate-100 shadow-sm">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-emerald-600 uppercase ml-2 font-bold underline">Capacidad (m3) *</label>
+                        <input type="number" required value={formData.capacityM3 || formData.capacity_m3 || ''} onChange={e => setFormData({...formData, capacityM3: e.target.value})} placeholder="Ej: 35" className={commonInputClass} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Modelo/Año</label>
+                        <input type="text" value={formData.modelYear || formData.model_year || ''} onChange={e => setFormData({...formData, modelYear: e.target.value})} placeholder="2024" className={commonInputClass} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Color</label>
+                        <input type="text" value={formData.color || ''} onChange={e => setFormData({...formData, color: e.target.value})} placeholder="Blanco" className={commonInputClass} />
+                      </div>
+                      <SearchableSelect 
+                        label="Tipo Vehículo" 
+                        value={formData.vehicleTypeId || formData.vehicle_type} 
+                        options={masterData['masterTiposVehiculo'] || []} 
+                        onChange={(val: string) => setFormData({...formData, vehicleTypeId: val})} 
+                      />
+                    </div>
+
+                    {/* 4. ESTADO OPERATIVO (NUEVO) */}
+                    <div className="p-8 bg-white rounded-[3rem] border-2 border-slate-100 shadow-sm">
+                        <SearchableSelect 
+                          label="Estado Operativo" 
+                          value={formData.statusId || formData.status_id} 
+                          options={statusOptions} 
+                          onChange={(val: string) => setFormData({...formData, statusId: val})} 
+                        />
+                    </div>
                 </div>
               ) : (
                 /* ACTUALIZACIÓN DEL FORMULARIO DE CONDUCTORES */
@@ -504,7 +666,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
 
                   <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-inner">
                     {uploadMode === 'photos' ? (
-                       <div className="grid grid-cols-2 gap-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-4 text-center">
                              <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Cara Frontal (A)</p>
                              <label className={`relative h-40 bg-white/5 border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all ${formData.licenseSideA ? 'border-emerald-500' : 'border-white/10'}`}>
@@ -543,7 +705,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                        <input type="text" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} placeholder="Ingrese nombre..." className={commonInputClass} />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <SearchableSelect label="Tipo Documento" value={formData.documentType} options={docTypeOptions} onChange={(val: string) => setFormData({...formData, documentType: val})} />
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Nro Documento</label>
@@ -551,24 +713,97 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Vencimiento Licencia</label>
-                        <input type="date" value={formData.licenseExpiry || ''} onChange={e => setFormData({...formData, licenseExpiry: e.target.value})} className={commonInputClass} />
+                        <input type="date" value={formData.licenseExpiry || formData.license_expiry || ''} onChange={e => setFormData({...formData, licenseExpiry: e.target.value})} className={commonInputClass} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Número Telefónico</label>
                         <input type="text" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+57 ..." className={commonInputClass} />
                       </div>
                     </div>
+
+                    <div className="p-8 bg-white rounded-[3rem] border-2 border-slate-100 shadow-sm">
+                        <SearchableSelect 
+                          label="Estado Operativo" 
+                          value={formData.statusId || formData.status_id} 
+                          options={statusOptions} 
+                          onChange={(val: string) => setFormData({...formData, statusId: val})} 
+                        />
+                    </div>
                   </div>
                 </div>
               )}
 
-              <div className="pt-8 flex flex-col md:flex-row gap-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all">DESCARTAR</button>
-                <button onClick={handleSave} className="flex-[2] bg-slate-900 text-white py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-2xl transition-all active:scale-95">CONFIRMAR OPERACIÓN</button>
+               <div className="pt-8 flex flex-col md:flex-row gap-4">
+                {modalMode === 'detail' ? (
+                  <>
+                    <div className="flex-1 space-y-4">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Visualizador de Soportes</p>
+                       <div className="flex flex-wrap gap-4 justify-center">
+                          {viewTab === 'vehicles' ? (
+                            <>
+                              {formData.soatPdfUrl && (
+                                <button type="button" onClick={() => window.open(formData.soatPdfUrl)} className="pointer-events-auto px-6 py-3 bg-emerald-500 text-slate-950 rounded-xl font-black text-[9px] uppercase">Ver SOAT (PDF)</button>
+                              )}
+                              {formData.technoPdfUrl && (
+                                <button type="button" onClick={() => window.open(formData.technoPdfUrl)} className="pointer-events-auto px-6 py-3 bg-blue-500 text-white rounded-xl font-black text-[9px] uppercase">Ver TECNO (PDF)</button>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {formData.licensePdf && (
+                                <button type="button" onClick={() => window.open(formData.licensePdf)} className="pointer-events-auto px-6 py-3 bg-purple-500 text-white rounded-xl font-black text-[9px] uppercase">Ver Licencia (PDF)</button>
+                              )}
+                              {formData.licenseSideA && (
+                                <button type="button" onClick={() => window.open(formData.licenseSideA)} className="pointer-events-auto px-6 py-3 bg-emerald-500 text-slate-950 rounded-xl font-black text-[9px] uppercase">Foto Frontal</button>
+                              )}
+                              {formData.licenseSideB && (
+                                <button type="button" onClick={() => window.open(formData.licenseSideB)} className="pointer-events-auto px-6 py-3 bg-emerald-500 text-slate-950 rounded-xl font-black text-[9px] uppercase">Foto Posterior</button>
+                              )}
+                            </>
+                          )}
+                       </div>
+                       <button type="button" onClick={() => setIsModalOpen(false)} className="pointer-events-auto w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-[10px] uppercase shadow-xl mt-4">SALIR</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all">DESCARTAR</button>
+                    <button onClick={handleSave} className="flex-[2] bg-slate-900 text-white py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-2xl transition-all active:scale-95">CONFIRMAR OPERACIÓN</button>
+                  </>
+                )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION DIALOG */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[800] bg-red-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl text-center border-4 border-red-500 overflow-hidden relative">
+            <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full mx-auto flex items-center justify-center mb-6 animate-pulse">
+              <Icons.Trash className="w-10 h-10" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 uppercase mb-2">¿Eliminar {viewTab === 'vehicles' ? 'Vehículo' : 'Conductor'}?</h3>
+            <p className="text-slate-500 font-bold mb-8 px-4">
+              Esta acción eliminará a <span className="text-red-700 font-black">{recordToDelete?.plate || recordToDelete?.name}</span> permanentemente del sistema M7 Intelligence. ¿Continuar?
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => { setShowDeleteConfirm(false); setRecordToDelete(null); }} 
+                className="py-4 bg-slate-100 text-slate-900 rounded-2xl font-black uppercase hover:bg-slate-200 transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleConfirmDelete} 
+                className="py-4 bg-red-600 text-white rounded-2xl font-black uppercase hover:bg-red-700 shadow-xl shadow-red-500/20 transition-all active:scale-95"
+              >
+                Sí, Eliminar
+              </button>
             </div>
           </div>
         </div>

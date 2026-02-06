@@ -7,10 +7,26 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Frameworks y Entorno
 node_modules
 dist
 dist-ssr
 *.local
+.env
+.wwebjs_auth
+.wwebjs_cache
+
+# Scripts de Diagnóstico y Temporales (Ignorados en Producción)
+*.cjs
+*.js
+*.txt
+*.pdf
+!package.json
+!run_migration.js
+
+# Base de Datos (Ocultar scripts de desarrollo, mantener el MASTER)
+*.sql
+!M7_PRODUCTION_SETUP.sql
 
 # Editor directories and files
 .vscode/*
@@ -22,6 +38,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# WhatsApp Auth
-.wwebjs_auth

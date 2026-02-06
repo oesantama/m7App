@@ -13,47 +13,10 @@ export const getPages = async (req: Request, res: Response) => {
       FROM pages 
       ORDER BY name ASC
     `);
-    console.log(`[DEBUG-PAGES] Query returned ${result.rows.length} rows`);
-    if (result.rows.length > 0) {
-        res.json(result.rows);
-        return;
-    }
-    
-    console.warn('[M7-PAGES] Sembrando datos mock (DB vacía)');
-    res.json([
-        // Configuración Maestros (MOD-01)
-        { id: 'PAG-01', name: 'ARTÍCULOS', route: 'master', moduleId: 'masterArticulo', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-02', name: 'CATEGORÍAS ARTÍCULOS', route: 'master', moduleId: 'masterCategorias', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-03', name: 'CLIENTES', route: 'master', moduleId: 'masterClientes', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-04', name: 'ESTADOS GLOBALES', route: 'master', moduleId: 'masterEstados', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-05', name: 'MARCAS', route: 'master', moduleId: 'masterMarcas', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-06', name: 'NOTIFICACIONES', route: 'master', moduleId: 'masterNotificaciones', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-07', name: 'TIPOS DOCUMENTO', route: 'master', moduleId: 'masterTipoDocumento', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-08', name: 'TIPOS NOTIFICACIÓN', route: 'master', moduleId: 'masterTIpoNotificacion', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-09', name: 'TIPOS VEHÍCULO', route: 'master', moduleId: 'masterTiposVehiculo', parentId: 'MOD-01', statusId: 'EST-01' },
-        { id: 'PAG-10', name: 'UNIDADES MEDIDA', route: 'master', moduleId: 'masterUnidadMedida', parentId: 'MOD-01', statusId: 'EST-01' },
-        
-        // Gestión Ajover (MOD-02)
-        { id: 'PAG-11', name: 'GESTIÓN DOCUMENTOS L', route: 'documentos', moduleId: 'gestionDocumentos', parentId: 'MOD-02', statusId: 'EST-01' },
-        { id: 'PAG-12', name: 'PLANEAR RUTAS', route: 'rutas', moduleId: 'planearRutas', parentId: 'MOD-02', statusId: 'EST-01' },
-        { id: 'PAG-13', name: 'RECIBIDO MATERIAL', route: 'recibido', moduleId: 'recibidoMaterial', parentId: 'MOD-02', statusId: 'EST-01' },
-        
-        // Gestión Transporte (MOD-03)
-        { id: 'PAG-14', name: 'FLOTAS & CONDUCTORES', route: 'flotas', moduleId: 'flotasConductores', parentId: 'MOD-03', statusId: 'EST-01' },
-        { id: 'PAG-15', name: 'VÍNCULO OPERATIVO', route: 'vinculo', moduleId: 'vinculoOperativo', parentId: 'MOD-03', statusId: 'EST-01' },
-        
-        // Seguridad & Acceso (MOD-04)
-        { id: 'PAG-16', name: 'MÓDULOS SISTEMA', route: 'master', moduleId: 'masterModulos', parentId: 'MOD-04', statusId: 'EST-01' },
-        { id: 'PAG-17', name: 'PÁGINAS WEB', route: 'master', moduleId: 'masterPaginas', parentId: 'MOD-04', statusId: 'EST-01' },
-        { id: 'PAG-18', name: 'PERMISOS POR ROL', route: 'master', moduleId: 'masterPermisosRol', parentId: 'MOD-04', statusId: 'EST-01' },
-        { id: 'PAG-19', name: 'PERMISOS POR USUARIO', route: 'master', moduleId: 'masterPermisosUsuario', parentId: 'MOD-04', statusId: 'EST-01' },
-        { id: 'PAG-20', name: 'ROLES DE SISTEMA', route: 'master', moduleId: 'masterRol', parentId: 'MOD-04', statusId: 'EST-01' },
-        { id: 'PAG-21', name: 'USUARIOS', route: 'master', moduleId: 'masterUsuarios', parentId: 'MOD-04', statusId: 'EST-01' },
-        { id: 'PAG-22', name: 'CONEXIÓN WHATSAPP', route: 'whatsapp-status', moduleId: 'masterWhatsApp', parentId: 'MOD-04', statusId: 'EST-01' }
-    ]); 
+    res.json(result.rows);
   } catch (err: any) {
     console.error('[PAGES-ERROR]', err);
-    res.status(500).json({ error: "Error fatal en controlador", details: err.message });
+    res.json([]);
   }
 };
 
@@ -69,5 +32,22 @@ export const savePage = async (req: Request, res: Response) => {
     res.json({ success: true, message: 'Página guardada' });
   } catch (err: any) {
     res.status(500).json({ error: "Error al guardar la página" });
+  }
+};
+
+export const deletePage = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const record = await pool.query('SELECT * FROM pages WHERE id = $1', [id]);
+    if (record.rows.length > 0) {
+      await pool.query(
+        'INSERT INTO deletion_logs (table_name, record_id, record_data, deleted_by) VALUES ($1, $2, $3, $4)',
+        ['pages', id, record.rows[0], 'Admin']
+      );
+    }
+    await pool.query('DELETE FROM pages WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Página eliminada' });
+  } catch (err) {
+    res.status(500).json({ error: "Error al eliminar la página" });
   }
 };

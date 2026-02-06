@@ -4,6 +4,7 @@ import { Icons, AVATAR_GALLERY } from '../constants';
 import { MasterRecord, MasterCategory, User, Article } from '../types';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { DataImportDialog } from './DataImportDialog';
 
 interface MasterModuleProps {
   onAudit: (entity: string, action: string) => void;
@@ -13,7 +14,7 @@ interface MasterModuleProps {
   user: User;
 }
 
-const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData, setAllMasterData, user }) => {
+const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData, setAllMasterData, user, onAudit }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
@@ -23,10 +24,14 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
   const [displayMode, setDisplayMode] = useState<'table' | 'grid'>('table');
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   // Estados para el diálogo de cambio de rol
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [pendingRoleId, setPendingRoleId] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<any>(null);
 
   // Extracción de Maestros para Selectores
   const roles = allMasterData['masterRol'] || [];
@@ -38,9 +43,163 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
   const uoms = allMasterData['masterUnidadMedida'] || [];
   const rolePermissions = allMasterData['masterPermisosRol'] || [];
   const categoriesArt = allMasterData['masterCategorias'] || [];
-  const notificationTypes = allMasterData['masterTIpoNotificacion'] || [];
+  const notificationTypes = allMasterData['masterTipoNotificacion'] || [];
+
+  const isSuperUser = user.roleId === 'ROL-01' || user.email === import.meta.env.VITE_APP_DEMO_EMAIL;
+  
+  const getPagePermissions = () => {
+    if (isSuperUser) return { canCreate: true, canEdit: true, canDelete: true, canView: true };
+    const pageInfo = pages.find(p => (p.moduleId || p.module_id) === activeMaster);
+    const perms = user.permissions.find(p => p.module === pageInfo?.id);
+    return {
+      canCreate: perms?.actions.includes('create') || false,
+      canEdit: perms?.actions.includes('edit') || false,
+      canDelete: perms?.actions.includes('delete') || false,
+      canView: perms?.actions.includes('view') || false,
+    };
+  };
+
+  const { canCreate, canEdit, canDelete } = getPagePermissions();
+
+  const finalCanCreate = activeMaster === 'masterPermisosUsuario' ? false : canCreate;
+  const finalCanDelete = activeMaster === 'masterPermisosUsuario' ? false : canDelete;
 
   const iconKeys = Object.keys(Icons);
+
+  const MASTER_PREFIXES: Record<MasterCategory, string> = {
+    masterEstados: 'EST',
+    masterTiposVehiculo: 'TVH',
+    masterMarcas: 'MAR',
+    masterNotificaciones: 'NOT',
+    masterTipoNotificacion: 'TGN',
+    masterUnidadMedida: 'UOM',
+    masterArticulo: 'ART',
+    masterClientes: 'CLI',
+    masterUsuarios: 'USR',
+    masterRol: 'ROL',
+    masterPermisosRol: 'PRL',
+    masterPermisosUsuario: 'PUS',
+    masterTipoDocumento: 'DOC',
+    masterModulos: 'MOD',
+    masterPaginas: 'PAG',
+    masterCategorias: 'CAT'
+  };
+
+  const MASTER_LABELS: Record<MasterCategory, string> = {
+    masterEstados: 'ESTADOS GLOBALES',
+    masterTiposVehiculo: 'TIPOS DE VEHÍCULO',
+    masterMarcas: 'MARCAS COMERCIALES',
+    masterNotificaciones: 'ALERTAS & NOTIFICACIONES',
+    masterTipoNotificacion: 'GRUPOS DE ALERTA',
+    masterUnidadMedida: 'UNIDADES DE MEDIDA',
+    masterArticulo: 'MAESTRO DE ARTÍCULOS',
+    masterClientes: 'CLIENTES CORPORATIVOS',
+    masterUsuarios: 'GESTIÓN DE USUARIOS',
+    masterRol: 'ROLES OPERATIVOS',
+    masterPermisosRol: 'MATRIZ DE ROLES',
+    masterPermisosUsuario: 'MATRIZ DE USUARIOS',
+    masterTipoDocumento: 'TIPOS DE DOCUMENTO',
+    masterModulos: 'MÓDULOS DE SISTEMA',
+    masterPaginas: 'PÀGINAS DE REDIRECCIÓN',
+    masterCategorias: 'CATEGORÍAS DE ARTÍCULO'
+  };
+
+  const generateNextId = (category: MasterCategory, data: MasterRecord[]) => {
+    const prefix = MASTER_PREFIXES[category] || 'M7';
+    const existingIds = data.map(d => d.id).filter(id => id.startsWith(`${prefix}-`));
+    
+    let nextNum = 1;
+    if (existingIds.length > 0) {
+      const nums = existingIds.map(id => {
+        const parts = id.split('-');
+        const numPart = parts[parts.length - 1];
+        return isNaN(parseInt(numPart)) ? 0 : parseInt(numPart);
+      });
+      nextNum = Math.max(...nums) + 1;
+    }
+    
+    return `${prefix}-${nextNum.toString().padStart(2, '0')}`;
+  };
+
+  const getInitialFormData = (category: MasterCategory, record: any = {}) => {
+    const defaults: any = {
+      name: '',
+      statusId: 'EST-01',
+      clientId: '',
+      clientIds: [],
+    };
+
+    if (category === 'masterUsuarios') {
+      Object.assign(defaults, {
+        email: '',
+        phone: '',
+        documentType: '',
+        documentNumber: '',
+        roleId: '',
+        avatar: AVATAR_GALLERY[0],
+      });
+    } else if (category === 'masterArticulo') {
+      Object.assign(defaults, {
+        sku: '',
+        barcode: '',
+        uomGeneralId: '',
+        uomInterId: '',
+        factorInter: 1,
+        uomStdId: '',
+        factorStd: 1,
+        categoryArticuloId: '',
+      });
+    } else if (category === 'masterClientes') {
+      Object.assign(defaults, {
+        email: '',
+        logoUrl: '',
+      });
+    } else if (category === 'masterRol') {
+      Object.assign(defaults, {
+        description: '',
+      });
+    } else if (category === 'masterModulos') {
+      Object.assign(defaults, {
+        iconClass: '',
+      });
+    } else if (category === 'masterPaginas') {
+      Object.assign(defaults, {
+        route: '',
+        parentId: '',
+      });
+    } else if (category === 'masterNotificaciones') {
+      Object.assign(defaults, {
+        notificationEmail: '',
+        tipoNotificacionId: '',
+      });
+    }
+
+    const normalizedRecord = { 
+      ...record,
+      statusId: record.statusId || record.status_id || 'EST-01',
+      clientId: record.clientId || record.client_id || '',
+      roleId: record.roleId || record.role_id || '',
+      parentId: record.parentId || record.parent_id || '',
+      iconClass: record.iconClass || record.icon_class || '',
+      notificationEmail: record.notificationEmail || record.notification_email || '',
+      tipoNotificacionId: record.tipoNotificacionId || record.tipo_notificacion_id || '',
+      categoryArticuloId: record.categoryArticuloId || record.category_articulo_id || ''
+    };
+
+    return { ...defaults, ...normalizedRecord };
+  };
+
+  const getColombiaNow = () => {
+    return new Date().toLocaleString('es-CO', { 
+      timeZone: 'America/Bogota',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
 
   const filteredData = useMemo(() => {
     const list = allMasterData[activeMaster] || [];
@@ -57,7 +216,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
 
   // --- LÓGICA DE MATRIZ DE PERMISOS ---
   const isAllPermsChecked = useMemo(() => {
-    if (activeMaster !== 'masterPermisosRol') return false;
+    if (activeMaster !== 'masterPermisosRol' && activeMaster !== 'masterPermisosUsuario') return false;
     const actions = ['view', 'create', 'edit', 'delete', 'active'];
     return pages.length > 0 && pages.every(p => actions.every(a => !!formData[`page_${p.id}_${a}`]));
   }, [formData, pages, activeMaster]);
@@ -103,6 +262,23 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
     setError(null);
 
     if (activeMaster === 'masterUsuarios') {
+      // RFC 5322 Email Regex
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (formData.email && !emailRegex.test(formData.email)) {
+          setError("M7 ERROR: Formato de correo inválido (RFC 5322).");
+          toast.error("Validación Fallida", { description: "Revise el formato del email." });
+          return;
+      }
+      
+      // Validación Teléfono (Mínimo 8 caracteres)
+      if (formData.phone) {
+          const phoneClean = formData.phone.replace(/[\s-]/g, '');
+          if (phoneClean.length < 8) {
+              setError("M7 ERROR: El teléfono debe tener al menos 8 dígitos.");
+              return;
+          }
+      }
+
       const emailExists = (allMasterData['masterUsuarios'] || []).some(u => 
         u.email?.toLowerCase() === formData.email?.toLowerCase() && u.id !== editingRecord?.id
       );
@@ -112,8 +288,15 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
       }
     }
 
-    const now = new Date().toISOString();
-    const finalId = editingRecord?.id || `${activeMaster}-${Date.now()}`;
+    // NUEVA VALIDACIÓN DE ACCESIBILIDAD (BUG-03)
+    if (activeMaster === 'masterArticulo' && !formData.categoryArticuloId) {
+      setError("M7 ERROR: Debe seleccionar una categoría para el artículo.");
+      toast.error("Validación de Accesibilidad", { description: "La categoría del artículo es obligatoria (WCAG AA)." });
+      return;
+    }
+
+    const now = getColombiaNow();
+    const finalId = editingRecord?.id || generateNextId(activeMaster, allMasterData[activeMaster] || []);
     const newRecord = { ...formData, id: finalId, updatedAt: now, updatedBy: user.name };
 
     try {
@@ -125,27 +308,23 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
             await api.saveUser(newRecord);
         } else if (activeMaster === 'masterArticulo') {
             await api.saveArticle(newRecord);
-        // } else if (activeMaster === 'masterClientes') {
-        //     await api.saveClient(newRecord); // TODO: Agregar saveClient si falta
+        } else if (activeMaster === 'masterRol') {
+            await api.saveRole(newRecord);
+        } else if (activeMaster === 'masterPermisosRol') {
+            await api.savePermission(newRecord);
+        } else if (activeMaster === 'masterPermisosUsuario') {
+            await api.saveUserPermission(newRecord);
+        } else if (activeMaster === 'masterPaginas') {
+            await api.savePage(newRecord);
+            await api.saveMaster(activeMaster, newRecord);
         } else {
             // Guardado Genérico para el resto de tablas maestras (masterTipoDocumento, etc.)
             await api.saveMaster(activeMaster, newRecord);
         }
         
         toast.success("Registro Guardado", { description: "Datos sincronizados con el núcleo M7." });
-
-        setAllMasterData(prev => {
-          const list = prev[activeMaster] || [];
-          const exists = list.some(i => i.id === finalId);
-          return { 
-            ...prev, 
-            [activeMaster]: exists 
-              ? list.map(i => i.id === finalId ? newRecord : i) 
-              : [...list, { ...newRecord, createdAt: now, createdBy: user.name }]
-          };
-        });
+        if (onAudit) onAudit(activeMaster, editingRecord ? 'UPDATE' : 'CREATE');
         setIsModalOpen(false);
-
     } catch (err: any) {
         console.error('[M7-MASTER] Save error:', err);
         setError("Error de Sincronización: " + (err.message || 'Fallo desconocido'));
@@ -158,17 +337,70 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [notificationMedia, setNotificationMedia] = useState<string | null>(null);
+  const [notificationMediaName, setNotificationMediaName] = useState('');
+
+  const handleDelete = async () => {
+    if (!recordToDelete) return;
+    
+    try {
+        const { api } = await import('../services/api');
+        
+        if (activeMaster === 'masterUsuarios') {
+            await api.deleteUser(recordToDelete.id, user.name);
+        } else if (activeMaster === 'masterPermisosUsuario') {
+            await api.deleteUserPermission(recordToDelete.id, user.name);
+        } else if (activeMaster === 'masterPermisosRol') {
+            await api.deleteRolePermission(recordToDelete.id, user.name);
+        } else if (activeMaster === 'masterArticulo') {
+            await api.deleteArticle(recordToDelete.id, user.name);
+        } else if (activeMaster === 'masterRol') {
+            await api.deleteRole(recordToDelete.id, user.name);
+        } else if (activeMaster === 'masterClientes') {
+            await api.deleteClient(recordToDelete.id, user.name);
+        } else if (activeMaster === 'masterModulos') {
+            await api.deleteModule(recordToDelete.id, user.name);
+        } else if (activeMaster === 'masterPaginas') {
+            await api.deletePage(recordToDelete.id, user.name);
+        } else {
+            await api.deleteMaster(activeMaster, recordToDelete.id, user.name);
+        }
+
+        toast.success("Registro Eliminado", { description: "La base de datos se ha actualizado." });
+        if (onAudit) onAudit(activeMaster, 'DELETE');
+        setIsModalOpen(false);
+        setShowDeleteConfirm(false);
+        setRecordToDelete(null);
+
+    } catch (err: any) {
+        console.error('[M7-MASTER] Delete error:', err);
+        setError("Error de Eliminación: " + (err.message || 'Fallo desconocido'));
+        toast.error("Error al eliminar", { description: err.message });
+        setShowDeleteConfirm(false);
+        setRecordToDelete(null);
+    }
+  };
 
   const handleExportExcel = () => {
     const dataToExport = filteredData.map(item => {
       const flat: any = { ...item };
       delete flat.avatar; delete flat.logoUrl; delete flat.photoUrl;
+      
+      // Asegurar formato Colombia para el reporte Excel (incluso para registros viejos)
+      if (flat.createdAt && flat.createdAt.includes('T')) {
+        flat.createdAt = new Date(flat.createdAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+      }
+      if (flat.updatedAt && flat.updatedAt.includes('T')) {
+        flat.updatedAt = new Date(flat.updatedAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+      }
+      
       return flat;
     });
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, activeMaster.replace('master', ''));
-    XLSX.writeFile(workbook, `M7_Export_${activeMaster}_${Date.now()}.xlsx`);
+    const sheetName = activeMaster.replace('master', '');
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, `Informacion_de_${sheetName}_${new Date().getTime()}.xlsx`);
   };
 
   const handleSendNotification = async () => {
@@ -196,7 +428,10 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
           const { api } = await import('../services/api');
           const res = await api.sendWhatsAppNotification({
               phones: uniquePhones,
-              message: notificationMessage
+              message: notificationMessage,
+              userId: user.id,
+              media: notificationMedia || undefined,
+              fileName: notificationMediaName || undefined
           });
 
           if (res.success) {
@@ -208,6 +443,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
               setIsNotificationSenderOpen(false);
               setNotificationMessage('');
               setSelectedUserIds([]);
+              setNotificationMedia(null);
+              setNotificationMediaName('');
           } else {
               toast.error("Error en el envío", { description: res.error || 'Ocurrió un error desconocido' });
           }
@@ -219,32 +456,46 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
       }
   };
 
-  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws);
+  const handleBatchImport = async (importedData: any[]) => {
+    try {
+      const currentList = [...(allMasterData[activeMaster] || [])];
       
-      const newRecords = data.map((item: any) => ({
-        ...item,
-        id: item.id || `${activeMaster}-${Math.random().toString(36).substr(2, 9)}`,
-        statusId: item.statusId || 'EST-01',
-        createdAt: new Date().toISOString(),
-        createdBy: user.name
-      }));
+      const newRecords = importedData.map((item: any) => {
+        const finalId = item.id || generateNextId(activeMaster, currentList);
+        
+        // Procesar clientIds si viene como string separado por comas
+        let processedClientIds = item.clientIds;
+        if (typeof item.clientIds === 'string') {
+          processedClientIds = item.clientIds.split(',').map((id: string) => id.trim()).filter(Boolean);
+        }
+
+        const record = {
+          ...item,
+          clientIds: processedClientIds,
+          id: finalId,
+          statusId: item.statusId || 'EST-01',
+          createdAt: getColombiaNow(),
+          createdBy: user.name
+        };
+        // Push to currentList so next item calculates from updated state
+        currentList.push(record as MasterRecord);
+        return record;
+      });
+
+      // TODO: Descomentar para backend real
+      // const { api } = await import('../services/api');
+      // await api.saveMasterBatch(activeMaster, newRecords);
 
       setAllMasterData(prev => ({
         ...prev,
         [activeMaster]: [...(prev[activeMaster] || []), ...newRecords]
       }));
-    };
-    reader.readAsBinaryString(file);
+      
+      // toast.success desde el Dialog
+    } catch (e) {
+      console.error(e);
+      throw new Error("Error procesando lote");
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
@@ -384,6 +635,81 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
                  </div>
                )}
             </div>
+
+            {/* SECCIÓN SEGURIDAD AVANZADA (2FA) - SOLO USUARIOS */}
+            {activeMaster === 'masterUsuarios' && editingRecord && (
+               <div className="bg-amber-50 rounded-[2.5rem] p-8 border-2 border-dashed border-amber-200 mt-6 mb-6">
+                  <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-4">
+                        <div className={`p-4 rounded-2xl ${(formData as any).twoFactorEnabled ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                           <Icons.Shield style={{ width: '24px', height: '24px' }} />
+                        </div>
+                        <div>
+                           <h4 className="text-amber-900 font-black text-xs uppercase tracking-widest leading-none mb-1">Seguridad Avanzada</h4>
+                           <p className="text-[10px] font-bold text-amber-700/60 uppercase">
+                               Estado 2FA: <span className={(formData as any).twoFactorEnabled ? 'text-emerald-600' : 'text-slate-400'}>{(formData as any).twoFactorEnabled ? 'ACTIVO' : 'INACTIVO'}</span>
+                           </p>
+                        </div>
+                     </div>
+                     {(formData as any).twoFactorEnabled ? (
+                        <button 
+                           type="button" 
+                           onClick={async () => {
+                              if (confirm("¿RESET SEGURIDAD 2FA?")) {
+                                 const { api } = await import('../services/api');
+                                 await api.deactivate2FA(formData.id);
+                                 setFormData({...formData as any, twoFactorEnabled: false});
+                                 toast.success("2FA Reseteado");
+                              }
+                           }}
+                           className="px-6 py-3 bg-red-600 text-white rounded-xl font-black text-[9px] uppercase hover:bg-red-700"
+                        >
+                           Resetear 2FA
+                        </button>
+                     ) : <span className="text-[9px] font-black opacity-50 uppercase tracking-widest text-slate-400">Sin Protección</span>}
+                  </div>
+               </div>
+            )}
+
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterPermisosUsuario':
+        return (
+          <div className="space-y-10 animate-in fade-in">
+            <div className="bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl">
+               <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+                  <h4 className="text-white font-black text-xs uppercase tracking-widest leading-none">Matriz M7 de Usuario</h4>
+                  <button type="button" onClick={toggleAllPerms} className={`${isAllPermsChecked ? 'bg-red-600' : 'bg-emerald-500'} text-white px-8 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg hover:opacity-80 transition-all`}>
+                    {isAllPermsChecked ? 'QUITAR TODO' : 'SELECCIONAR TODO'}
+                  </button>
+               </div>
+               <div className="overflow-x-auto max-h-[450px] custom-scrollbar">
+                  <table className="w-full text-left text-[10px]">
+                     <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20">
+                        <tr><th className="p-4 bg-slate-900">Página</th>{['VIEW', 'CREATE', 'EDIT', 'DELETE', 'ACTIVE'].map(a => <th key={a} className="p-4 text-center bg-slate-900">{a}</th>)}<th className="p-4 text-center bg-slate-900">Fila</th></tr>
+                     </thead>
+                     <tbody className="divide-y divide-white/5">
+                        {pages.map(p => (
+                          <tr key={p.id} className="hover:bg-white/5 transition-all">
+                             <td className="p-4 text-white font-bold uppercase">{p.name}</td>
+                             {['view', 'create', 'edit', 'delete', 'active'].map(a => (
+                               <td key={a} className="p-4 text-center">
+                                  <input type="checkbox" checked={!!formData[`page_${p.id}_${a}`]} onChange={e => setFormData({...formData, [`page_${p.id}_${a}`]: e.target.checked})} className="w-5 h-5 rounded-lg border-2 border-white/10 bg-transparent checked:bg-emerald-500 checked:border-emerald-500 transition-all cursor-pointer appearance-none flex items-center justify-center after:content-['✓'] after:text-white after:font-black after:hidden checked:after:block" />
+                               </td>
+                             ))}
+                             <td className="p-4 text-center">
+                                <button type="button" onClick={()=>togglePageRow(p.id)} className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-emerald-500 transition-all">
+                                  <Icons.Check />
+                                </button>
+                             </td>
+                          </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            </div>
             {renderStatusField()}
           </div>
         );
@@ -453,35 +779,77 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
               <input type="text" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value.toUpperCase()})} className={commonInputStyle} required />
             </div>
 
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Código de Barras</label>
+              <input type="text" value={formData.barcode || ''} onChange={e=>setFormData({...formData, barcode: e.target.value})} className={commonInputStyle} placeholder="Opcional..." />
+            </div>
+
             {/* Selectores de Unidades (Triple UOM) */}
-            <div className="md:col-span-2 bg-slate-100 p-8 rounded-[3rem] grid grid-cols-1 md:grid-cols-3 gap-6 border border-slate-200">
+            <div className="md:col-span-2 bg-slate-100 p-8 rounded-[3rem] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 border border-slate-200">
                <div className="space-y-1"><label className="text-[9px] font-black text-emerald-600 uppercase ml-2 tracking-widest">Unidad General</label>
                  <select value={formData.uomGeneralId || ''} onChange={e=>setFormData({...formData, uomGeneralId: e.target.value})} className={commonInputStyle}>
                    <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                  </select>
                </div>
                <div className="space-y-1"><label className="text-[9px] font-black text-blue-600 uppercase ml-2 tracking-widest">Unidad Intermedia</label>
-                 <select value={formData.uomInterId || ''} onChange={e=>setFormData({...formData, uomInterId: e.target.value})} className={commonInputStyle}>
-                   <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                 </select>
+                 <div className="flex gap-2">
+                    <select value={formData.uomInterId || ''} onChange={e=>setFormData({...formData, uomInterId: e.target.value})} className={commonInputStyle}>
+                      <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                    <input type="number" placeholder="Factor" value={formData.factorInter || ''} onChange={e=>setFormData({...formData, factorInter: Number(e.target.value)})} className="w-20 p-4 rounded-2xl bg-white border-2 border-slate-200 font-black text-[10px] text-center" />
+                 </div>
                </div>
                <div className="space-y-1"><label className="text-[9px] font-black text-slate-900 uppercase ml-2 tracking-widest">Unidad Estándar</label>
-                 <select value={formData.uomStdId || ''} onChange={e=>setFormData({...formData, uomStdId: e.target.value})} className={commonInputStyle}>
-                   <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                 </select>
+                 <div className="flex gap-2">
+                    <select value={formData.uomStdId || ''} onChange={e=>setFormData({...formData, uomStdId: e.target.value})} className={commonInputStyle}>
+                      <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                    <input type="number" placeholder="Factor" value={formData.factorStd || ''} onChange={e=>setFormData({...formData, factorStd: Number(e.target.value)})} className="w-20 p-4 rounded-2xl bg-white border-2 border-slate-200 font-black text-[10px] text-center" />
+                 </div>
                </div>
             </div>
 
             {/* Selectores Restaurados: Cliente y Categoría */}
-            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Cliente Dueño del Articulo</label>
-              <select value={formData.clientId || ''} onChange={e=>setFormData({...formData, clientId: e.target.value})} className={commonInputStyle} required>
-                <option value="">Seleccione Cliente...</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+            <div className="md:col-span-2 space-y-4">
+               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Clientes Propietarios (Multiselección)</label>
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {clients.map(c => (
+                    <label key={c.id} className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${formData.clientIds?.includes(c.id) ? 'bg-emerald-50 border-emerald-500' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
+                       <input type="checkbox" checked={formData.clientIds?.includes(c.id)} onChange={e => {
+                          const ids = formData.clientIds || [];
+                          setFormData({...formData, clientIds: e.target.checked ? [...ids, c.id] : ids.filter((id: string) => id !== c.id)});
+                        }} className="w-5 h-5 accent-emerald-500 rounded-lg" />
+                       <span className="text-[10px] font-black uppercase text-slate-900">{c.name}</span>
+                    </label>
+                  ))}
+               </div>
             </div>
-            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Categoría del Articulo</label>
-              <select value={formData.categoryArticuloId || ''} onChange={e=>setFormData({...formData, categoryArticuloId: e.target.value})} className={commonInputStyle} required>
-                <option value="">Seleccione Categoría...</option>{categoriesArt.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-              </select>
+
+            <div className="space-y-1">
+              <label 
+                htmlFor="categoryArticuloId" 
+                className={`text-[10px] font-black uppercase ml-2 tracking-widest ${error && !formData.categoryArticuloId ? 'text-red-500' : 'text-slate-400'}`}
+              >
+                Categoría del Articulo
+              </label>
+              <div className="relative group">
+                <select 
+                  id="categoryArticuloId"
+                  value={formData.categoryArticuloId || ''} 
+                  onChange={e=>setFormData({...formData, categoryArticuloId: e.target.value})} 
+                  className={`${commonInputStyle} ${error && !formData.categoryArticuloId ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
+                  required
+                  aria-invalid={error && !formData.categoryArticuloId ? "true" : "false"}
+                  aria-describedby={error && !formData.categoryArticuloId ? "category-error" : undefined}
+                >
+                  <option value="">Seleccione Categoría...</option>
+                  {categoriesArt.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                </select>
+                {error && !formData.categoryArticuloId && (
+                  <p id="category-error" className="text-[9px] font-black text-red-500 uppercase tracking-tight mt-1 ml-2 animate-in fade-in slide-in-from-top-1">
+                    M7 ERROR: Debe asignar una categoría válida al artículo
+                  </p>
+                )}
+              </div>
             </div>
             
             {renderStatusField()}
@@ -582,7 +950,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
         <div className="flex items-center gap-4">
            <div className="w-10 h-10 bg-slate-900 rounded-[1.2rem] flex items-center justify-center text-emerald-500 shadow-md"><Icons.Settings /></div>
            <div>
-             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">{activeMaster.replace('master', '')}</h2>
+             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">{MASTER_LABELS[activeMaster] || activeMaster.replace('master', '')}</h2>
              <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">Auditoría M7</p>
            </div>
         </div>
@@ -597,11 +965,10 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
              <div className={`absolute top-1 bottom-1 w-[40px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayMode === 'table' ? 'left-1' : 'left-[44px]'}`}></div>
            </div>
            
-           <label className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase cursor-pointer">
+           <button onClick={() => setIsImportDialogOpen(true)} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase cursor-pointer">
               <Icons.Excel />
               <span className="hidden xl:inline">Importar</span>
-              <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} />
-           </label>
+           </button>
 
            <button onClick={handleExportExcel} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel /><span className="hidden xl:inline">Excel</span></button>
            
@@ -612,16 +979,23 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
                </button>
            )}
 
-           <button onClick={()=>{setEditingRecord(null); setFormData({statusId: 'EST-01', clientIds: []}); setError(null); setIsModalOpen(true);}} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all">Nuevo</button>
+            {canCreate && (
+              <button onClick={()=>{setEditingRecord(null); setFormData(getInitialFormData(activeMaster)); setIsReadOnly(false); setError(null); setIsModalOpen(true);}} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all active:scale-95">Nuevo</button>
+            )}
         </div>
       </div>
 
       <div className="flex-1 bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-x-auto custom-scrollbar">
           {displayMode === 'table' ? (
-             <table className="w-full text-left">
+             <table className="w-full text-left min-w-[800px]">
                 <thead className="sticky top-0 z-10 bg-slate-900 text-white font-black uppercase tracking-widest text-[8px]">
-                   <tr><th className="px-8 py-4">Descripción Registro</th><th className="px-8 py-4 text-center">Estado</th><th className="px-8 py-4 text-right">Auditoría</th></tr>
+                   <tr>
+                     <th className="px-8 py-4">Descripción Registro</th>
+                     {activeMaster === 'masterUsuarios' && <th className="px-8 py-4 text-center">Seguridad (2FA)</th>}
+                     <th className="px-8 py-4 text-center">Estado</th>
+                     <th className="px-8 py-4 text-right">Auditoría</th>
+                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {paginatedData.map(item => (
@@ -632,20 +1006,48 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
                               {item.avatar ? <img src={item.avatar} className="w-full h-full object-cover" /> : (item.logoUrl ? <img src={item.logoUrl} className="w-full h-full object-contain p-1" /> : (item.photoUrl ? <img src={item.photoUrl} className="w-full h-full object-cover" /> : <Icons.Package className="text-slate-300 w-5 h-5" />))}
                            </div>
                            <div>
-                             <p className="font-black text-slate-900 text-[12px] uppercase">{item.name || item.id}</p>
-                             <p className="text-[8px] text-slate-400 font-bold uppercase">{item.email || item.id}</p>
+                             <p className="font-black text-slate-900 text-[12px] uppercase">
+                               {activeMaster === 'masterPermisosRol' 
+                                 ? (item.roleName || roles.find(r => r.id === item.roleId)?.name || item.roleId || item.id)
+                                 : (activeMaster === 'masterPermisosUsuario'
+                                   ? (item.userName || (allMasterData.masterUsuarios || []).find(u => u.id === item.userId)?.name || item.userId || item.id)
+                                   : (item.name || item.id))}
+                             </p>
+                             <p className="text-[8px] text-slate-400 font-bold uppercase flex flex-col gap-1">
+                               <span>{ (activeMaster === 'masterPermisosRol' || activeMaster === 'masterPermisosUsuario') ? `ID: ${item.id}` : (item.email || (item as any).notificationEmail || item.id)}</span>
+                               {activeMaster === 'masterNotificaciones' && (
+                                 <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-fit">
+                                   {notificationTypes.find(nt => nt.id === (item as any).tipoNotificacionId)?.name || 'TIPO DESCONOCIDO'}
+                                 </span>
+                               )}
+                             </p>
                            </div>
                          </div>
                       </td>
-                      <td className="px-8 py-4 text-center">
-                         <span className={`px-4 py-1 rounded-full text-[8px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{statuses.find(s=>s.id===item.statusId)?.name || 'ACTIVO'}</span>
-                      </td>
-                      <td className="px-8 py-4 text-right">
-                         <button onClick={()=>{setEditingRecord(item); setFormData({...item}); setError(null); setIsModalOpen(true);}} className="p-3 bg-emerald-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md active:scale-90"><Icons.Audit /></button>
-                      </td>
+                       {activeMaster === 'masterUsuarios' && (
+                         <td className="px-8 py-4 text-center">
+                            <div className="flex justify-center">
+                              <div className={`p-2 rounded-lg ${(item as any).twoFactorEnabled ? 'bg-emerald-500/20 text-emerald-600' : 'bg-slate-100 text-slate-300'}`} title={(item as any).twoFactorEnabled ? 'Autenticación 2FA Activa' : 'Sin 2FA'}>
+                                 <Icons.Shield style={{ width: '14px', height: '14px' }} />
+                              </div>
+                            </div>
+                         </td>
+                       )}
+                       <td className="px-8 py-4 text-center">
+                          <span className={`px-4 py-1 rounded-full text-[8px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{statuses.find(s=>s.id===item.statusId)?.name || 'ACTIVO'}</span>
+                       </td>
+                       <td className="px-8 py-4 text-right flex items-center justify-end gap-2">
+                          <button onClick={()=>{setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(true); setError(null); setIsModalOpen(true);}} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-md active:scale-90" title="Ver Detalle"><Icons.Search /></button>
+                          {canEdit && (
+                            <button onClick={()=>{setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(false); setError(null); setIsModalOpen(true);}} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-md active:scale-90" title="Editar"><Icons.Audit /></button>
+                          )}
+                          {canDelete && (
+                            <button onClick={()=>{setRecordToDelete(item); setShowDeleteConfirm(true);}} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-md active:scale-90" title="Eliminar"><Icons.Trash /></button>
+                          )}
+                       </td>
                     </tr>
                   ))}
-                  {paginatedData.length === 0 && <tr><td colSpan={3} className="py-20 text-center font-black text-slate-200 uppercase text-[10px] tracking-widest">Sin registros encontrados</td></tr>}
+                  {paginatedData.length === 0 && <tr><td colSpan={activeMaster === 'masterUsuarios' ? 4 : 3} className="py-20 text-center font-black text-slate-200 uppercase text-[10px] tracking-widest">Sin registros encontrados</td></tr>}
                 </tbody>
              </table>
           ) : (
@@ -658,8 +1060,20 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
                       </div>
                       <span className={`px-3 py-1 rounded-full text-[7px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{statuses.find(s=>s.id===item.statusId)?.name || 'ACTIVO'}</span>
                    </div>
-                   <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">{item.name || item.id}</h3>
-                   <button onClick={()=>{setEditingRecord(item); setFormData({...item}); setError(null); setIsModalOpen(true);}} className="w-full py-3 bg-emerald-500 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md">Auditar</button>
+                   <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">
+                     {activeMaster === 'masterPermisosRol'
+                       ? (item.roleName || roles.find(r => r.id === item.roleId)?.name || item.roleId || item.id)
+                       : (item.name || item.id)}
+                   </h3>
+                    <div className="flex gap-2">
+                      <button onClick={()=>{setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(true); setError(null); setIsModalOpen(true);}} className="flex-1 py-3 bg-blue-50 text-blue-600 rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-md">Detalle</button>
+                      {canEdit && (
+                        <button onClick={()=>{setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(false); setError(null); setIsModalOpen(true);}} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md">Auditar</button>
+                      )}
+                      {canDelete && (
+                        <button onClick={()=>{setRecordToDelete(item); setShowDeleteConfirm(true);}} className="w-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-600 hover:text-white transition-all active:scale-95"><Icons.Trash /></button>
+                      )}
+                    </div>
                 </div>
               ))}
             </div>
@@ -682,15 +1096,15 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
       </div>
 
       {/* NOTIFICATION SENDER MODAL */}
-       {isNotificationSenderOpen && (
-          <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
-             <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] border border-white/10">
-                <div className="bg-slate-900 p-8 text-white flex justify-between items-center shrink-0">
-                   <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-emerald-500 text-slate-950 rounded-[1.5rem] flex items-center justify-center shadow-xl"><Icons.Chat /></div>
-                      <div>
-                        <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">Centro de Difusión M7</h3>
-                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mt-1">Envío Masivo de WhatsApp</p>
+        {isNotificationSenderOpen && (
+           <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
+              <div className="bg-white w-[90vw] h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border border-white/10">
+                 <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 bg-emerald-500 text-slate-950 rounded-xl flex items-center justify-center shadow-xl"><Icons.Chat /></div>
+                       <div>
+                         <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Centro de Difusión M7</h3>
+                         <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mt-1">Envío Masivo de WhatsApp</p>
                       </div>
                    </div>
                    <button onClick={() => setIsNotificationSenderOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
@@ -708,7 +1122,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
                              <button onClick={() => setSelectedUserIds(allMasterData.masterUsuarios?.map(u => u.id) || [])} className="flex-1 py-2 bg-slate-200 hover:bg-emerald-500 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">Todos</button>
                              <button onClick={() => setSelectedUserIds([])} className="flex-1 py-2 bg-white border border-slate-200 hover:bg-red-100 hover:text-red-500 rounded-xl text-[10px] font-black uppercase transition-all">Ninguno</button>
                          </div>
-                      </div>
+                       </div>
                       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
                          {(allMasterData.masterUsuarios || []).map(u => (
                              <div key={u.id} onClick={() => {
@@ -737,6 +1151,38 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
                              placeholder="Escribe tu mensaje aquí... (Soporta formato WhatsApp: *negrita*, _cursiva_)"
                              className="flex-1 w-full bg-slate-50 border-2 border-slate-100 rounded-[2rem] p-6 resize-none outline-none focus:border-emerald-500 transition-all font-medium text-sm text-slate-700 placeholder:text-slate-300"
                           />
+                           
+                           <div className="flex items-center gap-4 px-4">
+                              <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-all">
+                                 <Icons.Paperclip className="w-4 h-4 text-slate-600" />
+                                 <span className="text-[10px] font-black uppercase text-slate-600">
+                                    {notificationMediaName ? notificationMediaName : 'Adjuntar Archivo'}
+                                 </span>
+                                 <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    onChange={(e) => {
+                                       const file = e.target.files?.[0];
+                                       if (file) {
+                                          setNotificationMediaName(file.name);
+                                          const reader = new FileReader();
+                                          reader.onload = (ev) => setNotificationMedia(ev.target?.result as string);
+                                          reader.readAsDataURL(file);
+                                       }
+                                    }}
+                                 />
+                              </label>
+                              
+                              {notificationMedia && (
+                                 <button 
+                                    onClick={() => { setNotificationMedia(null); setNotificationMediaName(''); }}
+                                    className="text-red-500 flex items-center gap-1 hover:bg-red-50 p-2 rounded-lg transition-all"
+                                 >
+                                    <Icons.X className="w-4 h-4" />
+                                    <span className="text-[10px] font-black uppercase">Quitar</span>
+                                 </button>
+                              )}
+                           </div>
                       </div>
                       
                       <div className="mt-6 flex justify-end">
@@ -764,30 +1210,77 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
           </div>
        )}
 
+        {/* DELETE CONFIRMATION DIALOG */}
+        {showDeleteConfirm && (
+           <div className="fixed inset-0 z-[600] bg-red-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
+              <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl text-center border-4 border-red-500">
+                 <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full mx-auto flex items-center justify-center mb-6 animate-pulse">
+                    <Icons.Trash className="w-10 h-10" />
+                 </div>
+                 <h3 className="text-2xl font-black text-slate-900 uppercase mb-2">¿Eliminar Registro?</h3>
+                 <p className="text-slate-500 font-bold mb-8">Esta acción es irreversible. Se eliminará permanentemente de la base de datos M7.</p>
+                 <div className="flex gap-4">
+                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-4 bg-slate-100 text-slate-900 rounded-xl font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
+                    <button onClick={handleDelete} className="flex-1 py-4 bg-red-600 text-white rounded-xl font-black uppercase hover:bg-red-700 shadow-xl transition-all">Sí, Eliminar</button>
+                 </div>
+              </div>
+           </div>
+        )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
-           <div className="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white/10">
-              <div className="bg-slate-900 p-8 text-white flex justify-between items-center shrink-0">
-                 <div className="flex items-center gap-6">
-                    <div className="w-12 h-12 bg-emerald-500 text-slate-950 rounded-[1.5rem] flex items-center justify-center shadow-xl"><Icons.Audit /></div>
+           <div className="bg-white w-[90vw] h-[90vh] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col border border-white/10">
+              <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+                 <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-emerald-500 text-slate-950 rounded-xl flex items-center justify-center shadow-xl"><Icons.Audit /></div>
                     <div>
-                      <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">{editingRecord ? 'Auditoría' : 'Nuevo'} {activeMaster.replace('master', '')}</h3>
-                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2">Módulo: Configuración Segura M7</p>
+                      <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{editingRecord ? 'Auditoría' : 'Nuevo'} {MASTER_LABELS[activeMaster] || activeMaster.replace('master', '')}</h3>
+                      <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">Módulo: Configuración Segura M7</p>
                     </div>
                  </div>
                  <button onClick={()=>setIsModalOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
               </div>
-              <form onSubmit={handleSave} className="p-10 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/20">
-                 {error && (
-                   <div className="mb-8 p-6 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-4 animate-in shake"><Icons.Alert /> {error}</div>
-                 )}
-                 {renderFormFields()}
-                 <div className="pt-10 border-t border-slate-200 flex flex-col md:flex-row gap-6 mt-10">
-                    <button type="button" onClick={()=>setIsModalOpen(false)} className="px-12 py-5 bg-red-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all active:scale-95">Descartar</button>
-                    <button type="submit" className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-xl transition-all active:scale-95">Confirmar Operación M7</button>
-                 </div>
-              </form>
+               <fieldset disabled={isReadOnly} className="contents">
+                 <form onSubmit={handleSave} className="p-10 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/20">
+                    {error && (
+                      <div className="mb-8 p-6 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-4 animate-in shake"><Icons.Alert /> {error}</div>
+                    )}
+                    {renderFormFields()}
+                    <div className="pt-10 border-t border-slate-200 flex flex-col md:flex-row gap-6 mt-10">
+                       <button type="button" onClick={()=>setIsModalOpen(false)} className="px-12 py-5 bg-red-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all active:scale-95">{isReadOnly ? 'Cerrar' : 'Descartar'}</button>
+                       {!isReadOnly && (
+                         <button type="submit" className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-xl transition-all active:scale-95">Confirmar Operación M7</button>
+                       )}
+                    </div>
+                 </form>
+               </fieldset>
            </div>
+        </div>
+      )}
+      {/* DATA IMPORT DIALOG */}
+      <DataImportDialog 
+        isOpen={isImportDialogOpen} 
+        onClose={() => setIsImportDialogOpen(false)} 
+        activeMaster={activeMaster}
+        existingData={allMasterData[activeMaster]}
+        onImport={handleBatchImport}
+      />
+       {/* DELETE CONFIRMATION DIALOG */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[600] bg-red-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl text-center border-4 border-red-500">
+            <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full mx-auto flex items-center justify-center mb-6 animate-pulse">
+              <Icons.Trash className="w-10 h-10" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 uppercase mb-2">¿Eliminar Registro?</h3>
+            <p className="text-slate-500 font-bold mb-8">
+              Esta acción eliminará a <span className="text-red-600">{recordToDelete?.name || recordToDelete?.id}</span> permanentemente del sistema M7 Intelligence.
+            </p>
+            <div className="flex gap-4">
+              <button onClick={() => {setShowDeleteConfirm(false); setRecordToDelete(null);}} className="flex-1 py-4 bg-slate-100 text-slate-900 rounded-xl font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
+              <button onClick={handleDelete} className="flex-1 py-4 bg-red-600 text-white rounded-xl font-black uppercase hover:bg-red-700 shadow-xl transition-all">Sí, Eliminar</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -8,9 +8,9 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-const EVO_URL = process.env.EVO_API_URL || 'http://localhost:8080';
-const EVO_KEY = process.env.EVO_API_KEY || '';
-const EVO_INSTANCE = process.env.EVO_INSTANCE || 'Milla7';
+const WAHA_URL = process.env.WAHA_API_URL || 'http://localhost:3000';
+const WAHA_KEY = process.env.WAHA_API_KEY || '';
+const SESSION_NAME = process.env.WAHA_SESSION_NAME || 'default';
 
 async function sendTargetMessage() {
     const targetNumber = '573212300050'; // Agregamos prefijo 57 de Colombia si no está
