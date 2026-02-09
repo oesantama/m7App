@@ -45,7 +45,7 @@ const App: React.FC = () => {
     isLoading,
     showTimeoutWarning,
     timeLeft,
-    
+
     // Acciones
     setUser,
     setIsAuthenticated,
@@ -63,10 +63,10 @@ const App: React.FC = () => {
     setShowTimeoutWarning,
     setTimeLeft,
     decrementTimeLeft,
-    
+
     // Helpers
     updateMasterData,
-    
+
     // Acciones de mutación
     addVehicle,
     updateVehicle,
@@ -76,15 +76,15 @@ const App: React.FC = () => {
     deleteDriver,
     addAssignment,
     endAssignment,
-    
+
     // Getters
     getAvailableVehicles,
-    
+
     // Utilidades
     logout
   } = useAppStore();
-  
-  const normalize = (data: any) => {
+
+  const normalize = React.useCallback((data: any) => {
     if (!Array.isArray(data)) return [];
     return data.map(item => ({
       ...item,
@@ -94,8 +94,8 @@ const App: React.FC = () => {
       iconClass: item.iconClass || item.icon_class,
       roleId: item.roleId || item.role_id
     }));
-  };
-  
+  }, []);
+
   // Timeout - 10 Minutos (600,000 ms)
   const TIMEOUT_MS = 10 * 60 * 1000;
   const WARNING_MS = 1 * 60 * 1000; // Aviso 1 minuto antes
@@ -110,259 +110,253 @@ const App: React.FC = () => {
     if (countdownInterval) clearInterval(countdownInterval);
 
     if (isAuthenticated) {
-        // Timer principal de 10 minutos
-        inactivityTimer = setTimeout(() => {
-            console.log('[M7-AUTH] Timeout por inactividad');
-            handleLogout(true);
-        }, TIMEOUT_MS);
+      // Timer principal de 10 minutos
+      inactivityTimer = setTimeout(() => {
+        handleLogout(true);
+      }, TIMEOUT_MS);
 
-        // Timer de aviso a los 9 minutos
-        warningTimer = setTimeout(() => {
-            setShowTimeoutWarning(true);
-            setTimeLeft(60);
-            countdownInterval = setInterval(() => {
-                decrementTimeLeft(); // Usa helper del store
-            }, 1000);
-        }, TIMEOUT_MS - WARNING_MS);
+      // Timer de aviso a los 9 minutos
+      warningTimer = setTimeout(() => {
+        setShowTimeoutWarning(true);
+        setTimeLeft(60);
+        countdownInterval = setInterval(() => {
+          decrementTimeLeft(); // Usa helper del store
+        }, 1000);
+      }, TIMEOUT_MS - WARNING_MS);
     }
   };
 
   // ============ PORTAL ROUTING ============
   const [isPortalMode, setIsPortalMode] = useState(false);
   const [portalRoute, setPortalRoute] = useState<'login' | 'tracking'>('login');
-  
+
   // Detectar modo portal por Hash (Simple Router)
   useEffect(() => {
     const checkHash = () => {
-        const hash = window.location.hash;
-        if (hash.startsWith('#/portal')) {
-            setIsPortalMode(true);
-            if (hash.includes('tracking')) {
-                setPortalRoute('tracking');
-            } else {
-                setPortalRoute('login');
-            }
+      const hash = window.location.hash;
+      if (hash.startsWith('#/portal')) {
+        setIsPortalMode(true);
+        if (hash.includes('tracking')) {
+          setPortalRoute('tracking');
         } else {
-             setIsPortalMode(false);
+          setPortalRoute('login');
         }
+      } else {
+        setIsPortalMode(false);
+      }
     };
-    
+
     window.addEventListener('hashchange', checkHash);
     checkHash(); // Initial check
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
   // Import dynamic components locally or use lazy? No, direct import above to keep it simple
-  
+
   useEffect(() => {
-      // Eventos de actividad
-      window.addEventListener('mousemove', resetInactivityTimer);
-      //...
+    // Eventos de actividad
+    window.addEventListener('mousemove', resetInactivityTimer);
+    //...
 
-      window.addEventListener('keydown', resetInactivityTimer);
-      window.addEventListener('click', resetInactivityTimer);
-      
-      resetInactivityTimer(); // Iniciar timer
+    window.addEventListener('keydown', resetInactivityTimer);
+    window.addEventListener('click', resetInactivityTimer);
 
-      return () => {
-          if (inactivityTimer) clearTimeout(inactivityTimer);
-          window.removeEventListener('mousemove', resetInactivityTimer);
-          window.removeEventListener('keydown', resetInactivityTimer);
-          window.removeEventListener('click', resetInactivityTimer);
-      };
+    resetInactivityTimer(); // Iniciar timer
+
+    return () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      window.removeEventListener('mousemove', resetInactivityTimer);
+      window.removeEventListener('keydown', resetInactivityTimer);
+      window.removeEventListener('click', resetInactivityTimer);
+    };
   }, [isAuthenticated]);
 
-  // Efecto para restaurar sesión
   useEffect(() => {
-    console.log('%c [M7-VERSION] FRONTEND V1.0.3 - DB-SYNC-AUDIT ', 'background: #10b981; color: #fff; font-weight: bold;');
-    
-    const restoreSession = async () => {
-        const savedUser = localStorage.getItem('m7_user_session');
-        
-        if (savedUser) {
-          try {
-            const parsedUser = JSON.parse(savedUser);
-            if (parsedUser && parsedUser.id) {
-                // SOLUCIÓN REAL: Forzar refresco de permisos para Admin en cada restauración
-                if (parsedUser.roleId === 'ROL-01' || parsedUser.id === 'USR-01') {
-                    console.log('[M7-AUTH] Refrescando permisos para Admin...');
-                    const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
-                    if (freshPerms && Array.isArray(freshPerms)) {
-                        parsedUser.permissions = freshPerms;
-                    }
-                }
 
-                setUser(parsedUser);
-                setIsAuthenticated(true);
-                
-                // CARGAR DATOS MAESTROS FRESCOS CON EL CLIENTE RESTAURADO
-                refreshAppData(parsedUser.clientId);
-                
-                // RESTAURAR CATEGORÍA ACTIVA DE MAESTROS SI EXISTE
-                const savedCategory = localStorage.getItem('m7_active_master_category');
-                if (savedCategory) {
-                    console.log('[M7-RESTORE] Restaurando categoría activa:', savedCategory);
-                    setActiveTab('master');
-                    setActiveMasterCategory(savedCategory as any);
-                    localStorage.removeItem('m7_active_master_category'); // Limpiar después de usar
-                }
+    const restoreSession = async () => {
+      const savedUser = localStorage.getItem('m7_user_session');
+
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          if (parsedUser && parsedUser.id) {
+            // SOLUCIÓN REAL: Forzar refresco de permisos para Admin en cada restauración
+            if (parsedUser.roleId === 'ROL-01' || parsedUser.id === 'USR-01') {
+              const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
+              if (freshPerms && Array.isArray(freshPerms)) {
+                parsedUser.permissions = freshPerms;
+              }
             }
-          } catch (e: any) {
-            console.error('[SESSION-RESTORE] Error:', e);
-            localStorage.removeItem('m7_user_session');
+
+            setUser(parsedUser);
+            setIsAuthenticated(true);
+
+            // CARGAR DATOS MAESTROS FRESCOS CON EL CLIENTE RESTAURADO
+            refreshAppData(parsedUser.clientId);
+
+            // RESTAURAR CATEGORÍA ACTIVA DE MAESTROS SI EXISTE
+            const savedCategory = localStorage.getItem('m7_active_master_category');
+            if (savedCategory) {
+              setActiveTab('master');
+              setActiveMasterCategory(savedCategory as any);
+              localStorage.removeItem('m7_active_master_category'); // Limpiar después de usar
+            }
           }
+        } catch (e: any) {
+          console.error('[SESSION-RESTORE] Error:', e);
+          localStorage.removeItem('m7_user_session');
         }
-        setIsRestoring(false);
+      }
+      setIsRestoring(false);
     };
-    
+
     restoreSession();
   }, []);
 
-  const refreshAppData = async (forcedClientId?: string) => {
+  const refreshAppData = React.useCallback(async (forcedClientId?: string) => {
     const targetClientId = forcedClientId || user?.clientId || 'c1';
-    console.log(`[M7-SYNC] Sincronizando datos para cliente: ${targetClientId || 'TODOS'}...`);
     try {
-        const [modules, pages, genericMasters, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData] = await Promise.all([
-            api.getModules().then(normalize).catch(() => []),
-            api.getPages().then(normalize).catch(() => []),
-            api.getGenericMasters().catch(() => []),
-            api.getArticles().catch(() => []),
-            api.getVehicles().catch(() => []),
-            api.getDrivers().catch(() => []),
-            api.getUsers().catch(() => []),
-            api.getRoles().catch(() => []),
-            api.getPermissions().catch(() => []),
-            api.getAllUserPermissions().catch(() => []),
-            api.getClients().catch(() => []),
-            api.getAssignments().catch(() => []),
-            api.getInvoices(targetClientId).catch(() => [])
-        ]);
+      const [modules, pages, genericMasters, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData] = await Promise.all([
+        api.getModules().then(normalize).catch(() => []),
+        api.getPages().then(normalize).catch(() => []),
+        api.getGenericMasters().catch(() => []),
+        api.getArticles().catch(() => []),
+        api.getVehicles().catch(() => []),
+        api.getDrivers().catch(() => []),
+        api.getUsers().catch(() => []),
+        api.getRoles().catch(() => []),
+        api.getPermissions().catch(() => []),
+        api.getAllUserPermissions().catch(() => []),
+        api.getClients().catch(() => []),
+        api.getAssignments().catch(() => []),
+        api.getInvoices(targetClientId).catch(() => [])
+      ]);
 
-        const groupedMasters: any = {};
-        if (Array.isArray(genericMasters)) {
-            genericMasters.forEach((m: any) => {
-                if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
-                groupedMasters[m.category].push(m);
-            });
-        }
+      const groupedMasters: any = {};
+      if (Array.isArray(genericMasters)) {
+        genericMasters.forEach((m: any) => {
+          if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
+          groupedMasters[m.category].push(m);
+        });
+      }
 
-        const mappedArticles = Array.isArray(articles) ? articles.map((a: any) => ({
-            ...a,
-            statusId: a.status_id,
-            clientId: a.client_id,
-            factorInter: a.factor_inter,
-            factorStd: a.factor_std,
-            uomGeneralId: a.uom_general_id,
-            uomInterId: a.uom_inter_id,
-            uomStdId: a.uom_std_id,
-            categoryArticuloId: a.category_articulo_id
-        })) : [];
+      const mappedArticles = Array.isArray(articles) ? articles.map((a: any) => ({
+        ...a,
+        statusId: a.status_id,
+        clientId: a.client_id,
+        factorInter: a.factor_inter,
+        factorStd: a.factor_std,
+        uomGeneralId: a.uom_general_id,
+        uomInterId: a.uom_inter_id,
+        uomStdId: a.uom_std_id,
+        categoryArticuloId: a.category_articulo_id
+      })) : [];
 
-        const mappedVehicles = Array.isArray(vehicles) ? vehicles.map((v: any) => ({
-            ...v,
-            clientId: v.client_id,
-            statusId: v.status_id,
-            capacityM3: parseFloat(v.capacity_m3 || '0'),
-            soatExpiry: v.soat_expiry,
-            technoExpiry: v.techno_expiry,
-            soatPdfUrl: v.soat_pdf,
-            technoPdfUrl: v.techno_pdf,
-            modelYear: v.model_year,
-            color: v.color,
-            vehicleTypeId: v.vehicle_type
-        })) : [];
+      const mappedVehicles = Array.isArray(vehicles) ? vehicles.map((v: any) => ({
+        ...v,
+        clientId: v.client_id,
+        statusId: v.status_id,
+        capacityM3: parseFloat(v.capacity_m3 || '0'),
+        soatExpiry: v.soat_expiry,
+        technoExpiry: v.techno_expiry,
+        soatPdfUrl: v.soat_pdf,
+        technoPdfUrl: v.techno_pdf,
+        modelYear: v.model_year,
+        color: v.color,
+        vehicleTypeId: v.vehicle_type
+      })) : [];
 
-        const mappedDrivers = Array.isArray(drivers) ? drivers.map((d: any) => ({
+      const mappedDrivers = Array.isArray(drivers) ? drivers.map((d: any) => ({
+        ...d,
+        status: (d.status_id === 'EST-01' || d.status_id === '1' || d.status === 'Activo') ? 'Activo' : 'Inactivo',
+        documentType: d.document_type,
+        documentNumber: d.document_number,
+        licenseExpiry: d.license_expiry,
+        licensePdf: d.license_pdf,
+        licenseSideA: d.license_side_a,
+        licenseSideB: d.license_side_b,
+        licenseCategory: d.license_category
+      })) : [];
+
+      setAllMasterData({
+        ...groupedMasters,
+        masterUsuarios: usersData,
+        masterRol: rolesData,
+        masterPermisosRol: permsData,
+        masterPermisosUsuario: userPermsData,
+        masterClientes: clientsData,
+        masterModulos: modules,
+        masterPaginas: pages,
+        masterArticulo: mappedArticles,
+        masterVehiculos: mappedVehicles,
+        masterConductores: mappedDrivers
+      });
+
+      setVehicles(mappedVehicles);
+      setDrivers(mappedDrivers);
+
+      const mappedAssignments = Array.isArray(assignmentsData) ? assignmentsData.map((a: any) => ({
+        id: a.id,
+        vehicleId: a.vehicle_id,
+        driverId: a.driver_id,
+        clientId: a.client_id,
+        isActive: a.is_active,
+        statusId: 'EST-01',
+        createdAt: a.created_at,
+        updatedAt: a.updated_at
+      })) : [];
+      setAssignments(mappedAssignments);
+
+      const mappedInvoices = Array.isArray(invoicesData) ? invoicesData.map((i: any) => ({
+        ...i,
+        externalDocId: i.external_doc_id || i.externalDocId,
+        clientId: i.clientId || i.client_id,
+        statusId: i.status_id,
+        volumeM3: Number(i.volume_m3 || i.volumeM3 || 0),
+        invoiceValue: Number(i.invoice_value || i.invoiceValue || 0),
+        planType: (i.codplan === 'AJI01' || i.planType === 'AJI01') ? 'Plan Normal' : (i.codplan === 'AJV20' || i.planType === 'AJV20') ? 'Plan R' : (i.planType || 'Plan Normal'),
+        status: i.status || 'Pendiente',
+        items: (i.items || []).map((it: any) => ({
+          ...it,
+          articleId: it.article_id,
+          expectedQty: Number(it.expected_qty || 0),
+          unCode: it.un_code,
+          clientRef: it.client_ref
+        }))
+      })) : [];
+      setInvoices(mappedInvoices);
+      setInvoices(mappedInvoices);
+
+      // Fetch operational data too
+      api.getDocuments(targetClientId).then(docs => {
+        if (Array.isArray(docs)) {
+          setDocuments(docs.map(d => ({
             ...d,
-            status: (d.status_id === 'EST-01' || d.status_id === '1' || d.status === 'Activo') ? 'Activo' : 'Inactivo', 
-            documentType: d.document_type,
-            documentNumber: d.document_number,
-            licenseExpiry: d.license_expiry,
-            licensePdf: d.license_pdf,
-            licenseSideA: d.license_side_a,
-            licenseSideB: d.license_side_b,
-            licenseCategory: d.license_category
-        })) : [];
-
-        setAllMasterData({
-            ...groupedMasters,
-            masterUsuarios: usersData,
-            masterRol: rolesData,
-            masterPermisosRol: permsData,
-            masterPermisosUsuario: userPermsData,
-            masterClientes: clientsData,
-            masterModulos: modules,
-            masterPaginas: pages,
-            masterArticulo: mappedArticles,
-            masterVehiculos: mappedVehicles,
-            masterConductores: mappedDrivers
-        });
-
-        setVehicles(mappedVehicles);
-        setDrivers(mappedDrivers);
-        
-        const mappedAssignments = Array.isArray(assignmentsData) ? assignmentsData.map((a: any) => ({
-            id: a.id,
-            vehicleId: a.vehicle_id,
-            driverId: a.driver_id,
-            clientId: a.client_id,
-            isActive: a.is_active,
-            statusId: 'EST-01',
-            createdAt: a.created_at,
-            updatedAt: a.updated_at
-        })) : [];
-        setAssignments(mappedAssignments);
-
-        const mappedInvoices = Array.isArray(invoicesData) ? invoicesData.map((i: any) => ({
-            ...i,
-            externalDocId: i.external_doc_id || i.externalDocId,
-            clientId: i.clientId || i.client_id,
-            statusId: i.status_id,
-            volumeM3: Number(i.volume_m3 || i.volumeM3 || 0),
-            invoiceValue: Number(i.invoice_value || i.invoiceValue || 0),
-            planType: (i.codplan === 'AJI01' || i.planType === 'AJI01') ? 'Plan Normal' : (i.codplan === 'AJV20' || i.planType === 'AJV20') ? 'Plan R' : (i.planType || 'Plan Normal'),
-            status: i.status || 'Pendiente',
-            items: (i.items || []).map((it: any) => ({
-                ...it,
-                articleId: it.article_id,
-                expectedQty: Number(it.expected_qty || 0),
-                unCode: it.un_code,
-                clientRef: it.client_ref
+            externalDocId: d.external_doc_id || d.externalDocId,
+            vehicleData: d.vehicle_plate || d.vehicleData,
+            // Mapeo Robusto M7
+            planType: (d.codplan === 'AJI01' || d.plan_type === 'AJI01' || d.planType === 'AJI01') ? 'Plan Normal' :
+              (d.codplan === 'AJV20' || d.plan_type === 'AJV20' || d.planType === 'AJV20') ? 'Plan R' :
+                (d.plan_type || d.planType || 'Plan Normal'),
+            createdAt: d.created_at || d.createdAt,
+            items: (d.items || []).map((it: any) => ({
+              ...it,
+              articleId: it.article_id,
+              expectedQty: it.expected_qty,
+              unCode: it.un_code,
+              clientRef: it.client_ref,
+              orderNumber: it.order_number,
+              peso: Number(it.peso || 0),
+              countedQty: it.count_2 || it.counted_qty
             }))
-        })) : [];
-        setInvoices(mappedInvoices);
-        console.log(`[M7-SYNC] Sincronización Exitosa. Facturas Recibidas: ${invoicesData?.length || 0}. Mapeadas: ${mappedInvoices.length}`);
+          })));
+        }
+      });
 
-        // Fetch operational data too
-        api.getDocuments(targetClientId).then(docs => {
-            if (Array.isArray(docs)) {
-                setDocuments(docs.map(d => ({
-                    ...d,
-                    externalDocId: d.external_doc_id || d.externalDocId,
-                    vehicleData: d.vehicle_plate || d.vehicleData,
-                    // Mapeo Robusto M7
-                    planType: (d.codplan === 'AJI01' || d.plan_type === 'AJI01' || d.planType === 'AJI01') ? 'Plan Normal' : 
-                              (d.codplan === 'AJV20' || d.plan_type === 'AJV20' || d.planType === 'AJV20') ? 'Plan R' : 
-                              (d.plan_type || d.planType || 'Plan Normal'),
-                    createdAt: d.created_at || d.createdAt,
-                    items: (d.items || []).map((it: any) => ({
-                        ...it,
-                        articleId: it.article_id,
-                        expectedQty: it.expected_qty,
-                        unCode: it.un_code,
-                        clientRef: it.client_ref,
-                        orderNumber: it.order_number,
-                        peso: Number(it.peso || 0),
-                        countedQty: it.count_2 || it.counted_qty
-                    }))
-                })));
-            }
-        });
-        
     } catch (err) {
-        console.error('[M7-SYNC] Error:', err);
+      console.error('[M7-SYNC] Error:', err);
     }
-  };
+  }, [user?.clientId, normalize, setAllMasterData, setVehicles, setDrivers, setAssignments, setInvoices, setDocuments]);
 
   // Efecto para persistir pestaña activa
   useEffect(() => {
@@ -374,11 +368,11 @@ const App: React.FC = () => {
   // Polling global para indicador
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
-    const checkWa = async () => { 
-      try { 
-        const res = await api.getWhatsAppStatus(user.id); 
-        setWaStatus(res.status === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED'); 
-      } catch {} 
+    const checkWa = async () => {
+      try {
+        const res = await api.getWhatsAppStatus(user.id);
+        setWaStatus(res.status === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED');
+      } catch { }
     };
     checkWa();
     const timer = setInterval(checkWa, 30000);
@@ -387,266 +381,258 @@ const App: React.FC = () => {
 
   const handleLogin = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     try {
-        setIsLoading(true);
-        // 1. Autenticación Real
-        const authRes = await api.login(email, pass);
-        console.log('[M7-LOGIN] Auth Response:', authRes);
-        
-        if (!authRes.success) {
-            console.log('[M7-LOGIN] Login failed - invalid credentials');
-            return { success: false, error: authRes.error || 'Credenciales no válidas' };
-        }
-        
-        const userData = authRes.user;
-        // ... (rest of the logic remains the same)
-        
-        // Simulo el resto para no repetir todo el bloque si es idéntico, 
-        // pero necesito asegurar que retorno {success: true} al final.
-        // (Volveré a pegar el bloque completo para evitar errores de contexto incompleto)
-        
-        // 2. Cargar permisos del usuario
-        const userPermissions = await api.getUserPermissions(userData.id).catch(() => null);
-        
-        // 3. Carga de Datos Iniciales
-        const [clients, users, roles, modules, pages, permissions, userPermissionsAll, genericMasters, articData] = await Promise.all([
-            api.getClients().catch(() => []),
-            api.getUsers().catch(() => []),
-            api.getRoles().catch(() => []),
-            api.getModules().then(normalize).catch(() => []),
-            api.getPages().then(normalize).catch(() => []),
-            api.getPermissions().catch(() => []),
-            api.getAllUserPermissions().catch(() => []),
-            api.getGenericMasters().catch(() => []),
-            api.getArticles().catch(() => [])
-        ]);
-        
-        const groupedMasters: any = {};
-        if (Array.isArray(genericMasters)) {
-            genericMasters.forEach((m: any) => {
-                if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
-                groupedMasters[m.category].push(m);
-            });
-        }
+      setIsLoading(true);
+      // 1. Autenticación Real
+      const authRes = await api.login(email, pass);
+      if (!authRes.success) {
+        return { success: false, error: authRes.error || 'Credenciales no válidas' };
+      }
 
-        let mappedPermissions: any[] = [];
-        if (Array.isArray(userPermissions)) {
-            mappedPermissions = userPermissions;
-        }
+      const userData = authRes.user;
+      // ... (rest of the logic remains the same)
 
-        setAllMasterData({
-            ...allMasterData,
-            ...groupedMasters,
-            masterClientes: Array.isArray(clients) ? clients : [],
-            masterUsuarios: Array.isArray(users) ? users : [],
-            masterRol: Array.isArray(roles) ? roles : [],
-            masterModulos: Array.isArray(modules) ? modules : [],
-            masterPaginas: Array.isArray(pages) ? pages : [],
-            masterPermisosRol: Array.isArray(permissions) ? permissions : [],
-            masterPermisosUsuario: Array.isArray(userPermissionsAll) ? userPermissionsAll : [],
-            masterArticulo: Array.isArray(articData) ? articData.map((a: any) => ({
-                ...a,
-                statusId: a.status_id,
-                clientId: a.client_id,
-                factorInter: a.factor_inter,
-                factorStd: a.factor_std,
-                uomGeneralId: a.uom_general_id,
-                uomInterId: a.uom_inter_id,
-                uomStdId: a.uom_std_id,
-                categoryArticuloId: a.category_articulo_id
-            })) : []
+      // Simulo el resto para no repetir todo el bloque si es idéntico, 
+      // pero necesito asegurar que retorno {success: true} al final.
+      // (Volveré a pegar el bloque completo para evitar errores de contexto incompleto)
+
+      // 2. Cargar permisos del usuario
+      const userPermissions = await api.getUserPermissions(userData.id).catch(() => null);
+
+      // 3. Carga de Datos Iniciales
+      const [clients, users, roles, modules, pages, permissions, userPermissionsAll, genericMasters, articData] = await Promise.all([
+        api.getClients().catch(() => []),
+        api.getUsers().catch(() => []),
+        api.getRoles().catch(() => []),
+        api.getModules().then(normalize).catch(() => []),
+        api.getPages().then(normalize).catch(() => []),
+        api.getPermissions().catch(() => []),
+        api.getAllUserPermissions().catch(() => []),
+        api.getGenericMasters().catch(() => []),
+        api.getArticles().catch(() => [])
+      ]);
+
+      const groupedMasters: any = {};
+      if (Array.isArray(genericMasters)) {
+        genericMasters.forEach((m: any) => {
+          if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
+          groupedMasters[m.category].push(m);
         });
+      }
 
-        const [docsData, vehData, driversData] = await Promise.all([
-            api.getDocuments(userData.client_id || 'c1').catch(() => []),
-            api.getVehicles().catch(() => []),
-            api.getDrivers().catch(() => [])
-        ]);
-        
-        setDocuments(Array.isArray(docsData) ? docsData.map((d: any) => ({
-            ...d,
-            externalDocId: d.external_doc_id,
-            vehicleData: d.vehicle_plate,
-            createdAt: d.created_at,
-            items: (d.items || []).map((it: any) => ({ ...it, articleId: it.article_id }))
-        })) : []);
-        setVehicles(Array.isArray(vehData) ? vehData : []);
-        setDrivers(Array.isArray(driversData) ? driversData : []);
+      let mappedPermissions: any[] = [];
+      if (Array.isArray(userPermissions)) {
+        mappedPermissions = userPermissions;
+      }
 
-        const finalUser = {
-            id: userData.id,
-            email: userData.email,
-            name: userData.name,
-            roleId: userData.role_id,
-            permissions: mappedPermissions,
-            clientId: 'c1'
-        } as any;
+      setAllMasterData({
+        ...allMasterData,
+        ...groupedMasters,
+        masterClientes: Array.isArray(clients) ? clients : [],
+        masterUsuarios: Array.isArray(users) ? users : [],
+        masterRol: Array.isArray(roles) ? roles : [],
+        masterModulos: Array.isArray(modules) ? modules : [],
+        masterPaginas: Array.isArray(pages) ? pages : [],
+        masterPermisosRol: Array.isArray(permissions) ? permissions : [],
+        masterPermisosUsuario: Array.isArray(userPermissionsAll) ? userPermissionsAll : [],
+        masterArticulo: Array.isArray(articData) ? articData.map((a: any) => ({
+          ...a,
+          statusId: a.status_id,
+          clientId: a.client_id,
+          factorInter: a.factor_inter,
+          factorStd: a.factor_std,
+          uomGeneralId: a.uom_general_id,
+          uomInterId: a.uom_inter_id,
+          uomStdId: a.uom_std_id,
+          categoryArticuloId: a.category_articulo_id
+        })) : []
+      });
 
-        setUser(finalUser);
-        localStorage.setItem('m7_user_session', JSON.stringify(finalUser));
-        setIsAuthenticated(true);
-        
-        toast.success(`Bienvenido, ${userData.name}`);
-        return { success: true };
+      const [docsData, vehData, driversData] = await Promise.all([
+        api.getDocuments(userData.client_id || 'c1').catch(() => []),
+        api.getVehicles().catch(() => []),
+        api.getDrivers().catch(() => [])
+      ]);
+
+      setDocuments(Array.isArray(docsData) ? docsData.map((d: any) => ({
+        ...d,
+        externalDocId: d.external_doc_id,
+        vehicleData: d.vehicle_plate,
+        createdAt: d.created_at,
+        items: (d.items || []).map((it: any) => ({ ...it, articleId: it.article_id }))
+      })) : []);
+      setVehicles(Array.isArray(vehData) ? vehData : []);
+      setDrivers(Array.isArray(driversData) ? driversData : []);
+
+      const finalUser = {
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        roleId: userData.role_id,
+        permissions: mappedPermissions,
+        clientId: 'c1'
+      } as any;
+
+      setUser(finalUser);
+      localStorage.setItem('m7_user_session', JSON.stringify(finalUser));
+      setIsAuthenticated(true);
+
+      toast.success(`Bienvenido, ${userData.name}`);
+      return { success: true };
 
     } catch (error: any) {
-        console.error("[M7-LOGIN] Login Error:", error);
-        return { success: false, error: 'Error de conexión con el núcleo M7' };
+      console.error("[M7-LOGIN] Login Error:", error);
+      return { success: false, error: 'Error de conexión con el núcleo M7' };
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleLogout = (expired = false) => {
     logout(); // Usa la acción del store
     if (expired) {
-        toast.error("Sesión expirada por inactividad");
+      toast.error("Sesión expirada por inactividad");
     } else {
-        toast.info("Sesión finalizada");
+      toast.info("Sesión finalizada");
     }
   };
 
   if (isRestoring) {
-      return (
-          <div className="flex h-screen w-full items-center justify-center bg-slate-950">
-              <div className="flex flex-col items-center gap-4">
-                  <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-emerald-500 font-bold uppercase tracking-widest text-xs animate-pulse">Restaurando Sistema M7...</p>
-              </div>
-          </div>
-      );
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-emerald-500 font-bold uppercase tracking-widest text-xs animate-pulse">Restaurando Sistema M7...</p>
+        </div>
+      </div>
+    );
   }
 
   const renderContent = () => {
     const availableVehiclesCount = vehicles.filter(v => v.status === 'Disponible' || v.status === 'Available').length;
-    
+
     switch (activeTab) {
       case 'dashboard':
         return (
           <div className="p-10 text-center animate-in fade-in duration-700">
             <h2 className="text-5xl font-black text-slate-900 mb-6 uppercase tracking-tighter">PROCESADOR MILLA SIETE</h2>
             <div className="w-32 h-2 bg-emerald-500 mx-auto rounded-full mb-10"></div>
-            
+
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${waStatus === 'CONNECTED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'} mb-10`}>
-                <div className={`w-2 h-2 rounded-full ${waStatus === 'CONNECTED' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-                <span className="text-[10px] font-black uppercase tracking-widest">{waStatus === 'CONNECTED' ? 'ASISTENTE ONLINE' : 'ASISTENTE OFFLINE'}</span>
+              <div className={`w-2 h-2 rounded-full ${waStatus === 'CONNECTED' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+              <span className="text-[10px] font-black uppercase tracking-widest">{waStatus === 'CONNECTED' ? 'ASISTENTE ONLINE' : 'ASISTENTE OFFLINE'}</span>
             </div>
 
             {/* HERO BANNER PROACTIVO - VISIBILIDAD MÁXIMA AL INICIO */}
-            <div className={`max-w-6xl mx-auto mb-12 p-1 relative overflow-hidden rounded-[3.5rem] group transition-all duration-700 shadow-2xl ${
-                documents.length === 0 
-                ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600' 
+            <div className={`max-w-6xl mx-auto mb-12 p-1 relative overflow-hidden rounded-[3.5rem] group transition-all duration-700 shadow-2xl ${documents.length === 0
+                ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600'
                 : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600'
-            }`}>
-                <div className="bg-slate-950/90 backdrop-blur-3xl p-10 md:p-14 rounded-[3.3rem] relative overflow-hidden flex flex-col md:flex-row items-center gap-10 border border-white/5">
-                    {/* Background Brain Animation */}
-                    <div className="absolute top-0 right-0 p-10 text-emerald-500/5 group-hover:scale-110 transition-transform duration-1000 hidden md:block">
-                        <Icons.Brain style={{ width: '250px', height: '250px' }} />
-                    </div>
-
-                    <div className={`w-28 h-28 rounded-[2rem] flex items-center justify-center shrink-0 shadow-2xl animate-pulse relative z-10 ${
-                        documents.length === 0 ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-amber-500 shadow-amber-500/20'
-                    }`}>
-                        <Icons.Sparkles className="text-slate-950 w-14 h-14" />
-                    </div>
-
-                    <div className="text-left flex-1 relative z-10">
-                        <div className={`inline-block px-4 py-1.5 rounded-full mb-6 border ${
-                            documents.length === 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
-                        }`}>
-                            <span className="text-[9px] font-black uppercase tracking-[0.2em]">Centro de Mando Inteligente M7</span>
-                        </div>
-                        
-                        <h3 className="text-white font-black text-3xl md:text-5xl uppercase tracking-tighter mb-4 leading-none">
-                            {documents.length === 0 
-                                ? "Listo para procesar tu logística" 
-                                : "Hay tareas críticas que requieren tu atención"}
-                        </h3>
-                        
-                        <p className="text-slate-400 text-lg md:text-xl font-medium leading-relaxed max-w-3xl">
-                            {documents.length === 0 
-                                ? "Tu panel está limpio. Sube un archivo de preventa para que M7 IQ pueda generar tus rutas optimizadas ahora."
-                                : `He detectado ${documents.length} documentos detenidos. ¿Quieres que audite la carga para liberar rutas de inmediato?`}
-                        </p>
-
-                        <div className="mt-10 flex flex-wrap gap-5">
-                            <button 
-                                onClick={() => setActiveTab('documentos')} 
-                                className={`px-10 py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl ${
-                                    documents.length === 0 
-                                    ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400' 
-                                    : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                                }`}
-                            >
-                                {documents.length === 0 ? "Abrir Gestor de Documentos" : "Iniciar Auditoría IA"}
-                            </button>
-                            <button 
-                                onClick={() => toast.success("M7 IQ: Consultando núcleo de inteligencia...", { description: "Usa el widget inferior para ver mi reporte completo." })} 
-                                className="px-8 py-5 border border-white/10 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all"
-                            >
-                                Informe Narrativo
-                            </button>
-                        </div>
-                    </div>
+              }`}>
+              <div className="bg-slate-950/90 backdrop-blur-3xl p-10 md:p-14 rounded-[3.3rem] relative overflow-hidden flex flex-col md:flex-row items-center gap-10 border border-white/5">
+                {/* Background Brain Animation */}
+                <div className="absolute top-0 right-0 p-10 text-emerald-500/5 group-hover:scale-110 transition-transform duration-1000 hidden md:block">
+                  <Icons.Brain style={{ width: '250px', height: '250px' }} />
                 </div>
+
+                <div className={`w-28 h-28 rounded-[2rem] flex items-center justify-center shrink-0 shadow-2xl animate-pulse relative z-10 ${documents.length === 0 ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-amber-500 shadow-amber-500/20'
+                  }`}>
+                  <Icons.Sparkles className="text-slate-950 w-14 h-14" />
+                </div>
+
+                <div className="text-left flex-1 relative z-10">
+                  <div className={`inline-block px-4 py-1.5 rounded-full mb-6 border ${documents.length === 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
+                    }`}>
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em]">Centro de Mando Inteligente M7</span>
+                  </div>
+
+                  <h3 className="text-white font-black text-3xl md:text-5xl uppercase tracking-tighter mb-4 leading-none">
+                    {documents.length === 0
+                      ? "Listo para procesar tu logística"
+                      : "Hay tareas críticas que requieren tu atención"}
+                  </h3>
+
+                  <p className="text-slate-400 text-lg md:text-xl font-medium leading-relaxed max-w-3xl">
+                    {documents.length === 0
+                      ? "Tu panel está limpio. Sube un archivo de preventa para que M7 IQ pueda generar tus rutas optimizadas ahora."
+                      : `He detectado ${documents.length} documentos detenidos. ¿Quieres que audite la carga para liberar rutas de inmediato?`}
+                  </p>
+
+                  <div className="mt-10 flex flex-wrap gap-5">
+                    <button
+                      onClick={() => setActiveTab('documentos')}
+                      className={`px-10 py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl ${documents.length === 0
+                          ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                          : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                        }`}
+                    >
+                      {documents.length === 0 ? "Abrir Gestor de Documentos" : "Iniciar Auditoría IA"}
+                    </button>
+                    <button
+                      onClick={() => toast.success("M7 IQ: Consultando núcleo de inteligencia...", { description: "Usa el widget inferior para ver mi reporte completo." })}
+                      className="px-8 py-5 border border-white/10 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all"
+                    >
+                      Informe Narrativo
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* KPI GRID - Ahora debajo del banner principal */}
             <div className="max-w-6xl mx-auto mb-12 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-bottom-10 duration-700">
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-slate-100 text-left hover:shadow-2xl transition-all">
-                    <div className="flex justify-between items-start mb-4">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CUMPLIMIENTO</p>
-                        <Icons.Check className="text-emerald-500" />
-                    </div>
-                    <h4 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">98%</h4>
-                    <p className="text-xs text-slate-500 font-medium">+14% vs semana previa</p>
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-slate-100 text-left hover:shadow-2xl transition-all">
+                <div className="flex justify-between items-start mb-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CUMPLIMIENTO</p>
+                  <Icons.Check className="text-emerald-500" />
                 </div>
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-slate-100 text-left hover:shadow-2xl transition-all">
-                    <div className="flex justify-between items-start mb-4">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">FLOTA DISPONIBLE</p>
-                        <Icons.Truck className="text-blue-500" />
-                    </div>
-                    <h4 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">{availableVehiclesCount}</h4>
-                    <p className="text-xs text-slate-500 font-medium">{availableVehiclesCount > 0 ? 'Capacidad de respuesta inmediata' : 'Flota totalmente ocupada'}</p>
+                <h4 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">98%</h4>
+                <p className="text-xs text-slate-500 font-medium">+14% vs semana previa</p>
+              </div>
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-slate-100 text-left hover:shadow-2xl transition-all">
+                <div className="flex justify-between items-start mb-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">FLOTA DISPONIBLE</p>
+                  <Icons.Truck className="text-blue-500" />
                 </div>
-                <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-lg text-left hover:bg-slate-800 transition-all group">
-                    <div className="flex justify-between items-start mb-4">
-                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">IA PROYECCIÓN</p>
-                        <Icons.Route className="text-emerald-500 animate-pulse" />
-                    </div>
-                    <h4 className="text-2xl font-black text-white tracking-tighter mb-2">Plan de Vuelo IQ</h4>
-                    <p className="text-xs text-slate-400">Ahorro estimado despacho: <span className="text-emerald-500 font-black">12 min</span></p>
+                <h4 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">{availableVehiclesCount}</h4>
+                <p className="text-xs text-slate-500 font-medium">{availableVehiclesCount > 0 ? 'Capacidad de respuesta inmediata' : 'Flota totalmente ocupada'}</p>
+              </div>
+              <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-lg text-left hover:bg-slate-800 transition-all group">
+                <div className="flex justify-between items-start mb-4">
+                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">IA PROYECCIÓN</p>
+                  <Icons.Route className="text-emerald-500 animate-pulse" />
                 </div>
+                <h4 className="text-2xl font-black text-white tracking-tighter mb-2">Plan de Vuelo IQ</h4>
+                <p className="text-xs text-slate-400">Ahorro estimado despacho: <span className="text-emerald-500 font-black">12 min</span></p>
+              </div>
             </div>
 
             <div className="max-w-2xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 bg-white rounded-[2rem] shadow-xl border border-slate-100">
-                    <div className="text-emerald-500 text-3xl mb-4 font-black">01</div>
-                    <h3 className="font-black text-sm uppercase text-slate-600">CARGAR</h3>
-                    <p className="text-xs text-slate-400 mt-2">Sube tus archivos Excel o JSON</p>
-                </div>
-                <div className="p-6 bg-white rounded-[2rem] shadow-xl border border-slate-100">
-                    <div className="text-blue-500 text-3xl mb-4 font-black">02</div>
-                    <h3 className="font-black text-sm uppercase text-slate-600">VALIDAR</h3>
-                    <p className="text-xs text-slate-400 mt-2">Gestiona y corrige en tiempo real</p>
-                </div>
-                <div className="p-6 bg-white rounded-[2rem] shadow-xl border border-slate-100">
-                    <div className="text-purple-500 text-3xl mb-4 font-black">03</div>
-                    <h3 className="font-black text-sm uppercase text-slate-600">DESCARGAR</h3>
-                    <p className="text-xs text-slate-400 mt-2">Exporta tus resultados limpios</p>
-                </div>
+              <div className="p-6 bg-white rounded-[2rem] shadow-xl border border-slate-100">
+                <div className="text-emerald-500 text-3xl mb-4 font-black">01</div>
+                <h3 className="font-black text-sm uppercase text-slate-600">CARGAR</h3>
+                <p className="text-xs text-slate-400 mt-2">Sube tus archivos Excel o JSON</p>
+              </div>
+              <div className="p-6 bg-white rounded-[2rem] shadow-xl border border-slate-100">
+                <div className="text-blue-500 text-3xl mb-4 font-black">02</div>
+                <h3 className="font-black text-sm uppercase text-slate-600">VALIDAR</h3>
+                <p className="text-xs text-slate-400 mt-2">Gestiona y corrige en tiempo real</p>
+              </div>
+              <div className="p-6 bg-white rounded-[2rem] shadow-xl border border-slate-100">
+                <div className="text-purple-500 text-3xl mb-4 font-black">03</div>
+                <h3 className="font-black text-sm uppercase text-slate-600">DESCARGAR</h3>
+                <p className="text-xs text-slate-400 mt-2">Exporta tus resultados limpios</p>
+              </div>
             </div>
           </div>
         );
       case 'master':
         return (
-          <MasterModule 
+          <MasterModule
             activeMaster={activeMasterCategory}
             allMasterData={allMasterData}
             setAllMasterData={setAllMasterData}
             user={user!}
             onAudit={async () => {
               // SOLO recargar maestros, NO toda la app
-              console.log('[M7-APP] Refreshing ONLY master records after audit...');
               try {
                 const freshMasters = await api.getGenericMasters();
                 if (Array.isArray(freshMasters)) {
@@ -656,7 +642,6 @@ const App: React.FC = () => {
                     grouped[m.category].push(m);
                   });
                   setAllMasterData(prevData => ({ ...prevData, ...grouped }));
-                  console.log('[M7-APP] ✅ Masters refreshed successfully');
                 }
               } catch (err) {
                 console.error('[M7-APP] Error refreshing masters:', err);
@@ -665,155 +650,155 @@ const App: React.FC = () => {
           />
         );
       case 'whatsapp-status':
-          return <WhatsAppConnect user={user} />;
+        return <WhatsAppConnect user={user} />;
       case 'documentos':
-          return (
-            <GestionDocumentosL 
-              documents={documents} 
-              invoices={invoices} 
-              user={user!} 
-              masterEstados={allMasterData.masterEstados || []}
-              onDocumentsChange={setDocuments}
-            />
-          );
+        return (
+          <GestionDocumentosL
+            documents={documents}
+            invoices={invoices}
+            user={user!}
+            masterEstados={allMasterData.masterEstados || []}
+            onDocumentsChange={setDocuments}
+          />
+        );
       case 'rutas':
-          return (
-            <RoutePlanner 
-              invoices={invoices}
-              vehicles={vehicles}
-              drivers={drivers}
-              assignments={assignments}
-              documents={documents}
-              user={user!}
-              onRefresh={() => refreshAppData()}
-              onAssign={(vId, dId, cId) => {
-                const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, statusId: 'EST-01' };
-                setAssignments([...assignments, newAssign]);
-              }}
-              onSaveRoute={(route) => {
-                console.log('Ruta Guardada:', route);
-                alert('Ruta M7 Guardada Exitosamente');
-              }}
-            />
-          );
+        return (
+          <RoutePlanner
+            invoices={invoices}
+            vehicles={vehicles}
+            drivers={drivers}
+            assignments={assignments}
+            documents={documents}
+            user={user!}
+            onRefresh={refreshAppData}
+            onAssign={(vId, dId, cId) => {
+              const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, statusId: 'EST-01' };
+              setAssignments([...assignments, newAssign]);
+            }}
+            onSaveRoute={(route) => {
+              console.log('Ruta Guardada:', route);
+              alert('Ruta M7 Guardada Exitosamente');
+            }}
+          />
+        );
       case 'recibido':
-          return (
-            <RecibidoMaterial 
-              documents={documents} 
-              onUpdateDocuments={setDocuments} 
-              user={user!} 
-              masterEstados={allMasterData.masterEstados || []}
-              masterNotificaciones={allMasterData.masterNotificaciones || []}
-              masterArticulo={allMasterData.masterArticulo || []}
-              onAddArticleToMaster={async (article) => {
-                await api.saveArticle(article);
-                setAllMasterData({ ...allMasterData, masterArticulo: [...(allMasterData.masterArticulo || []), article as MasterRecord] });
-              }}
-              onAddNotificationToMaster={async (notif) => {
-                const newNotif = { ...notif, id: `not-${Date.now()}` }; 
-                await api.saveMaster('masterNotificaciones', newNotif);
-                setAllMasterData({ ...allMasterData, masterNotificaciones: [...(allMasterData.masterNotificaciones || []), newNotif as MasterRecord] });
-              }}
-            />
-          );
+        return (
+          <RecibidoMaterial
+            documents={documents}
+            onUpdateDocuments={setDocuments}
+            user={user!}
+            masterEstados={allMasterData.masterEstados || []}
+            masterNotificaciones={allMasterData.masterNotificaciones || []}
+            masterArticulo={allMasterData.masterArticulo || []}
+            onAddArticleToMaster={async (article) => {
+              await api.saveArticle(article);
+              setAllMasterData({ ...allMasterData, masterArticulo: [...(allMasterData.masterArticulo || []), article as MasterRecord] });
+            }}
+            onAddNotificationToMaster={async (notif) => {
+              const newNotif = { ...notif, id: `not-${Date.now()}` };
+              await api.saveMaster('masterNotificaciones', newNotif);
+              setAllMasterData({ ...allMasterData, masterNotificaciones: [...(allMasterData.masterNotificaciones || []), newNotif as MasterRecord] });
+            }}
+          />
+        );
       case 'flotas':
-          return (
-            <FleetManager 
-              vehicles={vehicles} 
-              drivers={drivers} 
-              user={user!} 
-              masterData={allMasterData}
-              onAddVehicle={async (v) => {
-                  try {
-                    const res = await api.saveMaster('masterVehiculos', v);
-                    // Normalización local inmediata para reactividad
-                    const newVeh = { 
-                      ...v, 
-                      id: res.id || `veh-${Date.now()}`,
-                      statusId: v.statusId || 'EST-01', // Default Disponible
-                      capacityM3: Number(v.capacityM3) || 0
-                    };
-                    setVehicles([...vehicles, newVeh]);
-                    
-                    // Actualizar master data también
-                    const currentMaster = (allMasterData as any).masterVehiculos || [];
-                    setAllMasterData({
-                        ...allMasterData,
-                        // @ts-ignore
-                        masterVehiculos: [...currentMaster, { ...newVeh, name: newVeh.plate } as MasterRecord]
-                    });
-                    
-                    return { success: true };
-                  } catch (e) {
-                    console.error(e);
-                    return { success: false, error: 'Error al guardar vehículo' };
-                  }
-              }}
-              onUpdateVehicle={updateVehicle}
-              onDeleteVehicle={deleteVehicle}
-              onAddDriver={addDriver}
-              onUpdateDriver={updateDriver}
-              onDeleteDriver={deleteDriver}
-            />
-          );
+        return (
+          <FleetManager
+            vehicles={vehicles}
+            drivers={drivers}
+            user={user!}
+            masterData={allMasterData}
+            onAddVehicle={async (v) => {
+              try {
+                const res = await api.saveMaster('masterVehiculos', v);
+                // Normalización local inmediata para reactividad
+                const newVeh = {
+                  ...v,
+                  id: res.id || `veh-${Date.now()}`,
+                  statusId: v.statusId || 'EST-01', // Default Disponible
+                  capacityM3: Number(v.capacityM3) || 0
+                };
+                setVehicles([...vehicles, newVeh]);
+
+                // Actualizar master data también
+                const currentMaster = (allMasterData as any).masterVehiculos || [];
+                setAllMasterData({
+                  ...allMasterData,
+                  // @ts-ignore
+                  masterVehiculos: [...currentMaster, { ...newVeh, name: newVeh.plate } as MasterRecord]
+                });
+
+                return { success: true };
+              } catch (e) {
+                console.error(e);
+                return { success: false, error: 'Error al guardar vehículo' };
+              }
+            }}
+            onUpdateVehicle={updateVehicle}
+            onDeleteVehicle={deleteVehicle}
+            onAddDriver={addDriver}
+            onUpdateDriver={updateDriver}
+            onDeleteDriver={deleteDriver}
+          />
+        );
       case 'vinculo':
-          return (
-            <AssignmentManager 
-              vehicles={vehicles} 
-              drivers={drivers} 
-              assignments={assignments} 
-              user={user!} 
-              onAssign={async (vId, dId, cId) => {
-                const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-                addAssignment(newAssign); // Usa acción del store
-                try {
-                    await api.saveAssignment(newAssign);
-                } catch (e) {
-                    console.error("Error saving assignment:", e);
-                }
-              }}
-              onEndAssignment={async (aId) => {
-                endAssignment(aId); // Usa acción del store
-                try {
-                    await api.endAssignment(aId, user?.name);
-                } catch (e) {
-                    console.error("Error ending assignment:", e);
-                }
-              }}
-            />
-          );
+        return (
+          <AssignmentManager
+            vehicles={vehicles}
+            drivers={drivers}
+            assignments={assignments}
+            user={user!}
+            onAssign={async (vId, dId, cId) => {
+              const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+              addAssignment(newAssign); // Usa acción del store
+              try {
+                await api.saveAssignment(newAssign);
+              } catch (e) {
+                console.error("Error saving assignment:", e);
+              }
+            }}
+            onEndAssignment={async (aId) => {
+              endAssignment(aId); // Usa acción del store
+              try {
+                await api.endAssignment(aId, user?.name);
+              } catch (e) {
+                console.error("Error ending assignment:", e);
+              }
+            }}
+          />
+        );
       case 'firmas':
-          return <DigitalSignature user={user!} />;
+        return <DigitalSignature user={user!} />;
       case 'aprobar-firma':
-          return <ApprovalManager user={user!} allUsers={allMasterData.masterUsuarios || []} />;
+        return <ApprovalManager user={user!} allUsers={allMasterData.masterUsuarios || []} />;
       case 'gamification':
-          // Casting de user a Driver temporal para visualización
-          return <DriverGamification driver={{
-              id: user!.id,
-              name: user!.name,
-              documentNumber: user!.id,
-              statusId: 'EST-01',
-              clientId: user!.clientId || 'c1',
-              licenseCategory: 'C2',
-              status: 'Activo'
-          } as any} />;
+        // Casting de user a Driver temporal para visualización
+        return <DriverGamification driver={{
+          id: user!.id,
+          name: user!.name,
+          documentNumber: user!.id,
+          statusId: 'EST-01',
+          clientId: user!.clientId || 'c1',
+          licenseCategory: 'C2',
+          status: 'Activo'
+        } as any} />;
       case 'executive-dashboard':
-          return <ExecutiveDashboard />;
+        return <ExecutiveDashboard />;
       case 'despacho':
-          return (
-            <LogisticsDispatch 
-              user={user!}
-              selectedClient={user!.clientId || 'c1'}
-              vehicles={vehicles}
-              drivers={drivers}
-              assignments={assignments}
-              invoices={invoices}
-              activeRoutes={[]}
-              onRefresh={() => refreshAppData()}
-            />
-          );
+        return (
+          <LogisticsDispatch
+            user={user!}
+            selectedClient={user!.clientId || 'c1'}
+            vehicles={vehicles}
+            drivers={drivers}
+            assignments={assignments}
+            invoices={invoices}
+            activeRoutes={[]}
+            onRefresh={() => refreshAppData()}
+          />
+        );
       case 'chatbot':
-          return <AIChat context={{ user: user!.name, activeTab: 'chatbot-fullscreen' }} />;
+        return <AIChat context={{ user: user!.name, activeTab: 'chatbot-fullscreen' }} />;
       default:
         return (
           <div className="p-10 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
@@ -824,22 +809,22 @@ const App: React.FC = () => {
   };
 
   if (isPortalMode) {
-      return (
-          <>
-            <Toaster position="top-right" richColors theme="dark" />
-            <PortalLayout>
-                {portalRoute === 'login' && <ClientLogin onLogin={(token, user) => {
-                     // Handle client login state if we want persistence, for now just show success and maybe redirect to dashboard
-                     // For MVP, login just shows success or could store token
-                     localStorage.setItem('m7_client_token', token);
-                     // Redirect to simplified dashboard if we had one, or just stay logged in
-                     // For now, let's redirect to tracking
-                     window.location.hash = '#/portal/tracking';
-                }} />}
-                {portalRoute === 'tracking' && <OrderTracking />}
-            </PortalLayout>
-          </>
-      );
+    return (
+      <>
+        <Toaster position="top-right" richColors theme="dark" />
+        <PortalLayout>
+          {portalRoute === 'login' && <ClientLogin onLogin={(token, user) => {
+            // Handle client login state if we want persistence, for now just show success and maybe redirect to dashboard
+            // For MVP, login just shows success or could store token
+            localStorage.setItem('m7_client_token', token);
+            // Redirect to simplified dashboard if we had one, or just stay logged in
+            // For now, let's redirect to tracking
+            window.location.hash = '#/portal/tracking';
+          }} />}
+          {portalRoute === 'tracking' && <OrderTracking />}
+        </PortalLayout>
+      </>
+    );
   }
 
   if (!isAuthenticated || !user) {
@@ -848,38 +833,38 @@ const App: React.FC = () => {
 
   return (
     <>
-      <Toaster 
-        position="top-right" 
-        richColors 
-        theme="dark" 
+      <Toaster
+        position="top-right"
+        richColors
+        theme="dark"
         expand={true}
         toastOptions={{
           style: { borderRadius: '1.5rem', padding: '1.25rem' }
         }}
       />
-      <Layout 
-        user={user} 
-        activeTab={activeTab} 
+      <Layout
+        user={user}
+        activeTab={activeTab}
         setActiveTab={setActiveTab}
         activeMasterCategory={activeMasterCategory}
         setActiveMasterCategory={setActiveMasterCategory}
         onUpdateUser={async (data) => {
-             try {
-                 const updatedUser = { ...user, ...data };
-                 setUser(updatedUser);
-                 // Persistir en Backend
-                 console.log('[M7-APP] Persistiendo usuario...', updatedUser);
-                 await api.saveUser(updatedUser);
-                 
-                 // Actualizar también la lista de maestros para que se vea en Auditoría/Difusión
-                 const freshUsers = await api.getUsers().catch(() => []);
-                 setAllMasterData({ ...allMasterData, masterUsuarios: freshUsers });
-                 
-                 localStorage.setItem('m7_user_session', JSON.stringify(updatedUser));
-             } catch (e) {
-                 console.error('[M7-APP] Error al guardar perfil:', e);
-                 toast.error("Error al guardar en servidor", { description: "Los cambios son locales temporalmente." });
-             }
+          try {
+            const updatedUser = { ...user, ...data };
+            setUser(updatedUser);
+            // Persistir en Backend
+            console.log('[M7-APP] Persistiendo usuario...', updatedUser);
+            await api.saveUser(updatedUser);
+
+            // Actualizar también la lista de maestros para que se vea en Auditoría/Difusión
+            const freshUsers = await api.getUsers().catch(() => []);
+            setAllMasterData({ ...allMasterData, masterUsuarios: freshUsers });
+
+            localStorage.setItem('m7_user_session', JSON.stringify(updatedUser));
+          } catch (e) {
+            console.error('[M7-APP] Error al guardar perfil:', e);
+            toast.error("Error al guardar en servidor", { description: "Los cambios son locales temporalmente." });
+          }
         }}
         onLogout={handleLogout}
         modulesData={allMasterData.masterModulos}
@@ -887,36 +872,36 @@ const App: React.FC = () => {
       >
         {renderContent()}
       </Layout>
-      
-      <AIChat 
-          context={{
-            user: user.name,
-            activeTab,
-            documentsCount: documents.length,
-            invoicesCount: invoices.length,
-            availableVehicles: vehicles.filter(v => v.status === 'Disponible').length,
-            activeDrivers: drivers.filter(d => d.status === 'Activo').length,
-            recentAssignments: assignments.slice(-5)
-          }} 
+
+      <AIChat
+        context={{
+          user: user.name,
+          activeTab,
+          documentsCount: documents.length,
+          invoicesCount: invoices.length,
+          availableVehicles: vehicles.filter(v => v.status === 'Disponible').length,
+          activeDrivers: drivers.filter(d => d.status === 'Activo').length,
+          recentAssignments: assignments.slice(-5)
+        }}
       />
       {showTimeoutWarning && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in zoom-in duration-300">
-            <div className="bg-white max-w-md w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6">
-                <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto animate-bounce">
-                    <Icons.Alert style={{ width: '40px', height: '40px' }} />
-                </div>
-                <h3 className="text-2xl font-black text-slate-900 uppercase">¿Sigues ahí?</h3>
-                <p className="text-slate-500 font-medium">Tu sesión se cerrará por inactividad en:</p>
-                <div className="text-6xl font-black text-emerald-500 tabular-nums">
-                    00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
-                </div>
-                <button 
-                  onClick={resetInactivityTimer}
-                  className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl"
-                >
-                    Continuar Trabajando
-                </button>
+          <div className="bg-white max-w-md w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6">
+            <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto animate-bounce">
+              <Icons.Alert style={{ width: '40px', height: '40px' }} />
             </div>
+            <h3 className="text-2xl font-black text-slate-900 uppercase">¿Sigues ahí?</h3>
+            <p className="text-slate-500 font-medium">Tu sesión se cerrará por inactividad en:</p>
+            <div className="text-6xl font-black text-emerald-500 tabular-nums">
+              00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+            </div>
+            <button
+              onClick={resetInactivityTimer}
+              className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl"
+            >
+              Continuar Trabajando
+            </button>
+          </div>
         </div>
       )}
     </>

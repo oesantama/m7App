@@ -96,7 +96,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         return s !== 'EN RUTA' && s !== 'ENTREGADO' && s !== 'FINALIZADO';
       })())
     );
-    // console.log(`[M7-COMPONENT] RoutePlanner: validInvoices count = ${filtered.length} (de ${invoices.length} totales)`);
+
     return filtered;
   }, [invoices, learningExemptions]);
 
@@ -130,7 +130,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
 
   const availableVehicles = useMemo(() => {
-    // console.log(`[M7-ROUTER] Buscando tripulaciones activas para cliente: ${selectedClient}`);
+
 
     const activeLinks = assignments.filter(a =>
       a.isActive &&
@@ -1124,7 +1124,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         {route.assignedInvoices.map((inv, iIdx) => {
                           const isPriority = (inv as any).isPriority;
                           return (
-                            <div key={inv.id} className={`p-3 bg-white rounded-xl border ${isPriority ? 'border-amber-400 ring-1 ring-amber-100' : 'border-slate-100'} shadow-sm group/item hover:shadow-md transition-all flex flex-col gap-2`}>
+                            <div key={`${inv.id}-${iIdx}`} className={`p-3 bg-white rounded-xl border ${isPriority ? 'border-amber-400 ring-1 ring-amber-100' : 'border-slate-100'} shadow-sm group/item hover:shadow-md transition-all flex flex-col gap-2`}>
                               <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <div className={`w-6 h-6 ${isPriority ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-400'} rounded-lg flex items-center justify-center font-black text-[9px] shrink-0`}>{iIdx + 1}</div>
@@ -1567,7 +1567,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
                     return (
                       <div
-                        key={`${key}-${index}`}
+                        key={`DOC_GRP_${key}_${index}`}
                         className={`rounded-3xl border-2 transition-all overflow-hidden ${isSelected ? 'border-amber-400 bg-amber-50/30' : 'border-slate-100 bg-white hover:border-slate-200'}`}
                       >
                         <div className="p-6 flex items-center justify-between gap-4">
@@ -1614,8 +1614,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         {isExpanded && (
                           <div className="px-6 pb-6 pt-2 bg-white/50 border-t border-slate-100 flex flex-col gap-2 animate-in slide-in-from-top-2 duration-300">
                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Contenido del Documento:</p>
-                            {invoices.map(inv => (
-                              <div key={inv.id} className="p-3 bg-white border border-slate-100 rounded-2xl flex justify-between items-center">
+                            {invoices.map((inv, index) => (
+                              <div key={`INV_ITM_${inv.id}_${index}`} className="p-3 bg-white border border-slate-100 rounded-2xl flex justify-between items-center">
                                 <div>
                                   <p className="font-black text-[11px] text-slate-800 uppercase leading-none">{inv.invoiceNumber}</p>
                                   <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{inv.customerName}</p>
