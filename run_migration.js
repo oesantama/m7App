@@ -18,11 +18,11 @@ async function runMigration() {
   try {
     console.log('Conectando a DB...');
     await client.connect();
-    
-    const sqlPath = path.join(__dirname, 'migration_v2.sql');
+
+    const sqlPath = path.join(__dirname, 'migration_routes.sql');
     console.log(`Leyendo SQL desde: ${sqlPath}`);
     const sql = fs.readFileSync(sqlPath, 'utf8');
-    
+
     console.log('Ejecutando migración...');
     await client.query(sql);
     console.log('✅ Migración completada exitosamente.');
