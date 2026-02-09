@@ -303,32 +303,88 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
         // --- PERSISTENCIA BACKEND ---
         const { api } = await import('../services/api');
         
-        // Determinar qué endpoint usar
+        //Determinar qué endpoint usar
+        let saveResponse: any;
         if (activeMaster === 'masterUsuarios') {
-            await api.saveUser(newRecord);
+            saveResponse = await api.saveUser(newRecord);
         } else if (activeMaster === 'masterArticulo') {
-            await api.saveArticle(newRecord);
+            saveResponse = await api.saveArticle(newRecord);
         } else if (activeMaster === 'masterRol') {
-            await api.saveRole(newRecord);
+            saveResponse = await api.saveRole(newRecord);
         } else if (activeMaster === 'masterPermisosRol') {
-            await api.savePermission(newRecord);
+            saveResponse = await api.savePermission(newRecord);
         } else if (activeMaster === 'masterPermisosUsuario') {
-            await api.saveUserPermission(newRecord);
+            saveResponse = await api.saveUserPermission(newRecord);
         } else if (activeMaster === 'masterPaginas') {
-            await api.savePage(newRecord);
+            saveResponse = await api.savePage(newRecord);
             await api.saveMaster(activeMaster, newRecord);
         } else {
             // Guardado Genérico para el resto de tablas maestras (masterTipoDocumento, etc.)
-            await api.saveMaster(activeMaster, newRecord);
+            saveResponse = await api.saveMaster(activeMaster, newRecord);
         }
         
-        toast.success("Registro Guardado", { description: "Datos sincronizados con el núcleo M7." });
+        // VALIDACIÓN ESTRICTA DE RESPUESTA
+        if (!saveResponse || (saveResponse.success === false)) {
+            const errorMsg = saveResponse?.error || 'Error desconocido en la respuesta del servidor';
+            console.error('[M7-MASTER] Save failed with response:', saveResponse);
+            setError(`Error del servidor: ${errorMsg}`);
+            toast.error("Error al guardar", { 
+                description: errorMsg,
+                duration: 5000 
+            });
+            return; // NO cerrar modal si hay error
+        }
+        
+        // ÉXITO CONFIRMADO
+        console.log('[M7-MASTER] ✅ Save successful!', saveResponse);
+        
+        // Actualizar el estado local para que la tabla se refresque sin recargar página
+        // PRIORIDAD: Usar objeto completo del backend si está disponible (ej: saveResponse.article para artículos)
+        const recordWithId = saveResponse.article 
+          ? { ...saveResponse.article, statusId: saveResponse.article.statusId || newRecord.statusId }
+          : { ...newRecord, id: saveResponse.id || finalId };
+        
+        console.log('[M7-MASTER] 📊 Record to add/update:', recordWithId);
+        
+        setAllMasterData(prev => {
+          const currentList = Array.isArray(prev[activeMaster]) ? [...prev[activeMaster]!] : [];
+          let newList;
+          
+          if (editingRecord) {
+            // Actualizar existente
+            console.log('[M7-MASTER] Updating existing record:', editingRecord.id);
+            newList = currentList.map(r => r.id === editingRecord.id ? recordWithId : r);
+          } else {
+            // Agregar nuevo al inicio
+            console.log('[M7-MASTER] Adding new record to list. Current count:', currentList.length);
+            newList = [recordWithId, ...currentList];
+            console.log('[M7-MASTER] New list count:', newList.length);
+          }
+          
+          return {
+            ...prev,
+            [activeMaster]: newList
+          };
+        });
+
+        toast.success("Registro Guardado", { 
+            description: "La tabla se ha actualizado localmente.",
+            duration: 3000
+        });
+        
         if (onAudit) onAudit(activeMaster, editingRecord ? 'UPDATE' : 'CREATE');
         setIsModalOpen(false);
+        setEditingRecord(null);
+        setFormData({});
+        
     } catch (err: any) {
         console.error('[M7-MASTER] Save error:', err);
-        setError("Error de Sincronización: " + (err.message || 'Fallo desconocido'));
-        toast.error("Error al guardar", { description: "Verifique su conexión con el servidor." });
+        const errorMessage = err.message || 'Fallo desconocido';
+        setError("Error de Sincronización: " + errorMessage);
+        toast.error("Error al guardar", { 
+            description: errorMessage,
+            duration: 5000
+        });
     }
   };
 
@@ -944,6 +1000,10 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
     }
   };
 
+  console.log(`[M7-DEBUG] MasterModule Render: activeMaster="${activeMaster}"`);
+  console.log(`[M7-DEBUG] allMasterData keys:`, Object.keys(allMasterData));
+  console.log(`[M7-DEBUG] Data for activeMaster:`, allMasterData[activeMaster]);
+  
   return (
     <div className="flex flex-col gap-4 h-full animate-in fade-in duration-500 overflow-hidden">
       <div className="bg-white px-6 py-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">

@@ -2,6 +2,11 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 
+interface LearningPatternData {
+    city: string;
+    vehicle_id: string;
+}
+
 export const getRoutes = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
@@ -15,6 +20,16 @@ export const getRoutes = async (req: Request, res: Response) => {
     res.json(result.rows);
   } catch (err: any) {
     res.status(500).json({ error: "Error al obtener rutas" });
+  }
+};
+
+export const getRoutingPatterns = async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT * FROM routing_patterns WHERE strength > 0 ORDER BY strength DESC');
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[M7-GET-PATTERNS-ERR]', err.message);
+    res.status(500).json({ error: "Error al obtener patrones de aprendizaje" });
   }
 };
 
@@ -68,9 +83,53 @@ export const logRouteMovement = async (req: Request, res: Response) => {
       INSERT INTO route_modifications_log (route_id, invoice_id, action, user_id, previous_plate, new_plate, details)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
     `, [routeId, invoiceId, action, userId, previousPlate, newPlate, JSON.stringify(details)]);
+
+    // APRENDIZAJE IA M7: Si se agrega una factura a una ruta (manual), aprendemos la afinidad Ciudad-Vehículo
+    if (action === 'ADD' && details?.city && newPlate) {
+        // Buscamos el ID del vehículo por la placa
+        const vRes = await pool.query('SELECT id FROM vehicles WHERE plate = $1', [newPlate]);
+        if (vRes.rows.length > 0) {
+            const vId = vRes.rows[0].id;
+            const city = String(details.city).toUpperCase().trim();
+            
+            await pool.query(`
+                INSERT INTO routing_patterns (city, vehicle_id, strength, last_used)
+                VALUES ($1, $2, 1, NOW())
+                ON CONFLICT (city, vehicle_id) DO UPDATE SET
+                strength = routing_patterns.strength + 1,
+                last_used = NOW()
+            `, [city, vId]);
+            console.log(`[M7-LEARNING] Patrón registrado: ${city} -> ${newPlate} (Strength++)`);
+        }
+    }
+
     res.json({ success: true });
   } catch (err: any) {
     console.error('[M7-ROUTE-LOG-ERR]', err.message);
     res.status(500).json({ error: "Error al registrar logs de la ruta" });
   }
+};
+
+export const updateLocation = async (req: Request, res: Response) => {
+    const { vehicleId, driverId, latitude, longitude, accuracy, speed, heading } = req.body;
+    try {
+        await pool.query(`
+            INSERT INTO vehicle_locations (vehicle_id, driver_id, latitude, longitude, accuracy, speed, heading)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [vehicleId, driverId, latitude, longitude, accuracy || null, speed || null, heading || null]);
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('[M7-GPS-LOG-ERR]', err.message);
+        res.status(500).json({ error: "Error al registrar ubicación GPS" });
+    }
+};
+
+export const getLatestLocations = async (req: Request, res: Response) => {
+    try {
+        const result = await pool.query('SELECT * FROM v_latest_vehicle_locations');
+        res.json(result.rows);
+    } catch (err: any) {
+        console.error('[M7-GPS-GET-ERR]', err.message);
+        res.status(500).json({ error: "Error al obtener ubicaciones del centro de mando" });
+    }
 };

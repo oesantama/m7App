@@ -76,6 +76,32 @@ VALUES
 ('EST-08', 'masterEstados', 'INVENTARIADO', 'Proceso de inventario finalizado', 'EST-01')
 ON CONFLICT (id) DO NOTHING;
 
+-- 9. Tabla de Rastreo GPS (M7 Intelligence)
+CREATE TABLE IF NOT EXISTS vehicle_locations (
+    id SERIAL PRIMARY KEY,
+    vehicle_id TEXT NOT NULL,
+    driver_id TEXT,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    accuracy DECIMAL(8, 2),
+    speed DECIMAL(5, 2),
+    heading DECIMAL(5, 2),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Índices para optimizar consultas de última ubicación
+CREATE INDEX IF NOT EXISTS idx_vehicle_locations_vehicle_id ON vehicle_locations(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_locations_updated_at ON vehicle_locations(updated_at DESC);
+
+-- Vista para obtener solo la última posición conocida de cada vehículo
+CREATE OR REPLACE VIEW v_latest_vehicle_locations AS
+SELECT DISTINCT ON (vehicle_id)
+    vl.*,
+    v.plate
+FROM vehicle_locations vl
+LEFT JOIN vehicles v ON vl.vehicle_id = v.id
+ORDER BY vehicle_id, updated_at DESC;
+
 -- Saneamiento inicial de datos huérfanos
 UPDATE document_items SET item_status = 'PENDIENTE' WHERE item_status IS NULL;
 UPDATE document_items SET invoice = 'S/I' WHERE invoice IS NULL OR invoice = '';

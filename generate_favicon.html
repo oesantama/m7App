@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Generate M7 Favicon</title>
+</head>
+<body>
+    <canvas id="canvas" width="512" height="512"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Fondo negro
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Configurar fuente
+        ctx.font = 'bold 280px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Dibujar "M" en teal
+        ctx.fillStyle = '#10b981';
+        ctx.fillText('M', 200, 256);
+        
+        // Dibujar "7" en blanco
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('7', 340, 256);
+        
+        // Convertir a PNG y descargar
+        canvas.toBlob(function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'm7_favicon.png';
+            a.click();
+        });
+    </script>
+</body>
+</html>

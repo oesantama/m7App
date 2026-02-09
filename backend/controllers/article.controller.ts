@@ -31,12 +31,35 @@ export const saveArticle = async (req: Request, res: Response) => {
       a.barcode, a.categoryArticuloId, a.factorInter || 1, a.factorStd || 1,
       a.uomGeneralId, a.uomInterId, a.uomStdId
     ]);
-    res.json({ success: true, message: 'Artículo guardado' });
+    
+    // CRITICAL FIX: Return the complete article object to enable frontend state update
+    const savedArticle = {
+      id: a.id,
+      sku: a.sku,
+      name: a.name,
+      clientId: a.clientId,
+      statusId: a.statusId,
+      barcode: a.barcode,
+      categoryArticuloId: a.categoryArticuloId,
+      factorInter: a.factorInter || 1,
+      factorStd: a.factorStd || 1,
+      uomGeneralId: a.uomGeneralId,
+      uomInterId: a.uomInterId,
+      uomStdId: a.uomStdId
+    };
+    
+    res.json({ 
+      success: true, 
+      message: 'Artículo guardado',
+      id: a.id,  // Include ID for compatibility
+      article: savedArticle  // Include full object for state updates
+    });
   } catch (err: any) {
     console.error('[M7-ARTICLES] Save error:', err);
     res.status(500).json({ error: "Error al guardar el artículo" });
   }
 };
+
 
 export const deleteArticle = async (req: Request, res: Response) => {
   const { id } = req.params;

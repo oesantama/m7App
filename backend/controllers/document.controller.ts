@@ -4,31 +4,59 @@ import pool from '../config/database.js';
 
 export const getDocuments = async (req: Request, res: Response) => {
   try {
-    // Asegurar estructura del esquema
+    // REPARACIÓN INTEGRAL: Asegurar tablas y columnas críticas
+    await pool.query('CREATE TABLE IF NOT EXISTS documents_l (id TEXT PRIMARY KEY, client_id TEXT, external_doc_id TEXT, status TEXT DEFAULT \'PENDIENTE\', created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);');
+    await pool.query('CREATE TABLE IF NOT EXISTS document_items (id SERIAL PRIMARY KEY, document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE, article_id TEXT, expected_qty NUMERIC DEFAULT 0);');
+    
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS plan_type TEXT;');
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_notes TEXT;');
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_user TEXT;');
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_date TIMESTAMP WITH TIME ZONE;');
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS vehicle_plate TEXT;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS un_code TEXT DEFAULT \'\';');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS client_ref TEXT DEFAULT \'\';');
-    await pool.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_1 NUMERIC DEFAULT 0;');
-    await pool.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
-    await pool.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS expected_qty NUMERIC DEFAULT 0;');
-    await pool.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_user TEXT;');
-    await pool.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_observation TEXT;');
+    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picking_date TIMESTAMP WITH TIME ZONE;');
+    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiving_date TIMESTAMP WITH TIME ZONE;');
+    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picker_user TEXT;');
+    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS deliverer_user TEXT;');
+    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiver_user TEXT;');
     
-    // Reparar esquema document_items
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS received_qty NUMERIC DEFAULT 0;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS invoice TEXT;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS city TEXT;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS address TEXT;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS peso NUMERIC;');
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC DEFAULT 0;');
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit_volume TEXT;');
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS batch TEXT DEFAULT \'S/L\';');
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;');
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS un_code TEXT DEFAULT \'\';');
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS client_ref TEXT DEFAULT \'\';');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS item_status TEXT DEFAULT \'Pendiente\';');
-    
-    await pool.query('ALTER TABLE master_records ADD COLUMN IF NOT EXISTS tipo_notificacion_id TEXT;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS count_1 NUMERIC DEFAULT 0;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS notes TEXT;');
+
+    await pool.query(`
+      DO $$ BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unq_doc_art_inv') THEN 
+          ALTER TABLE document_items ADD CONSTRAINT unq_doc_art_inv UNIQUE (document_id, article_id, invoice, order_number); 
+        END IF; 
+      END $$;
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS document_consolidated_items (
+        id SERIAL PRIMARY KEY,
+        document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE,
+        article_id TEXT,
+        expected_qty NUMERIC DEFAULT 0,
+        count_1 NUMERIC DEFAULT 0,
+        count_2 NUMERIC DEFAULT 0,
+        inventory_user TEXT,
+        inventory_observation TEXT,
+        picked_qty NUMERIC DEFAULT 0,
+        dispatched_qty NUMERIC DEFAULT 0,
+        UNIQUE(document_id, article_id)
+      );
+    `);
 
     // Crear tabla de inventario real por cliente si no existe
     await pool.query(`
@@ -434,24 +462,47 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
 
   try {
     await client.query('BEGIN');
-    // AUTO-CORRECCIÓN Esquema en Bulk
+    // AUTO-CORRECCIÓN Esquema en Bulk (REPARACIÓN EXHAUSTIVA)
     await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS plan_type TEXT;');
     await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_notes TEXT;');
+    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picking_date TIMESTAMP WITH TIME ZONE;');
+    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiving_date TIMESTAMP WITH TIME ZONE;');
+    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picker_user TEXT;');
+    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS deliverer_user TEXT;');
+    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiver_user TEXT;');
+    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS codplan TEXT;');
+    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS delivery_date TIMESTAMP WITH TIME ZONE;');
+    
     await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_user TEXT;');
     await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_observation TEXT;');
+    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS expected_qty NUMERIC DEFAULT 0;');
+    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_1 NUMERIC DEFAULT 0;');
+    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
+    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS picked_qty NUMERIC DEFAULT 0;');
+    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS dispatched_qty NUMERIC DEFAULT 0;');
+    
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS received_qty NUMERIC DEFAULT 0;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS order_number TEXT;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit TEXT;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS invoice TEXT;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC DEFAULT 0;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit_volume TEXT DEFAULT \'0\';');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS city TEXT;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS address TEXT;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS observation TEXT;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS batch TEXT DEFAULT \'S/L\';');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;');
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS un_code TEXT;');
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS client_ref TEXT;');
+    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS item_status TEXT DEFAULT \'Pendiente\';');
     
-    // RESTRICCIÓN CRÍTICA PARA UPSERT EN CONSOLIDADOS
     await client.query(`
-      DELETE FROM document_consolidated_items a USING (
-        SELECT MIN(ctid) as ctid, document_id, article_id
-        FROM document_consolidated_items 
-        GROUP BY document_id, article_id HAVING COUNT(*) > 1
-      ) b
-      WHERE a.document_id = b.document_id 
-      AND a.article_id = b.article_id 
-      AND a.ctid <> b.ctid;
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unq_doc_art_inv') THEN 
+          ALTER TABLE document_items ADD CONSTRAINT unq_doc_art_inv UNIQUE (document_id, article_id, invoice, order_number); 
+        END IF; 
+      END $$;
     `);
 
     await client.query(`

@@ -114,6 +114,16 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }).then(r => r.json()),
+  getRoutingPatterns: () => fetch(`${API_URL}/routes/patterns`).then(r => r.json()),
+  
+  // GPS Tracking (Nueva API dedicada)
+  updateVehicleLocation: (data: any) => fetch(`${API_URL}/locations/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  getLatestVehicleLocations: () => fetch(`${API_URL}/locations/latest`).then(r => r.json()),
+  getVehicleLocationHistory: (vehicleId: string, limit = 50) => fetch(`${API_URL}/locations/history/${vehicleId}?limit=${limit}`).then(r => r.json()),
 
   // Gestión de Asignaciones (Vínculos Operativos)
   getAssignments: () => fetch(`${API_URL}/assignments`).then(r => r.json()),

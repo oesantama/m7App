@@ -18,6 +18,18 @@ interface RoutePlannerProps {
   onRefresh?: () => void;
 }
 
+const M7_HUB_ORIGIN = {
+    lat: 6.110595,
+    lng: -75.641505,
+    address: "CR 48C N°100 Sur - 72 Bodega 4 y 10, La Tablaza"
+};
+
+interface RoutingPattern {
+    city: string;
+    vehicle_id: string;
+    strength: number;
+}
+
 interface SuggestedRoute {
   id: string;
   vehicle: Vehicle;
@@ -34,9 +46,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [selectedClient, setSelectedClient] = useState(user.clientId || 'c1');
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [viewMode, setViewMode] = useState<'map' | 'intelligence'>('intelligence');
+  const [viewMode, setViewMode] = useState<'intelligence'>('intelligence');
   
   const [auditLogs, setAuditLogs] = useState<RouteLog[]>([]);
+  const [learningPatterns, setLearningPatterns] = useState<RoutingPattern[]>([]);
   const [learningExemptions, setLearningExemptions] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [auditModal, setAuditModal] = useState<{ isOpen: boolean; action: any; data: any } | null>(null);
@@ -105,34 +118,38 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return { planR, planNormal };
   }, [unassignedInvoices, documents]);
 
+  // Carga inicial de patrones de aprendizaje
+  useEffect(() => {
+    api.getRoutingPatterns().then(data => {
+        if (Array.isArray(data)) {
+            console.log(`[M7-INTELLIGENCE] Cargados ${data.length} patrones de aprendizaje regenerativo.`);
+            setLearningPatterns(data);
+        }
+    }).catch(err => console.error("Error cargando patrones IA:", err));
+  }, [onRefresh]);
 
-  // FLOTA DISPONIBLE: Basada ÚNICAMENTE en Vínculos Operativos Activos
+
   const availableVehicles = useMemo(() => {
     console.log(`[M7-ROUTER] Buscando tripulaciones activas para cliente: ${selectedClient}`);
     
-    // 1. Filtrar asignaciones activas del cliente seleccionado
     const activeLinks = assignments.filter(a => 
       a.isActive && 
-      (a.clientId === selectedClient) // Estricto al cliente seleccionado
+      (a.clientId === selectedClient)
     );
 
-    // 2. Mapear a objetos de vehículo completos con conductor
     const fleet = activeLinks.map(link => {
         const v = vehicles.find(veh => veh.id === link.vehicleId);
         const d = drivers.find(drv => drv.id === link.driverId);
         
-        if (!v || !d) {
-            console.warn(`[M7-ROUTER] Link corrupto o incompleto: ${link.id}`);
-            return null;
-        }
+        if (!v || !d) return null;
 
         return {
             ...v,
-            // Enriquecemos con datos del conductor para el UI
             driverName: d.name,
+            driverId: d.id,
             assignmentId: link.id
         };
-    }).filter(item => item !== null) as (Vehicle & { driverName: string, assignmentId: string })[];
+    }).filter(item => item !== null) as (Vehicle & { driverName: string, driverId: string, assignmentId: string })[];
 
     return fleet;
   }, [assignments, vehicles, drivers, selectedClient]);
@@ -224,19 +241,31 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const load: Invoice[] = [];
         let currentLoadVolume = 0;
         
-        // Capacidad
+        // Capacidad REGLA M7: MÁXIMO 90% (TECHO DURO)
         const nominalCapacity = vehicle.capacityM3 > 0 ? vehicle.capacityM3 : 30; 
-        const targetMinCapacity = nominalCapacity * 0.90; // Meta: Llenar al menos esto
-        const absoluteMaxCapacity = nominalCapacity;      // Techo duro
+        const targetMaxCapacity = nominalCapacity * 0.90; // Meta y límite: 90%
+        const absoluteMaxCapacity = targetMaxCapacity;      // Techo duro estricto
         
         // Rastreo de conflictos horarios en esta ruta específica
         const earlyBirdAssigned = new Set<string>();
 
-        // -- FASE 1: NÚCLEO DE CIUDAD --
-        // Intentamos establecer una "ciudad base" para el vehículo con la primera factura disponible
+        // -- FASE 1: NÚCLEO DE CIUDAD (IA REGENERATIVA) --
+        // Buscamos si este vehículo tiene una ciudad de alta afinidad aprendida
+        const affinity = learningPatterns.find(p => p.vehicle_id === vehicle.id);
+        const targetCity = affinity ? affinity.city : null;
+
         if (availableInvoices.length > 0) {
-            // Tomamos la mejor factura disponible para iniciar la ruta
-            const seedInvoice = availableInvoices[0]; 
+            // IA: Si hay afinidad, intentamos empezar con una factura de esa ciudad
+            let seedInvoice = null;
+            if (targetCity) {
+                // @ts-ignore
+                seedInvoice = availableInvoices.find(inv => inv.cityKey === targetCity);
+                if (seedInvoice) console.log(`[M7-IA] Aplicando patrón aprendido: ${vehicle.plate} -> ${targetCity}`);
+            }
+            
+            // Si no hay afinidad o no hay facturas de esa ciudad, tomamos la primera disponible
+            if (!seedInvoice) seedInvoice = availableInvoices[0];
+            
             // @ts-ignore
             const seedCity = seedInvoice.cityKey;
 
@@ -267,20 +296,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         }
 
         // -- FASE 2: RELLENO AGRESIVO (FILL THE GAPS) --
-        // Si aún no llegamos al 90%, buscamos CUALQUIER factura que quepa, 
-        // priorizando las que estén geográficamente cerca si es posible, o cualquiera si no.
-        
-        // Mientras tengamos espacio y facturas...
-        if (currentLoadVolume < targetMinCapacity && availableInvoices.length > 0) {
-            
+        // Si aún no llegamos al target, buscamos CUALQUIER factura que quepa
+        if (currentLoadVolume < targetMaxCapacity && availableInvoices.length > 0) {
             // Recorremos las facturas restantes para encontrar las que "calzan" mejor
-            // Idealmente querríamos las más grandes que quepan para llenar rápido
             for (let i = 0; i < availableInvoices.length; i++) {
                 const inv = availableInvoices[i];
                 
-                // Si ya estamos llenos (o pasamos el target), paramos esta búsqueda agresiva
-                // Pero el usuario pidió: "llegar a capacidad del 90%"
-                if (currentLoadVolume >= targetMinCapacity) break;
+                if (currentLoadVolume >= targetMaxCapacity) break;
 
                 // Chequeo simple de capacidad
                 if (currentLoadVolume + inv.volumeM3 <= absoluteMaxCapacity) {
@@ -295,7 +317,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // -- FASE 3: UBICACIÓN DE VEHÍCULO --
         // Asignamos el vehículo si lleva carga significativa
         if (load.length > 0) {
-            // Determinamos la ciudad dominante para etiquetar la ruta
+            // IA REGENERATIVA M7: Aprender de la ciudad dominante para fortalecer el patrón
             const cityCounts: {[key:string]: number} = {};
             load.forEach(inv => {
                 // @ts-ignore
@@ -386,7 +408,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       userId: user.name,
       previousPlate: action === 'REMOVE' ? route.vehicle.plate : null,
       newPlate: action === 'ADD' ? route.vehicle.plate : null,
-      details: { comment: auditComment, volume: data.invoice.volumeM3 }
+      details: { 
+          comment: auditComment, 
+          volume: data.invoice.volumeM3,
+          city: data.invoice.city // REGLA M7: Enviamos ciudad para aprendizaje IA
+      }
     }).catch(err => console.error("Error logging movement:", err));
 
     setAuditLogs(prev => [{
@@ -504,10 +530,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const actualConfirmDispatch = async (route: SuggestedRoute) => {
     setIsSaving(true);
     try {
+      // Buscamos el conductor real del vínculo
+      const link = assignments.find(a => a.vehicleId === route.vehicle.id && a.isActive);
       const res = await api.saveRoute({
         id: `rt-${Date.now()}`,
         vehicleId: route.vehicle.id,
-        driverId: 'S/A', 
+        driverId: link?.driverId || 'S/A', 
         clientId: selectedClient,
         invoiceIds: route.assignedInvoices.map(i => i.id),
         createdBy: user.name
@@ -516,6 +544,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       if (res.success) {
         toast.success("Despacho M7 Confirmado Exitosamente");
         setSuggestedRoutes(prev => prev.filter(r => r.id !== route.id));
+        if (onRefresh) onRefresh();
       } else {
         toast.error("Error al confirmar despacho");
       }
@@ -559,12 +588,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   // 2. Efecto para Renderizado de Datos en el Mapa
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || viewMode !== 'map') return;
+    if (!map || (viewMode !== 'map' && viewMode !== 'active')) return;
 
     console.log('[M7-MAP] Actualizando capas de datos...');
     
-    // Invalidar tamaño para renderizado correcto
-    setTimeout(() => { map.invalidateSize(); }, 300);
+    // Invalidar tamaño con retardo para asegurar que el contenedor está listo
+    setTimeout(() => { map.invalidateSize(); }, 400);
 
     // Limpiar capas previas excepto el TileLayer
     map.eachLayer((layer: any) => { 
@@ -580,7 +609,24 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       ((r.vehicle as any).driverName || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const allPoints: L.LatLngExpression[] = [];
+    const allPoints: L.LatLngExpression[] = [[M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng]];
+
+    // Marker de ORIGEN MAESTRO (HUB LA TABLAZA)
+    L.marker([M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng], {
+        icon: L.divIcon({
+            html: `<div class="w-10 h-10 flex items-center justify-center bg-slate-900 rounded-[1rem] shadow-2xl border-2 border-slate-700 text-emerald-400 rotate-45 transform hover:scale-110 transition-transform duration-300">
+                    <div class="-rotate-45">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                   </div>`,
+            className: 'm7-hub-marker',
+            iconSize: [40, 40]
+        })
+    }).addTo(map).bindPopup(`<div class="p-4 font-sans">
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ORIGEN MAESTRO M7</p>
+        <p class="font-black text-slate-800 text-sm leading-tight">${M7_HUB_ORIGIN.address}</p>
+        <div class="mt-2 w-full h-1 bg-emerald-500 rounded-full"></div>
+    </div>`);
 
     filteredRoutesForMap.forEach((route, idx) => {
       const routeColor = colorPalette[idx % colorPalette.length];
@@ -704,10 +750,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     
     for (const route of suggestedRoutes) {
         try {
+            const link = assignments.find(a => a.vehicleId === route.vehicle.id && a.isActive);
             const res = await api.saveRoute({
                 id: `rt-${Date.now()}-${Math.random()}`,
                 vehicleId: route.vehicle.id,
-                driverId: (route.vehicle as any).assignedDriver?.id || 'S/A',
+                driverId: link?.driverId || 'S/A',
                 clientId: selectedClient,
                 invoiceIds: route.assignedInvoices.map(i => i.id),
                 createdBy: user.name
@@ -724,64 +771,129 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   };
 
   const handleExportPlanilla = (route: SuggestedRoute) => {
-    // Generación simple de HTML para imprimir
+    const totalVolActual = route.assignedInvoices.reduce((acc, i) => acc + (i.volumeM3 || 0), 0);
+    // Generación premium de planilla HTML
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     
     const html = `
       <html>
         <head>
-          <title>PLANILLA DE CARGUE - ${route.vehicle.plate}</title>
+          <title>PLANILLA M7 - ${route.vehicle.plate}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 10px; }
-            th { background-color: #f0f0f0; }
-            .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-            .total { font-weight: bold; margin-top: 20px; text-align: right; }
+            @page { size: letter; margin: 1cm; }
+            body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; padding: 20px; }
+            .header-table { width: 100%; margin-bottom: 25px; border-bottom: 3px solid #0f172a; padding-bottom: 15px; }
+            .logo-placeholder { font-size: 28px; font-weight: 900; color: #020617; letter-spacing: -1px; }
+            .m7-accent { color: #10b981; }
+            .doc-title { text-align: right; font-size: 14px; font-weight: 900; color: #64748b; }
+            
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; background: #f8fafc; padding: 20px; border-radius: 15px; }
+            .info-item { font-size: 11px; }
+            .info-label { font-weight: 900; color: #94a3b8; text-transform: uppercase; font-size: 8px; margin-bottom: 3px; }
+            .info-value { font-weight: 800; color: #1e293b; font-size: 13px; }
+
+            table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+            th { background-color: #0f172a; color: white; padding: 12px 8px; text-align: left; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+            td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; font-weight: 600; }
+            tr:last-child td { border-bottom: none; }
+            tr:nth-child(even) { background-color: #f1f5f9; }
+
+            .prio-badge { background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 900; }
+            .footer-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; margin-top: 60px; padding: 0 40px; }
+            .sig-box { border-top: 2px solid #0f172a; padding-top: 10px; text-align: center; }
+            .sig-label { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #64748b; }
+            
+            .summary-box { margin-top: 30px; text-align: right; padding-right: 20px; }
+            .summary-total { font-size: 16px; font-weight: 900; color: #0f172a; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h2>M7 LOGÍSTICA - PLANILLA DE CARGUE</h2>
-            <p><strong>VEHÍCULO:</strong> ${route.vehicle.plate} | <strong>CONDUCTOR:</strong> ${(route.vehicle as any).driverName || 'S/A'}</p>
-            <p><strong>FECHA:</strong> ${new Date().toLocaleDateString()} | <strong>CIUDAD:</strong> ${route.city}</p>
-            <p><strong>CAPACIDAD:</strong> ${route.vehicle.capacityM3}m³ | <strong>OCUPACIÓN:</strong> ${route.totalVolume}m³ (${route.utilization}%)</p>
+          <table class="header-table" style="border:none;">
+            <tr style="background:none;">
+              <td style="border:none; padding:0;">
+                <div class="logo-placeholder">MILLA<span class="m7-accent">7</span></div>
+                <div style="font-size: 9px; font-bold; color: #64748b;">SOFTWARE DE LOGÍSTICA INTELIGENTE</div>
+              </td>
+              <td class="doc-title" style="border:none; padding:0;">
+                PLANILLA DE DESPACHO<br/>
+                <span style="color: #10b981;">ID RUTA: ${route.id.split('-').slice(-1)}</span>
+              </td>
+            </tr>
+          </table>
+
+          <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Vehículo / Placa</div>
+                <div class="info-value">${route.vehicle.plate}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Conductor Asignado</div>
+                <div class="info-value">${(route.vehicle as any).driverName || 'Óscar Santamaría'}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Fecha de Salida</div>
+                <div class="info-value">${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Capacidad Utilizada</div>
+                <div class="info-value">${totalVolActual.toFixed(2)}m³ / ${route.vehicle.capacityM3}m³ (${Math.round((totalVolActual / route.vehicle.capacityM3) * 100)}%)</div>
+            </div>
           </div>
+
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>CLIENTE</th>
-                <th>DIRECCIÓN</th>
-                <th>CIUDAD</th>
-                <th>VOL (m³)</th>
-                <th>PESO (Kg)</th>
-                <th>OBSERVACIONES / PRIORIDAD</th>
+                <th width="30">#</th>
+                <th width="100">Factura</th>
+                <th>Cliente</th>
+                <th>Destino / Ciudad</th>
+                <th width="60">Vol (m³)</th>
+                <th width="150">Observaciones</th>
               </tr>
             </thead>
             <tbody>
               ${route.assignedInvoices.map((inv, idx) => {
-                  const doc = documents.find(d => d.id === inv.docLId);
-                  const obs = doc?.inventory_observation || '';
-                  const isPrio = (inv as any).isPriority ? '★ PRIORIDAD' : '';
+                  const isPrio = (inv as any).isPriority ? '<span class="prio-badge">★ PRIORIDAD</span>' : '';
                   return `
                     <tr>
                       <td>${idx + 1}</td>
+                      <td style="font-weight:900; color:#0f172a;">${inv.invoiceNumber}</td>
                       <td>${inv.customerName}</td>
-                      <td>${inv.address}</td>
-                      <td>${inv.city}</td>
-                      <td>${inv.volumeM3}</td>
-                      <td>${(inv as any).weightKg || 0}</td>
-                      <td>${isPrio} ${obs}</td>
+                      <td>
+                        <div style="font-weight:800;">${inv.city}</div>
+                        <div style="font-size:8px; color:#64748b;">${inv.address}</div>
+                      </td>
+                      <td style="font-weight:900; color:#10b981;">${inv.volumeM3.toFixed(3)}</td>
+                      <td>
+                        ${isPrio}
+                        <div style="font-size:8px; margin-top:2px;">${inv.notes || ''}</div>
+                      </td>
                     </tr>
                   `;
               }).join('')}
             </tbody>
           </table>
-          <div class="total">
-            TOTAL TRACKS: ${route.assignedInvoices.length} | TOTAL VOLUMEN: ${route.totalVolume}m³
+
+          <div class="summary-box">
+             <div class="summary-total">TOTAL FACTURAS: ${route.assignedInvoices.length}</div>
+             <div style="font-size: 11px; font-weight: 700; color: #64748b;">CARGA TOTAL: ${totalVolActual.toFixed(2)}m³</div>
           </div>
+
+          <div class="footer-signatures">
+            <div class="sig-box">
+                <div class="sig-label">Firma Conductor</div>
+                <div style="font-size: 8px; margin-top: 5px;">${(route.vehicle as any).driverName || 'Óscar Santamaría'}</div>
+            </div>
+            <div class="sig-box">
+                <div class="sig-label">Revisión de Bodega / Despacho</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 40px; text-align: center; font-size: 8px; color: #94a3b8; font-weight: 700;">
+            DOCUMENTO GENERADO POR SISTEMA MILLA 7 LOGÍSTICA - ${new Date().toLocaleString()}
+          </div>
+
           <script>window.print();</script>
         </body>
       </html>
@@ -795,7 +907,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4 h-full animate-in fade-in duration-500 overflow-hidden">
+    <div className="flex flex-col gap-4 min-h-screen animate-in fade-in duration-500 pb-20">
       {/* HEADER COMPACTO */}
       <div className="bg-white p-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col xl:flex-row justify-between items-center gap-4 shrink-0 transition-all">
         <div className="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto justify-center">
@@ -818,10 +930,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-2 w-full xl:w-auto">
-          <div className="bg-slate-100 p-1 rounded-2xl flex shadow-inner h-10 relative w-full md:w-auto justify-between md:justify-start">
-             <button onClick={() => setViewMode('intelligence')} className={`flex-1 md:flex-none px-4 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewMode === 'intelligence' ? 'text-slate-900' : 'text-slate-400'}`}>IA</button>
-             <button onClick={() => setViewMode('map')} className={`flex-1 md:flex-none px-4 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewMode === 'map' ? 'text-slate-900' : 'text-slate-400'}`}>Mapa</button>
-             <div className={`hidden md:block absolute top-1 bottom-1 w-[60px] bg-white rounded-xl shadow-md transition-all duration-300 ${viewMode === 'intelligence' ? 'left-1' : 'left-[68px]'}`}></div>
+          <div className="bg-slate-100 p-1 rounded-2xl flex shadow-inner h-10 relative w-full md:w-auto">
+             <button onClick={() => setViewMode('intelligence')} className={`flex-1 md:flex-none px-6 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewMode === 'intelligence' ? 'text-slate-900' : 'text-slate-400'}`}>Sugerencias de Ruta</button>
+             <div className="absolute top-1 bottom-1 left-1 w-[calc(100%-8px)] bg-white rounded-xl shadow-md transition-all"></div>
           </div>
 
           <div className="relative group">
@@ -854,6 +965,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             {isOptimizing ? '...' : (suggestedRoutes.length > 0 ? 'RECALCULAR' : 'GENERAR')}
           </button>
         </div>
+      </div>
 
         {/* INDICADORES DE DÉFICIT EN HEADER (RELOCALIZADOS) */}
         {(unassignedMetrics.count > 0) && (
@@ -875,7 +987,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                    <Icons.Truck className="w-3 h-3" />
                 </div>
              </div>
-
+          </div>
+        )}
       {lastReadjustmentResult && (
           <div className="bg-slate-900/90 backdrop-blur-md border border-indigo-500/30 p-2 px-4 rounded-2xl shadow-lg flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300 mx-4 border-l-4 border-l-indigo-500">
               <div className="flex items-center gap-3">
@@ -911,18 +1024,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   </button>
               </div>
           </div>
-      )}
-          </div>
         )}
-      </div>
 
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 overflow-hidden">
-        {viewMode === 'map' ? (
-          <div className="flex-1 bg-slate-200 rounded-[2.5rem] shadow-xl border-4 border-white overflow-hidden relative">
-             <div id="m7-routing-map" className="w-full h-full"></div>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+      <div className="flex-1 flex flex-col lg:flex-row gap-4">
+          <div className="flex-1 space-y-4 pr-2">
              {suggestedRoutes.length === 0 ? (
                <div className="h-full flex flex-col items-center justify-center text-center p-10 bg-white rounded-[3rem] border border-slate-100 shadow-lg space-y-6">
                   <div className="w-24 h-24 bg-slate-50 rounded-[2rem] flex items-center justify-center text-slate-200 border-4 border-dashed border-slate-100">
@@ -1107,7 +1212,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 </div>
              )}
           </div>
-        )}
 
         <div className="hidden lg:flex w-72 bg-white p-6 rounded-[2.5rem] shadow-xl border border-slate-100 flex-col gap-6 shrink-0 overflow-hidden">
            <div className="space-y-4">
@@ -1526,7 +1630,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                        });
                    })()}
                 </div>
-             </div>
 
              <div className="p-6 bg-slate-50 border-t border-slate-100 rounded-b-[2.5rem] flex gap-4">
                 <button 
@@ -1550,6 +1653,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
              </div>
            </div>
         </div>
+      </div>
       )}
 
       {/* Modal de Confirmación de Despacho Premium */}
@@ -1723,7 +1827,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         </div>
       )}
     </div>
-  );
+);
 };
 
 export default RoutePlanner;

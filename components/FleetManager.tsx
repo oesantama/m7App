@@ -85,10 +85,10 @@ const FleetManager: React.FC<FleetManagerProps> = ({
   onAddVehicle, onAddDriver, onUpdateVehicle, onUpdateDriver,
   onDeleteVehicle, onDeleteDriver
 }) => {
-  const [viewTab, setViewTab] = useState<'vehicles' | 'drivers'>('vehicles');
+  const [viewTab, setViewTab] = useState<'vehicles' | 'drivers' | 'health'>('vehicles');
   const [displayType, setDisplayType] = useState<'table' | 'grid'>('table');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'single' | 'edit' | 'detail'>('single');
+  const [modalMode, setModalMode] = useState<'single' | 'edit' | 'detail' | 'telemetry'>('single');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -97,6 +97,39 @@ const FleetManager: React.FC<FleetManagerProps> = ({
   const [uploadMode, setUploadMode] = useState<'photos' | 'pdf'>('photos');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<any>(null);
+  
+  // Telemetry State
+  const [telemetryData, setTelemetryData] = useState<any[]>([]);
+  const [selectedTelemetry, setSelectedTelemetry] = useState<any>(null);
+
+  useEffect(() => {
+      if (viewTab === 'health') {
+          fetch('/api/telemetry/health')
+            .then(res => res.json())
+            .then(data => setTelemetryData(data))
+            .catch(err => console.error("Error fetching telemetry:", err));
+
+            const interval = setInterval(() => {
+                 fetch('/api/telemetry/health')
+                    .then(res => res.json())
+                    .then(data => setTelemetryData(data))
+                    .catch(err => console.error("Error polling telemetry:", err));
+            }, 5000);
+            return () => clearInterval(interval);
+      }
+  }, [viewTab]);
+
+  const fetchVehicleTelemetry = async (plate: string) => {
+      try {
+          const res = await fetch(`/api/telemetry/vehicle/${plate}/latest`);
+          const data = await res.json();
+          setSelectedTelemetry(data);
+          setModalMode('telemetry');
+          setIsModalOpen(true);
+      } catch (e) {
+          toast.error("No se pudo obtener la telemetría");
+      }
+  };
 
   const normalizePlate = (plate: string) => (plate || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
@@ -345,7 +378,8 @@ const FleetManager: React.FC<FleetManagerProps> = ({
           <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-11 relative">
             <button onClick={() => setViewTab('vehicles')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewTab === 'vehicles' ? 'text-slate-900' : 'text-slate-400'}`}>Vehículos</button>
             <button onClick={() => setViewTab('drivers')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewTab === 'drivers' ? 'text-slate-900' : 'text-slate-400'}`}>Conductores</button>
-            <div className={`absolute top-1 bottom-1 bg-white rounded-xl shadow-md transition-all duration-300 ${viewTab === 'vehicles' ? 'left-1 w-[80px]' : 'left-[84px] w-[95px]'}`}></div>
+            <button onClick={() => setViewTab('health')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewTab === 'health' ? 'text-emerald-600' : 'text-slate-400'}`}>Salud Flota</button>
+            <div className={`absolute top-1 bottom-1 bg-white rounded-xl shadow-md transition-all duration-300 ${viewTab === 'vehicles' ? 'left-1 w-[80px]' : viewTab === 'drivers' ? 'left-[84px] w-[95px]' : 'left-[184px] w-[90px]'}`}></div>
           </div>
 
           <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-11 relative">
@@ -560,6 +594,47 @@ const FleetManager: React.FC<FleetManagerProps> = ({
              <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 hover:text-white transition-all text-4xl font-thin" title="Cerrar">×</button>
             </div>
 
+            {modalMode === 'telemetry' && selectedTelemetry && (
+                <div className="space-y-8 animate-in zoom-in-95">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-slate-900 p-6 rounded-[2rem] text-center text-white">
+                            <Icons.Route className="mx-auto mb-2 text-emerald-500" />
+                            <h4 className="text-3xl font-black">{selectedTelemetry.speed}</h4>
+                            <span className="text-[9px] uppercase tracking-widest text-slate-400">km/h</span>
+                        </div>
+                        <div className="bg-white border border-slate-100 p-6 rounded-[2rem] text-center text-slate-900 shadow-lg">
+                            <Icons.Settings className="mx-auto mb-2 text-slate-300" />
+                            <h4 className="text-3xl font-black">{selectedTelemetry.rpm}</h4>
+                            <span className="text-[9px] uppercase tracking-widest text-slate-400">RPM</span>
+                        </div>
+                        <div className="bg-white border border-slate-100 p-6 rounded-[2rem] text-center text-slate-900 shadow-lg">
+                            <div className="mx-auto mb-2 text-slate-300 font-black text-xl">🌡️</div>
+                            <h4 className="text-3xl font-black">{selectedTelemetry.engine_temp}°</h4>
+                            <span className="text-[9px] uppercase tracking-widest text-slate-400">Temp</span>
+                        </div>
+                        <div className="bg-white border border-slate-100 p-6 rounded-[2rem] text-center text-slate-900 shadow-lg">
+                             <div className="mx-auto mb-2 text-slate-300 font-black text-xl">⛽</div>
+                            <h4 className="text-3xl font-black">{selectedTelemetry.fuel_level}%</h4>
+                            <span className="text-[9px] uppercase tracking-widest text-slate-400">Nivel</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-50 p-8 rounded-[2rem]">
+                        <h4 className="font-black text-slate-900 uppercase text-sm mb-4">Ubicación Actual</h4>
+                        <div className="flex items-center gap-4 text-xs font-bold text-slate-500">
+                             <span>Lat: {selectedTelemetry.latitude}</span>
+                             <span>Lng: {selectedTelemetry.longitude}</span>
+                             <span className="ml-auto text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full">{new Date(selectedTelemetry.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                    </div>
+
+                    <button onClick={() => setIsModalOpen(false)} className="w-full py-4 bg-emerald-500 text-slate-900 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-xl">
+                        Cerrar Monitor
+                    </button>
+                </div>
+            )}
+            
+            {(modalMode === 'single' || modalMode === 'edit' || modalMode === 'detail') && (
             <div className={`p-10 space-y-8 flex-1 bg-slate-50/20 max-h-[70vh] overflow-y-auto custom-scrollbar ${modalMode === 'detail' ? 'pointer-events-none opacity-90' : ''}`}>
               {aiError && (
                 <div className="p-6 bg-red-600 text-white rounded-[2rem] text-[10px] font-black uppercase flex items-center gap-4 animate-in shake">
@@ -776,6 +851,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                 )}
               </div>
             </div>
+            )}
           </div>
         </div>
       )}

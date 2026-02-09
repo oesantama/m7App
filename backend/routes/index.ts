@@ -21,6 +21,10 @@ import systemRoutes from './system.routes.js';
 import masterRoutes from './master.routes.js';
 import routeRoutes from './route.routes.js';
 import signatureRoutes from './signature.routes.js';
+import locationRoutes from './location.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
+import portalRoutes from './portal.routes.js';
+import telemetryRoutes from './telemetry.routes.js';
 
 
 const router = Router();
@@ -46,6 +50,10 @@ router.use('/user-permissions', userPermissionRoutes);
 router.use('/ai', aiRoutes);
 router.use('/system', systemRoutes);
 router.use('/signatures', signatureRoutes);
+router.use('/locations', locationRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/portal', portalRoutes);
+router.use('/telemetry', telemetryRoutes);
 
 
 export default router;

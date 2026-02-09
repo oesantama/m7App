@@ -203,27 +203,6 @@ const Layout: React.FC<LayoutProps> = ({
         </nav>
 
         <div className="mt-auto p-4 border-t border-slate-800 space-y-3">
-          {/* BOTÓN MESA DE AYUDA (HELP DESK) */}
-          {/* BOTÓN MESA DE AYUDA (HELP DESK) INTERACTIVO */}
-          <button 
-            onClick={() => {
-               if (isHelpMode) {
-                 setIsHelpMode(false);
-                 toast.dismiss();
-                 toast.info("Mesa de Ayuda Desactivada");
-               } else {
-                 setIsHelpMode(true);
-                 toast.info("Mesa de Ayuda ACTIVADA", { 
-                   description: "Haga clic en cualquier módulo del menú para ver su descripción sin navegar.",
-                   duration: Infinity 
-                 });
-               }
-            }}
-            className={`w-full flex items-center gap-3 px-4 py-3 border rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all group ${isCollapsed ? 'justify-center px-0' : ''} ${isHelpMode ? 'bg-emerald-500 text-slate-900 border-emerald-500 animate-pulse' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500 hover:text-slate-900'}`}
-          >
-            <Icons.Alert style={{ width: '16px', height: '16px' }} />
-            {!isCollapsed && <span>{isHelpMode ? 'SALIR DE AYUDA' : 'MESA DE AYUDA'}</span>}
-          </button>
 
           <div className={`bg-slate-800/40 rounded-3xl flex items-center p-4 gap-4 relative`}>
              <button onClick={() => setIsProfileModalOpen(true)} className="absolute inset-0 z-10 opacity-0 cursor-pointer"></button>

@@ -7,37 +7,82 @@ import MasterModule from './components/MasterModule';
 import WhatsAppConnect from './components/WhatsAppConnect';
 import GestionDocumentosL from './components/GestionDocumentosL';
 import RoutePlanner from './components/RoutePlanner';
+import LogisticsDispatch from './components/LogisticsDispatch';
 import RecibidoMaterial from './components/RecibidoMaterial';
 import FleetManager from './components/FleetManager';
 import AssignmentManager from './components/AssignmentManager';
 import AIChat from './components/AIChat';
 import DigitalSignature from './components/DigitalSignature';
 import ApprovalManager from './components/ApprovalManager';
+import ChatbotWidget from './components/ChatbotWidget';
+import DriverGamification from './components/DriverGamification';
+import ExecutiveDashboard from './components/ExecutiveDashboard';
 import { api } from './services/api';
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
+import { useAppStore } from './stores/useAppStore';
+import PortalLayout from './components/portal/PortalLayout';
+import ClientLogin from './components/portal/ClientLogin';
+import OrderTracking from './components/portal/OrderTracking';
 
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<string>(() => localStorage.getItem('m7_active_tab') || 'dashboard');
-  const [activeMasterCategory, setActiveMasterCategory] = useState<MasterCategory>('masterUsuarios');
-  const [allMasterData, setAllMasterData] = useState<{ [key in MasterCategory]?: MasterRecord[] }>({
-    masterUsuarios: [],
-    masterClientes: [],
-    masterArticulo: [],
-    masterTiposVehiculo: [],
-    masterEstados: [
-        { id: 'EST-01', name: 'ACTIVO', statusId: 'EST-01' } as any,
-        { id: 'EST-02', name: 'INACTIVO', statusId: 'EST-01' } as any
-    ],
-    masterModulos: [],
-    masterPaginas: [],
-    masterMarcas: []
-  });
-  const [waStatus, setWaStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
-  const [isLoading, setIsLoading] = useState(false);
+  // ============ ZUSTAND STORE ============
+  const {
+    // Estado
+    isAuthenticated,
+    user,
+    activeTab,
+    activeMasterCategory,
+    allMasterData,
+    documents,
+    invoices,
+    vehicles,
+    drivers,
+    assignments,
+    waStatus,
+    isRestoring,
+    isLoading,
+    showTimeoutWarning,
+    timeLeft,
+    
+    // Acciones
+    setUser,
+    setIsAuthenticated,
+    setActiveTab,
+    setActiveMasterCategory,
+    setAllMasterData,
+    setDocuments,
+    setInvoices,
+    setVehicles,
+    setDrivers,
+    setAssignments,
+    setWaStatus,
+    setIsRestoring,
+    setIsLoading,
+    setShowTimeoutWarning,
+    setTimeLeft,
+    decrementTimeLeft,
+    
+    // Helpers
+    updateMasterData,
+    
+    // Acciones de mutación
+    addVehicle,
+    updateVehicle,
+    deleteVehicle,
+    addDriver,
+    updateDriver,
+    deleteDriver,
+    addAssignment,
+    endAssignment,
+    
+    // Getters
+    getAvailableVehicles,
+    
+    // Utilidades
+    logout
+  } = useAppStore();
   
   const normalize = (data: any) => {
     if (!Array.isArray(data)) return [];
@@ -51,20 +96,9 @@ const App: React.FC = () => {
     }));
   };
   
-  // Estados Operativos
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [drivers, setDrivers] = useState<any[]>([]);
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<any[]>([]);
-
-  const [isRestoring, setIsRestoring] = useState(true);
-  
   // Timeout - 10 Minutos (600,000 ms)
   const TIMEOUT_MS = 10 * 60 * 1000;
   const WARNING_MS = 1 * 60 * 1000; // Aviso 1 minuto antes
-  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(60); // Segundos para el aviso
   let inactivityTimer: any;
   let warningTimer: any;
   let countdownInterval: any;
@@ -87,15 +121,44 @@ const App: React.FC = () => {
             setShowTimeoutWarning(true);
             setTimeLeft(60);
             countdownInterval = setInterval(() => {
-                setTimeLeft(prev => prev > 0 ? prev - 1 : 0);
+                decrementTimeLeft(); // Usa helper del store
             }, 1000);
         }, TIMEOUT_MS - WARNING_MS);
     }
   };
 
+  // ============ PORTAL ROUTING ============
+  const [isPortalMode, setIsPortalMode] = useState(false);
+  const [portalRoute, setPortalRoute] = useState<'login' | 'tracking'>('login');
+  
+  // Detectar modo portal por Hash (Simple Router)
+  useEffect(() => {
+    const checkHash = () => {
+        const hash = window.location.hash;
+        if (hash.startsWith('#/portal')) {
+            setIsPortalMode(true);
+            if (hash.includes('tracking')) {
+                setPortalRoute('tracking');
+            } else {
+                setPortalRoute('login');
+            }
+        } else {
+             setIsPortalMode(false);
+        }
+    };
+    
+    window.addEventListener('hashchange', checkHash);
+    checkHash(); // Initial check
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
+
+  // Import dynamic components locally or use lazy? No, direct import above to keep it simple
+  
   useEffect(() => {
       // Eventos de actividad
       window.addEventListener('mousemove', resetInactivityTimer);
+      //...
+
       window.addEventListener('keydown', resetInactivityTimer);
       window.addEventListener('click', resetInactivityTimer);
       
@@ -134,6 +197,15 @@ const App: React.FC = () => {
                 
                 // CARGAR DATOS MAESTROS FRESCOS CON EL CLIENTE RESTAURADO
                 refreshAppData(parsedUser.clientId);
+                
+                // RESTAURAR CATEGORÍA ACTIVA DE MAESTROS SI EXISTE
+                const savedCategory = localStorage.getItem('m7_active_master_category');
+                if (savedCategory) {
+                    console.log('[M7-RESTORE] Restaurando categoría activa:', savedCategory);
+                    setActiveTab('master');
+                    setActiveMasterCategory(savedCategory as any);
+                    localStorage.removeItem('m7_active_master_category'); // Limpiar después de usar
+                }
             }
           } catch (e: any) {
             console.error('[SESSION-RESTORE] Error:', e);
@@ -361,8 +433,8 @@ const App: React.FC = () => {
             mappedPermissions = userPermissions;
         }
 
-        setAllMasterData(prev => ({
-            ...prev,
+        setAllMasterData({
+            ...allMasterData,
             ...groupedMasters,
             masterClientes: Array.isArray(clients) ? clients : [],
             masterUsuarios: Array.isArray(users) ? users : [],
@@ -382,7 +454,7 @@ const App: React.FC = () => {
                 uomStdId: a.uom_std_id,
                 categoryArticuloId: a.category_articulo_id
             })) : []
-        }));
+        });
 
         const [docsData, vehData, driversData] = await Promise.all([
             api.getDocuments(userData.client_id || 'c1').catch(() => []),
@@ -425,18 +497,12 @@ const App: React.FC = () => {
   };
 
   const handleLogout = (expired = false) => {
-    setIsAuthenticated(false);
-    setUser(null);
-    localStorage.removeItem('m7_user_session');
-    localStorage.removeItem('m7_active_tab');
-    localStorage.removeItem('m7_master_data');
+    logout(); // Usa la acción del store
     if (expired) {
         toast.error("Sesión expirada por inactividad");
     } else {
         toast.info("Sesión finalizada");
     }
-    // No recargar para permitir mostrar el toast y volver al login limpiamente
-    // window.location.reload(); 
   };
 
   if (isRestoring) {
@@ -578,7 +644,24 @@ const App: React.FC = () => {
             allMasterData={allMasterData}
             setAllMasterData={setAllMasterData}
             user={user!}
-            onAudit={refreshAppData}
+            onAudit={async () => {
+              // SOLO recargar maestros, NO toda la app
+              console.log('[M7-APP] Refreshing ONLY master records after audit...');
+              try {
+                const freshMasters = await api.getGenericMasters();
+                if (Array.isArray(freshMasters)) {
+                  const grouped: any = {};
+                  freshMasters.forEach((m: any) => {
+                    if (!grouped[m.category]) grouped[m.category] = [];
+                    grouped[m.category].push(m);
+                  });
+                  setAllMasterData(prevData => ({ ...prevData, ...grouped }));
+                  console.log('[M7-APP] ✅ Masters refreshed successfully');
+                }
+              } catch (err) {
+                console.error('[M7-APP] Error refreshing masters:', err);
+              }
+            }}
           />
         );
       case 'whatsapp-status':
@@ -624,12 +707,12 @@ const App: React.FC = () => {
               masterArticulo={allMasterData.masterArticulo || []}
               onAddArticleToMaster={async (article) => {
                 await api.saveArticle(article);
-                setAllMasterData(prev => ({ ...prev, masterArticulo: [...(prev.masterArticulo || []), article as MasterRecord] }));
+                setAllMasterData({ ...allMasterData, masterArticulo: [...(allMasterData.masterArticulo || []), article as MasterRecord] });
               }}
               onAddNotificationToMaster={async (notif) => {
                 const newNotif = { ...notif, id: `not-${Date.now()}` }; 
                 await api.saveMaster('masterNotificaciones', newNotif);
-                setAllMasterData(prev => ({ ...prev, masterNotificaciones: [...(prev.masterNotificaciones || []), newNotif as MasterRecord] }));
+                setAllMasterData({ ...allMasterData, masterNotificaciones: [...(allMasterData.masterNotificaciones || []), newNotif as MasterRecord] });
               }}
             />
           );
@@ -646,62 +729,31 @@ const App: React.FC = () => {
                     // Normalización local inmediata para reactividad
                     const newVeh = { 
                       ...v, 
-                      id: res.id || `v-${Date.now()}`,
-                      capacityM3: Number(v.capacityM3 || 0)
+                      id: res.id || `veh-${Date.now()}`,
+                      statusId: v.statusId || 'EST-01', // Default Disponible
+                      capacityM3: Number(v.capacityM3) || 0
                     };
-                    // @ts-ignore
-                    setVehicles(prev => [...prev, newVeh]);
-                    toast.success("Vehículo registrado");
+                    setVehicles([...vehicles, newVeh]);
+                    
+                    // Actualizar master data también
+                    const currentMaster = (allMasterData as any).masterVehiculos || [];
+                    setAllMasterData({
+                        ...allMasterData,
+                        // @ts-ignore
+                        masterVehiculos: [...currentMaster, { ...newVeh, name: newVeh.plate } as MasterRecord]
+                    });
+                    
+                    return { success: true };
                   } catch (e) {
-                    toast.error("Error al guardar vehículo");
+                    console.error(e);
+                    return { success: false, error: 'Error al guardar vehículo' };
                   }
-                }}
-                onUpdateVehicle={async (id, data) => {
-                  try {
-                    await api.saveMaster('masterVehiculos', { ...data, id });
-                    // @ts-ignore
-                    setVehicles(prev => prev.map(v => v.id === id ? { ...v, ...data, capacityM3: Number(data.capacityM3 || v.capacityM3) } : v));
-                    toast.success("Vehículo actualizado");
-                  } catch (e) {
-                    toast.error("Error al actualizar vehículo");
-                  }
-                }}
-                onAddDriver={async (d) => {
-                    try {
-                      const res = await api.saveMaster('masterConductores', d);
-                      // Normalización: AssignmentManager requiere 'status'
-                      const statusName = allMasterData.masterEstados?.find(s => s.id === (d.statusId || 'EST-01'))?.name || 'Activo';
-                      const newDriver = { 
-                        ...d, 
-                        id: res.id || `d-${Date.now()}`,
-                        status: statusName 
-                      };
-                      // @ts-ignore
-                      setDrivers(prev => [...prev, newDriver]);
-                      toast.success("Conductor registrado");
-                    } catch (e) {
-                      toast.error("Error al guardar conductor");
-                    }
-                }}
-                onUpdateDriver={async (id, data) => {
-                    try {
-                      await api.saveMaster('masterConductores', { ...data, id });
-                      const statusName = allMasterData.masterEstados?.find(s => s.id === (data.statusId || 'EST-01'))?.name || 'Activo';
-                      // @ts-ignore
-                      setDrivers(prev => prev.map(d => d.id === id ? { ...d, ...data, status: statusName } : d));
-                      toast.success("Conductor actualizado");
-                    } catch (e) {
-                      toast.error("Error al actualizar conductor");
-                    }
-                }}
-              onDeleteVehicle={async (id) => {
-                await api.deleteVehicle(id, user?.name);
-                setVehicles(prev => prev.filter(v => v.id !== id));
               }}
-              onDeleteDriver={async (id) => {
-                await api.deleteDriver(id, user?.name);
-                setDrivers(prev => prev.filter(d => d.id !== id));
-              }}
+              onUpdateVehicle={updateVehicle}
+              onDeleteVehicle={deleteVehicle}
+              onAddDriver={addDriver}
+              onUpdateDriver={updateDriver}
+              onDeleteDriver={deleteDriver}
             />
           );
       case 'vinculo':
@@ -713,7 +765,7 @@ const App: React.FC = () => {
               user={user!} 
               onAssign={async (vId, dId, cId) => {
                 const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-                setAssignments(prev => [...prev, newAssign]);
+                addAssignment(newAssign); // Usa acción del store
                 try {
                     await api.saveAssignment(newAssign);
                 } catch (e) {
@@ -721,7 +773,7 @@ const App: React.FC = () => {
                 }
               }}
               onEndAssignment={async (aId) => {
-                setAssignments(prev => prev.map(a => a.id === aId ? { ...a, isActive: false, updatedAt: new Date().toISOString() } : a));
+                endAssignment(aId); // Usa acción del store
                 try {
                     await api.endAssignment(aId, user?.name);
                 } catch (e) {
@@ -734,6 +786,34 @@ const App: React.FC = () => {
           return <DigitalSignature user={user!} />;
       case 'aprobar-firma':
           return <ApprovalManager user={user!} allUsers={allMasterData.masterUsuarios || []} />;
+      case 'gamification':
+          // Casting de user a Driver temporal para visualización
+          return <DriverGamification driver={{
+              id: user!.id,
+              name: user!.name,
+              documentNumber: user!.id,
+              statusId: 'EST-01',
+              clientId: user!.clientId || 'c1',
+              licenseCategory: 'C2',
+              status: 'Activo'
+          } as any} />;
+      case 'executive-dashboard':
+          return <ExecutiveDashboard />;
+      case 'despacho':
+          return (
+            <LogisticsDispatch 
+              user={user!}
+              selectedClient={user!.clientId || 'c1'}
+              vehicles={vehicles}
+              drivers={drivers}
+              assignments={assignments}
+              invoices={invoices}
+              activeRoutes={[]}
+              onRefresh={() => refreshAppData()}
+            />
+          );
+      case 'chatbot':
+          return <AIChat context={{ user: user!.name, activeTab: 'chatbot-fullscreen' }} />;
       default:
         return (
           <div className="p-10 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
@@ -742,6 +822,25 @@ const App: React.FC = () => {
         );
     }
   };
+
+  if (isPortalMode) {
+      return (
+          <>
+            <Toaster position="top-right" richColors theme="dark" />
+            <PortalLayout>
+                {portalRoute === 'login' && <ClientLogin onLogin={(token, user) => {
+                     // Handle client login state if we want persistence, for now just show success and maybe redirect to dashboard
+                     // For MVP, login just shows success or could store token
+                     localStorage.setItem('m7_client_token', token);
+                     // Redirect to simplified dashboard if we had one, or just stay logged in
+                     // For now, let's redirect to tracking
+                     window.location.hash = '#/portal/tracking';
+                }} />}
+                {portalRoute === 'tracking' && <OrderTracking />}
+            </PortalLayout>
+          </>
+      );
+  }
 
   if (!isAuthenticated || !user) {
     return <Login onLogin={handleLogin} />;
@@ -774,7 +873,7 @@ const App: React.FC = () => {
                  
                  // Actualizar también la lista de maestros para que se vea en Auditoría/Difusión
                  const freshUsers = await api.getUsers().catch(() => []);
-                 setAllMasterData(prev => ({ ...prev, masterUsuarios: freshUsers }));
+                 setAllMasterData({ ...allMasterData, masterUsuarios: freshUsers });
                  
                  localStorage.setItem('m7_user_session', JSON.stringify(updatedUser));
              } catch (e) {

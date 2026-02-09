@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <style>
+      .bg { fill: #0f172a; }
+      .m-text { fill: #10b981; font-family: Arial, sans-serif; font-weight: 900; font-size: 280px; }
+      .seven-text { fill: #ffffff; font-family: Arial, sans-serif; font-weight: 900; font-size: 280px; }
+    </style>
+  </defs>
+  <rect class="bg" width="512" height="512"/>
+  <text class="m-text" x="100" y="360">M</text>
+  <text class="seven-text" x="280" y="360">7</text>
+</svg>
