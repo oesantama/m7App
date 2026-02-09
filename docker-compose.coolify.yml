@@ -1,0 +1,72 @@
+services:
+  # Backend
+  m7app-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: always
+    environment:
+      - PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-m7_admin}
+      - DB_PASS=${POSTGRES_PASSWORD:-m7_master_password}
+      - DB_NAME=${POSTGRES_DB:-m7_logistica}
+      # Add other env vars here or let Coolify inject them via .env
+    depends_on:
+      - postgres
+    networks:
+      - m7-network
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: always
+    depends_on:
+      - m7app-backend
+    networks:
+      - m7-network
+
+  # Evolution API (WhatsApp)
+  evolution:
+    image: atendai/evolution-api:v1.8.2
+    container_name: m7-evolution
+    restart: always
+    environment:
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-B3B896F8-9862-4467-9C17-A038848C1726}
+      - SERVER_URL=${EVOLUTION_API_URL:-http://localhost:8081}
+      - DOCKER_ENV=true
+      - LOG_LEVEL=error
+      - DEL_INSTANCE=false
+      - STORE_MESSAGES=true
+      - STORE_MESSAGE_UP=true
+      - DATABASE_ENABLED=false # Using local store for simplicity unless postgres needed
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    networks:
+      - m7-network
+
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-m7_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-m7_master_password}
+      - POSTGRES_DB=${POSTGRES_DB:-m7_logistica}
+    volumes:
+      - m7_logistica_data:/var/lib/postgresql/data
+    networks:
+      - m7-network
+
+networks:
+  m7-network:
+    driver: bridge
+
+volumes:
+  m7_logistica_data:
+  evolution_instances:
+  evolution_store:
