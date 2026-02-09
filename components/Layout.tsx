@@ -20,8 +20,8 @@ interface LayoutProps {
   pagesData?: MasterRecord[];
 }
 
-const Layout: React.FC<LayoutProps> = ({ 
-  children, activeTab, setActiveTab, activeMasterCategory, setActiveMasterCategory, 
+const Layout: React.FC<LayoutProps> = ({
+  children, activeTab, setActiveTab, activeMasterCategory, setActiveMasterCategory,
   onBack, showBack, user, onUpdateUser, onLogout, modulesData = [], pagesData = []
 }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -30,7 +30,7 @@ const Layout: React.FC<LayoutProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [profileData, setProfileData] = useState({ name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || AVATAR_GALLERY[0] });
-  
+
   // Estados para 2FA Flow
   const [twoFactorStep, setTwoFactorStep] = useState<'none' | 'qr'>('none');
   const [twoFactorQR, setTwoFactorQR] = useState('');
@@ -78,15 +78,11 @@ const Layout: React.FC<LayoutProps> = ({
   };
 
   const isSuperUser = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
-  
-  console.log('[M7-LAYOUT] User:', user);
-  console.log('[M7-LAYOUT] User Permissions:', user.permissions);
-  console.log('[M7-LAYOUT] Modules Data:', modulesData);
-  console.log('[M7-LAYOUT] Pages Data:', pagesData);
+
+
 
   // ORDENAMIENTO ASCENDENTE DE GRUPOS Y PÁGINAS - ROBUSTECIMIENTO DE PROPIEDADES
-  console.log('[M7-LAYOUT-DEBUG] Raw Modules:', modulesData);
-  console.log('[M7-LAYOUT-DEBUG] Raw Pages:', pagesData);
+
 
   const menuGroups = [...modulesData]
     .filter(m => (m.statusId || m.status_id) === 'EST-01')
@@ -96,11 +92,11 @@ const Layout: React.FC<LayoutProps> = ({
       const allowedPages = [...pagesData]
         .filter(p => (p.parentId || p.parent_id) === modId && (p.statusId || p.status_id) === 'EST-01')
         .filter(p => {
-            if (isSuperUser) return true; // BYPASS REAL PARA EL ADMINISTRADOR
-            const pId = p.id;
-            const userPerm = user.permissions.find(perm => perm.module === pId);
-            const hasPermission = userPerm && userPerm.actions.includes('view');
-            return hasPermission;
+          if (isSuperUser) return true; // BYPASS REAL PARA EL ADMINISTRADOR
+          const pId = p.id;
+          const userPerm = user.permissions.find(perm => perm.module === pId);
+          const hasPermission = userPerm && userPerm.actions.includes('view');
+          return hasPermission;
         })
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(page => ({
@@ -118,16 +114,16 @@ const Layout: React.FC<LayoutProps> = ({
       };
     })
     .filter(group => group.items.length > 0);
-    
-  console.log('[M7-LAYOUT] Menu Groups:', menuGroups);
+
+
 
   const selectItem = (item: any) => {
     if (isHelpMode) {
-        toast.info(`Módulo: ${item.label}`, {
-            description: `Este módulo permite gestionar ${item.label.toLowerCase()} y sus operaciones relacionadas.`,
-            duration: 4000
-        });
-        return;
+      toast.info(`Módulo: ${item.label}`, {
+        description: `Este módulo permite gestionar ${item.label.toLowerCase()} y sus operaciones relacionadas.`,
+        duration: 4000
+      });
+      return;
     }
     if (item.module) setActiveTab(item.module);
     if (item.masterCat && setActiveMasterCategory) setActiveMasterCategory(item.masterCat);
@@ -136,11 +132,11 @@ const Layout: React.FC<LayoutProps> = ({
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[M7-LAYOUT] Updating profile:', profileData);
+
     onUpdateUser(profileData);
     toast.success("Perfil Actualizado Correctamente", {
-        description: "Los cambios se han guardado con éxito.",
-        duration: 3000
+      description: "Los cambios se han guardado con éxito.",
+      duration: 3000
     });
     setIsProfileModalOpen(false);
   };
@@ -160,7 +156,7 @@ const Layout: React.FC<LayoutProps> = ({
     <div className="flex h-screen bg-slate-50 overflow-hidden font-inter">
       {/* MOBILE BACKDROP */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-950/50 z-20 md:hidden backdrop-blur-sm animate-in fade-in"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -178,7 +174,7 @@ const Layout: React.FC<LayoutProps> = ({
             </div>
           )}
         </div>
-        
+
         <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar px-3">
           {menuGroups.map((group) => (
             <div key={group.id} className="space-y-1">
@@ -205,12 +201,12 @@ const Layout: React.FC<LayoutProps> = ({
         <div className="mt-auto p-4 border-t border-slate-800 space-y-3">
 
           <div className={`bg-slate-800/40 rounded-3xl flex items-center p-4 gap-4 relative`}>
-             <button onClick={() => setIsProfileModalOpen(true)} className="absolute inset-0 z-10 opacity-0 cursor-pointer"></button>
-             <div className="w-10 h-10 rounded-full bg-slate-700 overflow-hidden border-2 border-emerald-500 shrink-0">
-               <img src={user.avatar || AVATAR_GALLERY[0]} alt="User" className="w-full h-full object-cover" />
-             </div>
-             {!isCollapsed && <div className="flex-1 min-w-0"><p className="text-xs font-black truncate uppercase">{user.name}</p><p className="text-[10px] text-emerald-500 font-black uppercase">{user.role}</p></div>}
-             <button onClick={onLogout} title="Cerrar Sesión" className="p-2 text-slate-500 hover:text-red-500 z-20 relative transition-colors"><Icons.LogOut /></button>
+            <button onClick={() => setIsProfileModalOpen(true)} className="absolute inset-0 z-10 opacity-0 cursor-pointer"></button>
+            <div className="w-10 h-10 rounded-full bg-slate-700 overflow-hidden border-2 border-emerald-500 shrink-0">
+              <img src={user.avatar || AVATAR_GALLERY[0]} alt="User" className="w-full h-full object-cover" />
+            </div>
+            {!isCollapsed && <div className="flex-1 min-w-0"><p className="text-xs font-black truncate uppercase">{user.name}</p><p className="text-[10px] text-emerald-500 font-black uppercase">{user.role}</p></div>}
+            <button onClick={onLogout} title="Cerrar Sesión" className="p-2 text-slate-500 hover:text-red-500 z-20 relative transition-colors"><Icons.LogOut /></button>
           </div>
         </div>
       </aside>
@@ -218,20 +214,20 @@ const Layout: React.FC<LayoutProps> = ({
       <main className="flex-1 flex flex-col overflow-hidden relative">
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 shrink-0 z-10 shadow-sm">
           <div className="flex items-center gap-4">
-             <button onClick={toggleSidebar} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-500 hover:text-emerald-500"><Icons.Menu /></button>
-             {showBack && (
-               <button onClick={onBack} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-red-700">
-                 Regresar
-               </button>
-             )}
-             <div className="flex items-center gap-3">
-                <div className="h-8 w-1.5 bg-emerald-500 rounded-full"></div>
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{activeTab.replace('-', ' ')}</h2>
-             </div>
+            <button onClick={toggleSidebar} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-500 hover:text-emerald-500"><Icons.Menu /></button>
+            {showBack && (
+              <button onClick={onBack} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-red-700">
+                Regresar
+              </button>
+            )}
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-1.5 bg-emerald-500 rounded-full"></div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{activeTab.replace('-', ' ')}</h2>
+            </div>
           </div>
-           <div id="m7-header-chat-target" className="flex items-center gap-4 transition-all pr-4">
-              {/* Aquí se inyectará el disparador de M7 IQ vía Portal */}
-           </div>
+          <div id="m7-header-chat-target" className="flex items-center gap-4 transition-all pr-4">
+            {/* Aquí se inyectará el disparador de M7 IQ vía Portal */}
+          </div>
         </header>
         <section className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar">{children}</section>
       </main>
@@ -240,8 +236,8 @@ const Layout: React.FC<LayoutProps> = ({
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-[90vw] h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
             <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
-               <h3 className="text-lg font-black uppercase tracking-tight">Mi Identidad M7</h3>
-               <button onClick={() => setIsProfileModalOpen(false)} className="text-2xl font-thin hover:text-red-500 transition-colors">&times;</button>
+              <h3 className="text-lg font-black uppercase tracking-tight">Mi Identidad M7</h3>
+              <button onClick={() => setIsProfileModalOpen(false)} className="text-2xl font-thin hover:text-red-500 transition-colors">&times;</button>
             </div>
             <form onSubmit={handleUpdateProfile} className="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
               <div className="flex flex-col items-center gap-6">
@@ -254,12 +250,12 @@ const Layout: React.FC<LayoutProps> = ({
                     <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
                   </label>
                 </div>
-                
+
                 <div className="w-full">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">Seleccionar Avatar Predefinido</label>
                   <div className="flex justify-center gap-3">
                     {AVATAR_GALLERY.map((av, i) => (
-                      <button key={i} type="button" onClick={() => setProfileData({...profileData, avatar: av})} className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all ${profileData.avatar === av ? 'border-emerald-500 scale-110 shadow-lg' : 'border-transparent hover:border-slate-300'}`}>
+                      <button key={i} type="button" onClick={() => setProfileData({ ...profileData, avatar: av })} className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all ${profileData.avatar === av ? 'border-emerald-500 scale-110 shadow-lg' : 'border-transparent hover:border-slate-300'}`}>
                         <img src={av} alt={`AV-${i}`} className="w-full h-full object-cover" />
                       </button>
                     ))}
@@ -270,11 +266,11 @@ const Layout: React.FC<LayoutProps> = ({
               <div className="grid grid-cols-1 gap-5">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nombre Completo</label>
-                  <input type="text" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value.toUpperCase()})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm" required />
+                  <input type="text" value={profileData.name} onChange={e => setProfileData({ ...profileData, name: e.target.value.toUpperCase() })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm" required />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Teléfono / Celular</label>
-                  <input type="text" value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm" placeholder="+57 ..." />
+                  <input type="text" value={profileData.phone} onChange={e => setProfileData({ ...profileData, phone: e.target.value })} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm" placeholder="+57 ..." />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Corporativo</label>
@@ -294,29 +290,29 @@ const Layout: React.FC<LayoutProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                       <span className={`text-[10px] font-black px-3 py-1 rounded-full ${(user as any).twoFactorEnabled ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                      <span className={`text-[10px] font-black px-3 py-1 rounded-full ${(user as any).twoFactorEnabled ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
                         {(user as any).twoFactorEnabled ? 'ACTIVO' : 'INACTIVO'}
-                       </span>
+                      </span>
                     </div>
                   </div>
 
                   {!(user as any).twoFactorEnabled ? (
                     <div className="space-y-4">
                       {twoFactorStep === 'none' && (
-                        <button 
+                        <button
                           type="button"
                           onClick={async () => {
-                             try {
-                               const res = await api.setup2FA(user.id);
-                               if (res.success) {
-                                 setTwoFactorQR(res.qrCode);
-                                 setTwoFactorSecret(res.secret);
-                                 setTwoFactorStep('qr');
-                                 toast.info("Configuración de 2FA Iniciada");
-                               }
-                             } catch (e) {
-                               toast.error("Error al iniciar 2FA");
-                             }
+                            try {
+                              const res = await api.setup2FA(user.id);
+                              if (res.success) {
+                                setTwoFactorQR(res.qrCode);
+                                setTwoFactorSecret(res.secret);
+                                setTwoFactorStep('qr');
+                                toast.info("Configuración de 2FA Iniciada");
+                              }
+                            } catch (e) {
+                              toast.error("Error al iniciar 2FA");
+                            }
                           }}
                           className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 hover:border-emerald-500 hover:text-emerald-500 transition-all uppercase tracking-widest"
                         >
@@ -326,64 +322,64 @@ const Layout: React.FC<LayoutProps> = ({
 
                       {twoFactorStep === 'qr' && (
                         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200 animate-in zoom-in-95">
-                           <p className="text-[9px] font-black text-slate-500 uppercase text-center mb-4">1. Escanea este código con Google Authenticator o Authy</p>
-                           <div className="w-40 h-40 bg-white mx-auto p-2 rounded-2xl border border-slate-200 mb-4">
-                              <img src={twoFactorQR} alt="QR 2FA" className="w-full h-full" />
-                           </div>
-                           <p className="text-[9px] font-black text-slate-500 uppercase text-center mb-2">2. Ingrese el código de 6 dígitos</p>
-                           <input 
-                              type="text" 
-                              maxLength={6}
-                              placeholder="000000"
-                              value={twoFactorVerifyCode}
-                              onChange={e => setTwoFactorVerifyCode(e.target.value)}
-                              className="w-full p-3 bg-white border border-slate-200 rounded-xl text-center font-black text-lg tracking-[0.5em] focus:border-emerald-500 outline-none"
-                           />
-                           <div className="flex gap-2 mt-4">
-                              <button 
-                                type="button" 
-                                onClick={() => setTwoFactorStep('none')}
-                                className="flex-1 py-3 bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase"
-                              >
-                                Cancelar
-                              </button>
-                              <button 
-                                type="button" 
-                                onClick={async () => {
-                                   if (twoFactorVerifyCode.length !== 6) return toast.error("Código incompleto");
-                                   try {
-                                      const res = await api.activate2FA({
-                                        userId: user.id,
-                                        secret: twoFactorSecret,
-                                        token: twoFactorVerifyCode
-                                      });
-                                      if (res.success) {
-                                         toast.success("2FA Activado con éxito");
-                                         // Actualizar estado local y forzar refresco si es necesario
-                                         onUpdateUser({ ...user, twoFactorEnabled: true } as any);
-                                         setTwoFactorStep('none');
-                                         setIsProfileModalOpen(false);
-                                      } else {
-                                         toast.error(res.error || "Código inválido");
-                                      }
-                                   } catch (e) {
-                                      toast.error("Error de verificación");
-                                   }
-                                }}
-                                className="flex-1 py-3 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase shadow-lg shadow-emerald-500/20"
-                              >
-                                Activar Ahora
-                              </button>
-                           </div>
+                          <p className="text-[9px] font-black text-slate-500 uppercase text-center mb-4">1. Escanea este código con Google Authenticator o Authy</p>
+                          <div className="w-40 h-40 bg-white mx-auto p-2 rounded-2xl border border-slate-200 mb-4">
+                            <img src={twoFactorQR} alt="QR 2FA" className="w-full h-full" />
+                          </div>
+                          <p className="text-[9px] font-black text-slate-500 uppercase text-center mb-2">2. Ingrese el código de 6 dígitos</p>
+                          <input
+                            type="text"
+                            maxLength={6}
+                            placeholder="000000"
+                            value={twoFactorVerifyCode}
+                            onChange={e => setTwoFactorVerifyCode(e.target.value)}
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl text-center font-black text-lg tracking-[0.5em] focus:border-emerald-500 outline-none"
+                          />
+                          <div className="flex gap-2 mt-4">
+                            <button
+                              type="button"
+                              onClick={() => setTwoFactorStep('none')}
+                              className="flex-1 py-3 bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (twoFactorVerifyCode.length !== 6) return toast.error("Código incompleto");
+                                try {
+                                  const res = await api.activate2FA({
+                                    userId: user.id,
+                                    secret: twoFactorSecret,
+                                    token: twoFactorVerifyCode
+                                  });
+                                  if (res.success) {
+                                    toast.success("2FA Activado con éxito");
+                                    // Actualizar estado local y forzar refresco si es necesario
+                                    onUpdateUser({ ...user, twoFactorEnabled: true } as any);
+                                    setTwoFactorStep('none');
+                                    setIsProfileModalOpen(false);
+                                  } else {
+                                    toast.error(res.error || "Código inválido");
+                                  }
+                                } catch (e) {
+                                  toast.error("Error de verificación");
+                                }
+                              }}
+                              className="flex-1 py-3 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase shadow-lg shadow-emerald-500/20"
+                            >
+                              Activar Ahora
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <button 
+                    <button
                       type="button"
                       onClick={() => {
                         if (confirm("¿Estás seguro de desactivar el 2FA? Esto reducirá la seguridad de tu cuenta.")) {
-                           api.deactivate2FA(user.id).then(() => window.location.reload());
+                          api.deactivate2FA(user.id).then(() => window.location.reload());
                         }
                       }}
                       className="w-full py-3 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black hover:bg-red-600 hover:text-white transition-all uppercase tracking-widest"
