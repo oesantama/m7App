@@ -22,6 +22,8 @@
         "dist_backend",
         "src",
         "**/*.test.ts",
-        "backend/tests/**/*"
+        "backend/tests/**/*",
+        "backend/test_wa.ts",
+        "backend/telemetry_simulator.ts"
     ]
 }
