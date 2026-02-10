@@ -75,7 +75,12 @@ export const getDocuments = async (req: Request, res: Response) => {
 
     // Asegurar que exista el tipo de notificación EMAIL (Normalizado)
     await pool.query(`
+      -- Corrección de Tipografía en Categorías
       UPDATE master_records SET category = 'masterTipoNotificacion' WHERE category = 'masterTIpoNotificacion';
+      -- Corrección de Referencias en Páginas (parent_id apunta al módulo/categoría)
+      UPDATE master_records SET parent_id = 'masterTipoNotificacion' WHERE parent_id = 'masterTIpoNotificacion';
+      -- Corrección de Referencias en Módulos (si el ID del módulo tuviera el typo)
+      UPDATE master_records SET id = 'masterTipoNotificacion' WHERE id = 'masterTIpoNotificacion';
     `);
 
     await pool.query(`

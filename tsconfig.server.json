@@ -1,0 +1,26 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "lib": [
+            "ES2022"
+        ],
+        "outDir": "./dist_backend",
+        "strict": true,
+        "noImplicitAny": false,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "noEmit": false
+    },
+    "include": [
+        "backend/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "dist_backend",
+        "src",
+        "**/*.test.ts"
+    ]
+}

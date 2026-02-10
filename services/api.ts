@@ -18,46 +18,46 @@ export const api = {
     return res.json();
   },
 
-  // Maestros
-  getUsers: () => fetch(`${API_URL}/users`).then(r => r.json()),
+  // Maestros - CACHE BUSTING FORZADO
+  getUsers: () => fetch(`${API_URL}/users?_t=${Date.now()}`).then(r => r.json()),
   saveUser: (data: any) => fetch(`${API_URL}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
   }).then(r => r.json()),
-  
+
   saveMaster: (category: string, data: any) => fetch(`${API_URL}/masters/${category}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
   }).then(r => r.json()),
-  
-  getGenericMasters: () => fetch(`${API_URL}/masters`).then(r => r.json()),
-  
+
+  getGenericMasters: () => fetch(`${API_URL}/masters?_t=${Date.now()}`).then(r => r.json()),
+
   deleteUser: (id: string, deletedBy?: string) => fetch(`${API_URL}/users/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   deleteMaster: (category: string, id: string, deletedBy?: string) => fetch(`${API_URL}/masters/${category}/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
 
-  getClients: () => fetch(`${API_URL}/clients`).then(r => r.json()),
-  getRoles: () => fetch(`${API_URL}/roles`).then(r => r.json()),
+  getClients: () => fetch(`${API_URL}/clients?_t=${Date.now()}`).then(r => r.json()),
+  getRoles: () => fetch(`${API_URL}/roles?_t=${Date.now()}`).then(r => r.json()),
   saveRole: (data: any) => fetch(`${API_URL}/roles`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }).then(r => r.json()),
-  
-  getModules: () => fetch(`${API_URL}/modules`).then(r => r.json()),
+
+  getModules: () => fetch(`${API_URL}/modules?_t=${Date.now()}`).then(r => r.json()),
   deleteModule: (id: string, deletedBy?: string) => fetch(`${API_URL}/modules/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  getPages: () => fetch(`${API_URL}/pages`).then(r => r.json()),
+  getPages: () => fetch(`${API_URL}/pages?_t=${Date.now()}`).then(r => r.json()),
   deletePage: (id: string, deletedBy?: string) => fetch(`${API_URL}/pages/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  
-  getPermissions: () => fetch(`${API_URL}/permissions`).then(r => r.json()),
+
+  getPermissions: () => fetch(`${API_URL}/permissions?_t=${Date.now()}`).then(r => r.json()),
   savePermission: (data: any) => fetch(`${API_URL}/permissions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }).then(r => r.json()),
-  
-  getUserPermissions: (userId: string) => fetch(`${API_URL}/user-permissions/${userId}`).then(r => r.json()),
+
+  getUserPermissions: (userId: string) => fetch(`${API_URL}/user-permissions/${userId}?_t=${Date.now()}`).then(r => r.json()),
   saveUserPermission: (data: any) => fetch(`${API_URL}/user-permissions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -74,7 +74,7 @@ export const api = {
   }).then(r => r.json()),
   deleteArticle: (id: string, deletedBy?: string) => fetch(`${API_URL}/articles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   deleteRole: (id: string, deletedBy?: string) => fetch(`${API_URL}/roles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  
+
   getVehicles: () => fetch(`${API_URL}/vehicles`).then(r => r.json()),
   saveVehicle: (data: any) => fetch(`${API_URL}/vehicles`, {
     method: 'POST',
@@ -98,12 +98,12 @@ export const api = {
     body: JSON.stringify(data)
   }).then(r => r.json()),
   deleteDocument: (id: string, user: string) => fetch(`${API_URL}/documents/${id}?user=${encodeURIComponent(user)}`, { method: 'DELETE' }).then(r => r.json()),
-   updateDocumentStatus: (id: string, status: string, user: string) => fetch(`${API_URL}/documents/status/${id}`, {
-     method: 'PATCH',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({ status, user })
-   }).then(r => r.json()),
-   getRoutes: () => fetch(`${API_URL}/routes`).then(r => r.json()),
+  updateDocumentStatus: (id: string, status: string, user: string) => fetch(`${API_URL}/documents/status/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, user })
+  }).then(r => r.json()),
+  getRoutes: () => fetch(`${API_URL}/routes`).then(r => r.json()),
   saveRoute: (data: any) => fetch(`${API_URL}/routes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -115,7 +115,7 @@ export const api = {
     body: JSON.stringify(data)
   }).then(r => r.json()),
   getRoutingPatterns: () => fetch(`${API_URL}/routes/patterns`).then(r => r.json()),
-  
+
   // GPS Tracking (Nueva API dedicada)
   updateVehicleLocation: (data: any) => fetch(`${API_URL}/locations/update`, {
     method: 'POST',
@@ -127,7 +127,7 @@ export const api = {
 
   // Gestión de Asignaciones (Vínculos Operativos)
   getAssignments: () => fetch(`${API_URL}/assignments`).then(r => r.json()),
-  
+
   saveAssignment: (data: any) => fetch(`${API_URL}/assignments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -146,25 +146,25 @@ export const api = {
     body: JSON.stringify(data)
   }).then(r => r.json()),
   getInvoices: (clientId?: string) => fetch(`${API_URL}/documents/invoices${clientId ? `?clientId=${clientId}` : ''}`).then(r => r.json()),
-  
+
   getWhatsAppStatus: (userId: string) => fetch(`${API_URL}/whatsapp/status?userId=${userId}`).then(r => r.json()),
   connectWhatsApp: (userId: string) => fetch(`${API_URL}/whatsapp/connect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId })
   }).then(r => r.json()),
-  
+
   disconnectWhatsApp: (userId: string) => fetch(`${API_URL}/whatsapp/disconnect`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId })
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId })
   }).then(r => r.json()),
 
   getWhatsAppHistory: (userId: string) => fetch(`${API_URL}/whatsapp/history?userId=${userId}`).then(r => r.json()),
-  
-  sendWhatsAppNotification: (data: { 
-    phones: string[], 
-    message: string, 
+
+  sendWhatsAppNotification: (data: {
+    phones: string[],
+    message: string,
     userId: string,
     media?: string, // base64
     fileName?: string
@@ -220,9 +220,9 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, context })
   }).then(r => r.json()),
-  
+
   getAllUserPermissions: () => fetch(`${API_URL}/user-permissions`).then(r => r.json()),
-  
+
   // Firma Digital
   createSignature: async (data: { documentNumber: string; digitalSignature: string; password: string; policyAccepted: boolean }) => {
     const res = await fetch(`${API_URL}/signatures`, {

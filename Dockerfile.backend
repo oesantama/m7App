@@ -1,7 +1,18 @@
-# Dockerfile para el Backend
+
+# Stage 1: Build
+FROM node:20-slim AS builder
+WORKDIR /app
+COPY package*.json ./
+# Instalamos TODO para poder compilar
+RUN npm install
+COPY . .
+# Compilamos usando el tsconfig.server.json
+RUN npm run build:server
+
+# Stage 2: Production
 FROM node:20-slim
 
-# Instalar dependencias para Puppeteer/Chromium
+# Instalar dependencias para Puppeteer/Chromium (necesario para PDFs/Whatsapp)
 RUN apt-get update && apt-get install -y \
     chromium \
     libnss3 \
@@ -15,17 +26,22 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    NODE_ENV=production
 
 WORKDIR /app
 
-# Copiar package.json del root (ya que las dependencias están ahí)
+# Copiamos package.json para instalar solo dependencias de producción
 COPY package*.json ./
-RUN npm install
+RUN npm ci --omit=dev
 
-# Copiar todo el código (incluyendo la carpeta backend)
-COPY . .
+# Copiamos el código compilado desde el stage 'builder'
+# La estructura en dist_backend dependerá de como tsc genere la salida.
+# Si tsconfig tiene "include": ["backend/**/*"], usualmente replica la carpeta backend dentro de dist_backend
+COPY --from=builder /app/dist_backend ./dist_backend
 
 EXPOSE 8080
 
-CMD ["npx", "tsx", "backend/server.ts"]
+# Ejecutamos el servidor compilado (Javascript plano)
+# Ajustar ruta si tsc genera diferente estructura, pero por defecto debería ser así:
+CMD ["node", "dist_backend/backend/server.js"]

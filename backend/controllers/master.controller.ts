@@ -21,7 +21,7 @@ export const saveMasterRecord = async (req: Request, res: Response) => {
     // Verificar que categoría existe en la tabla (opcional, pero buena práctica)
     // Para simplificar, asumimos que 'category' coincide con la columna 'category' en master_records
 
-    await pool.query(`
+    const result = await pool.query(`
       INSERT INTO master_records (id, category, name, description, parent_id, notification_email, icon_class, status_id, tipo_notificacion_id)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       ON CONFLICT (id) DO UPDATE SET

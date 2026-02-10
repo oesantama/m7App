@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "server": "tsx backend/server.ts",
     "test": "vitest",

@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useAppStore } from '../stores/useAppStore';
 import { Icons, AVATAR_GALLERY } from '../constants';
 import { MasterRecord, MasterCategory, User, Article } from '../types';
 import * as XLSX from 'xlsx';
@@ -9,12 +10,11 @@ import { DataImportDialog } from './DataImportDialog';
 interface MasterModuleProps {
   onAudit: (entity: string, action: string) => void;
   activeMaster: MasterCategory;
-  allMasterData: { [key in MasterCategory]?: MasterRecord[] };
-  setAllMasterData: React.Dispatch<React.SetStateAction<{ [key in MasterCategory]?: MasterRecord[] }>>;
   user: User;
 }
 
-const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData, setAllMasterData, user, onAudit }) => {
+const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit }) => {
+  const allMasterData = useAppStore(state => state.allMasterData);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
@@ -346,26 +346,78 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
 
 
 
-      setAllMasterData(prev => {
-        const currentList = Array.isArray(prev[activeMaster]) ? [...prev[activeMaster]!] : [];
-        let newList;
+      // RECARGA ROBUSTA (AJAX STYLE)
+      const refreshCategory = async (cat: MasterCategory) => {
+        try {
+          let newData: any[] = [];
 
-        if (editingRecord) {
-          // Actualizar existente
+          switch (cat) {
+            case 'masterUsuarios':
+              newData = await api.getUsers();
+              break;
+            case 'masterClientes':
+              newData = await api.getClients();
+              break;
+            case 'masterRol':
+              newData = await api.getRoles();
+              break;
+            case 'masterModulos':
+              newData = await api.getModules();
+              break;
+            case 'masterPaginas':
+              newData = await api.getPages();
+              break;
+            case 'masterPermisosRol':
+              newData = await api.getPermissions();
+              break;
+            case 'masterPermisosUsuario':
+              newData = await api.getAllUserPermissions();
+              break;
+            case 'masterArticulo': {
+              const articData = await api.getArticles();
+              if (Array.isArray(articData)) {
+                newData = articData.map((a: any) => ({
+                  ...a,
+                  statusId: a.status_id,
+                  clientId: a.client_id,
+                  factorInter: a.factor_inter,
+                  factorStd: a.factor_std,
+                  uomGeneralId: a.uom_general_id,
+                  uomInterId: a.uom_inter_id,
+                  uomStdId: a.uom_std_id,
+                  categoryArticuloId: a.category_articulo_id
+                }));
+              }
+              break;
+            }
+            default: {
+              // Maestros Genéricos (filter from all generic masters)
+              const allGenerics = await api.getGenericMasters();
 
-          newList = currentList.map(r => r.id === editingRecord.id ? recordWithId : r);
-        } else {
-          // Agregar nuevo al inicio
+              if (Array.isArray(allGenerics)) {
+                // Filter by category if the API returns a flat list of all masters
+                newData = allGenerics.filter((m: any) => m.category === cat);
 
-          newList = [recordWithId, ...currentList];
+                // Fallback: If the API returns grouped object (unlikely based on App.tsx logic but safe to check)
+                if (newData.length === 0 && !Array.isArray(allGenerics) && (allGenerics as any)[cat]) {
+                  newData = (allGenerics as any)[cat];
+                }
+              }
+              break;
+            }
+          }
 
+          if (Array.isArray(newData)) {
+            useAppStore.getState().updateMasterCategory(cat, newData);
+            // Force update context/state if needed, though store subscription should handle it
+          }
+        } catch (err) {
+          console.error("Error refreshing category", cat, err);
+          toast.error("Error recargando datos: " + (err as any).message);
         }
+      };
 
-        return {
-          ...prev,
-          [activeMaster]: newList
-        };
-      });
+      await refreshCategory(activeMaster);
 
       toast.success("Registro Guardado", {
         description: "La tabla se ha actualizado localmente.",

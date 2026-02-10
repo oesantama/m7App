@@ -641,24 +641,10 @@ const App: React.FC = () => {
         return (
           <MasterModule
             activeMaster={activeMasterCategory}
-            allMasterData={allMasterData}
-            setAllMasterData={setAllMasterData}
             user={user!}
             onAudit={async () => {
               // SOLO recargar maestros, NO toda la app
-              try {
-                const freshMasters = await api.getGenericMasters();
-                if (Array.isArray(freshMasters)) {
-                  const grouped: any = {};
-                  freshMasters.forEach((m: any) => {
-                    if (!grouped[m.category]) grouped[m.category] = [];
-                    grouped[m.category].push(m);
-                  });
-                  setAllMasterData(prevData => ({ ...prevData, ...grouped }));
-                }
-              } catch (err) {
-                console.error('[M7-APP] Error refreshing masters:', err);
-              }
+              // El store se actualiza internamente en MasterModule
             }}
           />
         );
