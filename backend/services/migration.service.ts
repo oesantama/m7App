@@ -2,6 +2,7 @@
 import pool from '../config/database.js';
 
 export const restoreSystem = async () => {
+  console.log('[M7-SYSTEM] Checking Database Consistency... (Emergency Deploy)');
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
