@@ -71,7 +71,40 @@ export const restoreSystem = async () => {
       );
     `);
 
-    // 2. Insertar Módulos
+    // 1.5 RESTAURACIÓN COMPLETA (OPCIÓN 2 - DEPLOY)
+    // Si existe backup completo y la tabla users está vacía (indicador de fresh start)
+    const fs = await import('fs');
+    const path = await import('path');
+    // Ajustar ruta para producción (dist_backend vs src)
+    // En Docker: /app/dist_backend/backend/full_restore.sql
+    // Pero si compilamos, el .sql debe copiarse. 
+    // Por simplicidad, leeremos del source si estamos local o del dist si prod.
+
+    // NOTA: Para que esto funcione en prod, el Dockerfile debe copiar este .sql
+    const backupPath = path.resolve(__dirname, '../full_restore.sql');
+
+    let backupExists = false;
+    try {
+      await fs.promises.access(backupPath);
+      backupExists = true;
+    } catch {
+      console.log('[M7-DB] No full_restore.sql found, skipping full restore.');
+    }
+
+    if (backupExists) {
+      const userCheck = await client.query('SELECT count(*) FROM users');
+      if (userCheck.rows[0].count === '0') {
+        console.log('[M7-DB] Base de datos vacía. Ejecutando RESTAURACIÓN COMPLETA desde local...');
+        const sql = await fs.promises.readFile(backupPath, 'utf8');
+        await client.query(sql);
+        console.log('[M7-DB] Restauración completa finalizada.');
+        await client.query('COMMIT');
+        return { success: true, message: 'Base de Datos Clonada de Local' };
+      }
+    }
+
+    // 2. Insertar Módulos (Solo si no restauramos backup arriba)
+    // Si ya restauramos, los ON CONFLICT DO NOTHING manejarán esto, o podemos saltarlo.
     await client.query(`
       INSERT INTO modules (id, name, icon_class) VALUES
       ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings'),
@@ -106,23 +139,23 @@ export const restoreSystem = async () => {
 
     // 4. Restaurar Permisos Admin
     const allPages = [
-        'PAG-01', 'PAG-02', 'PAG-03', 'PAG-04', 'PAG-05', 'PAG-06', 'PAG-07', 'PAG-08', 'PAG-09', 'PAG-10',
-        'PAG-11', 'PAG-12', 'PAG-13', 'PAG-14', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-18', 'PAG-19', 'PAG-20', 'PAG-21', 'PAG-22',
-        'PAG-FIRMAS', 'PAG-FIRMAS-APR'
+      'PAG-01', 'PAG-02', 'PAG-03', 'PAG-04', 'PAG-05', 'PAG-06', 'PAG-07', 'PAG-08', 'PAG-09', 'PAG-10',
+      'PAG-11', 'PAG-12', 'PAG-13', 'PAG-14', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-18', 'PAG-19', 'PAG-20', 'PAG-21', 'PAG-22',
+      'PAG-FIRMAS', 'PAG-FIRMAS-APR'
     ];
 
     const perms: any = {
-        id: "PERM-USER-USR-01",
-        userId: "USR-01",
-        statusId: "EST-01"
+      id: "PERM-USER-USR-01",
+      userId: "USR-01",
+      statusId: "EST-01"
     };
 
     allPages.forEach(p => {
-        perms[`page_${p}_view`] = true;
-        perms[`page_${p}_create`] = true;
-        perms[`page_${p}_edit`] = true;
-        perms[`page_${p}_delete`] = true;
-        perms[`page_${p}_active`] = true;
+      perms[`page_${p}_view`] = true;
+      perms[`page_${p}_create`] = true;
+      perms[`page_${p}_edit`] = true;
+      perms[`page_${p}_delete`] = true;
+      perms[`page_${p}_active`] = true;
     });
 
     await client.query(`
