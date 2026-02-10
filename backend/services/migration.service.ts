@@ -92,13 +92,28 @@ export const restoreSystem = async () => {
     }
 
     if (backupExists) {
-      const userCheck = await client.query('SELECT count(*) FROM users');
-      if (userCheck.rows[0].count === '0') {
-        console.log('[M7-DB] Base de datos vacía. Ejecutando RESTAURACIÓN COMPLETA desde local...');
+      let needsRestore = false;
+      try {
+        const userCheck = await client.query('SELECT count(*) FROM users');
+        if (userCheck.rows[0].count === '0') {
+          needsRestore = true;
+        }
+      } catch (err: any) {
+        // Si la tabla no existe (Code 42P01), necesitamos restaurar
+        if (err.code === '42P01') {
+          console.log('[M7-DB] Tabla users no existe. Procediendo a restaurar.');
+          needsRestore = true;
+        } else {
+          console.error('[M7-DB] Error verificando estado de BD:', err);
+        }
+      }
+
+      if (needsRestore) {
+        console.log('[M7-DB] Base de datos vacía o nueva. Ejecutando RESTAURACIÓN COMPLETA...');
         const sql = await fs.promises.readFile(backupPath, 'utf8');
         await client.query(sql);
         console.log('[M7-DB] Restauración completa finalizada.');
-        await client.query('COMMIT');
+        await client.query('COMMIT'); // Commit del restore
         return { success: true, message: 'Base de Datos Clonada de Local' };
       }
     }
