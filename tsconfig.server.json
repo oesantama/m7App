@@ -21,6 +21,7 @@
         "dist",
         "dist_backend",
         "src",
-        "**/*.test.ts"
+        "**/*.test.ts",
+        "backend/tests/**/*"
     ]
 }
