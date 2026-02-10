@@ -62,6 +62,7 @@ export const restoreSystem = async () => {
       );
     `);
 
+    await client.query('DROP TABLE IF EXISTS users CASCADE');
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -73,7 +74,7 @@ export const restoreSystem = async () => {
         document_number TEXT,
         phone TEXT,
         avatar TEXT,
-        client_ids JSONB, 
+        client_ids TEXT[], 
         status_id TEXT DEFAULT 'EST-01',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         two_factor_enabled BOOLEAN DEFAULT FALSE,
