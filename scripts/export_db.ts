@@ -1,9 +1,21 @@
-
-import pool from '../backend/config/database.js';
+import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const OUTPUT_FILE = path.join(process.cwd(), 'backend', 'full_restore.sql');
+
+// Configuración explícita para EXPORTAR LOCALMENTE
+// Ignoramos DATABASE_URL para asegurar que no se intente conectar al contenedor 'postgres'
+const pool = new Pool({
+    host: 'localhost',
+    user: process.env.POSTGRES_USER || 'm7_admin',
+    password: process.env.POSTGRES_PASSWORD || 'm7_master_password',
+    database: process.env.POSTGRES_DB || 'm7_logistica',
+    port: 5432,
+});
 
 const TABLES = [
     'roles',
