@@ -51,6 +51,157 @@ export const restoreSystem = async () => {
       );
     `);
 
+    // 0. Tablas Base (Orden Correcto para Foreign Keys)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS clients (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        logo_url TEXT,
+        status_id TEXT DEFAULT 'EST-01',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role_id TEXT,
+        document_type TEXT,
+        document_number TEXT,
+        phone TEXT,
+        avatar TEXT,
+        client_ids JSONB, 
+        status_id TEXT DEFAULT 'EST-01',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        two_factor_enabled BOOLEAN DEFAULT FALSE,
+        two_factor_secret TEXT
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS drivers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        document_type TEXT,
+        document_number TEXT,
+        phone TEXT,
+        client_id TEXT REFERENCES clients(id),
+        license_expiry TIMESTAMP WITH TIME ZONE,
+        license_pdf TEXT,
+        status_id TEXT DEFAULT 'EST-01'
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS vehicles (
+        id TEXT PRIMARY KEY,
+        plate TEXT UNIQUE NOT NULL,
+        brand TEXT,
+        owner TEXT,
+        capacity_m3 NUMERIC,
+        client_id TEXT REFERENCES clients(id),
+        soat_expiry TIMESTAMP WITH TIME ZONE,
+        techno_expiry TIMESTAMP WITH TIME ZONE,
+        soat_pdf TEXT,
+        techno_pdf TEXT,
+        status_id TEXT DEFAULT 'EST-01',
+        model_year TEXT,
+        color TEXT,
+        vehicle_type TEXT
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS master_records (
+        id TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        parent_id TEXT,
+        notification_email TEXT,
+        icon_class TEXT,
+        status_id TEXT DEFAULT 'EST-01',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        created_by TEXT,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        tipo_notificacion_id TEXT
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS articles (
+        id TEXT PRIMARY KEY,
+        sku TEXT NOT NULL,
+        name TEXT NOT NULL,
+        client_id TEXT REFERENCES clients(id),
+        uom_std TEXT,
+        factor_std NUMERIC,
+        status_id TEXT DEFAULT 'EST-01',
+        barcode TEXT,
+        category_articulo_id TEXT,
+        factor_inter NUMERIC,
+        uom_general_id TEXT,
+        uom_inter_id TEXT,
+        uom_std_id TEXT
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS documents_l (
+        id TEXT PRIMARY KEY,
+        external_doc_id TEXT,
+        client_id TEXT REFERENCES clients(id),
+        vehicle_plate TEXT,
+        codplan TEXT,
+        delivery_date TIMESTAMP WITH TIME ZONE,
+        city TEXT,
+        status TEXT DEFAULT 'Pendiente',
+        inventory_date TIMESTAMP WITH TIME ZONE,
+        inventory_user TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        inventory_observation TEXT,
+        plan_type TEXT,
+        inventory_notes TEXT,
+        tracking_token TEXT,
+        picking_date TIMESTAMP WITH TIME ZONE,
+        receiving_date TIMESTAMP WITH TIME ZONE,
+        picker_user TEXT,
+        deliverer_user TEXT,
+        receiver_user TEXT
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS document_items (
+        id SERIAL PRIMARY KEY,
+        document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE,
+        article_id TEXT REFERENCES articles(id),
+        expected_qty NUMERIC,
+        count_1 NUMERIC DEFAULT 0,
+        count_2 NUMERIC DEFAULT 0,
+        order_number TEXT,
+        unit TEXT,
+        notes TEXT,
+        item_status TEXT DEFAULT 'PENDIENTE',
+        un_code TEXT,
+        client_ref TEXT,
+        peso NUMERIC DEFAULT 0,
+        invoice TEXT,
+        volume NUMERIC DEFAULT 0,
+        city TEXT,
+        address TEXT,
+        batch TEXT,
+        observation TEXT,
+        received_qty NUMERIC DEFAULT 0,
+        unit_volume NUMERIC DEFAULT 0,
+        neighborhood TEXT
+      );
+    `);
+
+    // Tablas Originales (Ya existentes en el código pero movidas para respetar orden)
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_permissions (
          id TEXT PRIMARY KEY,
