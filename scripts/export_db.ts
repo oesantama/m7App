@@ -7,10 +7,9 @@ dotenv.config();
 
 const OUTPUT_FILE = path.join(process.cwd(), 'backend', 'full_restore.sql');
 
-// Configuración explícita para EXPORTAR LOCALMENTE
-// Ignoramos DATABASE_URL para asegurar que no se intente conectar al contenedor 'postgres'
+// Configuración flexiva (Docker o Local)
 const pool = new Pool({
-    host: 'localhost',
+    host: process.env.DB_HOST || 'postgres', // 'postgres' para Docker interna, 'localhost' si se corre local con puerto expuesto via tunel
     user: process.env.POSTGRES_USER || 'm7_admin',
     password: process.env.POSTGRES_PASSWORD || 'm7_master_password',
     database: process.env.POSTGRES_DB || 'm7_logistica',
