@@ -145,7 +145,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // Si el vehículo o conductor no existe, o si el vehículo está en una RUTA ACTIVA, lo ocultamos
       if (!v || !d) return null;
 
-      const isBusy = activeRoutes.some(r => r.vehicle_id === v.id && r.status === 'EN_RUTA');
+      const isBusy = activeRoutes.some(r =>
+        r.vehicleId === v.id &&
+        ['Assigned', 'In Route', 'EN_RUTA', 'Asignada', 'En Ruta'].includes(r.status)
+      );
+
       if (isBusy) return null; // Ocultar vehículos ocupados
 
       return {
@@ -157,7 +161,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }).filter(item => item !== null) as (Vehicle & { driverName: string, driverId: string, assignmentId: string })[];
 
     return fleet;
-  }, [assignments, vehicles, drivers, selectedClient]);
+  }, [assignments, vehicles, drivers, selectedClient, activeRoutes]);
 
   // CÁLCULO DE DÉFICIT DE FLOTA
   const unassignedMetrics = useMemo(() => {

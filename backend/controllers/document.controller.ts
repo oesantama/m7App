@@ -24,6 +24,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS city TEXT;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS address TEXT;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC DEFAULT 0;');
+    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS neighborhood TEXT DEFAULT \'\';');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit_volume TEXT;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS batch TEXT DEFAULT \'S/L\';');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;');
@@ -656,7 +657,7 @@ export const getInvoices = async (req: Request, res: Response) => {
   try {
     // Obtener facturas únicas (agrupadas por invoice, city, address) que estén pendientes
     // Se asume que item_status 'Pendiente' indica que no ha sido ruteada
-    const { clientId } = req.query;
+    const { clientId, ids } = req.query;
     let query = `
       SELECT 
         CONCAT(document_items.document_id, '_', COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)) as id,
@@ -665,6 +666,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         STRING_AGG(DISTINCT document_items.observation, '. ') as "notes",
         documents_l.external_doc_id as "externalDocId",
         document_items.city,
+        document_items.neighborhood,
         document_items.address,
         document_items.address as "customerName", -- Proxy if not available
         SUM(document_items.expected_qty) as "totalItems",
@@ -675,16 +677,63 @@ export const getInvoices = async (req: Request, res: Response) => {
         documents_l.codplan as "codplan",
         documents_l.plan_type as "planType",
         MAX(document_items.item_status) as "status",
-        4.6097 as lat, -- Placeholder: Bogotá
-        -74.0817 as lng -- Placeholder: Bogotá
+        CASE 
+          WHEN document_items.city ILIKE '%MEDELLIN%' OR document_items.city ILIKE '%MEDELLÍN%' OR document_items.city ILIKE '%ANTIOQUIA%' THEN 6.2442
+          WHEN document_items.city ILIKE '%CALI%' OR document_items.city ILIKE '%VALLE%' THEN 3.4516
+          WHEN document_items.city ILIKE '%BARRANQUILLA%' OR document_items.city ILIKE '%ATLANTICO%' OR document_items.city ILIKE '%ATLÁNTICO%' THEN 10.9685
+          WHEN document_items.city ILIKE '%CARTAGENA%' OR document_items.city ILIKE '%BOLIVAR%' THEN 10.3910
+          WHEN document_items.city ILIKE '%BUCARAMANGA%' OR document_items.city ILIKE '%SANTANDER%' THEN 7.1193
+          WHEN document_items.city ILIKE '%PEREIRA%' OR document_items.city ILIKE '%RISARALDA%' THEN 4.8133
+          WHEN document_items.city ILIKE '%MANIZALES%' OR document_items.city ILIKE '%CALDAS%' THEN 5.0703
+          WHEN document_items.city ILIKE '%ARMENIA%' OR document_items.city ILIKE '%QUINDIO%' THEN 4.5339
+          ELSE 4.6097 -- Default Bogotá
+        END + (random() * 0.01 - 0.005) as lat,
+        CASE 
+          WHEN document_items.city ILIKE '%MEDELLIN%' OR document_items.city ILIKE '%MEDELLÍN%' OR document_items.city ILIKE '%ANTIOQUIA%' THEN -75.5812
+          WHEN document_items.city ILIKE '%CALI%' OR document_items.city ILIKE '%VALLE%' THEN -76.5320
+          WHEN document_items.city ILIKE '%BARRANQUILLA%' OR document_items.city ILIKE '%ATLANTICO%' OR document_items.city ILIKE '%ATLÁNTICO%' THEN -74.7713
+          WHEN document_items.city ILIKE '%CARTAGENA%' OR document_items.city ILIKE '%BOLIVAR%' THEN -75.4794
+          WHEN document_items.city ILIKE '%BUCARAMANGA%' OR document_items.city ILIKE '%SANTANDER%' THEN -73.1227
+          WHEN document_items.city ILIKE '%PEREIRA%' OR document_items.city ILIKE '%RISARALDA%' THEN -75.6961
+          WHEN document_items.city ILIKE '%MANIZALES%' OR document_items.city ILIKE '%CALDAS%' THEN -75.5138
+          WHEN document_items.city ILIKE '%ARMENIA%' OR document_items.city ILIKE '%QUINDIO%' THEN -75.6811
+          ELSE -74.0817 -- Default Bogotá
+        END + (random() * 0.01 - 0.005) as lng
       FROM document_items
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
-      WHERE (
-        /* APERTURA TOTAL M7: Mostramos todo lo que no esté físicamente fuera o borrado */
+      WHERE 1=1
+    `;
+
+    const queryParams: any[] = [];
+
+    // Si vienen IDs específicos (para ver detalle de ruta), filtramos por ellos e ignoramos el estado
+    if (ids) {
+      const idList = (ids as string).split(',').map(id => id.trim());
+      // Asumiendo que el ID del frontend es user-friendly, pero en realidad es composite.
+      // La mejor forma es filtrar por invoice OR order_number OR document_id
+      // Pero el frontend manda 'ids' que son claves compuestas o UUIDs?
+      // El frontend usa `invoice_ids` que son IDs de facturas (strings).
+      // En el SELECT `id` es `CONCAT(...)`. Esto es complejo de igualar.
+      // Vamos a asumir que los IDs que manda el frontend son los `id` generados por este mismo endpoint.
+      // FIX: El `route.invoice_ids` guarda los IDs generados aqui??
+      // Si, en RoutePlanner se seleccionan invoices obtenidos de aqui.
+      // Entonces el ID es `docId_invoiceNum`.
+
+      // Truco: Desarmar el ID o usar LIKE?
+      // Mejor: Filtrar donde el CONCAT generado sea IN (lista)
+      // Postgres permite filtrar por el resultado del select si usamos subquery o HAVING, pero aqui es WHERE.
+      // Repetimos la logica del ID:
+      query += ` AND CONCAT(document_items.document_id, '_', COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)) = ANY($1::text[])`;
+      queryParams.push(idList);
+    } else {
+      // Comportamiento normal (Solo pendientes)
+      query += ` AND (
         (document_items.item_status IS NULL OR TRIM(UPPER(document_items.item_status)) NOT IN ('ELIMINADO', 'CANCELADO', 'ENTREGADO', 'FINALIZADO', 'ASIGNADO', 'EN RUTA', 'EN_RUTA'))
         AND (documents_l.status IS NULL OR UPPER(documents_l.status) IN ('PENDIENTE', 'AUDITADO', 'EN PROCESO'))
-      )
-      AND (
+      )`;
+    }
+
+    query += ` AND (
         (document_items.invoice IS NOT NULL AND document_items.invoice != '')
         OR 
         (document_items.order_number IS NOT NULL AND document_items.order_number != '')
@@ -693,24 +742,18 @@ export const getInvoices = async (req: Request, res: Response) => {
       )
     `;
 
-    const queryParams: any[] = [];
     /* 
       COMENTADO POR SOLICITUD DE USUARIO: 
       Los planes se cargan sin depender del cliente, el filtro bloquea la visibilidad.
-    if (clientId && clientId !== 'undefined' && clientId !== 'null' && clientId !== 'all' && clientId !== '') {
-      query += ` AND (
-        documents_l.client_id = $1 
-        OR documents_l.client_id IS NULL 
-        OR documents_l.client_id = '' 
-        OR documents_l.client_id IN (SELECT id FROM clients WHERE name ILIKE $1)
-      )`;
-      queryParams.push(clientId);
+    if (!ids && clientId && clientId !== 'undefined' && clientId !== 'null' && clientId !== 'all' && clientId !== '') {
+       // ... existing client filter logic if needed ...
     }
     */
 
     query += ` GROUP BY 
         COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number), 
         document_items.city, 
+        document_items.neighborhood,
         document_items.address, 
         document_items.document_id, 
         documents_l.client_id, 

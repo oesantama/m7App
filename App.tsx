@@ -40,6 +40,7 @@ const App: React.FC = () => {
     vehicles,
     drivers,
     assignments,
+    routes,
     waStatus,
     isRestoring,
     isLoading,
@@ -57,6 +58,7 @@ const App: React.FC = () => {
     setVehicles,
     setDrivers,
     setAssignments,
+    setRoutes,
     setWaStatus,
     setIsRestoring,
     setIsLoading,
@@ -233,6 +235,12 @@ const App: React.FC = () => {
         api.getInvoices(targetClientId).catch(() => []),
         api.getRoutes().catch(() => [])
       ]);
+
+      // Actualizamos estado global
+      setAssignments(assignmentsData as any[]);
+      setInvoices(invoicesData as any[]);
+      // Usamos acceso directo al store para evitar ReferenceError en closures
+      useAppStore.getState().setRoutes(routesData as any[]);
 
       const groupedMasters: any = {};
       if (Array.isArray(genericMasters)) {
@@ -799,7 +807,7 @@ const App: React.FC = () => {
             drivers={drivers}
             assignments={assignments}
             invoices={invoices}
-            activeRoutes={activeRoutes}
+            activeRoutes={routes}
             onRefresh={() => refreshAppData()}
           />
         );

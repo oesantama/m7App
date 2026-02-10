@@ -35,13 +35,17 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     activeRoutes,
     onRefresh
 }) => {
-    const [selectedActiveRoute, setSelectedActiveRoute] = useState<any | null>(null);
+    const [selectedActiveRoute, setSelectedActiveRoute] = useState<any | null>(null); // For Modal
+    const [visualizedRoute, setVisualizedRoute] = useState<any | null>(null); // For Map
     const [vehicleLocations, setVehicleLocations] = useState<any[]>([]);
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const mapRef = useRef<L.Map | null>(null);
     const markersRef = useRef<{ [key: string]: L.Marker }>({});
     const routeLinesRef = useRef<{ [key: string]: L.Polyline }>({});
+    const routeMarkersRef = useRef<L.Marker[]>([]);
+    const routePolylineRef = useRef<L.Polyline | null>(null);
+    const [routeInvoices, setRouteInvoices] = useState<any[]>([]);
 
     // 1. Inicialización del Mapa
     useEffect(() => {
@@ -357,7 +361,111 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
     };
 
-    // 4. Auto-reporte de ubicación y WakeLock (Mantener pantalla encendida)
+
+    // 4. Efecto para cargar detalle de ruta y dibujar en mapa (visualizedRoute)
+    useEffect(() => {
+        if (visualizedRoute && visualizedRoute.invoice_ids?.length > 0) {
+            // Limpiar visualización previa
+            routeMarkersRef.current.forEach(m => m.remove());
+            routeMarkersRef.current = [];
+            if (routePolylineRef.current) {
+                routePolylineRef.current.remove();
+                routePolylineRef.current = null;
+            }
+
+            // Fetch invoices
+            const ids = visualizedRoute.invoice_ids.join(',');
+            fetch(`/api/documents/invoices?ids=${encodeURIComponent(ids)}`)
+                .then(r => r.json())
+                .then((data: any[]) => {
+                    // Update routeInvoices only if we are also viewing details? 
+                    // No, routeInvoices is used for the modal. 
+                    // If we just view map, we might not need routeInvoices state... 
+                    // BUT, the map markers need data. 
+                    // Let's use a local variable for map data, OR reuse routeInvoices but be careful.
+                    // Actually, if I open detail, I want to fetch data. 
+                    // If I view map, I want to fetch data (coords).
+                    // Let's fetch in both cases.
+
+                    if (selectedActiveRoute && selectedActiveRoute.id === visualizedRoute.id) {
+                        setRouteInvoices(data);
+                    }
+
+                    // --- DIBUJAR EN MAPA ---
+                    if (mapRef.current && data.length > 0) {
+                        const points: L.LatLng[] = [L.latLng(M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng)];
+
+                        data.forEach((inv, idx) => {
+                            if (inv.lat && inv.lng) {
+                                const pos = L.latLng(inv.lat, inv.lng);
+                                points.push(pos);
+
+                                // Marcador numérico
+                                const icon = L.divIcon({
+                                    className: 'custom-invoice-marker',
+                                    html: `<div class="w-6 h-6 bg-emerald-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-[10px] font-black text-white">${idx + 1}</div>`,
+                                    iconSize: [24, 24]
+                                });
+
+                                const marker = L.marker(pos, { icon })
+                                    .addTo(mapRef.current!)
+                                    .bindPopup(`
+                                        <div class="p-2">
+                                            <p class="font-bold text-xs">${inv.invoiceNumber}</p>
+                                            <p class="text-[10px] text-slate-500 mb-1">${inv.customerName}</p>
+                                            <p class="text-[9px] text-emerald-600 font-bold uppercase">${inv.city || ''} ${inv.neighborhood ? `• ${inv.neighborhood}` : ''}</p>
+                                        </div>
+                                    `);
+                                routeMarkersRef.current.push(marker);
+                            }
+                        });
+
+                        // Polilinea
+                        routePolylineRef.current = L.polyline(points, {
+                            color: '#0ea5e9', // Sky blue
+                            weight: 4,
+                            opacity: 0.8,
+                            dashArray: '5, 10'
+                        }).addTo(mapRef.current);
+
+                        // Ajustar vista
+                        const bounds = L.latLngBounds(points);
+                        mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+                    }
+                })
+                .catch(err => console.error("Error fetching route details", err));
+        } else {
+            // Clear map if no route visualized?
+        }
+
+        // Cleanup moved to triggering new route or unmount
+    }, [visualizedRoute, selectedActiveRoute]);
+
+    // Cleanup effect for map elements on unmount
+    useEffect(() => {
+        return () => {
+            routeMarkersRef.current.forEach(m => m.remove());
+            routeMarkersRef.current = [];
+            if (routePolylineRef.current) {
+                routePolylineRef.current.remove();
+                routePolylineRef.current = null;
+            }
+        };
+    }, []);
+
+    // Effect to load data for MODAL specifically
+    useEffect(() => {
+        if (selectedActiveRoute && selectedActiveRoute.invoice_ids?.length > 0) {
+            const ids = selectedActiveRoute.invoice_ids.join(',');
+            fetch(`/api/documents/invoices?ids=${encodeURIComponent(ids)}`)
+                .then(r => r.json())
+                .then((data: any[]) => {
+                    setRouteInvoices(data);
+                });
+        }
+    }, [selectedActiveRoute]);
+
+    // 5. Auto-reporte de ubicación y WakeLock (Mantener pantalla encendida)
     useEffect(() => {
         if (!navigator.geolocation) return;
 
@@ -462,7 +570,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
                                 const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
                                 const inv = invoices.find(i => String(i.id).trim().replace(/[\r\n\t\f\v ]/g, '') === cleanId);
-                                return acc + (inv?.volumeM3 || 0);
+                                return acc + Number(inv?.volumeM3 || 0);
                             }, 0);
 
                             const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
@@ -513,19 +621,29 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             </div>
 
                                             <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => setSelectedActiveRoute(route)}
-                                                    className="flex-1 py-3 bg-slate-50 hover:bg-slate-900 hover:text-white border border-slate-200 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
-                                                >
-                                                    Ver Detalle
-                                                </button>
-                                                <button
-                                                    onClick={() => generateRoutePDF(route)}
-                                                    disabled={isGeneratingPDF}
-                                                    className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
-                                                >
-                                                    {isGeneratingPDF ? '...' : '📄 PDF'}
-                                                </button>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setVisualizedRoute(route)}
+                                                        className={`flex-1 py-3 border border-slate-200 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${visualizedRoute?.id === route.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-white hover:bg-slate-50'}`}
+                                                    >
+                                                        {visualizedRoute?.id === route.id ? 'Viendo Mapa' : '🗺️ Ver Mapa'}
+                                                    </button>
+                                                    <div className="flex gap-1 flex-1">
+                                                        <button
+                                                            onClick={() => setSelectedActiveRoute(route)}
+                                                            className="flex-1 py-3 bg-slate-50 hover:bg-slate-900 hover:text-white border border-slate-200 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
+                                                        >
+                                                            Detalles
+                                                        </button>
+                                                        <button
+                                                            onClick={() => generateRoutePDF(route)}
+                                                            disabled={isGeneratingPDF}
+                                                            className="px-3 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                                                        >
+                                                            {isGeneratingPDF ? '...' : 'PDF'}
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -599,6 +717,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             return drv?.name || 'CONDUCTOR EXTERNO';
                                         })()}
                                     </p>
+                                    <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                                        📌 {routeInvoices.length} Puntos de Entrega (Visible en Mapa)
+                                    </p>
                                 </div>
                             </div>
                             <button onClick={() => setSelectedActiveRoute(null)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
@@ -610,15 +731,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             <div className="grid grid-cols-4 gap-4">
                                 <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">FACTURAS</p>
-                                    <p className="text-2xl font-black text-slate-950">{(selectedActiveRoute.invoice_ids || []).length}</p>
+                                    <p className="text-2xl font-black text-slate-950">{routeInvoices.length}</p>
                                 </div>
                                 <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">VOLUMEN</p>
                                     <p className="text-2xl font-black text-emerald-600">
-                                        {(selectedActiveRoute.invoice_ids || []).reduce((acc: number, id: string) => {
-                                            const inv = invoices.find(i => i.id === id);
-                                            return acc + (inv?.volumeM3 || 0);
-                                        }, 0).toFixed(1)}m³
+                                        {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(1)}m³
                                     </p>
                                 </div>
                                 <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
@@ -627,10 +745,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                         <div
                                             className="bg-emerald-500 h-full rounded-full transition-all"
                                             style={{
-                                                width: `${Math.min(100, ((selectedActiveRoute.invoice_ids || []).reduce((acc: number, id: string) => {
-                                                    const inv = invoices.find(i => i.id === id);
-                                                    return acc + (inv?.volumeM3 || 0);
-                                                }, 0) / (vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 1)) * 100)}%`
+                                                width: `${Math.min(100, (routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0) / (vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 1)) * 100)}%`
                                             }}
                                         ></div>
                                     </div>
@@ -649,12 +764,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <p className="text-xs text-slate-400 font-bold">{(selectedActiveRoute.invoice_ids || []).length} items</p>
                                 </div>
                                 <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                                    {[...new Set(selectedActiveRoute.invoice_ids || [])].map((id: any, idx: number) => {
-                                        console.log('Rendering Invoice Row:', id, idx, `${id}-${idx}`);
-                                        const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
-                                        const inv = invoices.find(i => String(i.id).trim().replace(/[\r\n\t\f\v ]/g, '') === cleanId);
+                                    {routeInvoices.map((inv: any, idx: number) => {
                                         return (
-                                            <div key={`${id}-${idx}`} className="p-4 bg-gradient-to-r from-white to-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:shadow-md transition-all group">
+                                            <div key={`${inv.id || idx}-${idx}`} className="p-4 bg-gradient-to-r from-white to-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:shadow-md transition-all group">
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-emerald-500 font-black text-xs">
                                                         {idx + 1}
@@ -663,12 +775,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         <Icons.FileText className="w-5 h-5 text-slate-400 group-hover:text-slate-950" />
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm font-black text-slate-900">{inv?.invoiceNumber || id}</p>
+                                                        <p className="text-sm font-black text-slate-900">{inv?.invoiceNumber || inv.id || 'N/A'}</p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase">{inv?.customerName || 'Cliente Genérico'}</p>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-black text-emerald-600">{inv?.volumeM3?.toFixed(2) || '0.00'} m³</p>
+                                                    <p className="text-sm font-black text-emerald-600">{Number(inv?.volumeM3 || 0).toFixed(2)} m³</p>
                                                     <p className="text-[8px] font-bold text-slate-400 uppercase">{inv?.city || 'N/A'}</p>
                                                 </div>
                                             </div>
