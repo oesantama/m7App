@@ -44,4 +44,4 @@ EXPOSE 8080
 
 # Ejecutamos el servidor compilado (Javascript plano)
 # Ajustar ruta si tsc genera diferente estructura, pero por defecto debería ser así:
-CMD ["node", "dist_backend/backend/server.js"]
+CMD ["node", "dist_backend/server.js"]
