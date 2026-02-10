@@ -233,7 +233,11 @@ export const restoreSystem = async () => {
     // Por simplicidad, leeremos del source si estamos local o del dist si prod.
 
     // NOTA: Para que esto funcione en prod, el Dockerfile debe copiar este .sql
-    const backupPath = path.resolve(__dirname, '../full_restore.sql');
+    // Fix: __dirname no existe en ESM. Usamos process.cwd() que en Docker es /app
+    // El archivo se copia a ./dist_backend/full_restore.sql
+    const backupPath = path.join(process.cwd(), 'dist_backend', 'full_restore.sql');
+
+    console.log('[M7-DB] Buscando respaldo en:', backupPath);
 
     let backupExists = false;
     try {

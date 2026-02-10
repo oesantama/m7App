@@ -10,6 +10,9 @@ dotenv.config();
 
 const app = express();
 
+// Configuración para Proxy (Coolify/Nginx) - Necesario para Rate Limiting
+app.set('trust proxy', 1);
+
 // Middlewares de Seguridad Crítica (Hallazgos QA)
 app.use(helmet()); // Oculta X-Powered-By y agrega cabeceras de seguridad
 app.use(cors());
@@ -43,10 +46,10 @@ app.get('/health', (req, res) => {
 
 // Manejo Seguro de Rutas no Encontradas (Hallazgo QA: Ocultar nginx/express)
 app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
+  res.status(404).json({
+    success: false,
     error: "Recurso no disponible en el núcleo M7",
-    code: 404 
+    code: 404
   });
 });
 
@@ -57,10 +60,10 @@ app.listen(PORT, () => {
   console.log(`[M7-SYSTEM] Versión: 1.0.4 - BK-FORCE-RELOAD`);
   console.log(`[M7-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
-  
+
   // Inicialización de WhatsApp 
   console.log('[M7-SYSTEM] Evolution API Integration Active');
-  
+
   // RESTAURACIÓN AUTOMÁTICA M7 (MIGRACIONES)
   import('./services/migration.service.js').then(m => {
     m.restoreSystem()
