@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { updateVehicleLocation, getLatestVehicleLocations, getVehicleLocationHistory } from '../controllers/location.controller';
+import { updateVehicleLocation, getLatestVehicleLocations, getVehicleLocationHistory } from '../controllers/location.controller.js';
 
 const router = Router();
 
