@@ -7,7 +7,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     // REPARACIÓN INTEGRAL: Asegurar tablas y columnas críticas
     await pool.query('CREATE TABLE IF NOT EXISTS documents_l (id TEXT PRIMARY KEY, client_id TEXT, external_doc_id TEXT, status TEXT DEFAULT \'PENDIENTE\', created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);');
     await pool.query('CREATE TABLE IF NOT EXISTS document_items (id SERIAL PRIMARY KEY, document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE, article_id TEXT, expected_qty NUMERIC DEFAULT 0);');
-    
+
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS plan_type TEXT;');
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_notes TEXT;');
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_user TEXT;');
@@ -18,7 +18,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picker_user TEXT;');
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS deliverer_user TEXT;');
     await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiver_user TEXT;');
-    
+
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS received_qty NUMERIC DEFAULT 0;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS invoice TEXT;');
     await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS city TEXT;');
@@ -82,7 +82,7 @@ export const getDocuments = async (req: Request, res: Response) => {
       VALUES ('TGN-EMAIL', 'masterTipoNotificacion', 'EMAIL', 'EST-01')
       ON CONFLICT (id) DO NOTHING;
     `);
-    
+
     await pool.query(`
       INSERT INTO master_records (id, category, name, status_id)
       VALUES ('TGN-WA', 'masterTipoNotificacion', 'WHATSAPP', 'EST-01')
@@ -146,7 +146,7 @@ export const syncInventory = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     // AUTO-CORRECCIÓN: Asegurar columnas críticas
     await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_observation TEXT;');
     await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_notes TEXT;');
@@ -159,7 +159,7 @@ export const syncInventory = async (req: Request, res: Response) => {
     await client.query('ALTER TABLE master_records ADD COLUMN IF NOT EXISTS tipo_notificacion_id TEXT;');
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS count_1 NUMERIC DEFAULT 0;');
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
-    
+
     // RESTRICCIÓN CRÍTICA PARA UPSERT
     await client.query(`
       DELETE FROM document_consolidated_items a USING (
@@ -180,10 +180,10 @@ export const syncInventory = async (req: Request, res: Response) => {
         END IF; 
       END $$;
     `);
-    
+
     // 1. Bloqueo FOR UPDATE - Seleccionamos todo para tener los metadatos dinámicos
     const checkStatus = await client.query('SELECT * FROM documents_l WHERE id = $1 FOR UPDATE', [docId]);
-    
+
     if (checkStatus.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: "Documento no encontrado" });
@@ -215,13 +215,13 @@ export const syncInventory = async (req: Request, res: Response) => {
       if (!artId) continue;
 
       if (!skuAggregates[artId]) {
-        skuAggregates[artId] = { 
-          count1: 0, 
-          count2: 0, 
+        skuAggregates[artId] = {
+          count1: 0,
+          count2: 0,
           batch: item.batch || 'S/L',
           observation: item.inventoryNote || item.inventory_observation || ''
         };
-        
+
         // Auto-crear artículo si no existe (mismo comportamiento anterior)
         const artCheck = await client.query('SELECT 1 FROM articles WHERE UPPER(TRIM(id)) = $1', [artId]);
         if (artCheck.rows.length === 0) {
@@ -233,7 +233,7 @@ export const syncInventory = async (req: Request, res: Response) => {
       }
       skuAggregates[artId].count1 += Number(item.count1 || item.count_1 || 0);
       skuAggregates[artId].count2 += Number(item.count2 || item.count_2 || item.countedQty || 0);
-      
+
       // Si el item trae una nota específica, la priorizamos para el consolidado
       if (item.inventoryNote || item.inventory_observation) {
         skuAggregates[artId].observation = item.inventoryNote || item.inventory_observation;
@@ -279,12 +279,12 @@ export const syncInventory = async (req: Request, res: Response) => {
         SET item_status = $1, notes = $2, batch = $3, count_1 = $4, count_2 = $5
         WHERE document_id = $6 AND article_id = $7
       `, [
-        newStatus, 
-        item.inventoryNote || '', 
-        item.batch || 'S/L', 
-        item.count1 || 0, 
+        newStatus,
+        item.inventoryNote || '',
+        item.batch || 'S/L',
+        item.count1 || 0,
         item.count2 || item.countedQty || 0,
-        docId, 
+        docId,
         (item.articleId || '').trim().toUpperCase()
       ]);
     }
@@ -308,25 +308,25 @@ export const syncInventory = async (req: Request, res: Response) => {
 
         // B. Generar y Enviar Correo (Notificación Inteligente Ajover)
         const itemsWithDiscrepancies = items.filter((it: any) => {
-            const counted = Number(it.count2 || it.countedQty || 0);
-            const expected = Number(it.expectedQty || 0);
-            const hasNote = it.inventoryNote && it.inventoryNote.trim() !== '';
-            return counted !== expected || hasNote;
+          const counted = Number(it.count2 || it.countedQty || 0);
+          const expected = Number(it.expectedQty || 0);
+          const hasNote = it.inventoryNote && it.inventoryNote.trim() !== '';
+          return counted !== expected || hasNote;
         });
 
         const hasDiscrepancies = itemsWithDiscrepancies.length > 0;
-        const subject = hasDiscrepancies 
-            ? `⚠️ NOVEDADES EN RECIBO: ${docL.externalDocId} [${docL.vehicleData || 'S/V'}]`
-            : `✅ RECIBO CONFORME: ${docL.externalDocId} [${docL.vehicleData || 'S/V'}]`;
-        
+        const subject = hasDiscrepancies
+          ? `⚠️ NOVEDADES EN RECIBO: ${docL.externalDocId} [${docL.vehicleData || 'S/V'}]`
+          : `✅ RECIBO CONFORME: ${docL.externalDocId} [${docL.vehicleData || 'S/V'}]`;
+
         const tableRows = (hasDiscrepancies ? itemsWithDiscrepancies : items).map((it: any) => {
-            const counted = Number(it.count2 || it.countedQty || 0);
-            const expected = Number(it.expectedQty || 0);
-            const diff = counted - expected;
-            const diffColor = diff < 0 ? '#ef4444' : (diff > 0 ? '#f59e0b' : '#10b981');
-            const diffPrefix = diff > 0 ? '+' : '';
-            
-            return `
+          const counted = Number(it.count2 || it.countedQty || 0);
+          const expected = Number(it.expectedQty || 0);
+          const diff = counted - expected;
+          const diffColor = diff < 0 ? '#ef4444' : (diff > 0 ? '#f59e0b' : '#10b981');
+          const diffPrefix = diff > 0 ? '+' : '';
+
+          return `
               <tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 12px; font-size: 11px; color: #0f172a; font-weight: bold;">
                   ${it.articleId}
@@ -417,18 +417,18 @@ export const syncInventory = async (req: Request, res: Response) => {
         `;
 
         if (targetEmail) {
-            const { sendEmail } = await import('../services/notification.service.js');
-            console.log(`[M7-NOTIF] Iniciando envío de correo a: ${targetEmail}`);
-            await sendEmail(targetEmail, subject, html);
+          const { sendEmail } = await import('../services/notification.service.js');
+          console.log(`[M7-NOTIF] Iniciando envío de correo a: ${targetEmail}`);
+          await sendEmail(targetEmail, subject, html);
 
-            // C. Registrar log
-            const notifLogId = `NOT-${Date.now()}`;
-            await pool.query(`
+          // C. Registrar log
+          const notifLogId = `NOT-${Date.now()}`;
+          await pool.query(`
                 INSERT INTO master_records (id, category, name, description, notification_email, tipo_notificacion_id, status_id)
                 VALUES ($1, 'masterNotificaciones', 'LOG_INVENTARIO', $2, $3, $4, 'EST-01')
             `, [notifLogId, `RECIBO ${docL.externalDocId} - ${hasDiscrepancies ? 'CON NOVEDADES' : 'OK'}`, targetEmail, tipoId]);
         }
-        
+
       } catch (notifErr: any) {
         console.error('[M7-NOTIF-ERROR]', notifErr.message);
       }
@@ -452,7 +452,7 @@ export const syncInventory = async (req: Request, res: Response) => {
 export const bulkCreateDocuments = async (req: Request, res: Response) => {
   const { documents } = req.body;
   const client = await pool.connect();
-  
+
   const sanitizeDate = (dateVal: any) => {
     if (!dateVal) return null;
     const str = String(dateVal).trim().toUpperCase();
@@ -472,7 +472,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
     await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiver_user TEXT;');
     await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS codplan TEXT;');
     await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS delivery_date TIMESTAMP WITH TIME ZONE;');
-    
+
     await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_user TEXT;');
     await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_observation TEXT;');
     await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS expected_qty NUMERIC DEFAULT 0;');
@@ -480,7 +480,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
     await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
     await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS picked_qty NUMERIC DEFAULT 0;');
     await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS dispatched_qty NUMERIC DEFAULT 0;');
-    
+
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS received_qty NUMERIC DEFAULT 0;');
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS order_number TEXT;');
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit TEXT;');
@@ -495,7 +495,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS un_code TEXT;');
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS client_ref TEXT;');
     await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS item_status TEXT DEFAULT \'Pendiente\';');
-    
+
     await client.query(`
       DO $$ 
       BEGIN 
@@ -535,14 +535,14 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
         deliverer_user = EXCLUDED.deliverer_user,
         receiver_user = EXCLUDED.receiver_user
       `, [
-        doc.id, 
-        doc.clientId, 
-        doc.externalDocId || doc.external_doc_id, 
-        doc.vehicleData || doc.vehicle_plate || doc.plate || 'S/A', 
-        doc.codplan || doc.un_orig || 'S/I', 
+        doc.id,
+        doc.clientId,
+        doc.externalDocId || doc.external_doc_id,
+        doc.vehicleData || doc.vehicle_plate || doc.plate || 'S/A',
+        doc.codplan || doc.un_orig || 'S/I',
         doc.planType || doc.plan_type || 'N/A',
-        deliveryDate, 
-        doc.status || 'Pendiente', 
+        deliveryDate,
+        doc.status || 'Pendiente',
         doc.createdAt || new Date().toISOString(),
         pickingDate,
         receivingDate,
@@ -570,18 +570,18 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             un_code = EXCLUDED.un_code,
             client_ref = EXCLUDED.client_ref
           `, [
-            doc.id, 
-            item.articleId?.trim().toUpperCase(), 
-            item.expectedQty || 0, 
+            doc.id,
+            item.articleId?.trim().toUpperCase(),
+            item.expectedQty || 0,
             item.receivedQty || 0,
-            item.orderNumber || 'S/I', 
+            item.orderNumber || 'S/I',
             item.unit || 'und',
             item.invoice || 'S/I',
             item.volume || 0,
             item.unitVolume || '0',
             item.city || 'S/D',
             item.address || 'S/D',
-            item.observation || item.driverNote || '', 
+            item.observation || item.driverNote || '',
             item.batch || 'S/L',
             item.peso || 0,
             item.unCode || null,
@@ -593,7 +593,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
       // Insertar Consolidado (Auditoría)
       if (doc.consolidatedItems && doc.consolidatedItems.length > 0) {
         for (const item of doc.consolidatedItems) {
-           await client.query(`
+          await client.query(`
               INSERT INTO document_consolidated_items (document_id, article_id, expected_qty, count_1, count_2, picked_qty, dispatched_qty, inventory_observation)
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               ON CONFLICT (document_id, article_id) DO UPDATE SET
@@ -601,25 +601,25 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               count_1 = EXCLUDED.count_1,
               count_2 = EXCLUDED.count_2
            `, [
-             doc.id,
-             item.articleId?.trim().toUpperCase(),
-             item.expectedQty,
-             item.count1 || 0,
-             item.count2 || 0,
-             item.pickedQty || 0,
-             item.dispatchedQty || 0,
-             item.inventoryObservation || item.observation || ''
-           ]);
+            doc.id,
+            item.articleId?.trim().toUpperCase(),
+            item.expectedQty,
+            item.count1 || 0,
+            item.count2 || 0,
+            item.pickedQty || 0,
+            item.dispatchedQty || 0,
+            item.inventoryObservation || item.observation || ''
+          ]);
         }
       } else if (doc.items && doc.items.length > 0) {
         // Fallback: Si no viene consolidado explícito, crearlo desde items (para plan normal que igual necesita auditoría)
         for (const item of doc.items) {
-           // Chequear si ya existe para no duplicar en re-cargas parciales sin conflicto definido
-           // Mejor DELETE previo o Upsert?
-           // Dado que consolidado no tiene unique constraint complejo, asumimos carga limpia o verificar
-           // Por simplicidad en este paso, insertamos directo, pero idealmente upsert por doc_id + art_id
-           // Agregamos chequeo simple
-            await client.query(`
+          // Chequear si ya existe para no duplicar en re-cargas parciales sin conflicto definido
+          // Mejor DELETE previo o Upsert?
+          // Dado que consolidado no tiene unique constraint complejo, asumimos carga limpia o verificar
+          // Por simplicidad en este paso, insertamos directo, pero idealmente upsert por doc_id + art_id
+          // Agregamos chequeo simple
+          await client.query(`
                INSERT INTO document_consolidated_items (document_id, article_id, expected_qty, inventory_observation)
                VALUES ($1, $2, $3, $4)
                ON CONFLICT (document_id, article_id) DO UPDATE SET
@@ -681,8 +681,8 @@ export const getInvoices = async (req: Request, res: Response) => {
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
       WHERE (
         /* APERTURA TOTAL M7: Mostramos todo lo que no esté físicamente fuera o borrado */
-        (document_items.item_status IS NULL OR TRIM(UPPER(document_items.item_status)) NOT IN ('ELIMINADO', 'CANCELADO', 'ENTREGADO', 'FINALIZADO', 'EN RUTA'))
-        OR (documents_l.status IS NOT NULL AND UPPER(documents_l.status) IN ('PENDIENTE', 'AUDITADO'))
+        (document_items.item_status IS NULL OR TRIM(UPPER(document_items.item_status)) NOT IN ('ELIMINADO', 'CANCELADO', 'ENTREGADO', 'FINALIZADO', 'ASIGNADO', 'EN RUTA', 'EN_RUTA'))
+        AND (documents_l.status IS NULL OR UPPER(documents_l.status) IN ('PENDIENTE', 'AUDITADO', 'EN PROCESO'))
       )
       AND (
         (document_items.invoice IS NOT NULL AND document_items.invoice != '')
@@ -740,7 +740,7 @@ export const deleteDocument = async (req: Request, res: Response) => {
           inventory_date = CURRENT_TIMESTAMP 
       WHERE id = $2
     `, [user, id]);
-    
+
     // Opcional: También actualizar el item_status de los items para consistencia en ruteo
     await pool.query(`
       UPDATE document_items 

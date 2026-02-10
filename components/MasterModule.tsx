@@ -339,10 +339,10 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, allMasterData
       console.log('[M7-MASTER] ✅ Save successful!', saveResponse);
 
       // Actualizar el estado local para que la tabla se refresque sin recargar página
-      // PRIORIDAD: Usar objeto completo del backend si está disponible (ej: saveResponse.article para artículos)
+      // PRIORIDAD: Usar objeto completo del backend si está disponible (ej: saveResponse.article o saveResponse.record)
       const recordWithId = saveResponse.article
         ? { ...saveResponse.article, statusId: saveResponse.article.statusId || newRecord.statusId }
-        : { ...newRecord, id: saveResponse.id || finalId };
+        : (saveResponse.record ? saveResponse.record : { ...newRecord, id: saveResponse.id || finalId });
 
 
 

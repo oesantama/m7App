@@ -12,6 +12,7 @@ interface RoutePlannerProps {
   drivers: Driver[];
   assignments: VehicleAssignment[];
   documents: DocumentL[];
+  activeRoutes: Route[]; // Nueva prop
   user: User;
   onAssign: (vId: string, dId: string, cId: string) => void;
   onSaveRoute: (route: Partial<Route>) => void;
@@ -40,7 +41,7 @@ interface SuggestedRoute {
 }
 
 const RoutePlanner: React.FC<RoutePlannerProps> = ({
-  invoices, vehicles, drivers, assignments, documents, user, onAssign, onSaveRoute, onRefresh
+  invoices, vehicles, drivers, assignments, documents, activeRoutes, user, onAssign, onSaveRoute, onRefresh
 }) => {
   const mapRef = useRef<L.Map | null>(null);
   const [selectedClient, setSelectedClient] = useState(user.clientId || 'c1');
@@ -141,7 +142,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const v = vehicles.find(veh => veh.id === link.vehicleId);
       const d = drivers.find(drv => drv.id === link.driverId);
 
+      // Si el vehículo o conductor no existe, o si el vehículo está en una RUTA ACTIVA, lo ocultamos
       if (!v || !d) return null;
+
+      const isBusy = activeRoutes.some(r => r.vehicle_id === v.id && r.status === 'EN_RUTA');
+      if (isBusy) return null; // Ocultar vehículos ocupados
 
       return {
         ...v,

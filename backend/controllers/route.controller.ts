@@ -3,18 +3,25 @@ import { Request, Response } from 'express';
 import pool from '../config/database.js';
 
 interface LearningPatternData {
-    city: string;
-    vehicle_id: string;
+  city: string;
+  vehicle_id: string;
 }
 
 export const getRoutes = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
       SELECT r.*, v.plate, d.name as driver_name,
-      (SELECT json_agg(invoice_id) FROM route_invoices WHERE route_id = r.id) as invoice_ids
+      COALESCE(
+        (
+          SELECT json_agg(REGEXP_REPLACE(invoice_id, '[\\r\\n\\t\\f\\v ]', '', 'g')) 
+          FROM route_invoices 
+          WHERE TRIM(route_id) = TRIM(r.id)
+        ),
+        '[]'::json
+      ) as invoice_ids
       FROM routes r
-      LEFT JOIN vehicles v ON r.vehicle_id = v.id
-      LEFT JOIN drivers d ON r.driver_id = d.id
+      LEFT JOIN vehicles v ON TRIM(r.vehicle_id) = TRIM(v.id)
+      LEFT JOIN drivers d ON TRIM(r.driver_id) = TRIM(d.id)
       ORDER BY r.created_at DESC
     `);
     res.json(result.rows);
@@ -36,9 +43,18 @@ export const getRoutingPatterns = async (req: Request, res: Response) => {
 export const saveRoute = async (req: Request, res: Response) => {
   const { id, vehicleId, driverId, clientId, invoiceIds, createdBy } = req.body;
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
+
+    // AUTO-ASSIGN DRIVER IF MISSING (Requerimiento Crítico)
+    let finalDriverId = driverId;
+    if (!finalDriverId || finalDriverId === 'S/A' || finalDriverId === '') {
+      const linkRes = await client.query('SELECT driver_id FROM assignments WHERE vehicle_id = $1 AND is_active = true LIMIT 1', [vehicleId]);
+      if (linkRes.rows.length > 0) {
+        finalDriverId = linkRes.rows[0].driver_id;
+      }
+    }
 
     // 1. Insertar Cabecera de Ruta
     await client.query(`
@@ -46,24 +62,41 @@ export const saveRoute = async (req: Request, res: Response) => {
       VALUES ($1, $2, $3, $4, $5, 'Assigned')
       ON CONFLICT (id) DO UPDATE SET
       vehicle_id = $2, driver_id = $3, updated_by = $5, updated_at = NOW()
-    `, [id || `rt-${Date.now()}`, vehicleId, driverId, clientId, createdBy]);
+    `, [id || `rt-${Date.now()}`, vehicleId, finalDriverId, clientId, createdBy]);
 
     // 2. Limpiar facturas previas si es una actualización
     await client.query('DELETE FROM route_invoices WHERE route_id = $1', [id]);
 
-    // 3. Vincular Facturas y actualizar estado de las mismas
-    for (const invId of invoiceIds) {
+    // 3. Vincular Facturas y actualizar estado de las mismas (Deduplicating inputs)
+    const uniqueInvoiceIds = [...new Set(invoiceIds as string[])];
+
+    for (const invId of uniqueInvoiceIds) {
       // route_invoices usa text, asi que invId (string) esta bien
-      await client.query('INSERT INTO route_invoices (route_id, invoice_id) VALUES ($1, $2)', [id, invId]);
+      await client.query('INSERT INTO route_invoices (route_id, invoice_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, invId]);
     }
-    
+
     // 4. Actualización Masiva de Estado en Document Items (con Fallback)
-    if (invoiceIds.length > 0) {
-       await client.query(`
+    if (uniqueInvoiceIds.length > 0) {
+      console.log('[DEBUG] Attempting to update status for IDs:', uniqueInvoiceIds);
+
+      const updateResult = await client.query(`
          UPDATE document_items 
-         SET item_status = 'Asignado'
+         SET item_status = 'ASIGNADO'
          WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = ANY($1)
-       `, [invoiceIds]);
+         RETURNING id
+       `, [uniqueInvoiceIds]);
+
+      console.log(`[DEBUG] Updated ${updateResult.rowCount} document_items to ASIGNADO`);
+
+      if (updateResult.rowCount === 0) {
+        console.warn('[WARN] No document_items were updated! Checking for whitespace mismatches...');
+        // Intento secundario con TRIM si el primero falla
+        await client.query(`
+             UPDATE document_items 
+             SET item_status = 'ASIGNADO'
+             WHERE CONCAT(document_id, '_', TRIM(COALESCE(NULLIF(invoice, ''), order_number))) = ANY($1)
+          `, [uniqueInvoiceIds]);
+      }
     }
 
     await client.query('COMMIT');
@@ -86,21 +119,21 @@ export const logRouteMovement = async (req: Request, res: Response) => {
 
     // APRENDIZAJE IA M7: Si se agrega una factura a una ruta (manual), aprendemos la afinidad Ciudad-Vehículo
     if (action === 'ADD' && details?.city && newPlate) {
-        // Buscamos el ID del vehículo por la placa
-        const vRes = await pool.query('SELECT id FROM vehicles WHERE plate = $1', [newPlate]);
-        if (vRes.rows.length > 0) {
-            const vId = vRes.rows[0].id;
-            const city = String(details.city).toUpperCase().trim();
-            
-            await pool.query(`
+      // Buscamos el ID del vehículo por la placa
+      const vRes = await pool.query('SELECT id FROM vehicles WHERE plate = $1', [newPlate]);
+      if (vRes.rows.length > 0) {
+        const vId = vRes.rows[0].id;
+        const city = String(details.city).toUpperCase().trim();
+
+        await pool.query(`
                 INSERT INTO routing_patterns (city, vehicle_id, strength, last_used)
                 VALUES ($1, $2, 1, NOW())
                 ON CONFLICT (city, vehicle_id) DO UPDATE SET
                 strength = routing_patterns.strength + 1,
                 last_used = NOW()
             `, [city, vId]);
-            console.log(`[M7-LEARNING] Patrón registrado: ${city} -> ${newPlate} (Strength++)`);
-        }
+        console.log(`[M7-LEARNING] Patrón registrado: ${city} -> ${newPlate} (Strength++)`);
+      }
     }
 
     res.json({ success: true });
@@ -111,25 +144,25 @@ export const logRouteMovement = async (req: Request, res: Response) => {
 };
 
 export const updateLocation = async (req: Request, res: Response) => {
-    const { vehicleId, driverId, latitude, longitude, accuracy, speed, heading } = req.body;
-    try {
-        await pool.query(`
+  const { vehicleId, driverId, latitude, longitude, accuracy, speed, heading } = req.body;
+  try {
+    await pool.query(`
             INSERT INTO vehicle_locations (vehicle_id, driver_id, latitude, longitude, accuracy, speed, heading)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
         `, [vehicleId, driverId, latitude, longitude, accuracy || null, speed || null, heading || null]);
-        res.json({ success: true });
-    } catch (err: any) {
-        console.error('[M7-GPS-LOG-ERR]', err.message);
-        res.status(500).json({ error: "Error al registrar ubicación GPS" });
-    }
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[M7-GPS-LOG-ERR]', err.message);
+    res.status(500).json({ error: "Error al registrar ubicación GPS" });
+  }
 };
 
 export const getLatestLocations = async (req: Request, res: Response) => {
-    try {
-        const result = await pool.query('SELECT * FROM v_latest_vehicle_locations');
-        res.json(result.rows);
-    } catch (err: any) {
-        console.error('[M7-GPS-GET-ERR]', err.message);
-        res.status(500).json({ error: "Error al obtener ubicaciones del centro de mando" });
-    }
+  try {
+    const result = await pool.query('SELECT * FROM v_latest_vehicle_locations');
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[M7-GPS-GET-ERR]', err.message);
+    res.status(500).json({ error: "Error al obtener ubicaciones del centro de mando" });
+  }
 };

@@ -155,9 +155,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 });
 
                 const speedKmh = loc.speed ? (loc.speed * 3.6).toFixed(0) : '0';
-                const lastUpdate = new Date(loc.updated_at).toLocaleTimeString('es-CO', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
+                const lastUpdate = new Date(loc.updated_at).toLocaleTimeString('es-CO', {
+                    hour: '2-digit',
+                    minute: '2-digit'
                 });
 
                 markersRef.current[loc.vehicle_id] = L.marker(pos, { icon: customIcon })
@@ -209,7 +209,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         if (activePoints.length > 0 && mapRef.current) {
             activePoints.push(L.latLng([M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng]));
             const bounds = L.latLngBounds(activePoints);
-            
+
             // Solo auto-ajustar si el mapa no ha sido movido manualmente por el usuario en los últimos 10s
             // Por ahora, lo dejamos como una opción o solo la primera vez para evitar saltos (lag visual)
             if (!markersRef.current['init_view']) {
@@ -224,23 +224,23 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         setIsGeneratingPDF(true);
         try {
             const doc = new jsPDF();
-            
+
             // Header
             doc.setFillColor(15, 23, 42); // slate-900
             doc.rect(0, 0, 210, 35, 'F');
-            
+
             doc.setTextColor(16, 185, 129); // emerald-500
             doc.setFontSize(24);
             doc.setFont('helvetica', 'bold');
             doc.text('M7 INTELLIGENCE', 105, 15, { align: 'center' });
-            
+
             doc.setFontSize(10);
             doc.setTextColor(148, 163, 184); // slate-400
             doc.text('PLANILLA DE DESPACHO LOGÍSTICO', 105, 23, { align: 'center' });
-            doc.text(new Date().toLocaleDateString('es-CO', { 
-                day: '2-digit', 
-                month: 'long', 
-                year: 'numeric' 
+            doc.text(new Date().toLocaleDateString('es-CO', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
             }), 105, 29, { align: 'center' });
 
             // Información del Vehículo
@@ -273,7 +273,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 head: [],
                 body: vehicleInfo,
                 theme: 'plain',
-                styles: { 
+                styles: {
                     fontSize: 9,
                     cellPadding: 2,
                     textColor: [15, 23, 42]
@@ -286,7 +286,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
             // Tabla de Documentos
             let finalY = (doc as any).lastAutoTable.finalY || 90;
-            
+
             doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
             doc.text('DESGLOSE DE DOCUMENTOS', 14, finalY + 10);
@@ -308,14 +308,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 head: [['#', 'FACTURA', 'CLIENTE', 'CIUDAD', 'VOLUMEN', 'ORDEN']],
                 body: documentRows,
                 theme: 'grid',
-                headStyles: { 
+                headStyles: {
                     fillColor: [15, 23, 42],
                     textColor: [16, 185, 129],
                     fontStyle: 'bold',
                     fontSize: 8,
                     halign: 'center'
                 },
-                bodyStyles: { 
+                bodyStyles: {
                     fontSize: 8,
                     textColor: [15, 23, 42]
                 },
@@ -347,7 +347,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             // Guardar PDF
             const fileName = `M7_Planilla_${route.plate}_${new Date().getTime()}.pdf`;
             doc.save(fileName);
-            
+
             toast.success('✅ Planilla PDF generada exitosamente');
         } catch (error) {
             console.error('[PDF-GENERATION-ERROR]', error);
@@ -423,14 +423,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     <div>
                         <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Centro de Mando</h2>
                         <div className="flex items-center gap-2">
-                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
-                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rastreo GPS en Tiempo Real</p>
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rastreo GPS en Tiempo Real (v1.2-FIX)</p>
                         </div>
                     </div>
                 </div>
 
                 <div className="flex gap-4">
-                    <button 
+                    <button
                         onClick={fetchLocations}
                         disabled={isValidating}
                         className={`px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center gap-3 ${isValidating ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -438,7 +438,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         {isValidating ? <Icons.RotateCcw className="w-4 h-4 animate-spin" /> : <Icons.MapPin className="w-4 h-4" />}
                         {isValidating ? 'Actualizando...' : 'Actualizar GPS'}
                     </button>
-                    <button 
+                    <button
                         onClick={onRefresh}
                         className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-emerald-500 transition-all shadow-sm"
                     >
@@ -460,7 +460,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     ) : (
                         activeRoutes.map((route) => {
                             const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
-                                const inv = invoices.find(i => i.id === id);
+                                const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
+                                const inv = invoices.find(i => String(i.id).trim().replace(/[\r\n\t\f\v ]/g, '') === cleanId);
                                 return acc + (inv?.volumeM3 || 0);
                             }, 0);
 
@@ -479,7 +480,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 <h4 className="text-xl font-black text-slate-900">{route.plate}</h4>
                                             </div>
                                         </div>
-                                        
+
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100">
@@ -512,13 +513,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             </div>
 
                                             <div className="flex gap-2">
-                                                <button 
+                                                <button
                                                     onClick={() => setSelectedActiveRoute(route)}
                                                     className="flex-1 py-3 bg-slate-50 hover:bg-slate-900 hover:text-white border border-slate-200 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
                                                 >
                                                     Ver Detalle
                                                 </button>
-                                                <button 
+                                                <button
                                                     onClick={() => generateRoutePDF(route)}
                                                     disabled={isGeneratingPDF}
                                                     className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
@@ -537,7 +538,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 {/* Mapa del Centro de Mando */}
                 <div className="lg:col-span-2 bg-slate-200 rounded-[3rem] shadow-xl border-8 border-white overflow-hidden relative group">
                     <div id="logistics-dispatch-map" className="w-full h-full"></div>
-                    
+
                     {/* Overlay de Estadísticas Flotante y Moderno */}
                     <div className="absolute bottom-8 right-8 z-[400] flex flex-col gap-3">
                         <div className="bg-slate-900/90 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/10 shadow-2xl flex items-center gap-8">
@@ -581,130 +582,132 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
             {/* Modal de Detalle Mejorado */}
             {selectedActiveRoute && (
-              <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
-                 <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-300">
-                     <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-emerald-50 rounded-t-[2.5rem]">
-                         <div className="flex items-center gap-4">
-                             <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
-                                 <Icons.Truck className="w-7 h-7 text-emerald-500" />
-                             </div>
-                             <div>
-                                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Detalle de Despacho</h3>
-                                 <p className="text-xs font-bold text-slate-500 uppercase">
-                                    Ruta {selectedActiveRoute.plate} • {(() => {
-                                        if (selectedActiveRoute.driver_name && selectedActiveRoute.driver_name !== 'S/A') return selectedActiveRoute.driver_name;
-                                        const link = assignments.find(a => a.vehicleId === selectedActiveRoute.vehicle_id && a.isActive);
-                                        const drv = drivers.find(d => d.id === link?.driverId);
-                                        return drv?.name || 'CONDUCTOR EXTERNO';
-                                    })()}
-                                 </p>
-                             </div>
-                         </div>
-                         <button onClick={() => setSelectedActiveRoute(null)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
-                             <Icons.X className="w-5 h-5 text-slate-400" />
-                         </button>
-                     </div>
+                <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-300">
+                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-emerald-50 rounded-t-[2.5rem]">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
+                                    <Icons.Truck className="w-7 h-7 text-emerald-500" />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Detalle de Despacho</h3>
+                                    <p className="text-xs font-bold text-slate-500 uppercase">
+                                        Ruta {selectedActiveRoute.plate} • {(() => {
+                                            if (selectedActiveRoute.driver_name && selectedActiveRoute.driver_name !== 'S/A') return selectedActiveRoute.driver_name;
+                                            const link = assignments.find(a => a.vehicleId === selectedActiveRoute.vehicle_id && a.isActive);
+                                            const drv = drivers.find(d => d.id === link?.driverId);
+                                            return drv?.name || 'CONDUCTOR EXTERNO';
+                                        })()}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedActiveRoute(null)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                                <Icons.X className="w-5 h-5 text-slate-400" />
+                            </button>
+                        </div>
 
-                     <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-                         <div className="grid grid-cols-4 gap-4">
-                             <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-1">FACTURAS</p>
-                                 <p className="text-2xl font-black text-slate-950">{(selectedActiveRoute.invoice_ids || []).length}</p>
-                             </div>
-                             <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-1">VOLUMEN</p>
-                                 <p className="text-2xl font-black text-emerald-600">
-                                     {(selectedActiveRoute.invoice_ids || []).reduce((acc: number, id: string) => {
-                                         const inv = invoices.find(i => i.id === id);
-                                         return acc + (inv?.volumeM3 || 0);
-                                     }, 0).toFixed(1)}m³
-                                 </p>
-                             </div>
-                             <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-1">CAPACIDAD</p>
-                                 <div className="w-full bg-slate-200 h-2 rounded-full mt-2">
-                                     <div 
-                                         className="bg-emerald-500 h-full rounded-full transition-all" 
-                                         style={{ 
-                                             width: `${Math.min(100, ((selectedActiveRoute.invoice_ids || []).reduce((acc: number, id: string) => {
-                                                 const inv = invoices.find(i => i.id === id);
-                                                 return acc + (inv?.volumeM3 || 0);
-                                             }, 0) / (vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 1)) * 100)}%` 
-                                         }}
-                                     ></div>
-                                 </div>
-                             </div>
-                             <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-1">ESTADO</p>
-                                 <p className="text-[10px] font-black text-emerald-600 uppercase">
-                                     {selectedActiveRoute.status === 'EN_RUTA' ? '🚚 EN TRÁNSITO' : '✅ CONFIRMADA'}
-                                 </p>
-                             </div>
-                         </div>
+                        <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                            <div className="grid grid-cols-4 gap-4">
+                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">FACTURAS</p>
+                                    <p className="text-2xl font-black text-slate-950">{(selectedActiveRoute.invoice_ids || []).length}</p>
+                                </div>
+                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">VOLUMEN</p>
+                                    <p className="text-2xl font-black text-emerald-600">
+                                        {(selectedActiveRoute.invoice_ids || []).reduce((acc: number, id: string) => {
+                                            const inv = invoices.find(i => i.id === id);
+                                            return acc + (inv?.volumeM3 || 0);
+                                        }, 0).toFixed(1)}m³
+                                    </p>
+                                </div>
+                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">CAPACIDAD</p>
+                                    <div className="w-full bg-slate-200 h-2 rounded-full mt-2">
+                                        <div
+                                            className="bg-emerald-500 h-full rounded-full transition-all"
+                                            style={{
+                                                width: `${Math.min(100, ((selectedActiveRoute.invoice_ids || []).reduce((acc: number, id: string) => {
+                                                    const inv = invoices.find(i => i.id === id);
+                                                    return acc + (inv?.volumeM3 || 0);
+                                                }, 0) / (vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 1)) * 100)}%`
+                                            }}
+                                        ></div>
+                                    </div>
+                                </div>
+                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">ESTADO</p>
+                                    <p className="text-[10px] font-black text-emerald-600 uppercase">
+                                        {selectedActiveRoute.status === 'EN_RUTA' ? '🚚 EN TRÁNSITO' : '✅ CONFIRMADA'}
+                                    </p>
+                                </div>
+                            </div>
 
-                         <div className="space-y-3">
-                             <div className="flex justify-between items-center">
-                                 <p className="text-sm font-black text-slate-900 uppercase tracking-wider">Desglose de Documentos</p>
-                                 <p className="text-xs text-slate-400 font-bold">{(selectedActiveRoute.invoice_ids || []).length} items</p>
-                             </div>
-                             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                                 {(selectedActiveRoute.invoice_ids || []).map((id: string, idx: number) => {
-                                     const inv = invoices.find(i => i.id === id);
-                                     return (
-                                         <div key={id} className="p-4 bg-gradient-to-r from-white to-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:shadow-md transition-all group">
-                                             <div className="flex items-center gap-4">
-                                                 <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-emerald-500 font-black text-xs">
-                                                     {idx + 1}
-                                                 </div>
-                                                 <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-500 transition-all">
-                                                     <Icons.FileText className="w-5 h-5 text-slate-400 group-hover:text-slate-950" />
-                                                 </div>
-                                                 <div>
-                                                     <p className="text-sm font-black text-slate-900">{inv?.invoiceNumber || id}</p>
-                                                     <p className="text-[9px] font-bold text-slate-400 uppercase">{inv?.customerName || 'Cliente Genérico'}</p>
-                                                 </div>
-                                             </div>
-                                             <div className="text-right">
-                                                 <p className="text-sm font-black text-emerald-600">{inv?.volumeM3?.toFixed(2) || '0.00'} m³</p>
-                                                 <p className="text-[8px] font-bold text-slate-400 uppercase">{inv?.city || 'N/A'}</p>
-                                             </div>
-                                         </div>
-                                     );
-                                 })}
-                             </div>
-                         </div>
-                     </div>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <p className="text-sm font-black text-slate-900 uppercase tracking-wider">Desglose de Documentos</p>
+                                    <p className="text-xs text-slate-400 font-bold">{(selectedActiveRoute.invoice_ids || []).length} items</p>
+                                </div>
+                                <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                                    {[...new Set(selectedActiveRoute.invoice_ids || [])].map((id: any, idx: number) => {
+                                        console.log('Rendering Invoice Row:', id, idx, `${id}-${idx}`);
+                                        const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
+                                        const inv = invoices.find(i => String(i.id).trim().replace(/[\r\n\t\f\v ]/g, '') === cleanId);
+                                        return (
+                                            <div key={`${id}-${idx}`} className="p-4 bg-gradient-to-r from-white to-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:shadow-md transition-all group">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-emerald-500 font-black text-xs">
+                                                        {idx + 1}
+                                                    </div>
+                                                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-500 transition-all">
+                                                        <Icons.FileText className="w-5 h-5 text-slate-400 group-hover:text-slate-950" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-black text-slate-900">{inv?.invoiceNumber || id}</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{inv?.customerName || 'Cliente Genérico'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-black text-emerald-600">{inv?.volumeM3?.toFixed(2) || '0.00'} m³</p>
+                                                    <p className="text-[8px] font-bold text-slate-400 uppercase">{inv?.city || 'N/A'}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
 
-                     <div className="p-8 bg-gradient-to-r from-slate-50 to-emerald-50 border-t border-slate-100 rounded-b-[2.5rem] flex gap-4">
-                        <button 
-                            className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
-                            onClick={() => {
-                                generateRoutePDF(selectedActiveRoute);
-                                setSelectedActiveRoute(null);
-                            }}
-                            disabled={isGeneratingPDF}
-                        >
-                            {isGeneratingPDF ? (
-                                <>
-                                    <Icons.RotateCcw className="w-4 h-4 animate-spin" />
-                                    Generando...
-                                </>
-                            ) : (
-                                <>
-                                    <Icons.FileText className="w-4 h-4" />
-                                    Descargar Planilla PDF
-                                </>
-                            )}
-                        </button>
-                        <button 
-                            className="flex-1 py-4 bg-white border-2 border-slate-200 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all"
-                            onClick={() => setSelectedActiveRoute(null)}
-                        >
-                            Cerrar Vista
-                        </button>
-                     </div>
-                 </div>
-              </div>
+                        <div className="p-8 bg-gradient-to-r from-slate-50 to-emerald-50 border-t border-slate-100 rounded-b-[2.5rem] flex gap-4">
+                            <button
+                                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
+                                onClick={() => {
+                                    generateRoutePDF(selectedActiveRoute);
+                                    setSelectedActiveRoute(null);
+                                }}
+                                disabled={isGeneratingPDF}
+                            >
+                                {isGeneratingPDF ? (
+                                    <>
+                                        <Icons.RotateCcw className="w-4 h-4 animate-spin" />
+                                        Generando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icons.FileText className="w-4 h-4" />
+                                        Descargar Planilla PDF
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                className="flex-1 py-4 bg-white border-2 border-slate-200 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all"
+                                onClick={() => setSelectedActiveRoute(null)}
+                            >
+                                Cerrar Vista
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

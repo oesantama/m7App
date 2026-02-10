@@ -127,6 +127,7 @@ const App: React.FC = () => {
   };
 
   // ============ PORTAL ROUTING ============
+  const [activeRoutes, setActiveRoutes] = useState<any[]>([]); // Estado para rutas activas
   const [isPortalMode, setIsPortalMode] = useState(false);
   const [portalRoute, setPortalRoute] = useState<'login' | 'tracking'>('login');
 
@@ -216,7 +217,7 @@ const App: React.FC = () => {
   const refreshAppData = React.useCallback(async (forcedClientId?: string) => {
     const targetClientId = forcedClientId || user?.clientId || 'c1';
     try {
-      const [modules, pages, genericMasters, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData] = await Promise.all([
+      const [modules, pages, genericMasters, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData, routesData] = await Promise.all([
         api.getModules().then(normalize).catch(() => []),
         api.getPages().then(normalize).catch(() => []),
         api.getGenericMasters().catch(() => []),
@@ -229,7 +230,8 @@ const App: React.FC = () => {
         api.getAllUserPermissions().catch(() => []),
         api.getClients().catch(() => []),
         api.getAssignments().catch(() => []),
-        api.getInvoices(targetClientId).catch(() => [])
+        api.getInvoices(targetClientId).catch(() => []),
+        api.getRoutes().catch(() => [])
       ]);
 
       const groupedMasters: any = {};
@@ -326,6 +328,9 @@ const App: React.FC = () => {
       })) : [];
       setInvoices(mappedInvoices);
       setInvoices(mappedInvoices);
+
+      // Actualizar Rutas Activas
+      setActiveRoutes(Array.isArray(routesData) ? routesData : []);
 
       // Fetch operational data too
       api.getDocuments(targetClientId).then(docs => {
@@ -524,8 +529,8 @@ const App: React.FC = () => {
 
             {/* HERO BANNER PROACTIVO - VISIBILIDAD MÁXIMA AL INICIO */}
             <div className={`max-w-6xl mx-auto mb-12 p-1 relative overflow-hidden rounded-[3.5rem] group transition-all duration-700 shadow-2xl ${documents.length === 0
-                ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600'
-                : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600'
+              ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600'
+              : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600'
               }`}>
               <div className="bg-slate-950/90 backdrop-blur-3xl p-10 md:p-14 rounded-[3.3rem] relative overflow-hidden flex flex-col md:flex-row items-center gap-10 border border-white/5">
                 {/* Background Brain Animation */}
@@ -560,8 +565,8 @@ const App: React.FC = () => {
                     <button
                       onClick={() => setActiveTab('documentos')}
                       className={`px-10 py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl ${documents.length === 0
-                          ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-                          : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                        ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                        : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
                         }`}
                     >
                       {documents.length === 0 ? "Abrir Gestor de Documentos" : "Iniciar Auditoría IA"}
@@ -669,6 +674,7 @@ const App: React.FC = () => {
             drivers={drivers}
             assignments={assignments}
             documents={documents}
+            activeRoutes={routes} // Pasamos rutas activas para filtrar vehículos ocupados
             user={user!}
             onRefresh={refreshAppData}
             onAssign={(vId, dId, cId) => {
@@ -793,7 +799,7 @@ const App: React.FC = () => {
             drivers={drivers}
             assignments={assignments}
             invoices={invoices}
-            activeRoutes={[]}
+            activeRoutes={activeRoutes}
             onRefresh={() => refreshAppData()}
           />
         );
