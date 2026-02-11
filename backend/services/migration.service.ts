@@ -62,7 +62,6 @@ export const restoreSystem = async () => {
       );
     `);
 
-    await client.query('DROP TABLE IF EXISTS users CASCADE');
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -150,7 +149,6 @@ export const restoreSystem = async () => {
       );
     `);
 
-    await client.query('DROP TABLE IF EXISTS documents_l CASCADE');
     await client.query(`
       CREATE TABLE IF NOT EXISTS documents_l (
         id TEXT PRIMARY KEY,
@@ -176,7 +174,6 @@ export const restoreSystem = async () => {
       );
     `);
 
-    await client.query('DROP TABLE IF EXISTS document_items CASCADE');
     await client.query(`
       CREATE TABLE IF NOT EXISTS document_items (
         id SERIAL PRIMARY KEY,
