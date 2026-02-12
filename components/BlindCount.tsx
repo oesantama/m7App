@@ -1,6 +1,7 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { Icons } from '../constants';
+import { toast } from 'sonner';
 import { Article, DocumentL, DocumentLItem, MasterRecord, DocStatus } from '../types';
 
 interface BlindCountProps {
@@ -14,11 +15,11 @@ interface BlindCountProps {
   onAddNotificationToMaster: (notif: Partial<MasterRecord>) => void;
 }
 
-const BlindCount: React.FC<BlindCountProps> = ({ 
-  document: docL, 
+const BlindCount: React.FC<BlindCountProps> = ({
+  document: docL,
   masterNotificaciones,
   masterArticulo,
-  onConfirm, 
+  onConfirm,
   onPartialSave,
   onCancel,
   onAddArticleToMaster,
@@ -47,18 +48,37 @@ const BlindCount: React.FC<BlindCountProps> = ({
     });
     return initial;
   });
-  const [inventoryObservation, setInventoryObservation] = useState(docL.inventoryObservation || '');
+  const [inventoryObservation, setInventoryObservation] = useState(docL.inventory_observation || docL.inventoryNotes || '');
   const [mismatchIds, setMismatchIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-  const [validationAttempts, setValidationAttempts] = useState(0); 
+  const [validationAttempts, setValidationAttempts] = useState(0);
   const [lastScan, setLastScan] = useState<{ article: Article | null, message: string, status: 'success' | 'error' | 'new' } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
+  const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(20);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [conversionTarget, setConversionTarget] = useState<{
+    articleId: string;
+    currentQty: number;
+    factor: number;
+    targetQty: number;
+    fromLabel: string;
+    toLabel: string;
+  } | null>(null);
+  const [reverseTarget, setReverseTarget] = useState<{
+    articleId: string;
+    currentQty: number;
+    factor: number;
+    targetQty: number;
+    fromLabel: string;
+    toLabel: string;
+  } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isLoaded = useRef(false);
+  const ignoreScan = useRef(false); // Ref para ignorar basura del scanner
 
   // AGRUPACIÓN DE ITEMS POR SKU (VISTA GENERAL)
   const groupedItems = useMemo(() => {
@@ -88,11 +108,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
           return merged;
         });
         setCount1Data(prev => {
-           const merged = { ...prev };
-           Object.keys(data.count1Data || {}).forEach(k => {
-             merged[k] = Math.max(merged[k] || 0, data.count1Data[k]);
-           });
-           return merged;
+          const merged = { ...prev };
+          Object.keys(data.count1Data || {}).forEach(k => {
+            merged[k] = Math.max(merged[k] || 0, data.count1Data[k]);
+          });
+          return merged;
         });
         if (data.validationAttempts > 0) setValidationAttempts(data.validationAttempts);
         if (data.mismatchIds?.length > 0) setMismatchIds(data.mismatchIds);
@@ -122,34 +142,35 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
   const handleManualSave = () => {
     onPartialSave(
-      groupedItems.map(it => ({ 
-        ...it, 
-        countedQty: counts[it.articleId] || 0, 
-        inventoryNote: itemObservations[it.articleId] 
+      groupedItems.map(it => ({
+        ...it,
+        countedQty: counts[it.articleId] || 0,
+        inventoryNote: itemObservations[it.articleId]
       })),
       inventoryObservation
     );
   };
 
-  const handleScan = (e: React.FormEvent) => {
-    e.preventDefault();
-    const input = scanInput.trim().toUpperCase();
+  const processBarcode = (rawCode: string) => {
+    // FIX: Normalizar comillas a guiones (correction for scanner input)
+    const input = rawCode.trim().toUpperCase().replace(/'/g, '-');
     if (!input) return;
 
     const itemInDoc = groupedItems.find(it => it.articleId.toUpperCase() === input);
     if (!itemInDoc) {
       setLastScan({ article: null, message: `Código "${input}" fuera de plan.`, status: 'error' });
-      setScanInput(''); return;
+      setScanInput('');
+      return;
     }
 
     let articleMaster = (masterArticulo as Article[]).find(a => a.sku.toUpperCase() === input || a.barcode === input);
     if (!articleMaster) {
-      const newArticle: Article = { 
-        id: itemInDoc.articleId, sku: itemInDoc.articleId, barcode: itemInDoc.articleId, 
-        name: `SINCRO M7: ${itemInDoc.articleId}`, clientId: docL.clientId, 
-        factorInter: 1, factorStd: 1, createdBy: 'M7-SYS', 
-        createdAt: new Date().toISOString(), updatedBy: 'M7-SYS', 
-        updatedAt: new Date().toISOString(), statusId: 'EST-01' 
+      const newArticle: Article = {
+        id: itemInDoc.articleId, sku: itemInDoc.articleId, barcode: itemInDoc.articleId,
+        name: `SINCRO M7: ${itemInDoc.articleId}`, clientId: docL.clientId,
+        factorInter: 1, factorStd: 1, createdBy: 'M7-SYS',
+        createdAt: new Date().toISOString(), updatedBy: 'M7-SYS',
+        updatedAt: new Date().toISOString(), statusId: 'EST-01'
       };
       onAddArticleToMaster(newArticle);
       articleMaster = newArticle;
@@ -161,6 +182,39 @@ const BlindCount: React.FC<BlindCountProps> = ({
     inputRef.current?.focus();
   };
 
+  // Manejo inteligente del input para ignorar basura post-Ñ
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase();
+
+    // Si estamos en periodo de bloqueo (procesando basura post-Ñ), forzamos limpieza
+    if (ignoreScan.current) {
+      setScanInput('');
+      return;
+    }
+
+    if (val.includes('Ñ')) {
+      const cleanCode = val.split('Ñ')[0];
+      if (cleanCode) {
+        processBarcode(cleanCode);
+
+        // ACTIVAR BLOQUEO: Ignorar cualquier input por 500ms (lo que tarda el scanner en escupir el resto)
+        ignoreScan.current = true;
+        setTimeout(() => {
+          ignoreScan.current = false;
+          setScanInput(''); // Limpieza final de seguridad
+        }, 500);
+      }
+      setScanInput('');
+    } else {
+      setScanInput(val);
+    }
+  };
+
+  const handleScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    processBarcode(scanInput);
+  };
+
   const handleSubtract = (articleId: string) => {
     setCounts(prev => ({
       ...prev,
@@ -170,7 +224,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
   const handleValidationTrigger = () => {
     const mismatches = groupedItems.filter(it => (counts[it.articleId] || 0) !== it.expectedQty);
-    
+
     if (mismatches.length > 0 && validationAttempts === 0) {
       setCount1Data({ ...counts });
       setValidationAttempts(1);
@@ -185,11 +239,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const proceedToFinalize = () => {
     setShowConfirmDialog(false);
     // Buscar notificación específica "inventario ajover"
-    const targetNotif = masterNotificaciones.find(n => 
-      n.name?.trim().toLowerCase() === 'inventario ajover' && 
+    const targetNotif = masterNotificaciones.find(n =>
+      n.name?.trim().toLowerCase() === 'inventario ajover' &&
       n.statusId === 'EST-01'
     );
-    
+
     if (!targetNotif || !targetNotif.notificationEmail) {
       setShowEmailInput(true);
     } else {
@@ -197,9 +251,153 @@ const BlindCount: React.FC<BlindCountProps> = ({
     }
   };
 
+  const handleOpenConversion = (articleId: string) => {
+    const currentQty = counts[articleId] || 0;
+    if (currentQty === 0) return;
+
+    // Buscar en maestra
+    const masterInfo = masterArticulo.find(m => m.id === articleId || m.sku === articleId);
+    if (!masterInfo) {
+      toast.error('Artículo no encontrado en maestra para conversión');
+      return;
+    }
+
+    // Lógica simplificada: Si factorInter > 1, asumimos conversión de Caja -> Unidad
+    // O si item.unit == 'CJ' etc.
+    // POor defecto: Factor INTER
+    const factor = Number(masterInfo.factorInter || masterInfo.factor_inter || 0);
+
+    if (factor <= 1) {
+      toast.error('Este artículo no tiene factor de conversión configurado (Factor <= 1)');
+      return;
+    }
+
+    // Etiquetas MEJORADAS (M7 FIX)
+    // Intentamos obtener los nombres reales de las unidades desde la maestra
+    // Si factorInter se usa, asumimos conversión de INTERMEDIA -> ESTÁNDAR
+
+    // Posibles nombres de campo para Unidad Intermedia (Caja, Paquete, etc.)
+    const labelInter =
+      (masterInfo as any).uom_inter ||
+      (masterInfo as any).uom_intermediate ||
+      (masterInfo as any).uom_media ||
+      (masterInfo as any).uom_img || // A veces se usa este naming
+      'CJ'; // Fallback
+
+    // Posibles nombres de campo para Unidad Estándar (Und, Botella, etc.) 
+    const labelStd =
+      (masterInfo as any).uom_std ||
+      (masterInfo as any).uom_standard ||
+      (masterInfo as any).uom_base ||
+      'UND'; // Fallback
+
+    setConversionTarget({
+      articleId,
+      currentQty,
+      factor,
+      targetQty: currentQty * factor,
+      fromLabel: labelInter,
+      toLabel: labelStd
+    });
+  };
+
+  const confirmConversion = () => {
+    if (!conversionTarget) return;
+
+    setCounts(prev => ({
+      ...prev,
+      [conversionTarget.articleId]: conversionTarget.targetQty
+    }));
+
+    // Opcional: Agregar nota automática
+    setItemObservations(prev => ({
+      ...prev,
+      [conversionTarget.articleId]: `Conv: ${conversionTarget.currentQty} ${conversionTarget.fromLabel} x ${conversionTarget.factor} = ${conversionTarget.targetQty} ${conversionTarget.toLabel}. ${prev[conversionTarget.articleId] || ''}`
+    }));
+
+    toast.success('Conversión aplicada');
+    setConversionTarget(null);
+  };
+
+  const handleOpenReverse = (articleId: string) => {
+    const currentQty = counts[articleId] || 0;
+    if (currentQty === 0) return;
+
+    // Buscar en maestra
+    const masterInfo = masterArticulo.find(m => m.id === articleId || m.sku === articleId);
+    if (!masterInfo) {
+      toast.error('Artículo no encontrado en maestra para reversión');
+      return;
+    }
+
+    const factor = Number(masterInfo.factorInter || masterInfo.factor_inter || 0);
+
+    if (factor <= 1) {
+      toast.error('Este artículo no tiene factor configurado para reversar (Factor <= 1)');
+      return;
+    }
+
+    // Etiquetas (Invertidas respecto a conversión normal)
+    const labelInter =
+      (masterInfo as any).uom_inter ||
+      (masterInfo as any).uom_intermediate ||
+      (masterInfo as any).uom_media ||
+      'CJ'; 
+
+    const labelStd =
+      (masterInfo as any).uom_std ||
+      (masterInfo as any).uom_standard ||
+      (masterInfo as any).uom_base ||
+      'UND'; 
+
+    setReverseTarget({
+      articleId,
+      currentQty,
+      factor,
+      targetQty: currentQty / factor,
+      fromLabel: labelStd, // De Estándar (Unds)
+      toLabel: labelInter // A Intermedia (Cajas)
+    });
+  };
+
+  const confirmReverse = () => {
+    if (!reverseTarget) return;
+
+    setCounts(prev => ({
+      ...prev,
+      [reverseTarget.articleId]: reverseTarget.targetQty
+    }));
+
+    setItemObservations(prev => ({
+      ...prev,
+      [reverseTarget.articleId]: `Rev: ${reverseTarget.currentQty} ${reverseTarget.fromLabel} / ${reverseTarget.factor} = ${reverseTarget.targetQty} ${reverseTarget.toLabel}. ${prev[reverseTarget.articleId] || ''}`
+    }));
+
+    toast.success('Reversión aplicada');
+    setReverseTarget(null);
+  };
+
+  const exportToExcel = () => {
+    const dataToExport = groupedItems.map(item => ({
+      'Artículo / SKU': item.articleId,
+      'Descripción': (item as any).articleName || (masterArticulo.find(m => m.id === item.articleId) as any)?.name || 'Sin descripción',
+      'Estado': (counts[item.articleId] || 0) > 0 ? 'Conteo' : 'Pendiente',
+      'Cant. Auditada': counts[item.articleId] || 0,
+      'U.M.': item.unit || 'UND',
+      'Volumen': (item as any).volume || 0,
+      'Nota Inventario': itemObservations[item.articleId] || '',
+      'Nota General': inventoryObservation
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventario M7");
+    XLSX.writeFile(wb, `Inventario_${docL.externalDocId}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   const finalizeProcess = (email: string) => {
     setIsProcessing(true);
-    
+
     const emailInMaster = masterNotificaciones.some(n => n.notificationEmail === email && n.name?.toLowerCase().includes('ajover'));
     if (!emailInMaster) {
       onAddNotificationToMaster({
@@ -210,22 +408,22 @@ const BlindCount: React.FC<BlindCountProps> = ({
       });
     }
 
-      const finalItems: DocumentLItem[] = groupedItems.map(it => ({
-        ...it,
-        countedQty: counts[it.articleId] || 0,
-        count1: count1Data[it.articleId] || 0,
-        count2: counts[it.articleId] || 0,
-        inventoryNote: itemObservations[it.articleId] || '',
-        status: (counts[it.articleId] || 0) === it.expectedQty ? 'Matches' : 'Mismatch'
-      }));
-      
-      onConfirm(finalItems, inventoryObservation, email);
-      // NO cerramos el procesamiento aquí, dejamos que el padre lo maneje o que el componente se desmonte
+    const finalItems: DocumentLItem[] = groupedItems.map(it => ({
+      ...it,
+      countedQty: counts[it.articleId] || 0,
+      count1: count1Data[it.articleId] || 0,
+      count2: counts[it.articleId] || 0,
+      inventoryNote: itemObservations[it.articleId] || '',
+      status: (counts[it.articleId] || 0) === it.expectedQty ? 'Matches' : 'Mismatch'
+    }));
+
+    onConfirm(finalItems, inventoryObservation, email);
+    // NO cerramos el procesamiento aquí, dejamos que el padre lo maneje o que el componente se desmonte
   };
 
   const filteredItems = useMemo(() => {
     let list = groupedItems;
-    
+
     if (validationAttempts === 0) {
       // Fase 1: Solo mostramos lo que se ha escaneado
       list = groupedItems.filter(it => (counts[it.articleId] || 0) > 0);
@@ -236,9 +434,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
     if (tableSearch) {
       const search = tableSearch.toLowerCase();
-      list = list.filter(it => 
+      list = list.filter(it =>
         it.articleId.toLowerCase().includes(search) ||
-        (it.articleName || '').toLowerCase().includes(search) ||
+        ((it as any).articleName || '').toLowerCase().includes(search) ||
         (it.invoice || '').toLowerCase().includes(search)
       );
     }
@@ -247,9 +445,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
       list.sort((a, b) => {
         const aVal = (a as any)[sortConfig.key] || '';
         const bVal = (b as any)[sortConfig.key] || '';
-        
+
         if (typeof aVal === 'number' && typeof bVal === 'number') {
-           return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+          return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
         }
         const aStr = String(aVal).toLowerCase();
         const bStr = String(bVal).toLowerCase();
@@ -261,6 +459,17 @@ const BlindCount: React.FC<BlindCountProps> = ({
     return list;
   }, [groupedItems, tableSearch, validationAttempts, counts, mismatchIds, sortConfig]);
 
+  const totalPages = useMemo(() => {
+    if (rowsPerPage === 'all') return 1;
+    return Math.ceil(filteredItems.length / rowsPerPage);
+  }, [filteredItems, rowsPerPage]);
+
+  const paginatedItems = useMemo(() => {
+    if (rowsPerPage === 'all') return filteredItems;
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredItems.slice(start, start + rowsPerPage);
+  }, [filteredItems, currentPage, rowsPerPage]);
+
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -269,262 +478,403 @@ const BlindCount: React.FC<BlindCountProps> = ({
     setSortConfig({ key, direction });
   };
 
+  // FIX: Restauramos la función que se rompió
   const getSortIndicator = (key: string) => {
     if (!sortConfig || sortConfig.key !== key) return null;
     return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
   };
 
+  const totalUnits = Object.values(counts).reduce((a, b) => a + b, 0);
+
+
+
   return (
-    <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 w-full h-full flex flex-col relative animate-in fade-in duration-500 overflow-hidden">
-      
+    <div className="bg-white w-full h-full flex flex-col relative animate-in fade-in duration-500 overflow-hidden">
+
       {/* ÉXITO OVERLAY */}
       {saveSuccess && (
         <div className="absolute inset-0 z-[700] bg-slate-900/40 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
-           <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-300 border border-white/20">
-             <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg mb-6 animate-bounce">
-                <Icons.Check className="w-10 h-10" />
-             </div>
-             <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900 mb-2">Inventario Guardado</h2>
-             <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg">Operación Exitosa</p>
-           </div>
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-300 border border-white/20">
+            <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg mb-6 animate-bounce">
+              <Icons.Check className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900 mb-2">Inventario Guardado</h2>
+            <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg">Operación Exitosa</p>
+          </div>
         </div>
       )}
 
-      <div className="bg-slate-900 px-4 py-3 text-white flex flex-col lg:flex-row justify-between items-center shrink-0 border-b border-white/5 gap-3">
+      <div className="bg-slate-900 px-4 py-1 text-white flex flex-col lg:flex-row justify-between items-center shrink-0 border-none gap-3">
         <div className="flex items-center gap-3 w-full lg:w-auto">
           <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-950 shadow-lg shrink-0"><Icons.Scan className="w-5 h-5" /></div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-base md:text-xl font-black uppercase tracking-tight leading-none truncate">Recibo: {docL.externalDocId}</h2>
-            <div className="mt-1 flex items-center gap-2">
-               <span className="text-[8px] text-slate-500 font-bold uppercase bg-slate-800 px-2 py-0.5 rounded border border-white/5">{docL.vehicleData}</span>
-               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${validationAttempts === 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-                 {validationAttempts === 0 ? 'Fase 1: Conteo' : 'Fase 2: Novedades'}
-               </span>
+            <h2 className="text-base md:text-xl font-black uppercase tracking-tight leading-none truncate -mt-1">{docL.externalDocId}</h2>
+            <div className="mt-0.5 flex items-center gap-2">
+              <span className="text-[8px] text-slate-500 font-bold uppercase bg-slate-800 px-2 py-0.5 rounded border border-white/5">{docL.vehicleData}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${validationAttempts === 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                {validationAttempts === 0 ? 'Fase 1: Conteo' : 'Fase 2: Novedades'}
+              </span>
             </div>
           </div>
-          <button onClick={onCancel} className="lg:hidden text-slate-500 hover:text-red-500 transition-all text-3xl font-thin">&times;</button>
+          <button onClick={onCancel} className="lg:hidden text-slate-500 hover:text-red-500 transition-all text-2xl font-thin">&times;</button>
         </div>
-        
-        <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
-           <button onClick={onCancel} className="hidden md:block px-6 py-2 bg-slate-800 text-slate-400 hover:text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all">Cancelar</button>
-           <button 
-              onClick={handleValidationTrigger}
-              disabled={isProcessing || Object.keys(counts).length === 0}
-              className="px-6 py-2 bg-emerald-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-[0.1em] shadow-lg hover:bg-emerald-400 transition-all flex items-center gap-2 disabled:opacity-20 active:scale-95"
-           >
-              {isProcessing ? <Icons.Alert className="w-3 h-3 animate-spin" /> : <Icons.Signature className="w-3.5 h-3.5" />}
-              {validationAttempts === 0 ? 'Finalizar' : 'Cerrar'}
-           </button>
+
+        <div className="flex items-center gap-6 w-full lg:w-auto justify-end">
+          {/* CONTADORES (FOTO 3) */}
+          <div className="flex items-center gap-6 mr-2">
+            <div className="text-center">
+              <p className="text-xl font-black text-emerald-400 leading-none">{Object.keys(counts).length}</p>
+              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Items</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xl font-black text-white leading-none">{groupedItems.length}</p>
+              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Plan</p>
+            </div>
+          </div>
+
+          {/* SCANNER EN HEADER (FOTO 1 - BACKGROUND BLANCO) */}
+          <form onSubmit={handleScan} className="relative group w-48 md:w-64">
+            <input
+              ref={inputRef}
+              type="text"
+              value={scanInput}
+              onChange={handleInputChange}
+              placeholder="ESCANEAR SKU..."
+              autoFocus
+              className="w-full pl-4 pr-10 py-2.5 bg-white border border-white/20 rounded-xl text-slate-900 font-black uppercase text-sm outline-none focus:border-emerald-500 transition-all placeholder:text-slate-300 shadow-sm"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none">
+              <Icons.Scan className="w-4 h-4" />
+            </div>
+          </form>
+
+          <div className="flex flex-col items-end mr-4">
+            <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Total Unidades</span>
+            <span className="text-2xl font-black leading-none">{totalUnits}</span>
+          </div>
+          <button onClick={onCancel} className="hidden md:block px-6 py-2 bg-slate-800 text-slate-400 hover:text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all">Cancelar</button>
+          <button
+            onClick={handleValidationTrigger}
+            disabled={isProcessing || Object.keys(counts).length === 0}
+            className="px-6 py-2 bg-emerald-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-[0.1em] shadow-lg hover:bg-emerald-400 transition-all flex items-center gap-2 disabled:opacity-20 active:scale-95"
+          >
+            {isProcessing ? <Icons.Alert className="w-3 h-3 animate-spin" /> : <Icons.Signature className="w-3.5 h-3.5" />}
+            {validationAttempts === 0 ? 'Finalizar' : 'Cerrar'}
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-slate-50/20 overflow-hidden">
-        {/* PANEL IZQUIERDO: SCANNER Y OBS - AHORA CON SCROLL */}
-        <div className="w-full lg:w-80 p-4 md:p-6 space-y-4 shrink-0 flex flex-col border-r border-slate-100 bg-white overflow-y-auto custom-scrollbar">
-           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col gap-4">
-              <form onSubmit={handleScan} className="space-y-1">
-                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Escanear Referencia</label>
-                 <div className="relative group">
-                   <input 
-                     ref={inputRef}
-                     type="text" 
-                     value={scanInput} 
-                     onChange={e => setScanInput(e.target.value)} 
-                     placeholder="SKU..." 
-                     autoFocus 
-                     className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-2xl uppercase outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-inner"
-                   />
-                   <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-200 group-focus-within:text-emerald-500 transition-colors"><Icons.Search className="w-4 h-4" /></div>
-                 </div>
-              </form>
+      <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
+        {/* PANEL DERECHO: TABLA - SIN MARGENES (FLUSH) */}
+        <div className="flex-1 flex flex-col min-h-0 w-full overflow-hidden">
+          <div className="bg-white flex flex-col h-full relative">
+            <div className="px-0 py-1 border-b border-slate-50 bg-white flex items-center shrink-0 gap-4 overflow-x-auto z-30">
+              {/* SEARCH INPUT */}
+              <div className="relative flex-1 max-w-xs shrink-0 pl-4">
+                <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-3.5 h-3.5" />
+                <input
+                  type="text"
+                  value={tableSearch}
+                  onChange={e => setTableSearch(e.target.value)}
+                  placeholder="FILTRAR LISTADO..."
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-[9px] font-black uppercase outline-none focus:bg-white focus:border-emerald-500 transition-all placeholder:text-slate-400 text-slate-900"
+                />
+              </div>
 
+              {/* XLS BUTTON */}
+              <button onClick={exportToExcel} className="flex px-4 py-3 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all items-center gap-2 border border-emerald-100 shrink-0">
+                <Icons.Excel className="w-3.5 h-3.5" /> XLS
+              </button>
+
+              {/* LAST SCAN FEEDBACK (IMAGEN 2) */}
               {lastScan && (
-                <div className={`p-4 rounded-2xl border-2 animate-in slide-in-from-left-4 shadow-sm ${lastScan.status === 'success' ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                   <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${lastScan.status === 'success' ? 'bg-emerald-500 text-white shadow-md' : 'bg-red-500 text-white shadow-md'}`}>
-                         {lastScan.status === 'success' ? <Icons.Check /> : <Icons.Alert />}
+                <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 animate-in slide-in-from-left-4 shadow-sm shrink-0 ${lastScan.status === 'success' ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${lastScan.status === 'success' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-red-500 text-white shadow-sm'}`}>
+                    {lastScan.status === 'success' ? <Icons.Check className="w-4 h-4" /> : <Icons.Alert className="w-4 h-4" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`font-black text-[9px] uppercase truncate ${lastScan.status === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>{lastScan.message}</p>
+                    {lastScan.article && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{lastScan.article.id}</span>
+                        <span className="text-xl font-black text-slate-900 leading-none">{counts[lastScan.article.id]} <span className="text-[7px] text-slate-400">UNDS</span></span>
                       </div>
-                      <div className="min-w-0 flex-1">
-                         <p className={`font-black text-[8px] uppercase truncate ${lastScan.status === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>{lastScan.message}</p>
-                         {lastScan.article && (
-                           <div className="flex items-baseline gap-1 mt-0.5">
-                              <span className="text-2xl font-black text-slate-950 tracking-tighter">{counts[lastScan.article.id]}</span>
-                              <span className="text-[8px] font-black text-slate-400 uppercase">Unds</span>
-                           </div>
-                         )}
-                      </div>
-                   </div>
+                    )}
+                  </div>
                 </div>
               )}
-           </div>
 
-            <div className="bg-slate-900 p-6 rounded-[2rem] text-white shadow-xl relative overflow-hidden shrink-0">
-               <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="text-center">
-                     <p className="text-2xl font-black text-emerald-400 leading-none">{Object.keys(counts).length}</p>
-                     <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2">Items</p>
-                  </div>
-                  <div className="text-center">
-                     <p className="text-2xl font-black text-white leading-none">{groupedItems.length}</p>
-                     <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2">Plan</p>
-                  </div>
-               </div>
-               <div className="space-y-2 pt-4 border-t border-white/10">
-                  <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1 text-emerald-500/50">Notas del Inventario</label>
-                  <textarea 
-                    value={inventoryObservation}
-                    onChange={(e) => setInventoryObservation(e.target.value)}
-                    placeholder="ESCRIBIR OBSERVACIONES..."
-                    className="w-full h-24 bg-white/5 border border-white/10 rounded-xl p-3 text-[11px] font-bold text-emerald-400 outline-none focus:border-emerald-500/50 transition-all resize-none placeholder:text-slate-700 uppercase"
-                  />
-               </div>
+              {/* NOTAS DEL INVENTARIO (FOTO 2) */}
+              <div className="flex-1 max-w-md shrink-0">
+                <textarea
+                  value={inventoryObservation}
+                  onChange={(e) => setInventoryObservation(e.target.value)}
+                  placeholder="NOTAS GENERALES DEL INVENTARIO..."
+                  className="w-full h-11 bg-slate-50 border-2 border-transparent rounded-xl px-4 py-3 text-[10px] font-bold text-slate-900 outline-none focus:bg-white focus:border-emerald-500/50 transition-all resize-none placeholder:text-slate-300 uppercase leading-tight"
+                />
+              </div>
+
+              {validationAttempts === 1 && (
+                <div className="ml-auto flex items-center gap-2 text-red-600 animate-pulse shrink-0 mr-4">
+                  <Icons.Alert className="w-3 h-3" />
+                  <span className="text-[8px] font-black uppercase">Revisión</span>
+                </div>
+              )}
             </div>
-        </div>
 
-        {/* PANEL DERECHO: TABLA CON SCROLL */}
-        <div className="flex-1 flex flex-col min-h-0 w-full p-4 md:p-6 overflow-hidden">
-           <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden flex flex-col h-full relative">
-              <div className="p-4 border-b border-slate-50 bg-white flex items-center shrink-0">
-                 <div className="relative flex-1 max-w-xs">
-                    <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-3.5 h-3.5" />
-                    <input 
-                      type="text" 
-                      value={tableSearch}
-                      onChange={e => setTableSearch(e.target.value)}
-                      placeholder="FILTRAR LISTADO..." 
-                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border-2 border-transparent rounded-lg text-[9px] font-black uppercase outline-none focus:bg-white focus:border-emerald-500 transition-all"
-                    />
-                 </div>
-                 {validationAttempts === 1 && (
-                    <div className="ml-4 flex items-center gap-2 text-red-600 animate-pulse">
-                       <Icons.Alert className="w-3 h-3" />
-                       <span className="text-[8px] font-black uppercase">Mostrando únicamente novedades registradas</span>
-                    </div>
-                 )}
+            <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[1200px]">
+                <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px] sticky top-0 z-20 shadow-sm">
+                  <tr>
+                    <th className="px-6 py-4 cursor-pointer hover:text-emerald-400 min-w-[200px]" onClick={() => requestSort('articleId')}>Artículo / Ref{getSortIndicator('articleId')}</th>
+                    <th className="px-4 py-4 text-center cursor-pointer hover:text-emerald-400 min-w-[100px]" onClick={() => requestSort('status')}>Estado{getSortIndicator('status')}</th>
+                    <th className="px-4 py-4 text-center min-w-[100px]">Auditado</th>
+                    <th className="px-4 py-4 text-right min-w-[60px]">UM</th>
+                    <th className="px-4 py-4 text-right cursor-pointer hover:text-emerald-400 min-w-[80px]" onClick={() => requestSort('volume')}>Vol{getSortIndicator('volume')}</th>
+                    <th className="px-4 py-4 text-left min-w-[200px]">Notas Inventario</th>
+                    <th className="px-4 py-4 text-right pr-6 min-w-[80px]">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginatedItems.map(it => {
+                    const currentCount = counts[it.articleId] || 0;
+                    return (
+                      <tr key={it.articleId} className={`hover:bg-slate-50/50 transition-all font-bold group ${validationAttempts === 1 ? 'bg-red-50/10' : ''}`}>
+                        <td className="px-4 py-3 max-w-[150px]">
+                          <p className="font-black text-slate-900 text-xs uppercase tracking-tight leading-none truncate" title={it.articleId}>{it.articleId}</p>
+                          <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mt-1 truncate" title={(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId) as any)?.name || ''}>{(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId) as any)?.name || 'Sin descripción'}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {validationAttempts === 1 ? (
+                            <span className="px-2 py-0.5 bg-red-500 text-white rounded text-[7px] font-black uppercase tracking-widest shadow-sm">REVISIÓN</span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[7px] font-black uppercase tracking-widest">EN CONTEO</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className={`inline-flex items-center justify-center min-w-[50px] h-8 rounded-lg text-sm font-black shadow-inner transition-all ${currentCount > 0 ? (validationAttempts === 1 ? 'bg-slate-800 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-300'}`}>
+                            {currentCount}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-[9px] text-slate-500">{it.unit || 'UND'}</td>
+                        <td className="px-4 py-3 text-right text-[9px] text-slate-500">{(it as any).volume || '-'}</td>
+                        <td className="px-4 py-3 text-left">
+                          <input
+                            type="text"
+                            value={itemObservations[it.articleId] || ''}
+                            onChange={(e) => setItemObservations(prev => ({ ...prev, [it.articleId]: e.target.value }))}
+                            placeholder="NOTA SKU..."
+                            className="w-full bg-slate-50 border border-transparent rounded-lg px-2 py-1 text-[8px] font-bold text-slate-600 outline-none focus:bg-white focus:border-emerald-500 transition-all uppercase"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right pr-6 flex justify-end gap-2">
+                          {validationAttempts === 1 && (
+                            <>
+                              <button
+                                onClick={() => handleOpenConversion(it.articleId)}
+                                className="inline-flex items-center justify-center w-7 h-7 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-md active:scale-90"
+                                title="Convertir Unidades (Cajas -> Unds)"
+                              >
+                                <Icons.RefreshCw className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenReverse(it.articleId)}
+                                className="inline-flex items-center justify-center w-7 h-7 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all shadow-md active:scale-90"
+                                title="Reversar Unidades (Unds -> Cajas)"
+                              >
+                                <Icons.RotateCcw className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => handleSubtract(it.articleId)}
+                            disabled={currentCount === 0}
+                            className="inline-flex items-center justify-center w-7 h-7 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md active:scale-90 disabled:opacity-10"
+                            title="Restar Unidad"
+                          >
+                            <span className="font-black text-xs">-1</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredItems.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-24 text-center">
+                        <p className="font-black text-slate-300 uppercase text-[10px] tracking-[0.3em]">
+                          {validationAttempts === 0 ? 'Escanee para iniciar inventario' : 'Sin novedades registradas ✓'}
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* PAGINACIÓN INFERIOR (FOTO 4) */}
+            <div className="p-4 bg-slate-900 border-t border-white/5 flex justify-between items-center shrink-0 px-6">
+              <div className="flex items-center gap-4">
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Mostrar:</span>
+                <select
+                  value={rowsPerPage}
+                  onChange={e => { setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1); }}
+                  className="p-2 bg-slate-800 border border-white/10 rounded-lg text-[10px] font-black text-white uppercase outline-none focus:border-emerald-500 shadow-sm cursor-pointer"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value="all">Todos</option>
+                </select>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">
+                  Total: {filteredItems.length} registros
+                </span>
               </div>
 
-               <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left border-collapse min-w-[1200px]">
-                      <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px] sticky top-0 z-20 shadow-sm">
-                         <tr>
-                            <th className="px-4 py-4 cursor-pointer hover:text-emerald-400 min-w-[200px]" onClick={() => requestSort('articleId')}>Artículo / Ref{getSortIndicator('articleId')}</th>
-                            <th className="px-4 py-4 text-center cursor-pointer hover:text-emerald-400 min-w-[100px]" onClick={() => requestSort('status')}>Estado{getSortIndicator('status')}</th>
-                            <th className="px-4 py-4 text-center min-w-[100px]">Auditado</th>
-                            <th className="px-4 py-4 text-right min-w-[60px]">UM</th>
-                            <th className="px-4 py-4 text-right cursor-pointer hover:text-emerald-400 min-w-[80px]" onClick={() => requestSort('volume')}>Vol{getSortIndicator('volume')}</th>
-                            <th className="px-4 py-4 text-left min-w-[200px]">Notas Inventario</th>
-                            <th className="px-4 py-4 text-right pr-6 min-w-[80px]">Acción</th>
-                         </tr>
-                      </thead>
-                     <tbody className="divide-y divide-slate-50">
-                        {filteredItems.map(it => {
-                          const currentCount = counts[it.articleId] || 0;
-                          return (
-                            <tr key={it.articleId} className={`hover:bg-slate-50/50 transition-all font-bold group ${validationAttempts === 1 ? 'bg-red-50/10' : ''}`}>
-                               <td className="px-4 py-3 max-w-[150px]">
-                                  <p className="font-black text-slate-900 text-xs uppercase tracking-tight leading-none truncate" title={it.articleId}>{it.articleId}</p>
-                                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mt-1 truncate" title={(it as any).articleName || ''}>{(it as any).articleName || 'Sin descripción'}</p>
-                               </td>
-                               <td className="px-4 py-3 text-center">
-                                  {validationAttempts === 1 ? (
-                                    <span className="px-2 py-0.5 bg-red-500 text-white rounded text-[7px] font-black uppercase tracking-widest shadow-sm">REVISIÓN</span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[7px] font-black uppercase tracking-widest">EN CONTEO</span>
-                                  )}
-                               </td>
-                               <td className="px-4 py-3 text-center">
-                                  <div className={`inline-flex items-center justify-center min-w-[50px] h-8 rounded-lg text-sm font-black shadow-inner transition-all ${currentCount > 0 ? (validationAttempts === 1 ? 'bg-slate-800 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-300'}`}>
-                                     {currentCount}
-                                  </div>
-                               </td>
-                               <td className="px-4 py-3 text-right text-[9px] text-slate-500">{it.unit || 'UND'}</td>
-                               <td className="px-4 py-3 text-right text-[9px] text-slate-500">{(it as any).volume || '-'}</td>
-                               <td className="px-4 py-3 text-left">
-                                  <input 
-                                    type="text"
-                                    value={itemObservations[it.articleId] || ''}
-                                    onChange={(e) => setItemObservations(prev => ({ ...prev, [it.articleId]: e.target.value }))}
-                                    placeholder="NOTA SKU..."
-                                    className="w-full bg-slate-50 border border-transparent rounded-lg px-2 py-1 text-[8px] font-bold text-slate-600 outline-none focus:bg-white focus:border-emerald-500 transition-all uppercase"
-                                  />
-                               </td>
-                               <td className="px-4 py-3 text-right pr-6">
-                                  <button 
-                                    onClick={() => handleSubtract(it.articleId)}
-                                    disabled={currentCount === 0}
-                                    className="inline-flex items-center justify-center w-7 h-7 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md active:scale-90 disabled:opacity-10"
-                                  >
-                                     <span className="font-black text-xs">-1</span>
-                                  </button>
-                               </td>
-                            </tr>
-                          );
-                        })}
-                        {filteredItems.length === 0 && (
-                          <tr>
-                             <td colSpan={7} className="py-24 text-center">
-                                <p className="font-black text-slate-300 uppercase text-[10px] tracking-[0.3em]">
-                                   {validationAttempts === 0 ? 'Escanee para iniciar inventario' : 'Sin novedades registradas ✓'}
-                                </p>
-                             </td>
-                          </tr>
-                        )}
-                     </tbody>
-                  </table>
+              <div className="flex items-center gap-6">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  className="p-2 bg-slate-800 border border-white/10 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"
+                >
+                  <Icons.ChevronRight className="w-5 h-5 rotate-180" />
+                </button>
+
+                <span className="text-[11px] font-black uppercase text-white tracking-widest">
+                  Página {currentPage} / {totalPages || 1}
+                </span>
+
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  className="p-2 bg-slate-800 border border-white/10 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"
+                >
+                  <Icons.ChevronRight className="w-5 h-5" />
+                </button>
               </div>
-           </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* DIÁLOGO DE CONFIRMACIÓN M7 */}
       {showConfirmDialog && (
         <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
-           <div className="bg-white w-full max-w-md rounded-[3rem] p-10 text-center space-y-8 shadow-2xl border border-white/5">
-              <div className="w-16 h-16 bg-slate-900 text-emerald-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg"><Icons.Audit className="w-8 h-8" /></div>
-              <div className="space-y-2">
-                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Cerrar Auditoría M7</h3>
-                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Se sincronizarán los datos y se enviará el informe de inventario al centro de control.</p>
-              </div>
-              <div className="flex flex-col gap-4">
-                <button 
-                  onClick={proceedToFinalize}
-                  className="w-full py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-400 transition-all active:scale-95"
-                >
-                  Sincronizar y Finalizar
-                </button>
-                <button onClick={() => setShowConfirmDialog(false)} className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Volver a Revisión</button>
-              </div>
-           </div>
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 text-center space-y-8 shadow-2xl border border-white/5">
+            <div className="w-16 h-16 bg-slate-900 text-emerald-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg"><Icons.Audit className="w-8 h-8" /></div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Cerrar Auditoría M7</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Se sincronizarán los datos y se enviará el informe de inventario al centro de control.</p>
+            </div>
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={proceedToFinalize}
+                className="w-full py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-400 transition-all active:scale-95"
+              >
+                Sincronizar y Finalizar
+              </button>
+              <button onClick={() => setShowConfirmDialog(false)} className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Volver a Revisión</button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* MODAL EMAIL (SI NO EXISTE EN MAESTRO) */}
       {showEmailInput && (
         <div className="fixed inset-0 z-[600] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
-           <div className="bg-white w-full max-w-lg rounded-[3.5rem] p-12 text-center space-y-8 shadow-2xl border border-white/5">
-              <div className="w-16 h-16 bg-emerald-500 text-slate-950 rounded-[1.5rem] mx-auto flex items-center justify-center shadow-xl animate-bounce"><Icons.List className="w-8 h-8" /></div>
-              <div className="space-y-3">
-                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Notificación Ajover</h3>
-                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ingrese el correo de destino para el informe de novedades.</p>
+          <div className="bg-white w-full max-w-lg rounded-[3.5rem] p-12 text-center space-y-8 shadow-2xl border border-white/5">
+            <div className="w-16 h-16 bg-emerald-500 text-slate-950 rounded-[1.5rem] mx-auto flex items-center justify-center shadow-xl animate-bounce"><Icons.List className="w-8 h-8" /></div>
+            <div className="space-y-3">
+              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Notificación Ajover</h3>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ingrese el correo de destino para el informe de novedades.</p>
+            </div>
+            <input
+              type="email"
+              value={manualEmail}
+              onChange={e => setManualEmail(e.target.value)}
+              placeholder="CORREO@DESTINO.COM"
+              className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-center text-xs outline-none focus:border-emerald-500 transition-all shadow-inner"
+            />
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={() => finalizeProcess(manualEmail)}
+                disabled={!manualEmail.includes('@')}
+                className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-2xl transition-all disabled:opacity-20 active:scale-95"
+              >
+                Enviar y Finalizar
+              </button>
+              <button onClick={() => setShowEmailInput(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIÁLOGO CONVERSIÓN */}
+      {conversionTarget && (
+        <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl border border-white/10 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+
+            <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-sm mb-6"><Icons.RefreshCw className="w-7 h-7" /></div>
+
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-1">Conversión de Unidades</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">{conversionTarget.articleId}</p>
+
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-4 mb-6 border border-slate-100">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-black text-slate-400 uppercase">Actual:</span>
+                <span className="text-lg font-black text-slate-900">{conversionTarget.currentQty} <span className="text-[9px] text-slate-400">{conversionTarget.fromLabel}</span></span>
               </div>
-              <input 
-                type="email" 
-                value={manualEmail} 
-                onChange={e => setManualEmail(e.target.value)} 
-                placeholder="CORREO@DESTINO.COM"
-                className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-center text-xs outline-none focus:border-emerald-500 transition-all shadow-inner"
-              />
-              <div className="flex flex-col gap-4">
-                <button 
-                  onClick={() => finalizeProcess(manualEmail)}
-                  disabled={!manualEmail.includes('@')}
-                  className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-2xl transition-all disabled:opacity-20 active:scale-95"
-                >
-                  Enviar y Finalizar
-                </button>
-                <button onClick={() => setShowEmailInput(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Cancelar</button>
+              <div className="flex justify-between items-center px-4">
+                <Icons.List className="w-4 h-4 text-slate-300 rotate-90 mx-auto" /> {/* Flecha o Icono */}
+                <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded">Factor: {conversionTarget.factor}</span>
               </div>
-           </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-black text-slate-400 uppercase">Resultado:</span>
+                <span className="text-2xl font-black text-emerald-600">{conversionTarget.targetQty} <span className="text-[9px] text-emerald-400">{conversionTarget.toLabel}</span></span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setConversionTarget(null)} className="py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
+              <button onClick={confirmConversion} className="py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-500 shadow-lg shadow-blue-500/20 transition-all">Aplicar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIÁLOGO REVERSAR UNIDADES */}
+      {reverseTarget && (
+        <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl border border-white/10 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500"></div>
+
+            <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center shadow-sm mb-6"><Icons.RotateCcw className="w-7 h-7" /></div>
+
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-1">Reversar Unidades</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">{reverseTarget.articleId}</p>
+
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-4 mb-6 border border-slate-100">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-black text-slate-400 uppercase">Actual:</span>
+                <span className="text-lg font-black text-slate-900">{reverseTarget.currentQty} <span className="text-[9px] text-slate-400">{reverseTarget.fromLabel}</span></span>
+              </div>
+              <div className="flex justify-between items-center px-4">
+                <Icons.List className="w-4 h-4 text-slate-300 rotate-90 mx-auto" />
+                <span className="text-[9px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded">Divisor: {reverseTarget.factor}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-black text-slate-400 uppercase">Resultado:</span>
+                <span className="text-2xl font-black text-emerald-600">{reverseTarget.targetQty} <span className="text-[9px] text-emerald-400">{reverseTarget.toLabel}</span></span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setReverseTarget(null)} className="py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
+              <button onClick={confirmReverse} className="py-3 bg-amber-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-500 shadow-lg shadow-amber-500/20 transition-all">Aplicar</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

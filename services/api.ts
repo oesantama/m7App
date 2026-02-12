@@ -147,6 +147,12 @@ export const api = {
   }).then(r => r.json()),
   getInvoices: (clientId?: string) => fetch(`${API_URL}/documents/invoices${clientId ? `?clientId=${clientId}` : ''}`).then(r => r.json()),
 
+  resendInventoryNotification: (docId: string, targetEmail: string) => fetch(`${API_URL}/documents/resend-notification`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ docId, targetEmail })
+  }).then(r => r.json()),
+
   getWhatsAppStatus: (userId: string) => fetch(`${API_URL}/whatsapp/status?userId=${userId}`).then(r => r.json()),
   connectWhatsApp: (userId: string) => fetch(`${API_URL}/whatsapp/connect`, {
     method: 'POST',

@@ -380,6 +380,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   ...a,
                   statusId: a.status_id,
                   clientId: a.client_id,
+                  clientIds: a.client_ids || (a.client_id ? [a.client_id] : []),
                   factorInter: a.factor_inter,
                   factorStd: a.factor_std,
                   uomGeneralId: a.uom_general_id,
@@ -594,10 +595,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       // const { api } = await import('../services/api');
       // await api.saveMasterBatch(activeMaster, newRecords);
 
-      setAllMasterData(prev => ({
-        ...prev,
-        [activeMaster]: [...(prev[activeMaster] || []), ...newRecords]
-      }));
+      useAppStore.getState().updateMasterCategory(activeMaster, [...(allMasterData[activeMaster] || []), ...newRecords]);
 
       // toast.success desde el Dialog
     } catch (e) {
@@ -898,23 +896,65 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
-              <div className="space-y-1"><label className="text-[9px] font-black text-blue-600 uppercase ml-2 tracking-widest">Unidad Intermedia</label>
-                <div className="flex gap-2">
+              <div className="flex gap-4">
+                <div className="space-y-1 w-full">
+                  <label className="text-[9px] font-black text-blue-600 uppercase ml-2 tracking-widest">Unidad Intermedia</label>
                   <select value={formData.uomInterId || ''} onChange={e => setFormData({ ...formData, uomInterId: e.target.value })} className={commonInputStyle}>
                     <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
-                  <input type="number" placeholder="Factor" value={formData.factorInter || ''} onChange={e => setFormData({ ...formData, factorInter: Number(e.target.value) })} className="w-20 p-4 rounded-2xl bg-white border-2 border-slate-200 font-black text-[10px] text-center" />
+                </div>
+                <div className="space-y-1 shrink-0">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest block text-center">Factor</label>
+                  <input type="number" placeholder="1" value={formData.factorInter || ''} onChange={e => setFormData({ ...formData, factorInter: Number(e.target.value) })} className="w-24 p-4 rounded-2xl bg-white border-2 border-slate-200 font-black text-[10px] text-center outline-none focus:border-blue-500 transition-all" />
                 </div>
               </div>
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-900 uppercase ml-2 tracking-widest">Unidad Estándar</label>
-                <div className="flex gap-2">
+
+              <div className="flex gap-4">
+                <div className="space-y-1 w-full">
+                  <label className="text-[9px] font-black text-slate-900 uppercase ml-2 tracking-widest">Unidad Estándar</label>
                   <select value={formData.uomStdId || ''} onChange={e => setFormData({ ...formData, uomStdId: e.target.value })} className={commonInputStyle}>
                     <option value="">Seleccione...</option>{uoms.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
-                  <input type="number" placeholder="Factor" value={formData.factorStd || ''} onChange={e => setFormData({ ...formData, factorStd: Number(e.target.value) })} className="w-20 p-4 rounded-2xl bg-white border-2 border-slate-200 font-black text-[10px] text-center" />
+                </div>
+                <div className="space-y-1 shrink-0">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest block text-center">Factor</label>
+                  <input type="number" placeholder="1" value={formData.factorStd || ''} onChange={e => setFormData({ ...formData, factorStd: Number(e.target.value) })} className="w-24 p-4 rounded-2xl bg-white border-2 border-slate-200 font-black text-[10px] text-center outline-none focus:border-slate-900 transition-all" />
                 </div>
               </div>
             </div>
+
+            {/* VISOR DE FACTORES (LEYENDA INFORMATIVA) */}
+            {formData.uomGeneralId && (
+              <div className="md:col-span-2 bg-emerald-50/50 p-6 rounded-[2.5rem] border-2 border-dashed border-emerald-200/50 flex flex-col md:flex-row items-center justify-center gap-6 animate-in slide-in-from-bottom-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-emerald-500 text-white rounded-lg flex items-center justify-center font-black text-xs shadow-md">1</div>
+                  <span className="text-[11px] font-black text-slate-700 uppercase">{uoms.find(u => u.id === formData.uomGeneralId)?.name || 'UNIDAD'}</span>
+                </div>
+
+                <div className="text-emerald-300 hidden md:block">
+                  <Icons.ChevronRight className="w-5 h-5" />
+                </div>
+
+                <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl shadow-sm border border-emerald-100 min-w-[140px] justify-center">
+                  <span className="text-sm font-black text-blue-600">{formData.factorInter || 1}</span>
+                  <span className="text-[10px] font-black text-slate-500 uppercase">{uoms.find(u => u.id === formData.uomInterId)?.name || 'INTERMEDIA'}</span>
+                </div>
+
+                <div className="text-emerald-300 hidden md:block">
+                  <Icons.ChevronRight className="w-5 h-5" />
+                </div>
+
+                <div className="flex items-center gap-3 bg-slate-900 px-6 py-3 rounded-2xl shadow-lg min-w-[140px] justify-center">
+                  <span className="text-sm font-black text-emerald-400">{(formData.factorInter || 1) * (formData.factorStd || 1)}</span>
+                  <span className="text-[10px] font-black text-white uppercase">{uoms.find(u => u.id === formData.uomStdId)?.name || 'ESTÁNDAR'}</span>
+                </div>
+
+                <div className="ml-0 md:ml-auto flex items-center gap-2 bg-emerald-500/10 px-4 py-2 rounded-xl">
+                  <Icons.Alert className="text-emerald-600 w-3 h-3" />
+                  <p className="text-[9px] font-black text-emerald-700 uppercase leading-none">Cálculo de Equivalencia M7 IQ</p>
+                </div>
+              </div>
+            )}
 
             {/* Selectores Restaurados: Cliente y Categoría */}
             <div className="md:col-span-2 space-y-4">

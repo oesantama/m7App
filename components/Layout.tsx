@@ -229,7 +229,7 @@ const Layout: React.FC<LayoutProps> = ({
             {/* Aquí se inyectará el disparador de M7 IQ vía Portal */}
           </div>
         </header>
-        <section className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar">{children}</section>
+        <section className="flex-1 overflow-y-auto p-0 bg-slate-50/50 custom-scrollbar">{children}</section>
       </main>
 
       {isProfileModalOpen && (
