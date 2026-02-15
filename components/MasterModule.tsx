@@ -546,6 +546,27 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               }
               break;
             }
+            case 'masterEstados':
+              newData = await api.getEstados();
+              break;
+            case 'masterMarcas':
+              newData = await api.getMarcas();
+              break;
+            case 'masterTipoDocumento':
+              newData = await api.getTiposDocumento();
+              break;
+            case 'masterUnidadMedida':
+              newData = await api.getUnidadesMedida();
+              break;
+            case 'masterNotificaciones':
+              newData = await api.getNotificacionesConfig();
+              break;
+            case 'masterTiposVehiculo':
+              newData = await api.getTiposVehiculo();
+              break;
+            case 'masterTipoNotificacion':
+              newData = await api.getTiposNotificacion();
+              break;
             default: {
               // Maestros Genéricos (filter from all generic masters)
               const allGenerics = await api.getGenericMasters();
@@ -1278,6 +1299,19 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             </div>
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
               <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Descripción opcional del estado..." />
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterMarcas':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de la Marca</label>
+              <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Información adicional sobre la marca..." />
             </div>
             {renderStatusField()}
           </div>
