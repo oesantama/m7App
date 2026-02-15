@@ -14,6 +14,8 @@ interface AppState {
   
   // ============ DATOS MAESTROS ============
   allMasterData: { [key in MasterCategory]?: MasterRecord[] };
+  pages: any[]; // Dedicated table (no longer in master_records)
+  modules: any[]; // Dedicated table (no longer in master_records)
   
   // ============ DATOS OPERATIVOS ============
   documents: any[];
@@ -101,16 +103,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   allMasterData: {
     masterUsuarios: [],
     masterClientes: [],
-    masterArticulo: [],
+    masterRol: [],
+    masterEstados: [],
     masterTiposVehiculo: [],
-    masterEstados: [
-      { id: 'EST-01', name: 'ACTIVO', statusId: 'EST-01' } as any,
-      { id: 'EST-02', name: 'INACTIVO', statusId: 'EST-01' } as any
-    ],
-    masterModulos: [],
-    masterPaginas: [],
-    masterMarcas: []
+    masterArticulo: [],
+    masterMarcas: [],
   },
+  
+  pages: [], // Inicializado vacío, se carga desde API /pages
+  modules: [], // Inicializado vacío, se carga desde API /modules
   
   documents: [],
   invoices: [],

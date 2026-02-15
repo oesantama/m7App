@@ -46,6 +46,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const routeMarkersRef = useRef<L.Marker[]>([]);
     const routePolylineRef = useRef<L.Polyline | null>(null);
     const [routeInvoices, setRouteInvoices] = useState<any[]>([]);
+    const [fetchStatus, setFetchStatus] = useState<string>('IDLE');
 
     // 1. Inicialización del Mapa
     useEffect(() => {
@@ -362,84 +363,131 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     };
 
 
+    // Helper for robust ID matching
+    const cleanId = (id: any) => String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
+
+    // Unified function to load invoices (Hybrid: Local + Fetch Fallback)
+    const loadRouteInvoicesData = async (route: any, setFn: (data: any[]) => void, drawMap: boolean = false) => {
+        const rawIds = route.invoice_ids || route.invoiceIds || [];
+        if (!rawIds.length) {
+            setFn([]);
+            return;
+        }
+
+        // 1. Clean IDs
+        const targetIds = rawIds.map((id: any) => {
+            const val = typeof id === 'object' && id !== null ? (id.id || id.invoice_id) : id;
+            return cleanId(val);
+        });
+
+        // 2. Try Local Match
+        const localMatches = invoices.filter(inv => {
+            const invId = cleanId(inv.id);
+            const invNum = cleanId(inv.invoiceNumber); 
+            return targetIds.includes(invId) || targetIds.includes(invNum);
+        });
+
+        // 3. Fallback to API if we don't have all invoices locally
+        if (localMatches.length < rawIds.length) {
+            console.log(`[ROUTE-DEBUG] Missing ${rawIds.length - localMatches.length} invoices locally. Fetching...`);
+            setFetchStatus('FETCHING'); 
+            try {
+                const idsParam = targetIds.join(',');
+                // Use centralized API method
+                const paramsData = await api.getInvoices(undefined, idsParam);
+                
+                if (Array.isArray(paramsData)) {
+                    setFetchStatus(`OK (${paramsData.length})`);
+                    setFn(paramsData);
+                    if (drawMap) drawRouteOnMap(paramsData);
+                    return; // Exit, we have fresh data
+                } else {
+                    setFetchStatus('ERROR (Invalid Data)');
+                }
+            } catch (e: any) {
+                console.error("Error fetching route invoices fallback:", e);
+                setFetchStatus(`ERROR: ${e.message}`);
+            }
+        } else {
+            setFetchStatus('SKIPPED (Local Match OK)');
+        }
+
+        // Default to local matches if fetch skipped or failed
+        setFn(localMatches);
+        if (drawMap) drawRouteOnMap(localMatches);
+    };
+
+    const drawRouteOnMap = (data: any[]) => {
+        if (!mapRef.current || data.length === 0) return;
+
+        // Limpiar visualización previa
+        routeMarkersRef.current.forEach(m => m.remove());
+        routeMarkersRef.current = [];
+        if (routePolylineRef.current) {
+            routePolylineRef.current.remove();
+            routePolylineRef.current = null;
+        }
+
+        const points: L.LatLng[] = [L.latLng(M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng)];
+
+        data.forEach((inv, idx) => {
+             if (inv.lat && inv.lng) { 
+                const pos = L.latLng(inv.lat, inv.lng);
+                points.push(pos);
+
+                // Marcador numérico
+                const icon = L.divIcon({
+                    className: 'custom-invoice-marker',
+                    html: `<div class="w-6 h-6 bg-emerald-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-[10px] font-black text-white">${idx + 1}</div>`,
+                    iconSize: [24, 24]
+                });
+
+                const marker = L.marker(pos, { icon })
+                    .addTo(mapRef.current!)
+                    .bindPopup(`
+                        <div class="p-2">
+                            <p class="font-bold text-xs">${inv.invoiceNumber}</p>
+                            <p class="text-[10px] text-slate-500 mb-1">${inv.customerName}</p>
+                            <p class="text-[9px] text-emerald-600 font-bold uppercase">${inv.city || ''} ${inv.neighborhood ? `• ${inv.neighborhood}` : ''}</p>
+                        </div>
+                    `);
+                routeMarkersRef.current.push(marker);
+            }
+        });
+
+        // Polilinea
+        if (points.length > 1) {
+            routePolylineRef.current = L.polyline(points, {
+                color: '#0ea5e9', // Sky blue
+                weight: 4,
+                opacity: 0.8,
+                dashArray: '5, 10'
+            }).addTo(mapRef.current);
+            
+            const bounds = L.latLngBounds(points);
+            mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+        }
+    };
+
     // 4. Efecto para cargar detalle de ruta y dibujar en mapa (visualizedRoute)
     useEffect(() => {
-        if (visualizedRoute && visualizedRoute.invoice_ids?.length > 0) {
-            // Limpiar visualización previa
+        if (visualizedRoute) {
+            // Draw map requested
+            loadRouteInvoicesData(visualizedRoute, (data) => {
+                 if (selectedActiveRoute && selectedActiveRoute.id === visualizedRoute.id) {
+                    setRouteInvoices(data);
+                }
+            }, true);
+        } else {
+             // Cleanup map if null
             routeMarkersRef.current.forEach(m => m.remove());
             routeMarkersRef.current = [];
             if (routePolylineRef.current) {
                 routePolylineRef.current.remove();
                 routePolylineRef.current = null;
             }
-
-            // Fetch invoices
-            const ids = visualizedRoute.invoice_ids.join(',');
-            fetch(`/api/documents/invoices?ids=${encodeURIComponent(ids)}`)
-                .then(r => r.json())
-                .then((data: any[]) => {
-                    // Update routeInvoices only if we are also viewing details? 
-                    // No, routeInvoices is used for the modal. 
-                    // If we just view map, we might not need routeInvoices state... 
-                    // BUT, the map markers need data. 
-                    // Let's use a local variable for map data, OR reuse routeInvoices but be careful.
-                    // Actually, if I open detail, I want to fetch data. 
-                    // If I view map, I want to fetch data (coords).
-                    // Let's fetch in both cases.
-
-                    if (selectedActiveRoute && selectedActiveRoute.id === visualizedRoute.id) {
-                        setRouteInvoices(data);
-                    }
-
-                    // --- DIBUJAR EN MAPA ---
-                    if (mapRef.current && data.length > 0) {
-                        const points: L.LatLng[] = [L.latLng(M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng)];
-
-                        data.forEach((inv, idx) => {
-                            if (inv.lat && inv.lng) {
-                                const pos = L.latLng(inv.lat, inv.lng);
-                                points.push(pos);
-
-                                // Marcador numérico
-                                const icon = L.divIcon({
-                                    className: 'custom-invoice-marker',
-                                    html: `<div class="w-6 h-6 bg-emerald-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-[10px] font-black text-white">${idx + 1}</div>`,
-                                    iconSize: [24, 24]
-                                });
-
-                                const marker = L.marker(pos, { icon })
-                                    .addTo(mapRef.current!)
-                                    .bindPopup(`
-                                        <div class="p-2">
-                                            <p class="font-bold text-xs">${inv.invoiceNumber}</p>
-                                            <p class="text-[10px] text-slate-500 mb-1">${inv.customerName}</p>
-                                            <p class="text-[9px] text-emerald-600 font-bold uppercase">${inv.city || ''} ${inv.neighborhood ? `• ${inv.neighborhood}` : ''}</p>
-                                        </div>
-                                    `);
-                                routeMarkersRef.current.push(marker);
-                            }
-                        });
-
-                        // Polilinea
-                        routePolylineRef.current = L.polyline(points, {
-                            color: '#0ea5e9', // Sky blue
-                            weight: 4,
-                            opacity: 0.8,
-                            dashArray: '5, 10'
-                        }).addTo(mapRef.current);
-
-                        // Ajustar vista
-                        const bounds = L.latLngBounds(points);
-                        mapRef.current.fitBounds(bounds, { padding: [50, 50] });
-                    }
-                })
-                .catch(err => console.error("Error fetching route details", err));
-        } else {
-            // Clear map if no route visualized?
         }
-
-        // Cleanup moved to triggering new route or unmount
-    }, [visualizedRoute, selectedActiveRoute]);
+    }, [visualizedRoute, selectedActiveRoute, invoices]);
 
     // Cleanup effect for map elements on unmount
     useEffect(() => {
@@ -455,15 +503,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
     // Effect to load data for MODAL specifically
     useEffect(() => {
-        if (selectedActiveRoute && selectedActiveRoute.invoice_ids?.length > 0) {
-            const ids = selectedActiveRoute.invoice_ids.join(',');
-            fetch(`/api/documents/invoices?ids=${encodeURIComponent(ids)}`)
-                .then(r => r.json())
-                .then((data: any[]) => {
-                    setRouteInvoices(data);
-                });
+        if (selectedActiveRoute) {
+            loadRouteInvoicesData(selectedActiveRoute, setRouteInvoices, false);
         }
-    }, [selectedActiveRoute]);
+    }, [selectedActiveRoute, invoices]);
 
     // 5. Auto-reporte de ubicación y WakeLock (Mantener pantalla encendida)
     useEffect(() => {
@@ -523,35 +566,69 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Cabecera de Control */}
-            <div className="bg-white rounded-[3rem] p-8 shadow-xl border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
-                <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-slate-900 rounded-[1.5rem] flex items-center justify-center shadow-2xl border-2 border-emerald-500">
-                        <Icons.Radar className="w-8 h-8 text-emerald-500 animate-pulse" />
+            {/* Cabecera de Control Compacta */}
+            <div className="bg-white rounded-[2rem] p-4 shadow-md border border-slate-100 flex flex-col xl:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg border border-emerald-500">
+                        <Icons.Radar className="w-5 h-5 text-emerald-500 animate-pulse" />
                     </div>
                     <div>
-                        <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Centro de Mando</h2>
+                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">Centro de Mando</h2>
                         <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rastreo GPS en Tiempo Real (v1.2-FIX)</p>
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rastreo GPS (v1.2-FIX)</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex gap-4">
-                    <button
-                        onClick={fetchLocations}
-                        disabled={isValidating}
-                        className={`px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center gap-3 ${isValidating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        {isValidating ? <Icons.RotateCcw className="w-4 h-4 animate-spin" /> : <Icons.MapPin className="w-4 h-4" />}
-                        {isValidating ? 'Actualizando...' : 'Actualizar GPS'}
-                    </button>
-                    <button
-                        onClick={onRefresh}
-                        className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-emerald-500 transition-all shadow-sm"
-                    >
-                        <Icons.RefreshCw className="w-5 h-5" />
-                    </button>
+                <div className="flex flex-wrap items-center gap-2 md:gap-4 justify-center">
+                    <div className="flex bg-slate-50 p-1 rounded-xl items-center gap-1 border border-slate-100">
+                         <div className="text-center px-3 py-1 bg-white rounded-lg shadow-sm border border-slate-100">
+                            <p className="text-[6px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-0.5">Activas</p>
+                            <p className="text-sm font-black text-slate-900 leading-none">{activeRoutes.length}</p>
+                        </div>
+                        <div className="text-center px-3 py-1">
+                            <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">GPS Ok</p>
+                            <p className="text-sm font-black text-slate-700 leading-none">{vehicleLocations.length}</p>
+                        </div>
+                        <div className="text-center px-3 py-1">
+                            <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest leading-none mb-0.5">Sin Señal</p>
+                            <p className="text-sm font-black text-slate-700 leading-none">{Math.max(0, activeRoutes.length - vehicleLocations.length)}</p>
+                        </div>
+                    </div>
+
+                    <div className="hidden xl:flex bg-slate-50 p-1 rounded-xl items-center gap-3 border border-slate-100 px-3 h-full">
+                        <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest">Ref:</p>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                            <p className="text-[7px] font-black text-slate-600 uppercase">HUB</p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                             <div className="w-1.5 h-1.5 bg-slate-900 rounded-sm rotate-45"></div>
+                            <p className="text-[7px] font-black text-slate-600 uppercase">En Ruta</p>
+                        </div>
+                         <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-px bg-emerald-500 border-t border-dashed border-emerald-600"></div>
+                            <p className="text-[7px] font-black text-slate-600 uppercase">Trayecto</p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={fetchLocations}
+                            disabled={isValidating}
+                            className={`px-4 py-2 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all flex items-center gap-2 ${isValidating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            {isValidating ? <Icons.RotateCcw className="w-3 h-3 animate-spin" /> : <Icons.MapPin className="w-3 h-3" />}
+                            {isValidating ? '...' : 'GPS'}
+                        </button>
+                        <button
+                            onClick={onRefresh}
+                            className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-emerald-500 transition-all shadow-sm"
+                        >
+                            <Icons.RefreshCw className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -657,44 +734,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 <div className="lg:col-span-2 bg-slate-200 rounded-[3rem] shadow-xl border-8 border-white overflow-hidden relative group">
                     <div id="logistics-dispatch-map" className="w-full h-full"></div>
 
-                    {/* Overlay de Estadísticas Flotante y Moderno */}
-                    <div className="absolute bottom-8 right-8 z-[400] flex flex-col gap-3">
-                        <div className="bg-slate-900/90 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/10 shadow-2xl flex items-center gap-8">
-                            <div className="text-center px-2">
-                                <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Activas</p>
-                                <p className="text-2xl font-black text-white">{activeRoutes.length}</p>
-                            </div>
-                            <div className="h-8 w-px bg-white/10"></div>
-                            <div className="text-center px-2">
-                                <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">GPS Ok</p>
-                                <p className="text-2xl font-black text-white">{vehicleLocations.length}</p>
-                            </div>
-                            <div className="h-8 w-px bg-white/10"></div>
-                            <div className="text-center px-2">
-                                <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest mb-1">Sin Señal</p>
-                                <p className="text-2xl font-black text-white">{Math.max(0, activeRoutes.length - vehicleLocations.length)}</p>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Leyenda del Mapa Minimalista (Top-Right) */}
-                    <div className="absolute top-6 right-6 z-[400] bg-slate-900/40 backdrop-blur-md p-4 rounded-3xl border border-white/5 shadow-inner hidden md:block group-hover:bg-slate-900/80 transition-all">
-                        <p className="text-[7px] font-black text-white/50 uppercase mb-3 tracking-widest text-center">Referencia</p>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                                <p className="text-[8px] font-black text-white/70 uppercase">HUB M7</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-3 h-3 bg-slate-100 rounded-md rotate-45 border border-emerald-500"></div>
-                                <p className="text-[8px] font-black text-white/70 uppercase">En Ruta</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-5 h-px bg-emerald-500/50 border-t border-dashed border-emerald-500"></div>
-                                <p className="text-[8px] font-black text-white/70 uppercase">Trayecto</p>
-                            </div>
-                        </div>
-                    </div>
+
+
                 </div>
             </div>
 
@@ -717,6 +759,26 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             return drv?.name || 'CONDUCTOR EXTERNO';
                                         })()}
                                     </p>
+                                    
+                                    {/* DEBUG BLOCK - TEMPORARY */}
+                                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-[10px] font-mono text-red-800 overflow-x-auto max-w-lg">
+                                        <p><strong>DEBUG INFO:</strong></p>
+                                        <p>Route IDs (Sample): {JSON.stringify((selectedActiveRoute.invoice_ids || []).slice(0, 2))}</p>
+                                        <p>First Link ID: {selectedActiveRoute.invoice_ids?.[0]}</p>
+                                        <hr className="border-red-200 my-1"/>
+                                        <p><strong>LOCAL INVOICES SAMPLE (First 2):</strong></p>
+                                        {invoices.slice(0, 2).map((inv, i) => (
+                                            <p key={i}>
+                                                #{i+1}: ID=[{inv.id}] / Num=[{inv.invoiceNumber}] / DocL=[{inv.docLId}]
+                                            </p>
+                                        ))}
+                                        <hr className="border-red-200 my-1"/>
+                                        <p>Matching Logic Check:</p>
+                                        <p>Trying to find RouteID in Local IDs or Numbers...</p>
+                                        <hr className="border-red-200 my-1"/>
+                                        <p><strong>FETCH STATUS:</strong> {fetchStatus}</p>
+                                    </div>
+
                                     <p className="text-[10px] text-emerald-600 font-bold mt-1">
                                         📌 {routeInvoices.length} Puntos de Entrega (Visible en Mapa)
                                     </p>

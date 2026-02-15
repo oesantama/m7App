@@ -45,6 +45,78 @@ export const api = {
     body: JSON.stringify(data)
   }).then(r => r.json()),
 
+  // Categorías (Nueva Tabla)
+  getCategories: () => fetch(`${API_URL}/categories?_t=${Date.now()}`).then(r => r.json()),
+  saveCategory: (data: any) => fetch(`${API_URL}/categories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteCategory: (id: string, deletedBy?: string) => fetch(`${API_URL}/categories/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Estados
+  getEstados: () => fetch(`${API_URL}/estados?_t=${Date.now()}`).then(r => r.json()),
+  saveEstado: (data: any) => fetch(`${API_URL}/estados`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteEstado: (id: string, deletedBy?: string) => fetch(`${API_URL}/estados/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Marcas
+  getMarcas: () => fetch(`${API_URL}/marcas?_t=${Date.now()}`).then(r => r.json()),
+  saveMarca: (data: any) => fetch(`${API_URL}/marcas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteMarca: (id: string, deletedBy?: string) => fetch(`${API_URL}/marcas/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Tipos de Documento
+  getTiposDocumento: () => fetch(`${API_URL}/tipos-documento?_t=${Date.now()}`).then(r => r.json()),
+  saveTipoDocumento: (data: any) => fetch(`${API_URL}/tipos-documento`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteTipoDocumento: (id: string, deletedBy?: string) => fetch(`${API_URL}/tipos-documento/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Unidades de Medida
+  getUnidadesMedida: () => fetch(`${API_URL}/unidades-medida?_t=${Date.now()}`).then(r => r.json()),
+  saveUnidadMedida: (data: any) => fetch(`${API_URL}/unidades-medida`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteUnidadMedida: (id: string, deletedBy?: string) => fetch(`${API_URL}/unidades-medida/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Notificaciones Config
+  getNotificacionesConfig: () => fetch(`${API_URL}/notificaciones-config?_t=${Date.now()}`).then(r => r.json()),
+  saveNotificacionConfig: (data: any) => fetch(`${API_URL}/notificaciones-config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteNotificacionConfig: (id: string, deletedBy?: string) => fetch(`${API_URL}/notificaciones-config/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Tipos de Vehículo
+  getTiposVehiculo: () => fetch(`${API_URL}/tipos-vehiculo?_t=${Date.now()}`).then(r => r.json()),
+  saveTipoVehiculo: (data: any) => fetch(`${API_URL}/tipos-vehiculo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteTipoVehiculo: (id: string, deletedBy?: string) => fetch(`${API_URL}/tipos-vehiculo/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Tipos de Notificación
+  getTiposNotificacion: () => fetch(`${API_URL}/tipos-notificacion?_t=${Date.now()}`).then(r => r.json()),
+  saveTipoNotificacion: (data: any) => fetch(`${API_URL}/tipos-notificacion`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteTipoNotificacion: (id: string, deletedBy?: string) => fetch(`${API_URL}/tipos-notificacion/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+
   getModules: () => fetch(`${API_URL}/modules?_t=${Date.now()}`).then(r => r.json()),
   deleteModule: (id: string, deletedBy?: string) => fetch(`${API_URL}/modules/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   getPages: () => fetch(`${API_URL}/pages?_t=${Date.now()}`).then(r => r.json()),
@@ -65,7 +137,15 @@ export const api = {
   }).then(r => r.json()),
   deleteUserPermission: (id: string, deletedBy?: string) => fetch(`${API_URL}/user-permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   deleteRolePermission: (id: string, deletedBy?: string) => fetch(`${API_URL}/permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  
+  getClients: () => fetch(`${API_URL}/clients`).then(r => r.json()),
+  saveClient: (data: any) => fetch(`${API_URL}/clients`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
   deleteClient: (id: string, deletedBy?: string) => fetch(`${API_URL}/clients/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  
   getArticles: () => fetch(`${API_URL}/articles`).then(r => r.json()),
   saveArticle: (data: any) => fetch(`${API_URL}/articles`, {
     method: 'POST',
@@ -145,7 +225,12 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }).then(r => r.json()),
-  getInvoices: (clientId?: string) => fetch(`${API_URL}/documents/invoices${clientId ? `?clientId=${clientId}` : ''}`).then(r => r.json()),
+  getInvoices: (clientId?: string, ids?: string) => {
+    let url = `${API_URL}/documents/invoices?`;
+    if (clientId) url += `clientId=${clientId}&`;
+    if (ids) url += `ids=${encodeURIComponent(ids)}`;
+    return fetch(url).then(r => r.json());
+  },
 
   resendInventoryNotification: (docId: string, targetEmail: string) => fetch(`${API_URL}/documents/resend-notification`, {
     method: 'POST',

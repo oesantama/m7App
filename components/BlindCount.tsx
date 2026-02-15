@@ -58,21 +58,29 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [manualEmail, setManualEmail] = useState('');
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(20);
   const [currentPage, setCurrentPage] = useState(1);
-  const [conversionTarget, setConversionTarget] = useState<{
+  /* ESTADO UNIFICADO DE TRANSACCIÓN */
+  const [unitTransaction, setUnitTransaction] = useState<{
+    type: 'CONVERT' | 'REVERSE';
     articleId: string;
     currentQty: number;
-    factor: number;
-    targetQty: number;
-    fromLabel: string;
-    toLabel: string;
-  } | null>(null);
-  const [reverseTarget, setReverseTarget] = useState<{
-    articleId: string;
-    currentQty: number;
-    factor: number;
-    targetQty: number;
-    fromLabel: string;
-    toLabel: string;
+    options: {
+      id: string;
+      label: string;
+      sourceUnit: string;
+      targetUnit: string;
+      factor: number;
+      operation: 'multiply' | 'divide';
+      resultQty: number;
+    }[];
+    selectedOption?: {
+      id: string;
+      label: string;
+      sourceUnit: string;
+      targetUnit: string;
+      factor: number;
+      operation: 'multiply' | 'divide';
+      resultQty: number;
+    };
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -251,130 +259,175 @@ const BlindCount: React.FC<BlindCountProps> = ({
     }
   };
 
-  const handleOpenConversion = (articleId: string) => {
+  const handleOpenTransaction = (articleId: string, type: 'CONVERT' | 'REVERSE') => {
     const currentQty = counts[articleId] || 0;
-    if (currentQty === 0) return;
+    if (currentQty === 0) {
+      toast.warning('No hay cantidad para procesar');
+      return;
+    }
 
-    // Buscar en maestra
     const masterInfo = masterArticulo.find(m => m.id === articleId || m.sku === articleId);
     if (!masterInfo) {
-      toast.error('Artículo no encontrado en maestra para conversión');
+      toast.error('Artículo no encontrado en maestra');
       return;
     }
 
-    // Lógica simplificada: Si factorInter > 1, asumimos conversión de Caja -> Unidad
-    // O si item.unit == 'CJ' etc.
-    // POor defecto: Factor INTER
-    const factor = Number(masterInfo.factorInter || masterInfo.factor_inter || 0);
+    // Nombres de Unidades (Fallback seguros)
+    const uomGen = (masterInfo as any).uom_general || 'CAJA'; // Nivel 1
+    const uomInter = (masterInfo as any).uom_inter || (masterInfo as any).uom_intermediate || 'PACK'; // Nivel 2
+    const uomStd = (masterInfo as any).uom_std || (masterInfo as any).uom_standard || 'UND'; // Nivel 3
 
-    if (factor <= 1) {
-      toast.error('Este artículo no tiene factor de conversión configurado (Factor <= 1)');
-      return;
+    // Factores
+    const fInter = Number((masterInfo as any).factorInter || (masterInfo as any).factor_inter || 1); // Cuantos N2 hay en N1
+    const fStd = Number((masterInfo as any).factorStd || (masterInfo as any).factor_std || 1); // Cuantos N3 hay en N2
+
+    const options: any[] = [];
+
+    if (type === 'CONVERT') {
+      // CONVERSIÓN (Desglose / Multiplicación)
+      // Escenario 1: Nivel 1 -> Nivel 2 (Caja -> Pack)
+      if (fInter > 1) {
+        options.push({
+            id: 'gen_to_inter',
+            label: `Desglosar ${uomGen} a ${uomInter}`,
+            sourceUnit: uomGen,
+            targetUnit: uomInter,
+            factor: fInter,
+            operation: 'multiply',
+            resultQty: currentQty * fInter
+        });
+      }
+      // Escenario 2: Nivel 2 -> Nivel 3 (Pack -> Und)
+      if (fStd > 1) {
+         options.push({
+            id: 'inter_to_std',
+            label: `Desglosar ${uomInter} a ${uomStd}`,
+            sourceUnit: uomInter,
+            targetUnit: uomStd,
+            factor: fStd,
+            operation: 'multiply',
+            resultQty: currentQty * fStd
+        });
+      }
+      // Escenario 3: Nivel 1 -> Nivel 3 (Directo: Caja -> Und)
+      const fTotal = fInter * fStd;
+      if (fTotal > 1 && fTotal !== fInter && fTotal !== fStd) {
+         options.push({
+            id: 'gen_to_std',
+            label: `Desglosar Completamente (${uomGen} -> ${uomStd})`,
+            sourceUnit: uomGen,
+            targetUnit: uomStd,
+            factor: fTotal,
+            operation: 'multiply',
+            resultQty: currentQty * fTotal
+        });
+      }
+      
+      // Fallback si no hay factores configurados pero el usuario intenta convertir (ej. caso del usuario con 30 y 1)
+      if (options.length === 0 && fInter > 1) {
+          options.push({
+            id: 'simple_convert',
+            label: `Convertir ${uomGen} a ${uomStd}`,
+            sourceUnit: uomGen,
+            targetUnit: uomStd,
+            factor: fInter,
+            operation: 'multiply',
+            resultQty: currentQty * fInter
+        });
+      }
+
+    } else {
+      // REVERSA (Agrupación / División)
+      // Escenario 1: Nivel 3 -> Nivel 2 (Und -> Pack)
+      if (fStd > 1) {
+        options.push({
+            id: 'std_to_inter',
+            label: `Agrupar ${uomStd} en ${uomInter}`,
+            sourceUnit: uomStd,
+            targetUnit: uomInter,
+            factor: fStd,
+            operation: 'divide',
+            resultQty: currentQty / fStd
+        });
+      }
+      // Escenario 2: Nivel 2 -> Nivel 1 (Pack -> Caja)
+      if (fInter > 1) {
+         options.push({
+            id: 'inter_to_gen',
+            label: `Agrupar ${uomInter} en ${uomGen}`,
+            sourceUnit: uomInter,
+            targetUnit: uomGen,
+            factor: fInter,
+            operation: 'divide',
+            resultQty: currentQty / fInter
+        });
+      }
+       // Escenario 3: Nivel 3 -> Nivel 1 (Directo: Und -> Caja)
+       const fTotal = fInter * fStd;
+       if (fTotal > 1 && fTotal !== fInter && fTotal !== fStd) {
+          options.push({
+             id: 'std_to_gen',
+             label: `Agrupación Completa (${uomStd} -> ${uomGen})`,
+             sourceUnit: uomStd,
+             targetUnit: uomGen,
+             factor: fTotal,
+             operation: 'divide',
+             resultQty: currentQty / fTotal
+         });
+       }
+
+       // Fallback simple
+       if (options.length === 0 && fInter > 1) {
+          options.push({
+            id: 'simple_reverse',
+            label: `Convertir ${uomStd} a ${uomGen}`,
+            sourceUnit: uomStd,
+            targetUnit: uomGen,
+            factor: fInter,
+            operation: 'divide',
+            resultQty: currentQty / fInter
+        });
+       }
     }
 
-    // Etiquetas MEJORADAS (M7 FIX)
-    // Intentamos obtener los nombres reales de las unidades desde la maestra
-    // Si factorInter se usa, asumimos conversión de INTERMEDIA -> ESTÁNDAR
+    if (options.length === 0) {
+        toast.error('No hay factores de conversión configurados.');
+        return;
+    }
 
-    // Posibles nombres de campo para Unidad Intermedia (Caja, Paquete, etc.)
-    const labelInter =
-      (masterInfo as any).uom_inter ||
-      (masterInfo as any).uom_intermediate ||
-      (masterInfo as any).uom_media ||
-      (masterInfo as any).uom_img || // A veces se usa este naming
-      'CJ'; // Fallback
-
-    // Posibles nombres de campo para Unidad Estándar (Und, Botella, etc.) 
-    const labelStd =
-      (masterInfo as any).uom_std ||
-      (masterInfo as any).uom_standard ||
-      (masterInfo as any).uom_base ||
-      'UND'; // Fallback
-
-    setConversionTarget({
-      articleId,
-      currentQty,
-      factor,
-      targetQty: currentQty * factor,
-      fromLabel: labelInter,
-      toLabel: labelStd
+    setUnitTransaction({
+        type,
+        articleId,
+        currentQty,
+        options,
     });
   };
 
-  const confirmConversion = () => {
-    if (!conversionTarget) return;
+  const applyTransaction = () => {
+    if (!unitTransaction || !unitTransaction.selectedOption) return;
+
+    const opt = unitTransaction.selectedOption;
+    
+    // Validación de decimales
+    if (!Number.isInteger(opt.resultQty)) {
+        if(!confirm(`La operación resultará en decimales (${opt.resultQty.toFixed(2)}). ¿Continuar?`)) return;
+    }
 
     setCounts(prev => ({
       ...prev,
-      [conversionTarget.articleId]: conversionTarget.targetQty
+      [unitTransaction.articleId]: Number(opt.resultQty.toFixed(2))
     }));
 
-    // Opcional: Agregar nota automática
-    setItemObservations(prev => ({
-      ...prev,
-      [conversionTarget.articleId]: `Conv: ${conversionTarget.currentQty} ${conversionTarget.fromLabel} x ${conversionTarget.factor} = ${conversionTarget.targetQty} ${conversionTarget.toLabel}. ${prev[conversionTarget.articleId] || ''}`
-    }));
-
-    toast.success('Conversión aplicada');
-    setConversionTarget(null);
-  };
-
-  const handleOpenReverse = (articleId: string) => {
-    const currentQty = counts[articleId] || 0;
-    if (currentQty === 0) return;
-
-    // Buscar en maestra
-    const masterInfo = masterArticulo.find(m => m.id === articleId || m.sku === articleId);
-    if (!masterInfo) {
-      toast.error('Artículo no encontrado en maestra para reversión');
-      return;
-    }
-
-    const factor = Number(masterInfo.factorInter || masterInfo.factor_inter || 0);
-
-    if (factor <= 1) {
-      toast.error('Este artículo no tiene factor configurado para reversar (Factor <= 1)');
-      return;
-    }
-
-    // Etiquetas (Invertidas respecto a conversión normal)
-    const labelInter =
-      (masterInfo as any).uom_inter ||
-      (masterInfo as any).uom_intermediate ||
-      (masterInfo as any).uom_media ||
-      'CJ'; 
-
-    const labelStd =
-      (masterInfo as any).uom_std ||
-      (masterInfo as any).uom_standard ||
-      (masterInfo as any).uom_base ||
-      'UND'; 
-
-    setReverseTarget({
-      articleId,
-      currentQty,
-      factor,
-      targetQty: currentQty / factor,
-      fromLabel: labelStd, // De Estándar (Unds)
-      toLabel: labelInter // A Intermedia (Cajas)
-    });
-  };
-
-  const confirmReverse = () => {
-    if (!reverseTarget) return;
-
-    setCounts(prev => ({
-      ...prev,
-      [reverseTarget.articleId]: reverseTarget.targetQty
-    }));
+    const opSymbol = opt.operation === 'multiply' ? 'x' : '/';
+    const logMsg = `${unitTransaction.type === 'CONVERT' ? 'Conv' : 'Rev'}: ${unitTransaction.currentQty} ${opt.sourceUnit} ${opSymbol} ${opt.factor} = ${opt.resultQty.toFixed(2)} ${opt.targetUnit}`;
 
     setItemObservations(prev => ({
       ...prev,
-      [reverseTarget.articleId]: `Rev: ${reverseTarget.currentQty} ${reverseTarget.fromLabel} / ${reverseTarget.factor} = ${reverseTarget.targetQty} ${reverseTarget.toLabel}. ${prev[reverseTarget.articleId] || ''}`
+      [unitTransaction.articleId]: `${logMsg}. ${prev[unitTransaction.articleId] || ''}`
     }));
 
-    toast.success('Reversión aplicada');
-    setReverseTarget(null);
+    toast.success('Cambio aplicado');
+    setUnitTransaction(null);
   };
 
   const exportToExcel = () => {
@@ -671,16 +724,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
                           {validationAttempts === 1 && (
                             <>
                               <button
-                                onClick={() => handleOpenConversion(it.articleId)}
+                                onClick={() => handleOpenTransaction(it.articleId, 'CONVERT')}
                                 className="inline-flex items-center justify-center w-7 h-7 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-md active:scale-90"
-                                title="Convertir Unidades (Cajas -> Unds)"
+                                title="Convertir Unidades (Desglosar)"
                               >
                                 <Icons.RefreshCw className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => handleOpenReverse(it.articleId)}
+                                onClick={() => handleOpenTransaction(it.articleId, 'REVERSE')}
                                 className="inline-flex items-center justify-center w-7 h-7 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all shadow-md active:scale-90"
-                                title="Reversar Unidades (Unds -> Cajas)"
+                                title="Reversar Unidades (Agrupar)"
                               >
                                 <Icons.RotateCcw className="w-3.5 h-3.5" />
                               </button>
@@ -810,70 +863,65 @@ const BlindCount: React.FC<BlindCountProps> = ({
         </div>
       )}
 
-      {/* DIÁLOGO CONVERSIÓN */}
-      {conversionTarget && (
+      {/* MODAL UNIFICADO DE TRANSACCIÓN */}
+      {unitTransaction && (
         <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl border border-white/10 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 text-center shadow-2xl border border-white/10 relative overflow-hidden">
+             
+             {/* Header Dinámico */}
+             <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${unitTransaction.type === 'CONVERT' ? 'from-blue-500 to-indigo-500' : 'from-amber-500 to-orange-500'}`}></div>
+             
+             <div className={`w-16 h-16 rounded-3xl mx-auto flex items-center justify-center shadow-lg mb-6 ${unitTransaction.type === 'CONVERT' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                {unitTransaction.type === 'CONVERT' ? <Icons.RefreshCw className="w-8 h-8" /> : <Icons.RotateCcw className="w-8 h-8" />}
+             </div>
 
-            <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-sm mb-6"><Icons.RefreshCw className="w-7 h-7" /></div>
+             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-1">
+                {unitTransaction.type === 'CONVERT' ? 'Convertir Unidades' : 'Reversar Unidades'}
+             </h3>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-8">
+                Artículo: {unitTransaction.articleId} | Actual: {unitTransaction.currentQty}
+             </p>
 
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-1">Conversión de Unidades</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">{conversionTarget.articleId}</p>
+             {/* Selector de Opciones */}
+             <div className="space-y-4 mb-8">
+                <p className="text-left text-[9px] font-black text-slate-400 uppercase ml-2">Seleccione Operación:</p>
+                {unitTransaction.options.map(opt => (
+                    <div 
+                        key={opt.id}
+                        onClick={() => setUnitTransaction({...unitTransaction, selectedOption: opt})}
+                        className={`cursor-pointer p-4 rounded-2xl border-2 transition-all group relative overflow-hidden ${unitTransaction.selectedOption?.id === opt.id ? (unitTransaction.type === 'CONVERT' ? 'border-blue-500 bg-blue-50/50' : 'border-amber-500 bg-amber-50/50') : 'border-slate-100 bg-white hover:border-slate-300'}`}
+                    >
+                         <div className="flex justify-between items-center relative z-10">
+                            <div className="text-left">
+                                <p className="text-[11px] font-black uppercase text-slate-800">{opt.label}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">Factor: {opt.factor}</span>
+                                    <span className="text-[9px] font-bold text-slate-400">{opt.sourceUnit} → {opt.targetUnit}</span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className={`text-xl font-black ${unitTransaction.type === 'CONVERT' ? 'text-blue-600' : 'text-amber-600'}`}>
+                                    {opt.resultQty.toFixed(2).replace(/\.00$/, '')}
+                                </p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase">Resultado</p>
+                            </div>
+                         </div>
+                    </div>
+                ))}
+             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-4 space-y-4 mb-6 border border-slate-100">
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] font-black text-slate-400 uppercase">Actual:</span>
-                <span className="text-lg font-black text-slate-900">{conversionTarget.currentQty} <span className="text-[9px] text-slate-400">{conversionTarget.fromLabel}</span></span>
-              </div>
-              <div className="flex justify-between items-center px-4">
-                <Icons.List className="w-4 h-4 text-slate-300 rotate-90 mx-auto" /> {/* Flecha o Icono */}
-                <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded">Factor: {conversionTarget.factor}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] font-black text-slate-400 uppercase">Resultado:</span>
-                <span className="text-2xl font-black text-emerald-600">{conversionTarget.targetQty} <span className="text-[9px] text-emerald-400">{conversionTarget.toLabel}</span></span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setConversionTarget(null)} className="py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
-              <button onClick={confirmConversion} className="py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-500 shadow-lg shadow-blue-500/20 transition-all">Aplicar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DIÁLOGO REVERSAR UNIDADES */}
-      {reverseTarget && (
-        <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center shadow-2xl border border-white/10 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500"></div>
-
-            <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl mx-auto flex items-center justify-center shadow-sm mb-6"><Icons.RotateCcw className="w-7 h-7" /></div>
-
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-1">Reversar Unidades</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">{reverseTarget.articleId}</p>
-
-            <div className="bg-slate-50 rounded-2xl p-4 space-y-4 mb-6 border border-slate-100">
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] font-black text-slate-400 uppercase">Actual:</span>
-                <span className="text-lg font-black text-slate-900">{reverseTarget.currentQty} <span className="text-[9px] text-slate-400">{reverseTarget.fromLabel}</span></span>
-              </div>
-              <div className="flex justify-between items-center px-4">
-                <Icons.List className="w-4 h-4 text-slate-300 rotate-90 mx-auto" />
-                <span className="text-[9px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded">Divisor: {reverseTarget.factor}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] font-black text-slate-400 uppercase">Resultado:</span>
-                <span className="text-2xl font-black text-emerald-600">{reverseTarget.targetQty} <span className="text-[9px] text-emerald-400">{reverseTarget.toLabel}</span></span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setReverseTarget(null)} className="py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
-              <button onClick={confirmReverse} className="py-3 bg-amber-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-500 shadow-lg shadow-amber-500/20 transition-all">Aplicar</button>
-            </div>
+             <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => setUnitTransaction(null)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={applyTransaction}
+                    disabled={!unitTransaction.selectedOption}
+                    className={`py-4 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all ${!unitTransaction.selectedOption ? 'bg-slate-300 cursor-not-allowed' : (unitTransaction.type === 'CONVERT' ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/30' : 'bg-amber-600 hover:bg-amber-500 shadow-amber-500/30')}`}
+                  >
+                    Aplicar Cambio
+                  </button>
+             </div>
           </div>
         </div>
       )}

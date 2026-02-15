@@ -134,7 +134,6 @@ export const restoreSystem = async () => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS articles (
         id TEXT PRIMARY KEY,
-        sku TEXT NOT NULL,
         name TEXT NOT NULL,
         client_id TEXT REFERENCES clients(id),
         uom_std TEXT,
@@ -145,7 +144,7 @@ export const restoreSystem = async () => {
         factor_inter NUMERIC,
         uom_general_id TEXT,
         uom_inter_id TEXT,
-        uom_std_id TEXT
+        image_url TEXT
       );
     `);
 

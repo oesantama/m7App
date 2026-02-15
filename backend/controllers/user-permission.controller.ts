@@ -108,11 +108,11 @@ export const saveUserPermission = async (req: Request, res: Response) => {
   const p = req.body;
   try {
     await pool.query(`
-      INSERT INTO user_permissions (id, user_id, permissions, status_id)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO user_permissions (id, user_id, permissions, status_id, created_by, updated_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
-      user_id = $2, permissions = $3, status_id = $4
-    `, [p.id, p.userId, JSON.stringify(p), p.statusId]);
+      user_id = $2, permissions = $3, status_id = $4, updated_by = $5, updated_at = CURRENT_TIMESTAMP
+    `, [p.id, p.userId, JSON.stringify(p), p.statusId, p.createdBy || p.updatedBy || 'System']);
     res.json({ success: true, message: 'Permisos de usuario guardados' });
   } catch (err: any) {
     res.status(500).json({ error: "Error al guardar permisos de usuario" });

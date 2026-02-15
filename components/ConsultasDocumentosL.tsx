@@ -175,6 +175,38 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     XLSX.writeFile(wb, `${fileName}_${new Date().getTime()}.xlsx`);
   };
 
+  const handleDetailExport = () => {
+    let dataToExport: any[] = [];
+    if (activeDetailTab === 'reception') {
+      dataToExport = sortedDetailItems.map(it => ({
+        ARTICULO: it.articleId,
+        UN: it.unCode || '-',
+        REF: it.clientRef || '-',
+        CIUDAD: it.city || '-',
+        CANT_PLAN: it.expectedQty,
+        RECIBIDO: Number(it.receivedQty || it.count1 || 0),
+        UM: it.unit || 'und',
+        FACTURA: it.invoice || '-',
+        PEDIDO: it.orderNumber || 'S/I',
+        PESO: Number(it.peso || 0),
+        ESTADO: it.itemStatus === 'En Conteo' ? 'Pendiente' : (it.itemStatus || 'Pendiente'),
+        OBS_CONDUCTOR: 'driverNote' in it ? (it as any).driverNote : (it as any).observation || '',
+        NOTA_AUDITORIA: it.inventoryNote || ''
+      }));
+    } else {
+      dataToExport = sortedDetailItems.map((it: any) => ({
+        ARTICULO: it.article_id || it.articleId || it.sku,
+        CANT_PLAN: Number(it.expected_qty || it.expectedQty || 0),
+        CONTEO_1: Number(it.count_1 || it.count1 || 0),
+        CONTEO_2: Number(it.count_2 || it.count2 || 0),
+        ALISTADO: Number(it.picked_qty || it.pickedQty || 0),
+        DESPACHADO: Number(it.dispatched_qty || it.dispatchedQty || 0),
+        OBS_INVENTARIO: it.inventory_observation || it.inventoryObservation || ''
+      }));
+    }
+    exportToExcel(dataToExport, `Detalle_${activeDetailTab.toUpperCase()}_MOV_${selectedDoc?.externalDocId}`);
+  };
+
   const filteredDocs = useMemo(() => {
     return documents.filter(doc => {
       const matchPlaca = !filters.plate || (doc.vehicleData || '').toLowerCase().includes(filters.plate.toLowerCase());
@@ -398,6 +430,13 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg">
                       Reg: {sortedDetailItems.length}
                     </div>
+                    <button
+                      onClick={handleDetailExport}
+                      className="bg-emerald-500 text-white px-3 py-2 rounded-lg hover:bg-emerald-600 transition-colors shadow-lg"
+                      title="Exportar a Excel"
+                    >
+                      <Icons.Excel className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 

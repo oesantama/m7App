@@ -19,18 +19,36 @@ import aiRoutes from './ai.routes.js';
 import twoFactorRoutes from './2fa.routes.js';
 import systemRoutes from './system.routes.js';
 import masterRoutes from './master.routes.js';
+import categoryRoutes from './category.routes.js';
 import routeRoutes from './route.routes.js';
 import signatureRoutes from './signature.routes.js';
 import locationRoutes from './location.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import portalRoutes from './portal.routes.js';
 import telemetryRoutes from './telemetry.routes.js';
+import adminRoutes from './admin.routes.js';
+import estadoRoutes from './estado.routes.js';
+import marcaRoutes from './marca.routes.js';
+import tipoDocumentoRoutes from './tipo-documento.routes.js';
+import unidadMedidaRoutes from './unidad-medida.routes.js';
+import notificacionRoutes from './notificacion.routes.js';
+import tipoVehiculoRoutes from './tipo-vehiculo.routes.js';
+import tipoNotificacionRoutes from './tipo-notificacion.routes.js';
 
 
 const router = Router();
 
 router.use('/masters', masterRoutes);
+router.use('/categories', categoryRoutes);
 router.use('/routes', routeRoutes);
+router.use('/admin', adminRoutes); // Database Manager
+router.use('/estados', estadoRoutes);
+router.use('/marcas', marcaRoutes);
+router.use('/tipos-documento', tipoDocumentoRoutes);
+router.use('/unidades-medida', unidadMedidaRoutes);
+router.use('/notificaciones-config', notificacionRoutes);
+router.use('/tipos-vehiculo', tipoVehiculoRoutes);
+router.use('/tipos-notificacion', tipoNotificacionRoutes);
 router.use('/auth', authRoutes);
 router.use('/2fa', twoFactorRoutes);
 router.use('/users', userRoutes);

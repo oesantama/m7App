@@ -13,7 +13,7 @@ export const getRoutes = async (req: Request, res: Response) => {
       SELECT r.*, v.plate, d.name as driver_name,
       COALESCE(
         (
-          SELECT json_agg(REGEXP_REPLACE(invoice_id, '[\\r\\n\\t\\f\\v ]', '', 'g')) 
+          SELECT json_agg(TRIM(invoice_id)) 
           FROM route_invoices 
           WHERE TRIM(route_id) = TRIM(r.id)
         ),

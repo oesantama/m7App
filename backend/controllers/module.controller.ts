@@ -20,11 +20,11 @@ export const saveModule = async (req: Request, res: Response) => {
   const m = req.body;
   try {
     await pool.query(`
-      INSERT INTO modules (id, name, icon_class, status_id)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO modules (id, name, icon_class, status_id, created_by, updated_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
-      name = $2, icon_class = $3, status_id = $4
-    `, [m.id, m.name, m.iconClass, m.statusId]);
+      name = $2, icon_class = $3, status_id = $4, updated_by = $5, updated_at = CURRENT_TIMESTAMP
+    `, [m.id, m.name, m.iconClass, m.statusId, m.createdBy || m.updatedBy || 'System']);
     res.json({ success: true, message: 'Módulo guardado' });
   } catch (err: any) {
     res.status(500).json({ error: "Error al guardar el módulo" });

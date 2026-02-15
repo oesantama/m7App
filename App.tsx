@@ -25,6 +25,8 @@ import PortalLayout from './components/portal/PortalLayout';
 import ClientLogin from './components/portal/ClientLogin';
 import OrderTracking from './components/portal/OrderTracking';
 
+// Import Admin Module
+const AdminDBManager = React.lazy(() => import('./pages/AdminDBManager'));
 
 const App: React.FC = () => {
   // ============ ZUSTAND STORE ============
@@ -219,10 +221,14 @@ const App: React.FC = () => {
   const refreshAppData = React.useCallback(async (forcedClientId?: string) => {
     const targetClientId = forcedClientId || user?.clientId || 'c1';
     try {
-      const [modules, pages, genericMasters, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData, routesData] = await Promise.all([
+      const [
+        modules, pages, genericMasters, categories, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData, routesData,
+        estados, marcas, tiposDocumento, unidadesMedida, notificacionesConfig, tiposVehiculo, tiposNotificacion
+      ] = await Promise.all([
         api.getModules().then(normalize).catch(() => []),
         api.getPages().then(normalize).catch(() => []),
         api.getGenericMasters().catch(() => []),
+        api.getCategories().catch(() => []), // NEW: Categories Table
         api.getArticles().catch(() => []),
         api.getVehicles().catch(() => []),
         api.getDrivers().catch(() => []),
@@ -233,7 +239,15 @@ const App: React.FC = () => {
         api.getClients().catch(() => []),
         api.getAssignments().catch(() => []),
         api.getInvoices(targetClientId).catch(() => []),
-        api.getRoutes().catch(() => [])
+        api.getRoutes().catch(() => []),
+        // NEW: Dedicated tables
+        api.getEstados().catch(() => []),
+        api.getMarcas().catch(() => []),
+        api.getTiposDocumento().catch(() => []),
+        api.getUnidadesMedida().catch(() => []),
+        api.getNotificacionesConfig().catch(() => []),
+        api.getTiposVehiculo().catch(() => []),
+        api.getTiposNotificacion().catch(() => [])
       ]);
 
       // Actualizamos estado global
@@ -258,8 +272,9 @@ const App: React.FC = () => {
         factorStd: a.factor_std,
         uomGeneralId: a.uom_general_id,
         uomInterId: a.uom_inter_id,
-        uomStdId: a.uom_std_id,
-        categoryArticuloId: a.category_articulo_id
+        uomStdId: a.uom_std, // FIXED: Column is uom_std
+        categoryArticuloId: a.category_articulo_id,
+        imageUrl: a.image_url // ADDED: Image URL
       })) : [];
 
       const mappedVehicles = Array.isArray(vehicles) ? vehicles.map((v: any) => ({
@@ -290,17 +305,33 @@ const App: React.FC = () => {
 
       setAllMasterData({
         ...groupedMasters,
+        masterCategorias: categories, // NEW: From dedicated table
+        masterEstados: estados, // NEW: From dedicated table
+        masterMarcas: marcas, // NEW: From dedicated table
+        masterTipoDocumento: tiposDocumento, // NEW: From dedicated table
+        masterUnidadMedida: unidadesMedida, // NEW: From dedicated table
+        masterNotificaciones: notificacionesConfig, // NEW: From dedicated table
+        masterTiposVehiculo: tiposVehiculo, // NEW: From dedicated table
+        masterTipoNotificacion: tiposNotificacion, // NEW: From dedicated table
         masterUsuarios: usersData,
         masterRol: rolesData,
         masterPermisosRol: permsData,
         masterPermisosUsuario: userPermsData,
-        masterClientes: clientsData,
-        masterModulos: modules,
-        masterPaginas: pages,
+        masterClientes: Array.isArray(clientsData) ? clientsData.map((c: any) => ({
+          ...c,
+          logoUrl: c.logo_url, // Map from DB column
+          createdAt: c.created_at,
+          updatedAt: c.updated_at,
+          createdBy: c.created_by,
+          updatedBy: c.updated_by
+        })) : [],
         masterArticulo: mappedArticles,
         masterVehiculos: mappedVehicles,
         masterConductores: mappedDrivers
       });
+
+      // Update store with dedicated tables
+      useAppStore.setState({ pages, modules });
 
       setVehicles(mappedVehicles);
       setDrivers(mappedDrivers);
@@ -348,9 +379,9 @@ const App: React.FC = () => {
             externalDocId: d.external_doc_id || d.externalDocId,
             vehicleData: d.vehicle_plate || d.vehicleData,
             // Mapeo Robusto M7
-            planType: (d.codplan === 'AJI01' || d.plan_type === 'AJI01' || d.planType === 'AJI01') ? 'Plan Normal' :
-              (d.codplan === 'AJV20' || d.plan_type === 'AJV20' || d.planType === 'AJV20') ? 'Plan R' :
-                (d.plan_type || d.planType || 'Plan Normal'),
+            planType: (d.plan_type || d.planType) ? (d.plan_type || d.planType) :
+              (d.codplan === 'AJI01') ? 'Plan Normal' :
+              (d.codplan === 'AJV20') ? 'Plan R' : 'Plan Normal',
             createdAt: d.created_at || d.createdAt,
             items: (d.items || []).map((it: any) => ({
               ...it,
@@ -658,6 +689,7 @@ const App: React.FC = () => {
             user={user!}
             masterEstados={allMasterData.masterEstados || []}
             onDocumentsChange={setDocuments}
+            onRefresh={() => refreshAppData()}
           />
         );
       case 'rutas':
@@ -680,6 +712,12 @@ const App: React.FC = () => {
               alert('Ruta M7 Guardada Exitosamente');
             }}
           />
+        );
+      case 'admin-db':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Gestor DB...</div>}>
+            <AdminDBManager />
+          </React.Suspense>
         );
       case 'recibido':
         return (
@@ -867,8 +905,8 @@ const App: React.FC = () => {
           }
         }}
         onLogout={handleLogout}
-        modulesData={allMasterData.masterModulos}
-        pagesData={allMasterData.masterPaginas}
+        modulesData={useAppStore.getState().modules}
+        pagesData={useAppStore.getState().pages}
       >
         {renderContent()}
       </Layout>

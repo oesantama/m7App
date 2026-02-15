@@ -27,6 +27,35 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isReadOnly, setIsReadOnly] = useState(false);
 
+  // Helper for Image Compression
+  const compressImage = async (base64Str: string, maxWidth = 800, quality = 0.7): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+           ctx.drawImage(img, 0, 0, width, height);
+           resolve(canvas.toDataURL('image/jpeg', quality));
+        } else {
+           resolve(base64Str); // Fallback
+        }
+      };
+      img.onerror = () => resolve(base64Str);
+    });
+  };
+
   // Estados para el diálogo de cambio de rol
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [pendingRoleId, setPendingRoleId] = useState('');
@@ -35,8 +64,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
 
   // Extracción de Maestros para Selectores
   const roles = allMasterData['masterRol'] || [];
-  const modules = allMasterData['masterModulos'] || [];
-  const pages = allMasterData['masterPaginas'] || [];
+  const pages = useAppStore(s => s.pages) || []; // Dedicated table
+  const modules = useAppStore(s => s.modules) || []; // Dedicated table
   const statuses = allMasterData['masterEstados'] || [];
   const clients = allMasterData['masterClientes'] || [];
   const docTypes = allMasterData['masterTipoDocumento'] || [];
@@ -80,8 +109,6 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterPermisosRol: 'PRL',
     masterPermisosUsuario: 'PUS',
     masterTipoDocumento: 'DOC',
-    masterModulos: 'MOD',
-    masterPaginas: 'PAG',
     masterCategorias: 'CAT'
   };
 
@@ -99,8 +126,6 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterPermisosRol: 'MATRIZ DE ROLES',
     masterPermisosUsuario: 'MATRIZ DE USUARIOS',
     masterTipoDocumento: 'TIPOS DE DOCUMENTO',
-    masterModulos: 'MÓDULOS DE SISTEMA',
-    masterPaginas: 'PÀGINAS DE REDIRECCIÓN',
     masterCategorias: 'CATEGORÍAS DE ARTÍCULO'
   };
 
@@ -158,14 +183,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       Object.assign(defaults, {
         description: '',
       });
-    } else if (category === 'masterModulos') {
+    } else if (category === 'masterCategorias') {
       Object.assign(defaults, {
-        iconClass: '',
-      });
-    } else if (category === 'masterPaginas') {
-      Object.assign(defaults, {
-        route: '',
-        parentId: '',
+        description: '',
       });
     } else if (category === 'masterNotificaciones') {
       Object.assign(defaults, {
@@ -203,7 +223,18 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
 
   const filteredData = useMemo(() => {
     const list = allMasterData[activeMaster] || [];
-    return list.filter(d => (d.name || d.email || d.id || '').toLowerCase().includes(searchTerm.toLowerCase()));
+    return list.filter(d => {
+      const searchStr = searchTerm.toLowerCase();
+      // Enhanced Search for Articles (include SKU/ID and Barcode)
+      if (activeMaster === 'masterArticulo') {
+         return (
+           (d.name && d.name.toLowerCase().includes(searchStr)) ||
+           (d.id && d.id.toLowerCase().includes(searchStr)) ||
+           ((d as any).barcode && (d as any).barcode.toLowerCase().includes(searchStr))
+         );
+      }
+      return (d.name || d.email || d.id || '').toLowerCase().includes(searchStr);
+    });
   }, [allMasterData, activeMaster, searchTerm]);
 
   const paginatedData = useMemo(() => {
@@ -296,19 +327,39 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     }
 
     const now = getColombiaNow();
-    const finalId = editingRecord?.id || generateNextId(activeMaster, allMasterData[activeMaster] || []);
+    // Allow user to set ID (SKU) for new records, fallback to generator
+    const finalId = editingRecord?.id || formData.id || generateNextId(activeMaster, allMasterData[activeMaster] || []);
     const newRecord = { ...formData, id: finalId, updatedAt: now, updatedBy: user.name };
 
     try {
       // --- PERSISTENCIA BACKEND ---
+      // --- PERSISTENCIA BACKEND ---
       const { api } = await import('../services/api');
+      const { saveCategory } = api; // Destructure for cleaner usage
 
       //Determinar qué endpoint usar
       let saveResponse: any;
       if (activeMaster === 'masterUsuarios') {
         saveResponse = await api.saveUser(newRecord);
       } else if (activeMaster === 'masterArticulo') {
-        saveResponse = await api.saveArticle(newRecord);
+        // SANITIZATION: Create clean payload avoiding duplicate snake_case/camelCase keys
+        const articlePayload = {
+            id: newRecord.id,
+            name: newRecord.name,
+            clientId: newRecord.clientId,
+            statusId: newRecord.statusId,
+            barcode: newRecord.barcode,
+            categoryArticuloId: newRecord.categoryArticuloId,
+            factorInter: newRecord.factorInter,
+            factorStd: newRecord.factorStd,
+            uomGeneralId: newRecord.uomGeneralId,
+            uomInterId: newRecord.uomInterId,
+            uomStdId: newRecord.uomStdId, // Ensure this is sent
+            imageUrl: newRecord.imageUrl,
+            updatedBy: user.name,
+            updatedAt: getColombiaNow()
+        };
+        saveResponse = await api.saveArticle(articlePayload);
       } else if (activeMaster === 'masterRol') {
         saveResponse = await api.saveRole(newRecord);
       } else if (activeMaster === 'masterPermisosRol') {
@@ -318,6 +369,13 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       } else if (activeMaster === 'masterPaginas') {
         saveResponse = await api.savePage(newRecord);
         await api.saveMaster(activeMaster, newRecord);
+      } else if (activeMaster === 'masterCategorias') {
+        saveResponse = await saveCategory(newRecord);
+      } else if (activeMaster === 'masterClientes') {
+        saveResponse = await api.saveClient(newRecord);
+      } else if (activeMaster === 'masterModulos') {
+         // @ts-ignore - Legacy support if needed
+         saveResponse = await api.saveModule(newRecord);
       } else {
         // Guardado Genérico para el resto de tablas maestras (masterTipoDocumento, etc.)
         saveResponse = await api.saveMaster(activeMaster, newRecord);
@@ -356,7 +414,17 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               newData = await api.getUsers();
               break;
             case 'masterClientes':
-              newData = await api.getClients();
+              const cliData = await api.getClients();
+              if (Array.isArray(cliData)) {
+                  newData = cliData.map((c: any) => ({
+                      ...c,
+                      logoUrl: c.logo_url, // Map from DB column
+                      createdAt: c.created_at,
+                      updatedAt: c.updated_at,
+                      createdBy: c.created_by,
+                      updatedBy: c.updated_by
+                  }));
+              }
               break;
             case 'masterRol':
               newData = await api.getRoles();
@@ -366,6 +434,18 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               break;
             case 'masterPaginas':
               newData = await api.getPages();
+              break;
+            case 'masterCategorias':
+              const catData = await api.getCategories();
+              if (Array.isArray(catData)) {
+                  newData = catData.map((c: any) => ({
+                      ...c,
+                      createdAt: c.created_at,
+                      updatedAt: c.updated_at,
+                      createdBy: c.created_by,
+                      updatedBy: c.updated_by
+                  }));
+              }
               break;
             case 'masterPermisosRol':
               newData = await api.getPermissions();
@@ -385,9 +465,15 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   factorStd: a.factor_std,
                   uomGeneralId: a.uom_general_id,
                   uomInterId: a.uom_inter_id,
-                  uomStdId: a.uom_std_id,
-                  categoryArticuloId: a.category_articulo_id
+                  uomStdId: a.uom_std || a.uom_std_id, // Map correctly from uom_std column
+                  categoryArticuloId: a.category_articulo_id,
+                  imageUrl: a.image_url,
+                  createdAt: a.created_at,
+                  updatedAt: a.updated_at,
+                  createdBy: a.created_by || 'SISTEMA',
+                  updatedBy: a.updated_by || 'SISTEMA'
                 }));
+                console.log('[DEBUG] Articulos Mapped:', newData[0]);
               }
               break;
             }
@@ -483,8 +569,15 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
 
     } catch (err: any) {
       console.error('[M7-MASTER] Delete error:', err);
-      setError("Error de Eliminación: " + (err.message || 'Fallo desconocido'));
-      toast.error("Error al eliminar", { description: err.message });
+      const msg = err.message || 'Fallo desconocido';
+      
+      let friendlyMsg = msg;
+      if (msg.includes('foreign key constraint') || msg.includes('violates foreign key')) {
+          friendlyMsg = "NO SE PUEDE ELIMINAR: El registro está siendo usado por otros módulos del sistema (Artículos, Facturas, etc). Debe eliminar o reasignar los dependientes primero.";
+      }
+
+      setError("Error de Eliminación: " + friendlyMsg);
+      toast.error("Operación Restringida", { description: friendlyMsg, duration: 6000 });
       setShowDeleteConfirm(false);
       setRecordToDelete(null);
     }
@@ -608,7 +701,23 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setFormData({ ...formData, [field]: reader.result });
+      reader.onloadend = async () => {
+         const rawBase64 = reader.result as string;
+         // Compress if it's an image
+         if (file.type.startsWith('image/')) {
+            try {
+              toast.info("Comprimiendo imagen...", { duration: 1000 });
+              const compressed = await compressImage(rawBase64);
+              setFormData({ ...formData, [field]: compressed });
+              toast.success("Imagen optimizada correctamente");
+            } catch (err) {
+              console.error("Compression error", err);
+              setFormData({ ...formData, [field]: rawBase64 });
+            }
+         } else {
+            setFormData({ ...formData, [field]: rawBase64 });
+         }
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -871,16 +980,27 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
             <div className="md:col-span-2 flex flex-col items-center p-6 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
               <div className="w-24 h-24 bg-white rounded-2xl overflow-hidden shadow-md border-2 border-emerald-500 mb-3 flex items-center justify-center">
-                {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" /> : <Icons.Package className="text-slate-300 w-10 h-10" />}
+                {formData.imageUrl ? <img src={formData.imageUrl} className="w-full h-full object-cover" /> : <Icons.Package className="text-slate-300 w-10 h-10" />}
               </div>
-              <label className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-black text-[9px] uppercase cursor-pointer hover:bg-emerald-600 transition-all">
+              <label className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-black text-[9px] uppercase cursor-pointer hover:bg-emerald-600 transition-all mb-2">
                 Subir Foto Art.
-                <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'photoUrl')} />
+                <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'imageUrl')} />
               </label>
+              <div className="w-full max-w-xs mt-2">
+                 <input type="text" placeholder="O pegar URL de imagen..." value={formData.imageUrl || ''} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} className="w-full text-center text-[9px] border-b border-slate-300 focus:border-emerald-500 outline-none bg-transparent p-1" />
+              </div>
             </div>
-            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">SKU / Identificador</label>
-              <input type="text" value={formData.sku || ''} onChange={e => setFormData({ ...formData, sku: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">SKU / Identificador (Único)</label>
+              <input type="text" value={formData.id || ''} onChange={e => setFormData({ ...formData, id: e.target.value.toUpperCase() })} className={commonInputStyle} required placeholder="Ej: ART-001" disabled={!!editingRecord} />
             </div>
+
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Cliente Asociado</label>
+              <select required value={formData.clientId || ''} onChange={e => setFormData({ ...formData, clientId: e.target.value })} className={commonInputStyle}>
+                 <option value="">Seleccione Cliente...</option>
+                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
             <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre Comercial</label>
               <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
             </div>
@@ -956,22 +1076,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               </div>
             )}
 
-            {/* Selectores Restaurados: Cliente y Categoría */}
-            <div className="md:col-span-2 space-y-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Clientes Propietarios (Multiselección)</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {clients.map(c => (
-                  <label key={c.id} className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${formData.clientIds?.includes(c.id) ? 'bg-emerald-50 border-emerald-500' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
-                    <input type="checkbox" checked={formData.clientIds?.includes(c.id)} onChange={e => {
-                      const ids = formData.clientIds || [];
-                      setFormData({ ...formData, clientIds: e.target.checked ? [...ids, c.id] : ids.filter((id: string) => id !== c.id) });
-                    }} className="w-5 h-5 accent-emerald-500 rounded-lg" />
-                    <span className="text-[10px] font-black uppercase text-slate-900">{c.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
+            {/* Selectores Restaurados: Categoría */}
             <div className="space-y-1">
               <label
                 htmlFor="categoryArticuloId"
@@ -1015,6 +1120,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 Subir Logo Corporativo
                 <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'logoUrl')} />
               </label>
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">ID Sistema (Autogenerado)</label>
+              <input type="text" value={formData.id || 'CLI-###'} disabled className={`${commonInputStyle} bg-slate-100 text-slate-500`} />
             </div>
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Cliente</label>
               <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
@@ -1075,6 +1183,19 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 <option value="">Seleccione Tipo...</option>
                 {notificationTypes.map(nt => <option key={nt.id} value={nt.id}>{nt.name}</option>)}
               </select>
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterCategorias':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de la Categoría</label>
+              <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} />
             </div>
             {renderStatusField()}
           </div>
@@ -1142,6 +1263,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               <thead className="sticky top-0 z-10 bg-slate-900 text-white font-black uppercase tracking-widest text-[8px]">
                 <tr>
                   <th className="px-8 py-4">Descripción Registro</th>
+                  <th className="px-8 py-4 text-center">Creación</th>
+                  <th className="px-8 py-4 text-center">Actualización</th>
                   {activeMaster === 'masterUsuarios' && <th className="px-8 py-4 text-center">Seguridad (2FA)</th>}
                   <th className="px-8 py-4 text-center">Estado</th>
                   <th className="px-8 py-4 text-right">Auditoría</th>
@@ -1152,8 +1275,11 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   <tr key={item.id} className="hover:bg-slate-50 transition-all group">
                     <td className="px-8 py-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center border border-slate-100 shrink-0 shadow-sm">
-                          {item.avatar ? <img src={item.avatar} className="w-full h-full object-cover" /> : (item.logoUrl ? <img src={item.logoUrl} className="w-full h-full object-contain p-1" /> : (item.photoUrl ? <img src={item.photoUrl} className="w-full h-full object-cover" /> : <Icons.Package className="text-slate-300 w-5 h-5" />))}
+                        <div className="w-10 h-10 bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center border border-slate-100 shrink-0 shadow-sm group-hover:scale-110 transition-transform">
+                          {item.avatar ? <img src={item.avatar} className="w-full h-full object-cover" /> :
+                            (item.imageUrl ? <img src={item.imageUrl} className="w-full h-full object-cover" /> :
+                            (item.logoUrl ? <img src={item.logoUrl} className="w-full h-full object-contain p-1" /> :
+                            (item.photoUrl ? <img src={item.photoUrl} className="w-full h-full object-cover" /> : <Icons.Package className="text-slate-300 w-5 h-5" />)))}
                         </div>
                         <div>
                           <p className="font-black text-slate-900 text-[12px] uppercase">
@@ -1163,17 +1289,62 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                                 ? (item.userName || (allMasterData.masterUsuarios || []).find(u => u.id === item.userId)?.name || item.userId || item.id)
                                 : (item.name || item.id))}
                           </p>
-                          <p className="text-[8px] text-slate-400 font-bold uppercase flex flex-col gap-1">
-                            <span>{(activeMaster === 'masterPermisosRol' || activeMaster === 'masterPermisosUsuario') ? `ID: ${item.id}` : (item.email || (item as any).notificationEmail || item.id)}</span>
+                          
+                          {/* DETALLES DE TABLA (Artículos y Categorías) */}
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            {(activeMaster === 'masterPermisosRol' || activeMaster === 'masterPermisosUsuario') && (
+                               <span className="text-[8px] text-slate-400 font-bold uppercase">ID: {item.id}</span>
+                            )}
+                            
+                            {/* EMAIL / ORIGNAL SUBTITLE */}
+                            {!['masterArticulo', 'masterCategorias', 'masterPermisosRol', 'masterPermisosUsuario'].includes(activeMaster) && (
+                               <span className="text-[8px] text-slate-400 font-bold uppercase">{item.email || (item as any).notificationEmail || item.id}</span>
+                            )}
+
+                            {/* ARTÍCULOS */}
+                            {activeMaster === 'masterArticulo' && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[7px] font-black text-slate-500 bg-slate-100 px-1.5 rounded uppercase">
+                                  {categoriesArt.find(c => c.id === (item as any).categoryArticuloId)?.name || 'SIN CAT'}
+                                </span>
+                                <span className="text-[7px] font-bold text-slate-400 uppercase">
+                                  {(item as any).uomStdId ? uoms.find(u => u.id === (item as any).uomStdId)?.name : ''}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* CATEGORÍAS */}
+                            {activeMaster === 'masterCategorias' && (item as any).description && (
+                               <span className="text-[8px] text-slate-400 font-medium italic truncate max-w-[200px]">{(item as any).description}</span>
+                            )}
+
                             {activeMaster === 'masterNotificaciones' && (
-                              <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-fit">
+                              <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-fit text-[8px] font-black uppercase mt-1">
                                 {notificationTypes.find(nt => nt.id === (item as any).tipoNotificacionId)?.name || 'TIPO DESCONOCIDO'}
                               </span>
                             )}
-                          </p>
+                          </div>
                         </div>
                       </div>
                     </td>
+                    
+                    <td className="px-8 py-4 text-center">
+                      <div className="flex flex-col items-center">
+                        <span className="font-bold text-[9px] uppercase text-slate-700">{(item as any).createdBy || 'Sistema'}</span>
+                        <span className="text-[8px] text-slate-400 font-medium">
+                          {new Date((item as any).createdAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-4 text-center">
+                      <div className="flex flex-col items-center">
+                        <span className="font-bold text-[9px] uppercase text-slate-700">{(item as any).updatedBy || (item as any).createdBy || 'Sistema'}</span>
+                        <span className="text-[8px] text-slate-400 font-medium">
+                          {new Date((item as any).updatedAt || (item as any).createdAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
+                        </span>
+                      </div>
+                    </td>
+
                     {activeMaster === 'masterUsuarios' && (
                       <td className="px-8 py-4 text-center">
                         <div className="flex justify-center">
@@ -1187,12 +1358,12 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                       <span className={`px-4 py-1 rounded-full text-[8px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{statuses.find(s => s.id === item.statusId)?.name || 'ACTIVO'}</span>
                     </td>
                     <td className="px-8 py-4 text-right flex items-center justify-end gap-2">
-                      <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(true); setError(null); setIsModalOpen(true); }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-md active:scale-90" title="Ver Detalle"><Icons.Search /></button>
+                      <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(true); setError(null); setIsModalOpen(true); }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white hover:scale-110 active:scale-90 transition-all shadow-md" title="Ver Detalle"><Icons.Search /></button>
                       {canEdit && (
-                        <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(false); setError(null); setIsModalOpen(true); }} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-md active:scale-90" title="Editar"><Icons.Audit /></button>
+                        <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(false); setError(null); setIsModalOpen(true); }} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white hover:scale-110 active:scale-90 transition-all shadow-md" title="Editar"><Icons.Audit /></button>
                       )}
                       {canDelete && (
-                        <button onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-md active:scale-90" title="Eliminar"><Icons.Trash /></button>
+                        <button onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white hover:scale-110 active:scale-90 transition-all shadow-md" title="Eliminar"><Icons.Trash /></button>
                       )}
                     </td>
                   </tr>
@@ -1206,22 +1377,51 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 <div key={item.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl hover:border-emerald-500 transition-all group overflow-hidden">
                   <div className="flex justify-between items-start mb-4">
                     <div className="w-10 h-10 bg-slate-900 text-emerald-500 rounded-xl flex items-center justify-center shadow-lg group-hover:bg-emerald-500 group-hover:text-white transition-all overflow-hidden">
-                      {item.avatar ? <img src={item.avatar} className="w-full h-full object-cover" /> : (item.logoUrl ? <img src={item.logoUrl} className="w-full h-full object-contain p-1" /> : <Icons.Package />)}
+                      {item.avatar ? <img src={item.avatar} className="w-full h-full object-cover" /> :
+                        (item.imageUrl ? <img src={item.imageUrl} className="w-full h-full object-cover" /> :
+                        (item.logoUrl ? <img src={item.logoUrl} className="w-full h-full object-contain p-1" /> : <Icons.Package />))}
                     </div>
                     <span className={`px-3 py-1 rounded-full text-[7px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{statuses.find(s => s.id === item.statusId)?.name || 'ACTIVO'}</span>
                   </div>
-                  <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">
+                  <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1 flex items-center gap-2">
+                    {activeMaster === 'masterClientes' && (item as any).logoUrl && (
+                      <img src={(item as any).logoUrl} alt="logo" className="w-6 h-6 object-contain rounded-md border border-slate-200" />
+                    )}
                     {activeMaster === 'masterPermisosRol'
                       ? (item.roleName || roles.find(r => r.id === item.roleId)?.name || item.roleId || item.id)
                       : (item.name || item.id)}
                   </h3>
+                  
+                  {/* DETALLES ESPECÍFICOS DE ARTÍCULOS */}
+                  {activeMaster === 'masterArticulo' && (
+                    <div className="mb-3 space-y-1">
+                       <div className="flex items-center gap-2">
+                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">CAT:</span>
+                         <span className="text-[9px] font-bold text-slate-600 truncate">
+                           {categoriesArt.find(c => c.id === (item as any).categoryArticuloId)?.name || 'SIN CAT'}
+                         </span>
+                       </div>
+                       <div className="flex items-center gap-2">
+                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">UOM:</span>
+                         <span className="text-[9px] font-bold text-slate-600 truncate">
+                           {uoms.find(u => u.id === (item as any).uomStdId)?.name || 'N/A'}
+                         </span>
+                       </div>
+                    </div>
+                  )}
+
+                  {/* DETALLES DE CATEGORÍAS */}
+                  {activeMaster === 'masterCategorias' && (item as any).description && (
+                     <p className="text-[9px] text-slate-500 italic mb-3 line-clamp-2">{(item as any).description}</p>
+                  )}
+
                   <div className="flex gap-2">
-                    <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(true); setError(null); setIsModalOpen(true); }} className="flex-1 py-3 bg-blue-50 text-blue-600 rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-md">Detalle</button>
+                    <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(true); setError(null); setIsModalOpen(true); }} className="flex-1 py-3 bg-blue-50 text-blue-600 rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-blue-600 hover:text-white hover:scale-105 active:scale-95 transition-all shadow-md">Detalle</button>
                     {canEdit && (
-                      <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(false); setError(null); setIsModalOpen(true); }} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md">Auditar</button>
+                      <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(false); setError(null); setIsModalOpen(true); }} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 hover:scale-105 active:scale-95 transition-all shadow-md">Auditar</button>
                     )}
                     {canDelete && (
-                      <button onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }} className="w-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-600 hover:text-white transition-all active:scale-95"><Icons.Trash /></button>
+                      <button onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }} className="w-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-600 hover:text-white hover:scale-110 active:scale-90 transition-all active:scale-95"><Icons.Trash /></button>
                     )}
                   </div>
                 </div>

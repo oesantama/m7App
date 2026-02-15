@@ -16,11 +16,11 @@ export const saveClient = async (req: Request, res: Response) => {
   const c = req.body;
   try {
     await pool.query(`
-      INSERT INTO clients (id, name, logo_url, status_id)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO clients (id, name, logo_url, status_id, created_by, updated_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
-      name = $2, logo_url = $3, status_id = $4
-    `, [c.id, c.name, c.logoUrl, c.statusId]);
+      name = $2, logo_url = $3, status_id = $4, updated_by = $5, updated_at = CURRENT_TIMESTAMP
+    `, [c.id, c.name, c.logoUrl, c.statusId, c.createdBy || c.updatedBy || 'System']);
     res.json({ success: true, message: 'Cliente guardado' });
   } catch (err: any) {
     res.status(500).json({ error: "No se pudo guardar el cliente" });
@@ -42,6 +42,6 @@ export const deleteClient = async (req: Request, res: Response) => {
     if (result.rowCount === 0) return res.status(404).json({ error: "Cliente no encontrado" });
     res.json({ success: true, message: 'Cliente eliminado correctamente' });
   } catch (err: any) {
-    res.status(500).json({ error: "Error al eliminar el cliente" });
+    res.status(500).json({ error: "Error al eliminar el cliente", details: err.detail || err.message });
   }
 };

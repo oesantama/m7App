@@ -173,6 +173,7 @@ export interface DocumentLItem {
   orderNumber?: string;
   unCode?: string;
   clientRef?: string;
+  peso?: number;
 }
 
 export interface Invoice extends AuditBase {
@@ -203,19 +204,18 @@ export interface Route extends AuditBase {
 }
 
 export type MasterCategory = 
-  | 'masterEstados'
-  | 'masterTiposVehiculo' 
-  | 'masterMarcas' 
-  | 'masterNotificaciones' 
-  | 'masterTipoNotificacion' 
-  | 'masterUnidadMedida' 
-  | 'masterArticulo' 
-  | 'masterClientes' 
   | 'masterUsuarios' 
+  | 'masterClientes' 
+  | 'masterArticulo' 
   | 'masterRol' 
   | 'masterPermisosRol' 
   | 'masterPermisosUsuario'
-  | 'masterTipoDocumento' 
-  | 'masterModulos' 
-  | 'masterPaginas'
-  | 'masterCategorias';
+  | 'masterCategorias' // Dedicated Table
+  | 'masterEstados' 
+  | 'masterTiposVehiculo' 
+  | 'masterMarcas' 
+  | 'masterNotificaciones'
+  | 'masterTipoNotificacion'
+  | 'masterUnidadMedida'
+  | 'masterTipoDocumento';
+

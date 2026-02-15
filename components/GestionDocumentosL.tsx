@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 // Extendemos DocumentL localmente para manejar el estado de duplicado en la UI
 interface PreviewDocument extends DocumentL {
   isDuplicate?: boolean;
+  isHeaderUpdate?: boolean; // New flag for metadata corrections
   consolidatedItems?: any[];
 }
 
@@ -25,9 +26,12 @@ interface GestionDocumentosLProps {
   user: User;
   masterEstados: MasterRecord[];
   onDocumentsChange: (docs: DocumentL[]) => void;
+  onRefresh?: () => void; // New prop for global refresh
 }
 
-const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invoices, user, masterEstados, onDocumentsChange }) => {
+
+
+const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invoices, user, masterEstados, onDocumentsChange, onRefresh }) => {
   const [activeTab, setActiveTab] = useState<'cargue' | 'consultas'>('cargue');
   const [activeModalTab, setActiveModalTab] = useState<'reception' | 'audit'>('reception');
   const [preview, setPreview] = useState<{ fileName: string; mapped: PreviewDocument[]; type: string } | null>(null);
@@ -431,13 +435,17 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
         // VALIDACIÓN DE DUPLICADOS: Placa y Carga (Case Insensitive)
         const mapped: PreviewDocument[] = Array.from(docsMap.entries()).map(([key, data]) => {
-          const isDuplicate = documents.some(d => {
+          const existingDoc = documents.find(d => {
             const dCarga = String(d.externalDocId || (d as any).external_doc_id || '').trim().toLowerCase();
             const dPlaca = String(d.vehicleData || (d as any).vehicle_plate || (d as any).plate || '').trim().toLowerCase();
             const currCarga = String(data.carga || '').trim().toLowerCase();
             const currPlaca = String(data.placa || '').trim().toLowerCase();
             return dCarga === currCarga && dPlaca === currPlaca;
           });
+
+          const isDuplicate = !!existingDoc;
+          // Si existe pero el Plan Type es diferente, permitimos la actualización (Solo Cabecera)
+          const isHeaderUpdate = isDuplicate && existingDoc?.planType !== type;
 
           return {
             id: `doc-${data.placa}-${data.carga}`,
@@ -458,7 +466,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             updatedBy: user.name,
             status: DocStatus.PENDING,
             statusId: 'EST-03',
-            isDuplicate: isDuplicate
+            isDuplicate: isDuplicate && !isHeaderUpdate, // Si es update, no lo marcamos como duplicate bloqueante
+            isHeaderUpdate: isHeaderUpdate
           };
         });
 
@@ -504,13 +513,22 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     const newDocs = preview.mapped.filter(d => !d.isDuplicate);
     const duplicatedDocs = preview.mapped.filter(d => d.isDuplicate);
 
-    if (newDocs.length > 0) {
-      // ENVIAR SOLO NUEVOS
-      api.bulkCreateDocuments({ documents: newDocs }).then(res => {
+    // Preparar payload: Los que son HeaderUpdate se envían SIN items para evitar duplicar cantidades
+    const payloadDocs = newDocs.map(d => {
+      if (d.isHeaderUpdate) {
+        return { ...d, items: [], consolidatedItems: [] };
+      }
+      return d;
+    });
+
+    if (payloadDocs.length > 0) {
+      // ENVIAR NUEVOS Y ACTUALIZACIONES
+      api.bulkCreateDocuments({ documents: payloadDocs }).then(res => {
         if (res.success) {
-            onDocumentsChange([...newDocs, ...documents]);
-           toast.success(`Cargados ${newDocs.length} documentos nuevos exitosamente.`);
-           setPreview(null);
+            onDocumentsChange([...payloadDocs, ...documents]); // Optimistic update
+            if (onRefresh) onRefresh(); // Trigger global data refresh
+            toast.success(`Procesados ${payloadDocs.length} documentos (Creación/Actualización).`);
+            setPreview(null);
         } else {
            toast.error(`Error del servidor: ${res.error || 'Desconocido'}`);
         }
@@ -786,6 +804,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                    <td className="px-4 py-2 text-center">
                                      {it.isDuplicate ? (
                                        <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest">YA EXISTE</span>
+                                     ) : it.isHeaderUpdate ? (
+                                       <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest">ACTUALIZAR PLAN</span>
                                      ) : (
                                        <span className="bg-emerald-500 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest">NUEVO</span>
                                      )}

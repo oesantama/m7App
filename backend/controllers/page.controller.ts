@@ -24,11 +24,11 @@ export const savePage = async (req: Request, res: Response) => {
   const p = req.body;
   try {
     await pool.query(`
-      INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO pages (id, name, route, module_id, parent_id, status_id, created_by, updated_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
-      name = $2, route = $3, module_id = $4, parent_id = $5, status_id = $6
-    `, [p.id, p.name, p.route, p.moduleId, p.parentId, p.statusId]);
+      name = $2, route = $3, module_id = $4, parent_id = $5, status_id = $6, updated_by = $7, updated_at = CURRENT_TIMESTAMP
+    `, [p.id, p.name, p.route, p.moduleId, p.parentId, p.statusId, p.createdBy || p.updatedBy || 'System']);
     res.json({ success: true, message: 'Página guardada' });
   } catch (err: any) {
     res.status(500).json({ error: "Error al guardar la página" });

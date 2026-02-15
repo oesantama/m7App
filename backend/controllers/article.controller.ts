@@ -15,29 +15,37 @@ export const getArticles = async (req: Request, res: Response) => {
 export const saveArticle = async (req: Request, res: Response) => {
   const a = req.body;
   try {
+    // Note: uom_std_id and client_ids were removed. 
+    // We assume uom_std exists (based on user info) or we map to it if needed.
+    // For now, I will remove the deleted columns from the query and add image_url.
+    // If uom_std is a column, we should map a.uomStdId or a.uomStd to it.
+    // The user said "COMO 'UOM_STD_ID' Y 'CLIENT_IDS'... deje las que van a quedar" implies UOM_STD and CLIENT_ID remain.
+    
     await pool.query(`
       INSERT INTO articles (
-        id, sku, name, client_id, status_id, 
+        id, name, client_id, status_id, 
         barcode, category_articulo_id, factor_inter, factor_std,
-        uom_general_id, uom_inter_id, uom_std_id, client_ids
+        uom_general_id, uom_inter_id, uom_std, image_url,
+        created_by, updated_by, created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
-        sku = $2, name = $3, client_id = $4, status_id = $5,
-        barcode = $6, category_articulo_id = $7, factor_inter = $8, factor_std = $9,
-        uom_general_id = $10, uom_inter_id = $11, uom_std_id = $12, client_ids = $13
+        name = $2, client_id = $3, status_id = $4,
+        barcode = $5, category_articulo_id = $6, factor_inter = $7, factor_std = $8,
+        uom_general_id = $9, uom_inter_id = $10, uom_std = $11, image_url = $12,
+        updated_by = $13, updated_at = CURRENT_TIMESTAMP
     `, [
-      a.id, a.sku, a.name, a.clientId || (a.clientIds && a.clientIds[0]), a.statusId,
+      a.id, a.name, a.clientId || (a.clientIds && a.clientIds[0]), a.statusId,
       a.barcode, a.categoryArticuloId, a.factorInter || 1, a.factorStd || 1,
-      a.uomGeneralId, a.uomInterId, a.uomStdId, a.clientIds || []
+      a.uomGeneralId, a.uomInterId, a.uomStdId, a.imageUrl || null,
+      a.createdBy || a.updatedBy || 'System'
     ]);
 
     // CRITICAL FIX: Return the complete article object to enable frontend state update
     const savedArticle = {
       id: a.id,
-      sku: a.sku,
       name: a.name,
-      clientIds: a.clientIds || [],
+      clientId: a.clientId || (a.clientIds && a.clientIds[0]),
       statusId: a.statusId,
       barcode: a.barcode,
       categoryArticuloId: a.categoryArticuloId,
@@ -45,7 +53,8 @@ export const saveArticle = async (req: Request, res: Response) => {
       factorStd: a.factorStd || 1,
       uomGeneralId: a.uomGeneralId,
       uomInterId: a.uomInterId,
-      uomStdId: a.uomStdId
+      uomStdId: a.uomStdId, // ADDED
+      imageUrl: a.imageUrl
     };
 
     res.json({

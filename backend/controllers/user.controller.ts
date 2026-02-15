@@ -46,16 +46,17 @@ export const saveUser = async (req: Request, res: Response) => {
         await pool.query(`
           UPDATE users 
           SET email = $2, name = $3, password = $4, role_id = $5, client_ids = $6, status_id = $7,
-              phone = $8, avatar = $9, document_type = $10, document_number = $11, two_factor_enabled = $12
+              phone = $8, avatar = $9, document_type = $10, document_number = $11, two_factor_enabled = $12,
+              updated_by = $13, updated_at = CURRENT_TIMESTAMP
           WHERE id = $1
-        `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled]);
+        `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled, u.updatedBy || 'System']);
         
         // ASEGURAR QUE EL REGISTRO DE PERMISOS EXISTA (BACK-FILL SI FALTA)
         await pool.query(`
-          INSERT INTO user_permissions (id, user_id, permissions, status_id)
-          VALUES ($1, $2, $3, $4)
+          INSERT INTO user_permissions (id, user_id, permissions, status_id, created_by, updated_by, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
           ON CONFLICT (user_id) DO NOTHING
-        `, [`PUS-${u.id}`, u.id, '{}', u.statusId]);
+        `, [`PUS-${u.id}`, u.id, '{}', u.statusId, u.updatedBy || 'System']);
 
         res.json({ success: true, message: 'Usuario actualizado correctamente' });
     } else {

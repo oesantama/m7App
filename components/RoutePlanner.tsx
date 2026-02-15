@@ -47,7 +47,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [selectedClient, setSelectedClient] = useState(user.clientId || 'c1');
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [viewMode, setViewMode] = useState<'intelligence'>('intelligence');
+  const [viewMode, setViewMode] = useState<'intelligence' | 'map' | 'active'>('intelligence');
 
   const [auditLogs, setAuditLogs] = useState<RouteLog[]>([]);
   const [learningPatterns, setLearningPatterns] = useState<RoutingPattern[]>([]);
@@ -89,14 +89,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   // FILTRADO DE FACTURAS APTAS: Real (basado en lo que viene del API de facturas)
   const validInvoices = useMemo(() => {
-    const filtered = invoices.filter(inv =>
-      !learningExemptions.includes(inv.id) &&
-      (!inv.status || (() => {
-        const s = String(inv.status).toUpperCase();
-        // Solo ocultamos lo que ya está en ruta físicamente o finalizado
-        return s !== 'EN RUTA' && s !== 'ENTREGADO' && s !== 'FINALIZADO';
-      })())
-    );
+    // REGLA M7: Solo planificar items en estado 'Pendiente' o 'Auditado'
+    const filtered = invoices.filter(inv => {
+      if (learningExemptions.includes(inv.id)) return false;
+      const s = String(inv.status || '').toUpperCase();
+      return s === 'PENDIENTE' || s === 'AUDITADO';
+    });
 
     return filtered;
   }, [invoices, learningExemptions]);
@@ -144,6 +142,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       // Si el vehículo o conductor no existe, o si el vehículo está en una RUTA ACTIVA, lo ocultamos
       if (!v || !d) return null;
+
+      // ST-FIX: Validar estado del vehículo 'Disponible' (Case insensitive y cast seguro)
+      const vStatus = String(v.status || '').toUpperCase();
+      if (vStatus !== 'DISPONIBLE') return null;
 
       const isBusy = activeRoutes.some(r =>
         r.vehicleId === v.id &&
@@ -369,7 +371,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const processedDocIds = Array.from(readjustmentModal.selectedDocIds).map(id => {
           const strId = String(id);
           const d = documents.find(doc => doc.id === strId);
-          return d?.external_doc_id || strId.slice(-8);
+          return d?.externalDocId || strId.slice(-8);
         });
 
         setLastReadjustmentResult({
@@ -1378,8 +1380,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                             DOC: {inv.externalDocId}
                           </span>
                         )}
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${inv.planType === 'Plan R' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                          {inv.planType || 'Plan Normal'}
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Plan R' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                          {documents.find(d => d.id === inv.docLId)?.planType || 'Plan Normal'}
                         </span>
                       </div>
                       {(inv as any).isPriority && (
@@ -1548,8 +1550,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
                     const doc = documents.find(d => d.id === inv.docLId);
                     const groupKey = inv.docLId;
-                    const label = doc?.external_doc_id
-                      ? `Documento Maestro: ${doc.external_doc_id}`
+                    const label = doc?.externalDocId
+                      ? `Documento Maestro: ${doc.externalDocId}`
                       : `Documento L: ${String(inv.docLId).slice(-8)}`;
                     const desc = doc?.inventory_observation || "Carga Masiva M7";
 

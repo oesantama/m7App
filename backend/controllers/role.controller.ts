@@ -16,11 +16,11 @@ export const saveRole = async (req: Request, res: Response) => {
   const r = req.body;
   try {
     await pool.query(`
-      INSERT INTO roles (id, name, status_id)
-      VALUES ($1, $2, $3)
+      INSERT INTO roles (id, name, status_id, created_by, updated_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
-      name = $2, status_id = $3
-    `, [r.id, r.name, r.statusId]);
+      name = $2, status_id = $3, updated_by = $4, updated_at = CURRENT_TIMESTAMP
+    `, [r.id, r.name, r.statusId, r.createdBy || r.updatedBy || 'System']);
     res.json({ success: true, message: 'Rol guardado' });
   } catch (err: any) {
     res.status(500).json({ error: "Error al guardar el rol" });

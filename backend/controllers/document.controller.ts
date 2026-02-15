@@ -676,12 +676,16 @@ export const updateStatus = async (req: Request, res: Response) => {
 export const getInvoices = async (req: Request, res: Response) => {
   try {
     // Obtener facturas únicas (agrupadas por invoice, city, address) que estén pendientes
-    // Se asume que item_status 'Pendiente' indica que no ha sido ruteada
+    // Obtener facturas únicas (agrupadas por invoice, city, address)
     const { clientId, ids } = req.query;
+    
+    // Helper para ID robusto en SQL
+    const sqlIdGen = `CONCAT(TRIM(document_items.document_id), '_', TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)))`;
+    
     let query = `
       SELECT 
-        CONCAT(document_items.document_id, '_', COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)) as id,
-        COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number) as "invoiceNumber",
+        ${sqlIdGen} as id,
+        TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)) as "invoiceNumber",
         MAX(document_items.order_number) as "orderNumber",
         STRING_AGG(DISTINCT document_items.observation, '. ') as "notes",
         documents_l.external_doc_id as "externalDocId",
@@ -729,22 +733,52 @@ export const getInvoices = async (req: Request, res: Response) => {
     // Si vienen IDs específicos (para ver detalle de ruta), filtramos por ellos e ignoramos el estado
     if (ids) {
       const idList = (ids as string).split(',').map(id => id.trim());
-      // Asumiendo que el ID del frontend es user-friendly, pero en realidad es composite.
-      // La mejor forma es filtrar por invoice OR order_number OR document_id
-      // Pero el frontend manda 'ids' que son claves compuestas o UUIDs?
-      // El frontend usa `invoice_ids` que son IDs de facturas (strings).
-      // En el SELECT `id` es `CONCAT(...)`. Esto es complejo de igualar.
-      // Vamos a asumir que los IDs que manda el frontend son los `id` generados por este mismo endpoint.
-      // FIX: El `route.invoice_ids` guarda los IDs generados aqui??
-      // Si, en RoutePlanner se seleccionan invoices obtenidos de aqui.
-      // Entonces el ID es `docId_invoiceNum`.
+      
+      // ESTRATEGIA DE BÚSQUEDA HÍBRIDA ROBUSTA
+      // 1. Descomponer los IDs compuestos (DocID_Invoice) para buscar por columnas exactas
+      // ID Típico: "doc-AAA-123_INV-001" -> Doc="doc-AAA-123", Inv="INV-001"
+      
+      const conditions: string[] = [];
+      const flatParams: any[] = [];
+      let paramIdx = 1; // Start after existing params if any (none here usually, but good practice)
+      
+      // Add existing query params offset if we had any (queryParams is empty at start of this block but check scope)
+      // Actually queryParams has nothing yet.
+      
+      // Construimos un mega-OR combinando búsqueda exacta por columnas y fallback por LIKE invoice
+      // Es menos eficiente que ANY() pero garantiza encontrar el registro si existe
+      
+      const orClauses = idList.map((compId) => {
+         const lastUnderscore = compId.lastIndexOf('_');
+         let searchTerm = compId;
+         
+         if (lastUnderscore > 0) {
+             // Extract suffix (Invoice/Order)
+             searchTerm = compId.substring(lastUnderscore + 1);
+         }
+         
+         // Remove ALL whitespace from the search term to match the storage logic
+         searchTerm = searchTerm.replace(/\s/g, '');
+         
+         // Parameterize
+         queryParams.push(searchTerm);
+         const pIdx = `$${queryParams.length}`;
+         
+         // Match: Invoice OR Order equal to suffix (ignoring whitespace in DB columns too)
+         // Postgres REGEXP_REPLACE(col, '\s', '', 'g') removes all whitespace characters
+         return `(
+            REGEXP_REPLACE(COALESCE(document_items.invoice, ''), '\\s', '', 'g') = ${pIdx} 
+            OR 
+            REGEXP_REPLACE(COALESCE(document_items.order_number, ''), '\\s', '', 'g') = ${pIdx}
+            OR
+            REGEXP_REPLACE(COALESCE(document_items.client_ref, ''), '\\s', '', 'g') = ${pIdx}
+         )`;
+      });
 
-      // Truco: Desarmar el ID o usar LIKE?
-      // Mejor: Filtrar donde el CONCAT generado sea IN (lista)
-      // Postgres permite filtrar por el resultado del select si usamos subquery o HAVING, pero aqui es WHERE.
-      // Repetimos la logica del ID:
-      query += ` AND CONCAT(document_items.document_id, '_', COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)) = ANY($1::text[])`;
-      queryParams.push(idList);
+      if (orClauses.length > 0) {
+          query += ` AND (${orClauses.join(' OR ')})`;
+      }
+      
     } else {
       // Comportamiento normal (Solo pendientes)
       query += ` AND (
