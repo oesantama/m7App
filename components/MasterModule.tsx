@@ -368,14 +368,83 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         saveResponse = await api.saveUserPermission(newRecord);
       } else if (activeMaster === 'masterPaginas') {
         saveResponse = await api.savePage(newRecord);
-        await api.saveMaster(activeMaster, newRecord);
       } else if (activeMaster === 'masterCategorias') {
         saveResponse = await saveCategory(newRecord);
       } else if (activeMaster === 'masterClientes') {
         saveResponse = await api.saveClient(newRecord);
       } else if (activeMaster === 'masterModulos') {
-         // @ts-ignore - Legacy support if needed
-         saveResponse = await api.saveModule(newRecord);
+        saveResponse = await api.saveModule(newRecord);
+      } else if (activeMaster === 'masterEstados') {
+        const cleanData = {
+          id: newRecord.id,
+          name: newRecord.name,
+          description: newRecord.description || '',
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name
+        };
+        saveResponse = await api.saveEstado(cleanData);
+      } else if (activeMaster === 'masterMarcas') {
+        const cleanData = {
+          id: newRecord.id,
+          name: newRecord.name,
+          description: newRecord.description || '',
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name
+        };
+        saveResponse = await api.saveMarca(cleanData);
+      } else if (activeMaster === 'masterTipoDocumento') {
+        const cleanData = {
+          id: newRecord.id,
+          name: newRecord.name,
+          description: newRecord.description || '',
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name
+        };
+        saveResponse = await api.saveTipoDocumento(cleanData);
+      } else if (activeMaster === 'masterUnidadMedida') {
+        const cleanData = {
+          id: newRecord.id,
+          name: newRecord.name,
+          description: newRecord.description || '',
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name
+        };
+        saveResponse = await api.saveUnidadMedida(cleanData);
+      } else if (activeMaster === 'masterNotificaciones') {
+        const cleanData = {
+          id: newRecord.id,
+          name: newRecord.name,
+          notificationEmail: newRecord.notificationEmail || '',
+          tipoNotificacionId: newRecord.tipoNotificacionId,
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name
+        };
+        saveResponse = await api.saveNotificacionConfig(cleanData);
+      } else if (activeMaster === 'masterTiposVehiculo') {
+        const cleanData = {
+          id: newRecord.id,
+          name: newRecord.name,
+          description: newRecord.description || '',
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name
+        };
+        saveResponse = await api.saveTipoVehiculo(cleanData);
+      } else if (activeMaster === 'masterTipoNotificacion') {
+        const cleanData = {
+          id: newRecord.id,
+          name: newRecord.name,
+          description: newRecord.description || '',
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name
+        };
+        saveResponse = await api.saveTipoNotificacion(cleanData);
       } else {
         // Guardado Genérico para el resto de tablas maestras (masterTipoDocumento, etc.)
         saveResponse = await api.saveMaster(activeMaster, newRecord);
@@ -1196,6 +1265,19 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             </div>
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
               <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} />
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterEstados':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Registro</label>
+              <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Descripción opcional del estado..." />
             </div>
             {renderStatusField()}
           </div>
