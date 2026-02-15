@@ -41,10 +41,11 @@ export const getUserPermissions = async (req: Request, res: Response) => {
   
   // SOLUCIÓN MEJORADA: Verificación por ID o por Rol de Super Admin
   const isSuperAdmin = 
-    userId === 'USR-01' || 
     userId === 'admin' || 
     userId === 'admin@millasiete.com';
 
+  // Si necesitamos la lista completa de páginas para el admin, lo ideal sería consultarla de la DB
+  // pero mantendremos la lista hardcoded por ahora solo para el fallback de admin real.
   const pages = [
     'PAG-01', 'PAG-02', 'PAG-03', 'PAG-04', 'PAG-05', 'PAG-06', 'PAG-07', 'PAG-08', 'PAG-09', 'PAG-10',
     'PAG-11', 'PAG-12', 'PAG-13', 'PAG-14', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-18', 'PAG-19', 'PAG-20', 'PAG-21', 'PAG-22'
@@ -80,23 +81,10 @@ export const getUserPermissions = async (req: Request, res: Response) => {
         statusId: row.status_id
       };
 
-      // Transformar objeto plano a array si es necesario para el formato de consumo del Layout
-      if (!Array.isArray(flatPerms)) {
-          const transformed: any[] = [];
-          pages.forEach(pageId => {
-              const actions: string[] = [];
-              if (flatPerms[`page_${pageId}_view`]) actions.push('view');
-              if (flatPerms[`page_${pageId}_create`]) actions.push('create');
-              if (flatPerms[`page_${pageId}_edit`]) actions.push('edit');
-              if (flatPerms[`page_${pageId}_delete`] ) actions.push('delete');
-              if (flatPerms[`page_${pageId}_active`]) actions.push('active');
-              
-              if (actions.length > 0) {
-                  transformed.push({ module: pageId, actions });
-              }
-          });
-          return res.json(transformed);
-      }
+      // Retornar el objeto plano para que el Editor de Permisos (MasterModule) pueda 
+      // mapear los checkboxes correctamente (formData['page_X_view']).
+      // La transformación a array se hace en auth.controller.ts para el login.
+      return res.json(flatPerms);
 
       return res.json(flatPerms);
     }

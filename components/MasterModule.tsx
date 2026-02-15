@@ -15,12 +15,13 @@ interface MasterModuleProps {
 }
 
 const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit }) => {
-  const { allMasterData, setAllMasterData } = useAppStore();
+  const { allMasterData, setAllMasterData, updateMasterCategory } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -839,6 +840,30 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     }
   };
 
+  // Force load users when managing permissions to ensure names are available
+  React.useEffect(() => {
+    const loadUsersIfNeeded = async () => {
+        if (activeMaster === 'masterPermisosUsuario' && (!allMasterData.masterUsuarios || allMasterData.masterUsuarios.length === 0)) {
+            try {
+                const { api } = await import('../services/api');
+                const users = await api.getUsers();
+                updateMasterCategory('masterUsuarios', users);
+            } catch (e) {
+                console.error("Error loading users for permissions view", e);
+            }
+        }
+    };
+    loadUsersIfNeeded();
+  }, [activeMaster]);
+
+  // DEBUG: Check permissions data
+  React.useEffect(() => {
+    if (activeMaster === 'masterPermisosUsuario') {
+        console.log("DEBUG PERMISSIONS DATA:", paginatedData);
+        console.log("DEBUG USERS DATA:", allMasterData.masterUsuarios);
+    }
+  }, [activeMaster, paginatedData, allMasterData.masterUsuarios]);
+
   const commonInputStyle = "w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs outline-none focus:border-emerald-500 transition-all shadow-sm appearance-none cursor-pointer";
 
   const renderStatusField = () => (
@@ -903,8 +928,72 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Email Corporativo</label>
                 <input type="email" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value.toLowerCase() })} className={commonInputStyle} required />
               </div>
+
+              {/* Password Fields - Only for New Users or Explicit Change */}
+              {(!editingRecord || showPasswordChange) && (
+                  <div className="md:col-span-2 bg-slate-100 p-6 rounded-3xl border border-slate-200 animate-in fade-in slide-in-from-top-4 relative group">
+                    <button type="button" onClick={() => {setShowPasswordChange(false); setFormData({...formData, password: '', confirmPassword: ''});}} className="absolute top-4 right-4 p-2 bg-white rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm"><Icons.X className="w-4 h-4" /></button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-1 relative">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Contraseña</label>
+                        <div className="relative">
+                            <input 
+                                type={showPassword ? "text" : "password"} 
+                                value={formData.password || ''} 
+                                onChange={e => setFormData({ ...formData, password: e.target.value })} 
+                                className={commonInputStyle} 
+                                placeholder="Ingrese contraseña"
+                                autoComplete="new-password"
+                            />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-3 text-slate-400 hover:text-emerald-500 transition-colors">
+                                {showPassword ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="space-y-1 relative">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Confirmar Contraseña</label>
+                        <div className="relative">
+                            <input 
+                                type={showConfirmPassword ? "text" : "password"} 
+                                value={formData.confirmPassword || ''} 
+                                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} 
+                                className={`${commonInputStyle} ${formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword ? 'border-red-500 text-red-600 bg-red-50' : ''}`} 
+                                placeholder="Repita la contraseña"
+                                autoComplete="new-password"
+                            />
+                             <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-3 text-slate-400 hover:text-emerald-500 transition-colors">
+                                {showConfirmPassword ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
+                        {formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                           <p className="text-[9px] font-bold text-red-500 ml-2 mt-1 animate-pulse">Las contraseñas no coinciden</p>
+                        )}
+                    </div>
+                    </div>
+                  </div>
+              )}
+              
+              {editingRecord && !showPasswordChange && (
+                  <div className="md:col-span-2 flex justify-center">
+                      <button type="button" onClick={() => setShowPasswordChange(true)} className="px-6 py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase hover:bg-slate-200 transition-all flex items-center gap-2">
+                          <Icons.Lock className="w-4 h-4" />
+                          Cambiar Contraseña
+                      </button>
+                  </div>
+              )}
+
               <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Teléfono de Contacto</label>
-                <input type="text" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} className={commonInputStyle} />
+                <input 
+                    type="text" 
+                    value={formData.phone || ''} 
+                    onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        if (val.length <= 15) setFormData({ ...formData, phone: val });
+                    }} 
+                    className={commonInputStyle} 
+                    placeholder="Solo números"
+                />
+                {formData.phone && formData.phone.length < 7 && <p className="text-[9px] font-bold text-amber-500 ml-2">Número parece incompleto</p>}
               </div>
               <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo Documento</label>
                 <select value={formData.documentType || ''} onChange={e => setFormData({ ...formData, documentType: e.target.value })} className={commonInputStyle}>
@@ -1008,7 +1097,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         );
 
       case 'masterPermisosUsuario':
-        const targetUser = (allMasterData.masterUsuarios || []).find(u => u.id === formData.userId);
+        const targetUser = (allMasterData.masterUsuarios || []).find(u => u.id === (formData.userId || formData.user_id));
         return (
           <div className="space-y-10 animate-in fade-in">
              {/* HEADER CON NOMBRE DE USUARIO */}
@@ -1018,7 +1107,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 </div>
                 <div>
                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Gestionando Permisos Para:</p>
-                   <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{targetUser?.name || formData.userName || 'Usuario Desconocido'}</h3>
+                   <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{targetUser?.name || formData.userName || formData.user_id || 'Usuario Desconocido'}</h3>
                 </div>
              </div>
 
@@ -1505,7 +1594,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                             {activeMaster === 'masterPermisosRol'
                               ? (item.roleName || roles.find(r => r.id === item.roleId)?.name || item.roleId || item.id)
                               : (activeMaster === 'masterPermisosUsuario'
-                                ? (item.userName || (allMasterData.masterUsuarios || []).find(u => u.id === item.userId)?.name || item.userId || 'Usuario Desconocido')
+                                ? ((item as any).userName || (allMasterData.masterUsuarios || []).find(u => u.id === ((item as any).userId || (item as any).user_id))?.name || (item as any).userId || (item as any).user_id || 'Usuario Desconocido')
                                 : (item.name || item.id))}
                           </p>
                           
@@ -1582,7 +1671,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                       {canEdit && (
                         <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(false); setError(null); setIsModalOpen(true); }} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white hover:scale-110 active:scale-90 transition-all shadow-md" title="Editar"><Icons.Audit /></button>
                       )}
-                      {canDelete && (
+                      {canDelete && activeMaster !== 'masterUsuarios' && (
                         <button onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white hover:scale-110 active:scale-90 transition-all shadow-md" title="Eliminar"><Icons.Trash /></button>
                       )}
                     </td>
@@ -1609,7 +1698,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                     )}
                     {activeMaster === 'masterPermisosRol'
                       ? (item.roleName || roles.find(r => r.id === item.roleId)?.name || item.roleId || item.id)
-                      : (item.name || item.id)}
+                      : (activeMaster === 'masterPermisosUsuario'
+                        ? ((item as any).userName || (allMasterData.masterUsuarios || []).find(u => u.id === ((item as any).userId || (item as any).user_id))?.name || (item as any).userId || (item as any).user_id || 'Usuario Desconocido')
+                        : (item.name || item.id))}
                   </h3>
                   
                   {/* DETALLES ESPECÍFICOS DE ARTÍCULOS */}
@@ -1640,7 +1731,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                     {canEdit && (
                       <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(false); setError(null); setIsModalOpen(true); }} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 hover:scale-105 active:scale-95 transition-all shadow-md">Auditar</button>
                     )}
-                    {canDelete && (
+                    {canDelete && activeMaster !== 'masterUsuarios' && (
                       <button onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }} className="w-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-600 hover:text-white hover:scale-110 active:scale-90 transition-all active:scale-95"><Icons.Trash /></button>
                     )}
                   </div>

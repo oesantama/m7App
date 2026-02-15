@@ -103,7 +103,13 @@ const Layout: React.FC<LayoutProps> = ({
         .filter(p => {
           if (isSuperUser) return true;
           const pId = p.id;
-          const userPerm = user.permissions.find(perm => perm.module === pId);
+          const userPerm = user.permissions?.find(perm => perm.module === pId); // Added optional chaining just in case
+          
+          // DEBUG PERMISSIONS
+          // console.log(`Checking Page: ${p.name} (${pId})`);
+          // console.log(`User Perms for ${pId}:`, userPerm);
+          // console.log(`Has View?`, userPerm?.actions?.includes('view'));
+
           return userPerm && userPerm.actions.includes('view');
         })
         .sort((a, b) => a.name.localeCompare(b.name))

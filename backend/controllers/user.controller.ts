@@ -44,7 +44,6 @@ export const saveUser = async (req: Request, res: Response) => {
         let newPass = check.rows[0].password;
         
         // Si viene password y NO es igual al anterior (implica cambio), encriptarlo
-        // Nota: En frontend se debe validar que si el campo viene vacío, no se envía
         if (u.password && u.password.trim() !== '') {
              const salt = await bcrypt.genSalt(10);
              newPass = await bcrypt.hash(u.password, salt);
@@ -84,11 +83,17 @@ export const saveUser = async (req: Request, res: Response) => {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         `, [u.id, u.email, u.name, hashedPassword, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled]);
         
+
+        // 3. Obtener permisos base del ROL seleccionado
+        const rolePermsResult = await pool.query('SELECT permissions FROM role_permissions WHERE role_id = $1', [u.roleId]);
+        const initialPermissions = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : '{}';
+
         await pool.query(`
           INSERT INTO user_permissions (id, user_id, permissions, status_id)
           VALUES ($1, $2, $3, $4)
-          ON CONFLICT (user_id) DO NOTHING
-        `, [`PUS-${u.id}`, u.id, '{}', u.statusId]);
+          ON CONFLICT (user_id) DO UPDATE SET
+            permissions = CASE WHEN user_permissions.permissions::text = '{}'::text THEN $3 ELSE user_permissions.permissions END
+        `, [`PUS-${u.id}`, u.id, initialPermissions, u.statusId]);
 
         res.json({ success: true, message: 'Usuario creado y perfil de permisos inicializado' });
     }
