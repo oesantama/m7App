@@ -34,10 +34,17 @@ export const api = {
 
   getGenericMasters: () => fetch(`${API_URL}/masters?_t=${Date.now()}`).then(r => r.json()),
 
+
   deleteUser: (id: string, deletedBy?: string) => fetch(`${API_URL}/users/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   deleteMaster: (category: string, id: string, deletedBy?: string) => fetch(`${API_URL}/masters/${category}/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
 
   getClients: () => fetch(`${API_URL}/clients?_t=${Date.now()}`).then(r => r.json()),
+  saveClient: (data: any) => fetch(`${API_URL}/clients`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
+  deleteClient: (id: string, deletedBy?: string) => fetch(`${API_URL}/clients/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   getRoles: () => fetch(`${API_URL}/roles?_t=${Date.now()}`).then(r => r.json()),
   saveRole: (data: any) => fetch(`${API_URL}/roles`, {
     method: 'POST',
@@ -118,6 +125,11 @@ export const api = {
   deleteTipoNotificacion: (id: string, deletedBy?: string) => fetch(`${API_URL}/tipos-notificacion/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
 
   getModules: () => fetch(`${API_URL}/modules?_t=${Date.now()}`).then(r => r.json()),
+  saveModule: (data: any) => fetch(`${API_URL}/modules`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
   deleteModule: (id: string, deletedBy?: string) => fetch(`${API_URL}/modules/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   getPages: () => fetch(`${API_URL}/pages?_t=${Date.now()}`).then(r => r.json()),
   deletePage: (id: string, deletedBy?: string) => fetch(`${API_URL}/pages/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
@@ -137,14 +149,6 @@ export const api = {
   }).then(r => r.json()),
   deleteUserPermission: (id: string, deletedBy?: string) => fetch(`${API_URL}/user-permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   deleteRolePermission: (id: string, deletedBy?: string) => fetch(`${API_URL}/permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  
-  getClients: () => fetch(`${API_URL}/clients`).then(r => r.json()),
-  saveClient: (data: any) => fetch(`${API_URL}/clients`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteClient: (id: string, deletedBy?: string) => fetch(`${API_URL}/clients/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
   
   getArticles: () => fetch(`${API_URL}/articles`).then(r => r.json()),
   saveArticle: (data: any) => fetch(`${API_URL}/articles`, {

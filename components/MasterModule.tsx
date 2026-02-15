@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import { Icons, AVATAR_GALLERY } from '../constants';
+import { getMasterCategoryFromRoute } from '../constants/routes';
 import { MasterRecord, MasterCategory, User, Article } from '../types';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -14,10 +15,12 @@ interface MasterModuleProps {
 }
 
 const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit }) => {
-  const allMasterData = useAppStore(state => state.allMasterData);
+  const { allMasterData, setAllMasterData } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +65,47 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<any>(null);
 
+  // Formateador de Fechas Ultra-Robusto M7
+  const safeFormatDate = (val: any, record?: any) => {
+    // Si val es nulo, intentar buscar en el record por si hay mayúsculas (CREATED_AT)
+    let finalVal = val;
+    if (!finalVal && record) {
+      const keys = Object.keys(record);
+      const findKey = (k: string) => keys.find(key => key.toUpperCase() === k.toUpperCase());
+      const altKey = findKey('createdAt') || findKey('created_at') || findKey('updatedAt') || findKey('updated_at');
+      if (altKey) finalVal = record[altKey];
+    }
+
+    if (!finalVal) return 'Sistema';
+    
+    try {
+      let d = finalVal;
+      if (typeof d === 'string') {
+        if (d.includes(' ') && !d.includes('T')) d = d.replace(' ', 'T');
+        if (d.includes('+')) d = d.split('+')[0];
+      }
+      
+      const dateObj = new Date(d);
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toLocaleString('es-CO', { 
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+          hour12: true
+        });
+      }
+      
+      // Fallback manual
+      if (typeof d === 'string') {
+        const match = d.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+        if (match) return `${match[3]}/${match[2]}/${match[1]} ${match[4]}:${match[5]}`;
+        return d.split('.')[0].replace('T', ' '); 
+      }
+      return 'Fecha s/f';
+    } catch {
+      return 'Error Fecha';
+    }
+  };
+
   // Extracción de Maestros para Selectores
   const roles = allMasterData['masterRol'] || [];
   const pages = useAppStore(s => s.pages) || []; // Dedicated table
@@ -78,7 +122,11 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
 
   const getPagePermissions = () => {
     if (isSuperUser) return { canCreate: true, canEdit: true, canDelete: true, canView: true };
-    const pageInfo = pages.find(p => (p.moduleId || p.module_id) === activeMaster);
+    // Buscar la página cuya ruta mapea a la categoría maestra activa
+    const pageInfo = pages.find(p => {
+      const masterCat = getMasterCategoryFromRoute(p.route, p.id);
+      return masterCat === activeMaster;
+    });
     const perms = user.permissions.find(p => p.module === pageInfo?.id);
     return {
       canCreate: perms?.actions.includes('create') || false,
@@ -228,9 +276,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   const filteredData = useMemo(() => {
     // For modules and pages, use dedicated store fields
     let list: any[] = [];
-    if (activeMaster === 'masterModulos') {
+    if (activeMaster === 'modules') {
       list = modules || [];
-    } else if (activeMaster === 'masterPaginas') {
+    } else if (activeMaster === 'pages') {
       list = pages || [];
     } else {
       list = allMasterData[activeMaster] || [];
@@ -379,13 +427,22 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         saveResponse = await api.savePermission(newRecord);
       } else if (activeMaster === 'masterPermisosUsuario') {
         saveResponse = await api.saveUserPermission(newRecord);
-      } else if (activeMaster === 'masterPaginas') {
-        saveResponse = await api.savePage(newRecord);
+      } else if (activeMaster === 'pages') {
+        // SANITIZATION: Crear payload limpio solo con campos necesarios
+        const pagePayload = {
+          id: newRecord.id,
+          name: newRecord.name,
+          route: newRecord.route,
+          parentId: newRecord.parentId,
+          statusId: newRecord.statusId,
+          updatedBy: user.name
+        };
+        saveResponse = await api.savePage(pagePayload);
       } else if (activeMaster === 'masterCategorias') {
         saveResponse = await saveCategory(newRecord);
       } else if (activeMaster === 'masterClientes') {
         saveResponse = await api.saveClient(newRecord);
-      } else if (activeMaster === 'masterModulos') {
+      } else if (activeMaster === 'modules') {
         saveResponse = await api.saveModule(newRecord);
       } else if (activeMaster === 'masterEstados') {
         const cleanData = {
@@ -491,131 +548,53 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       // RECARGA ROBUSTA (AJAX STYLE)
       const refreshCategory = async (cat: MasterCategory) => {
         try {
-          let newData: any[] = [];
-
+          let rawData: any[] = [];
           switch (cat) {
-            case 'masterUsuarios':
-              newData = await api.getUsers();
-              break;
-            case 'masterClientes':
-              const cliData = await api.getClients();
-              if (Array.isArray(cliData)) {
-                  newData = cliData.map((c: any) => ({
-                      ...c,
-                      logoUrl: c.logo_url, // Map from DB column
-                      createdAt: c.created_at,
-                      updatedAt: c.updated_at,
-                      createdBy: c.created_by,
-                      updatedBy: c.updated_by
-                  }));
-              }
-              break;
-            case 'masterRol':
-              newData = await api.getRoles();
-              newData = newData.map((r: any) => ({ ...r, statusId: r.status_id, createdBy: r.created_by, updatedBy: r.updated_by, createdAt: r.created_at, updatedAt: r.updated_at }));
-              break;
-            case 'masterCategorias':
-              const catData = await api.getCategories();
-              if (Array.isArray(catData)) {
-                  newData = catData.map((c: any) => ({
-                      ...c,
-                      createdAt: c.created_at,
-                      updatedAt: c.updated_at,
-                      createdBy: c.created_by,
-                      updatedBy: c.updated_by
-                  }));
-              }
-              break;
-            case 'masterPermisosRol':
-              newData = await api.getPermissions();
-              break;
-            case 'masterPermisosUsuario':
-              newData = await api.getAllUserPermissions();
-              break;
-            case 'masterArticulo': {
-              const articData = await api.getArticles();
-              if (Array.isArray(articData)) {
-                newData = articData.map((a: any) => ({
-                  ...a,
-                  statusId: a.status_id,
-                  clientId: a.client_id,
-                  clientIds: a.client_ids || (a.client_id ? [a.client_id] : []),
-                  factorInter: a.factor_inter,
-                  factorStd: a.factor_std,
-                  uomGeneralId: a.uom_general_id,
-                  uomInterId: a.uom_inter_id,
-                  uomStdId: a.uom_std || a.uom_std_id, // Map correctly from uom_std column
-                  categoryArticuloId: a.category_articulo_id,
-                  imageUrl: a.image_url,
-                  createdAt: a.created_at,
-                  updatedAt: a.updated_at,
-                  createdBy: a.created_by || 'SISTEMA',
-                  updatedBy: a.updated_by || 'SISTEMA'
-                }));
-                console.log('[DEBUG] Articulos Mapped:', newData[0]);
-              }
-              break;
-            }
-            case 'masterEstados':
-              newData = await api.getEstados();
-              newData = newData.map((e: any) => ({ ...e, statusId: e.status_id, createdBy: e.created_by, updatedBy: e.updated_by, createdAt: e.created_at, updatedAt: e.updated_at }));
-              break;
-            case 'masterMarcas':
-              newData = await api.getMarcas();
-              newData = newData.map((m: any) => ({ ...m, statusId: m.status_id, createdBy: m.created_by, updatedBy: m.updated_by, createdAt: m.created_at, updatedAt: m.updated_at }));
-              break;
-            case 'masterTipoDocumento':
-              newData = await api.getTiposDocumento();
-              newData = newData.map((td: any) => ({ ...td, statusId: td.status_id, createdBy: td.created_by, updatedBy: td.updated_by, createdAt: td.created_at, updatedAt: td.updated_at }));
-              break;
-            case 'masterUnidadMedida':
-              newData = await api.getUnidadesMedida();
-              newData = newData.map((um: any) => ({ ...um, statusId: um.status_id, createdBy: um.created_by, updatedBy: um.updated_by, createdAt: um.created_at, updatedAt: um.updated_at }));
-              break;
-            case 'masterNotificaciones':
-              newData = await api.getNotificacionesConfig();
-              // Map snake_case to camelCase like in App.tsx
-              newData = newData.map((n: any) => ({
-                ...n,
-                notificationEmail: n.notification_email,
-                tipoNotificacionId: n.tipo_notificacion_id,
-                tipoNotificacionName: n.tipo_notificacion_name,
-                statusId: n.status_id,
-                createdBy: n.created_by,
-                updatedBy: n.updated_by,
-                createdAt: n.created_at,
-                updatedAt: n.updated_at
-              }));
-              break;
-            case 'masterTiposVehiculo':
-              newData = await api.getTiposVehiculo();
-              newData = newData.map((tv: any) => ({ ...tv, statusId: tv.status_id, createdBy: tv.created_by, updatedBy: tv.updated_by, createdAt: tv.created_at, updatedAt: tv.updated_at }));
-              break;
-            case 'masterTipoNotificacion':
-              newData = await api.getTiposNotificacion();
-              newData = newData.map((tn: any) => ({ ...tn, statusId: tn.status_id, createdBy: tn.created_by, updatedBy: tn.updated_by, createdAt: tn.created_at, updatedAt: tn.updated_at }));
-              break;
-            default: {
-              // Maestros Genéricos (filter from all generic masters)
+            case 'masterUsuarios': rawData = await api.getUsers(); break;
+            case 'masterClientes': rawData = await api.getClients(); break;
+            case 'masterRol': rawData = await api.getRoles(); break;
+            case 'masterCategorias': rawData = await api.getCategories(); break;
+            case 'masterPermisosRol': rawData = await api.getPermissions(); break;
+            case 'masterPermisosUsuario': rawData = await api.getAllUserPermissions(); break;
+            case 'masterArticulo': rawData = await api.getArticles(); break;
+            case 'masterEstados': rawData = await api.getEstados(); break;
+            case 'masterMarcas': rawData = await api.getMarcas(); break;
+            case 'masterTipoDocumento': rawData = await api.getTiposDocumento(); break;
+            case 'masterUnidadMedida': rawData = await api.getUnidadesMedida(); break;
+            case 'masterNotificaciones': rawData = await api.getNotificacionesConfig(); break;
+            case 'masterTiposVehiculo': rawData = await api.getTiposVehiculo(); break;
+            case 'masterTipoNotificacion': rawData = await api.getTiposNotificacion(); break;
+            default:
               const allGenerics = await api.getGenericMasters();
-
-              if (Array.isArray(allGenerics)) {
-                // Filter by category if the API returns a flat list of all masters
-                newData = allGenerics.filter((m: any) => m.category === cat);
-
-                // Fallback: If the API returns grouped object (unlikely based on App.tsx logic but safe to check)
-                if (newData.length === 0 && !Array.isArray(allGenerics) && (allGenerics as any)[cat]) {
-                  newData = (allGenerics as any)[cat];
-                }
-              }
-              break;
-            }
+              rawData = (allGenerics as any)[cat] || [];
           }
 
-          if (Array.isArray(newData)) {
-            useAppStore.getState().updateMasterCategory(cat, newData);
-            // Force update context/state if needed, though store subscription should handle it
-          }
+          // APLICAR NORMALIZACIÓN ÚNICA (Igual que en App.tsx) - Soporte Mayúsculas Driver Docker
+          const normalized = (rawData || []).map(item => {
+            const keys = Object.keys(item);
+            const findKey = (k: string) => keys.find(key => key.toLowerCase() === k.toLowerCase());
+            
+            const getVal = (p: string, s: string) => {
+              const key = findKey(p) || findKey(s) || p || s;
+              return (item[key] !== undefined && item[key] !== null) ? item[key] : undefined;
+            };
+
+            return {
+              ...item,
+              statusId: getVal('statusId', 'status_id'),
+              roleId: getVal('roleId', 'role_id'),
+              createdAt: getVal('createdAt', 'created_at'),
+              updatedAt: getVal('updatedAt', 'updated_at'),
+              createdBy: getVal('createdBy', 'created_by'),
+              updatedBy: getVal('updatedBy', 'updated_by')
+            };
+          });
+
+          setAllMasterData({
+            ...allMasterData,
+            [cat]: normalized
+          });
+
         } catch (err) {
           console.error("Error refreshing category", cat, err);
           toast.error("Error recargando datos: " + (err as any).message);
@@ -671,9 +650,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         await api.deleteRole(recordToDelete.id, user.name);
       } else if (activeMaster === 'masterClientes') {
         await api.deleteClient(recordToDelete.id, user.name);
-      } else if (activeMaster === 'masterModulos') {
+      } else if (activeMaster === 'modules') {
         await api.deleteModule(recordToDelete.id, user.name);
-      } else if (activeMaster === 'masterPaginas') {
+      } else if (activeMaster === 'pages') {
         await api.deletePage(recordToDelete.id, user.name);
       } else if (activeMaster === 'masterEstados') {
         await api.deleteEstado(recordToDelete.id, user.name);
@@ -727,11 +706,11 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       delete flat.avatar; delete flat.logoUrl; delete flat.photoUrl;
 
       // Asegurar formato Colombia para el reporte Excel (incluso para registros viejos)
-      if (flat.createdAt && flat.createdAt.includes('T')) {
-        flat.createdAt = new Date(flat.createdAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+      if (flat.createdAt) {
+        flat.createdAt = safeFormatDate(flat.createdAt).replace(' a. m.', ' AM').replace(' p. m.', ' PM');
       }
-      if (flat.updatedAt && flat.updatedAt.includes('T')) {
-        flat.updatedAt = new Date(flat.updatedAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+      if (flat.updatedAt) {
+        flat.updatedAt = safeFormatDate(flat.updatedAt || flat.createdAt).replace(' a. m.', ' AM').replace(' p. m.', ' PM');
       }
 
       return flat;
@@ -1029,8 +1008,20 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         );
 
       case 'masterPermisosUsuario':
+        const targetUser = (allMasterData.masterUsuarios || []).find(u => u.id === formData.userId);
         return (
           <div className="space-y-10 animate-in fade-in">
+             {/* HEADER CON NOMBRE DE USUARIO */}
+             <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 flex items-center gap-4">
+                <div className="w-12 h-12 bg-slate-900 text-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
+                   {targetUser?.avatar ? <img src={targetUser.avatar} className="w-full h-full object-cover rounded-2xl" /> : <Icons.User />}
+                </div>
+                <div>
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Gestionando Permisos Para:</p>
+                   <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{targetUser?.name || formData.userName || 'Usuario Desconocido'}</h3>
+                </div>
+             </div>
+
             <div className="bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl">
               <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
                 <h4 className="text-white font-black text-xs uppercase tracking-widest leading-none">Matriz M7 de Usuario</h4>
@@ -1478,7 +1469,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             </button>
           )}
 
-          {canCreate && (
+          {canCreate && activeMaster !== 'masterPermisosUsuario' && (
             <button onClick={() => { setEditingRecord(null); setFormData(getInitialFormData(activeMaster)); setIsReadOnly(false); setError(null); setIsModalOpen(true); }} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all active:scale-95">Nuevo</button>
           )}
         </div>
@@ -1514,7 +1505,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                             {activeMaster === 'masterPermisosRol'
                               ? (item.roleName || roles.find(r => r.id === item.roleId)?.name || item.roleId || item.id)
                               : (activeMaster === 'masterPermisosUsuario'
-                                ? (item.userName || (allMasterData.masterUsuarios || []).find(u => u.id === item.userId)?.name || item.userId || item.id)
+                                ? (item.userName || (allMasterData.masterUsuarios || []).find(u => u.id === item.userId)?.name || item.userId || 'Usuario Desconocido')
                                 : (item.name || item.id))}
                           </p>
                           
@@ -1560,16 +1551,16 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                     <td className="px-8 py-4 text-center">
                       <div className="flex flex-col items-center">
                         <span className="font-bold text-[9px] uppercase text-slate-700">{(item as any).createdBy || 'Sistema'}</span>
-                        <span className="text-[8px] text-slate-400 font-medium">
-                          {new Date((item as any).createdAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
+                        <span className="text-[8px] text-slate-400 font-medium whitespace-nowrap">
+                          {safeFormatDate((item as any).createdAt)}
                         </span>
                       </div>
                     </td>
                     <td className="px-8 py-4 text-center">
                       <div className="flex flex-col items-center">
                         <span className="font-bold text-[9px] uppercase text-slate-700">{(item as any).updatedBy || (item as any).createdBy || 'Sistema'}</span>
-                        <span className="text-[8px] text-slate-400 font-medium">
-                          {new Date((item as any).updatedAt || (item as any).createdAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
+                        <span className="text-[8px] text-slate-400 font-medium whitespace-nowrap">
+                          {safeFormatDate((item as any).updatedAt || (item as any).createdAt)}
                         </span>
                       </div>
                     </td>

@@ -11,6 +11,7 @@ interface AppState {
   // ============ NAVEGACIÓN ============
   activeTab: string;
   activeMasterCategory: MasterCategory;
+  activePageId: string;
   
   // ============ DATOS MAESTROS ============
   allMasterData: { [key in MasterCategory]?: MasterRecord[] };
@@ -39,6 +40,7 @@ interface AppState {
   // ============ ACCIONES DE NAVEGACIÓN ============
   setActiveTab: (tab: string) => void;
   setActiveMasterCategory: (category: MasterCategory) => void;
+  setActivePageId: (id: string) => void;
   
   // ============ ACCIONES DE DATOS MAESTROS ============
   setAllMasterData: (data: { [key in MasterCategory]?: MasterRecord[] }) => void;
@@ -99,6 +101,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   activeTab: localStorage.getItem('m7_active_tab') || 'dashboard',
   activeMasterCategory: 'masterUsuarios',
+  activePageId: localStorage.getItem('m7_active_page_id') || '',
   
   allMasterData: {
     masterUsuarios: [],
@@ -138,6 +141,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ activeTab: tab });
   },
   setActiveMasterCategory: (category) => set({ activeMasterCategory: category }),
+  setActivePageId: (id) => {
+    localStorage.setItem('m7_active_page_id', id);
+    set({ activePageId: id });
+  },
   
   // Datos maestros
   setAllMasterData: (data) => set({ allMasterData: data }),

@@ -5,7 +5,8 @@ import pool from '../config/database.js';
 export const getModules = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
-      SELECT id, name, icon_class AS "iconClass", status_id AS "statusId" 
+      SELECT id, name, icon_class AS "iconClass", status_id AS "statusId",
+      created_at AS "createdAt", updated_at AS "updatedAt", created_by AS "createdBy", updated_by AS "updatedBy"
       FROM modules 
       ORDER BY name ASC
     `);

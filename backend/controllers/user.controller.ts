@@ -14,7 +14,9 @@ export const getUsers = async (req: Request, res: Response) => {
         u.document_type AS "documentType",
         u.document_number AS "documentNumber",
         ds.approved AS "isApproved",
-        (ds.digital_signature IS NOT NULL) AS "hasSignature"
+        (ds.digital_signature IS NOT NULL) AS "hasSignature",
+        u.created_at AS "createdAt", u.updated_at AS "updatedAt", 
+        u.created_by AS "createdBy", u.updated_by AS "updatedBy"
       FROM users u
       LEFT JOIN digital_signatures ds ON u.email = ds.document_number
       ORDER BY u.name ASC
@@ -30,17 +32,24 @@ export const getUsers = async (req: Request, res: Response) => {
   }
 };
 
+import bcrypt from 'bcrypt';
+
 export const saveUser = async (req: Request, res: Response) => {
   const u = req.body;
   try {
-    // 1. Verificar si el usuario ya existe
     const check = await pool.query('SELECT password FROM users WHERE id = $1', [u.id]);
     
     if (check.rows.length > 0) {
         // UPDATE
-        const currentPass = check.rows[0].password;
-        const newPass = u.password || currentPass; // Mantener anterior si no envían uno nuevo
-        // Asegurar que clientIds sea un array
+        let newPass = check.rows[0].password;
+        
+        // Si viene password y NO es igual al anterior (implica cambio), encriptarlo
+        // Nota: En frontend se debe validar que si el campo viene vacío, no se envía
+        if (u.password && u.password.trim() !== '') {
+             const salt = await bcrypt.genSalt(10);
+             newPass = await bcrypt.hash(u.password, salt);
+        }
+
         const clientIds = Array.isArray(u.clientIds) ? u.clientIds : (u.clientId ? [u.clientId] : []);
         
         await pool.query(`
@@ -51,7 +60,6 @@ export const saveUser = async (req: Request, res: Response) => {
           WHERE id = $1
         `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled, u.updatedBy || 'System']);
         
-        // ASEGURAR QUE EL REGISTRO DE PERMISOS EXISTA (BACK-FILL SI FALTA)
         await pool.query(`
           INSERT INTO user_permissions (id, user_id, permissions, status_id, created_by, updated_by, created_at, updated_at)
           VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -60,20 +68,22 @@ export const saveUser = async (req: Request, res: Response) => {
 
         res.json({ success: true, message: 'Usuario actualizado correctamente' });
     } else {
-        // INSERT (Password es obligatorio)
+        // INSERT
         if (!u.password) {
-            res.status(400).json({ error: "La contraseña es obligatoria para nuevos usuarios" });
-            return;
+            return res.status(400).json({ error: "La contraseña es obligatoria para nuevos usuarios" });
         }
-        // Asegurar que clientIds sea un array
+
+        // Encriptar password inicial
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(u.password, salt);
+
         const clientIds = Array.isArray(u.clientIds) ? u.clientIds : (u.clientId ? [u.clientId] : []);
 
         await pool.query(`
           INSERT INTO users (id, email, name, password, role_id, client_ids, status_id, phone, avatar, document_type, document_number, two_factor_enabled)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        `, [u.id, u.email, u.name, u.password, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled]);
+        `, [u.id, u.email, u.name, hashedPassword, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled]);
         
-        // CREAR REGISTRO DE PERMISOS INICIAL (SI NO EXISTE)
         await pool.query(`
           INSERT INTO user_permissions (id, user_id, permissions, status_id)
           VALUES ($1, $2, $3, $4)

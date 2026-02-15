@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Icons, INITIAL_CLIENTS, AVATAR_GALLERY } from '../constants';
+import { getMasterCategoryFromRoute } from '../constants/routes';
 import { Toaster, toast } from 'sonner';
 import { User, PageModule, MasterCategory, MasterRecord } from '../types';
 import { api } from '../services/api';
@@ -11,6 +12,8 @@ interface LayoutProps {
   setActiveTab: (tab: string) => void;
   activeMasterCategory?: MasterCategory;
   setActiveMasterCategory?: (cat: MasterCategory) => void;
+  activePageId?: string;
+  setActivePageId?: (id: string) => void;
   onBack?: () => void;
   showBack?: boolean;
   user: User;
@@ -22,6 +25,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({
   children, activeTab, setActiveTab, activeMasterCategory, setActiveMasterCategory,
+  activePageId, setActivePageId,
   onBack, showBack, user, onUpdateUser, onLogout, modulesData = [], pagesData = []
 }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -83,28 +87,39 @@ const Layout: React.FC<LayoutProps> = ({
 
   // ORDENAMIENTO ASCENDENTE DE GRUPOS Y PÁGINAS - ROBUSTECIMIENTO DE PROPIEDADES
 
-
   const menuGroups = [...modulesData]
     .filter(m => (m.statusId || m.status_id) === 'EST-01')
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(mod => {
-      const modId = mod.id;
+      const modId = String(mod.id).trim().toUpperCase();
+      
       const allowedPages = [...pagesData]
-        .filter(p => (p.parentId || p.parent_id) === modId && (p.statusId || p.status_id) === 'EST-01')
         .filter(p => {
-          if (isSuperUser) return true; // BYPASS REAL PARA EL ADMINISTRADOR
+          const pParentId = String(p.parentId || p.parent_id || '').trim().toUpperCase();
+          const isMatch = pParentId === modId;
+          const isActive = (p.statusId || p.status_id) === 'EST-01';
+          return isMatch && isActive;
+        })
+        .filter(p => {
+          if (isSuperUser) return true;
           const pId = p.id;
           const userPerm = user.permissions.find(perm => perm.module === pId);
-          const hasPermission = userPerm && userPerm.actions.includes('view');
-          return hasPermission;
+          return userPerm && userPerm.actions.includes('view');
         })
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map(page => ({
-          id: page.id,
-          label: page.name,
-          module: page.route as PageModule,
-          masterCat: (page.moduleId || page.module_id) as MasterCategory
-        }));
+        .map(page => {
+          const masterCat = getMasterCategoryFromRoute(page.route, page.id);
+          // Si tiene categoría maestra, el tab activo debe ser 'master' para mostrar MasterModule
+          // A menos que sea una ruta operativa directa como 'despacho', 'rutas', etc.
+          const isMasterPage = !!masterCat;
+          
+          return {
+            id: page.id,
+            label: page.name,
+            module: (isMasterPage ? 'master' : page.route) as PageModule,
+            masterCat: masterCat as MasterCategory
+          };
+        });
 
       return {
         id: mod.id,
@@ -139,6 +154,7 @@ const Layout: React.FC<LayoutProps> = ({
     }
     if (item.module) setActiveTab(item.module);
     if (item.masterCat && setActiveMasterCategory) setActiveMasterCategory(item.masterCat);
+    if (item.id && setActivePageId) setActivePageId(item.id);
     if (window.innerWidth < 768) setIsMobileMenuOpen(false);
   };
 
@@ -200,7 +216,7 @@ const Layout: React.FC<LayoutProps> = ({
               {expandedGroup === group.id && !isCollapsed && (
                 <div className="ml-6 pl-4 border-l border-slate-800 space-y-1 py-1">
                   {group.items.map((item) => (
-                    <button key={item.id} onClick={() => selectItem(item)} className={`w-full text-left px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all ${(activeTab === item.module && (!activeMasterCategory || activeMasterCategory === item.masterCat)) ? 'text-emerald-400 bg-emerald-400/5' : 'text-slate-500 hover:text-slate-300'}`}>
+                    <button key={item.id} onClick={() => selectItem(item)} className={`w-full text-left px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all ${(activePageId === item.id) ? 'text-emerald-400 bg-emerald-400/5 shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}>
                       {item.label}
                     </button>
                   ))}

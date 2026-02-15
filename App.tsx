@@ -36,6 +36,7 @@ const App: React.FC = () => {
     user,
     activeTab,
     activeMasterCategory,
+    activePageId,
     allMasterData,
     documents,
     invoices,
@@ -48,12 +49,15 @@ const App: React.FC = () => {
     isLoading,
     showTimeoutWarning,
     timeLeft,
+    modules,
+    pages,
 
     // Acciones
     setUser,
     setIsAuthenticated,
     setActiveTab,
     setActiveMasterCategory,
+    setActivePageId,
     setAllMasterData,
     setDocuments,
     setInvoices,
@@ -90,14 +94,47 @@ const App: React.FC = () => {
 
   const normalize = React.useCallback((data: any) => {
     if (!Array.isArray(data)) return [];
-    return data.map(item => ({
-      ...item,
-      statusId: item.statusId || item.status_id,
-      parentId: item.parentId || item.parent_id,
-      moduleId: item.moduleId || item.module_id,
-      iconClass: item.iconClass || item.icon_class,
-      roleId: item.roleId || item.role_id
-    }));
+    return data.map(item => {
+      // Robustez absoluta para campos Postgres
+      const getVal = (primary: string, secondary: string) => {
+        // Mayúsculas/Minúsculas - Driver Postgres Docker
+        const pUpper = primary.toUpperCase();
+        const sUpper = secondary.toUpperCase();
+        const keys = Object.keys(item);
+        const findKey = (k: string) => keys.find(key => key.toLowerCase() === k.toLowerCase());
+        
+        const key = findKey(primary) || findKey(secondary) || primary || secondary;
+        return (item[key] !== undefined && item[key] !== null) ? item[key] : undefined;
+      };
+
+      const parseDate = (val: any) => {
+        if (!val) return undefined;
+        if (typeof val === 'string') {
+          // Postgres format: space instead of T
+          if (val.includes(' ') && !val.includes('T')) return val.replace(' ', 'T');
+        }
+        return val;
+      };
+
+      return {
+        ...item,
+        statusId: getVal('statusId', 'status_id'),
+        moduleId: getVal('moduleId', 'module_id'),
+        iconClass: getVal('iconClass', 'icon_class'),
+        roleId: getVal('roleId', 'role_id'),
+        // Auditoría Normalizada
+        createdAt: parseDate(getVal('createdAt', 'created_at')),
+        updatedAt: parseDate(getVal('updatedAt', 'updated_at')),
+        createdBy: getVal('createdBy', 'created_by'),
+        updatedBy: getVal('updatedBy', 'updated_by'),
+        // Sistema
+        notificationEmail: getVal('notificationEmail', 'notification_email'),
+        tipoNotificacionId: getVal('tipoNotificacionId', 'tipo_notificacion_id'),
+        tipoNotificacionName: getVal('tipoNotificacionName', 'tipo_notificacion_name'),
+        logoUrl: getVal('logoUrl', 'logo_url'),
+        imageUrl: getVal('imageUrl', 'image_url')
+      };
+    });
   }, []);
 
   // Timeout - 10 Minutos (600,000 ms)
@@ -227,27 +264,26 @@ const App: React.FC = () => {
       ] = await Promise.all([
         api.getModules().then(normalize).catch(() => []),
         api.getPages().then(normalize).catch(() => []),
-        api.getGenericMasters().catch(() => []),
-        api.getCategories().catch(() => []), // NEW: Categories Table
-        api.getArticles().catch(() => []),
-        api.getVehicles().catch(() => []),
-        api.getDrivers().catch(() => []),
-        api.getUsers().catch(() => []),
-        api.getRoles().catch(() => []),
-        api.getPermissions().catch(() => []),
-        api.getAllUserPermissions().catch(() => []),
-        api.getClients().catch(() => []),
-        api.getAssignments().catch(() => []),
+        api.getGenericMasters().then(normalize).catch(() => []),
+        api.getCategories().then(normalize).catch(() => []), 
+        api.getArticles().then(normalize).catch(() => []),
+        api.getVehicles().then(normalize).catch(() => []),
+        api.getDrivers().then(normalize).catch(() => []),
+        api.getUsers().then(normalize).catch(() => []),
+        api.getRoles().then(normalize).catch(() => []),
+        api.getPermissions().then(normalize).catch(() => []),
+        api.getAllUserPermissions().then(normalize).catch(() => []),
+        api.getClients().then(normalize).catch(() => []),
+        api.getAssignments().then(normalize).catch(() => []),
         api.getInvoices(targetClientId).catch(() => []),
         api.getRoutes().catch(() => []),
-        // NEW: Dedicated tables
-        api.getEstados().catch(() => []),
-        api.getMarcas().catch(() => []),
-        api.getTiposDocumento().catch(() => []),
-        api.getUnidadesMedida().catch(() => []),
-        api.getNotificacionesConfig().catch(() => []),
-        api.getTiposVehiculo().catch(() => []),
-        api.getTiposNotificacion().catch(() => [])
+        api.getEstados().then(normalize).catch(() => []),
+        api.getMarcas().then(normalize).catch(() => []),
+        api.getTiposDocumento().then(normalize).catch(() => []),
+        api.getUnidadesMedida().then(normalize).catch(() => []),
+        api.getNotificacionesConfig().then(normalize).catch(() => []),
+        api.getTiposVehiculo().then(normalize).catch(() => []),
+        api.getTiposNotificacion().then(normalize).catch(() => [])
       ]);
 
       // Actualizamos estado global
@@ -264,7 +300,7 @@ const App: React.FC = () => {
         });
       }
 
-      const mappedArticles = Array.isArray(articles) ? articles.map((a: any) => ({
+      const mappedArticles = normalize(Array.isArray(articles) ? articles.map((a: any) => ({
         ...a,
         statusId: a.status_id,
         clientId: a.client_id,
@@ -272,12 +308,12 @@ const App: React.FC = () => {
         factorStd: a.factor_std,
         uomGeneralId: a.uom_general_id,
         uomInterId: a.uom_inter_id,
-        uomStdId: a.uom_std, // FIXED: Column is uom_std
+        uomStdId: a.uom_std, 
         categoryArticuloId: a.category_articulo_id,
-        imageUrl: a.image_url // ADDED: Image URL
-      })) : [];
+        imageUrl: a.image_url 
+      })) : []);
 
-      const mappedVehicles = Array.isArray(vehicles) ? vehicles.map((v: any) => ({
+      const mappedVehicles = normalize(Array.isArray(vehicles) ? vehicles.map((v: any) => ({
         ...v,
         clientId: v.client_id,
         statusId: v.status_id,
@@ -289,9 +325,9 @@ const App: React.FC = () => {
         modelYear: v.model_year,
         color: v.color,
         vehicleTypeId: v.vehicle_type
-      })) : [];
+      })) : []);
 
-      const mappedDrivers = Array.isArray(drivers) ? drivers.map((d: any) => ({
+      const mappedDrivers = normalize(Array.isArray(drivers) ? drivers.map((d: any) => ({
         ...d,
         status: (d.status_id === 'EST-01' || d.status_id === '1' || d.status === 'Activo') ? 'Activo' : 'Inactivo',
         documentType: d.document_type,
@@ -301,96 +337,23 @@ const App: React.FC = () => {
         licenseSideA: d.license_side_a,
         licenseSideB: d.license_side_b,
         licenseCategory: d.license_category
-      })) : [];
+      })) : []);
 
       setAllMasterData({
         ...groupedMasters,
-        masterCategorias: Array.isArray(categories) ? categories.map((c: any) => ({
-          ...c,
-          statusId: c.status_id,
-          createdBy: c.created_by,
-          updatedBy: c.updated_by,
-          createdAt: c.created_at,
-          updatedAt: c.updated_at
-        })) : [],
-        masterEstados: Array.isArray(estados) ? estados.map((e: any) => ({
-          ...e,
-          statusId: e.status_id,
-          createdBy: e.created_by,
-          updatedBy: e.updated_by,
-          createdAt: e.created_at,
-          updatedAt: e.updated_at
-        })) : [],
-        masterMarcas: Array.isArray(marcas) ? marcas.map((m: any) => ({
-          ...m,
-          statusId: m.status_id,
-          createdBy: m.created_by,
-          updatedBy: m.updated_by,
-          createdAt: m.created_at,
-          updatedAt: m.updated_at
-        })) : [],
-        masterTipoDocumento: Array.isArray(tiposDocumento) ? tiposDocumento.map((td: any) => ({
-          ...td,
-          statusId: td.status_id,
-          createdBy: td.created_by,
-          updatedBy: td.updated_by,
-          createdAt: td.created_at,
-          updatedAt: td.updated_at
-        })) : [],
-        masterUnidadMedida: Array.isArray(unidadesMedida) ? unidadesMedida.map((um: any) => ({
-          ...um,
-          statusId: um.status_id,
-          createdBy: um.created_by,
-          updatedBy: um.updated_by,
-          createdAt: um.created_at,
-          updatedAt: um.updated_at
-        })) : [],
-        masterNotificaciones: Array.isArray(notificacionesConfig) ? notificacionesConfig.map((n: any) => ({
-          ...n,
-          notificationEmail: n.notification_email,
-          tipoNotificacionId: n.tipo_notificacion_id,
-          tipoNotificacionName: n.tipo_notificacion_name,
-          statusId: n.status_id,
-          createdBy: n.created_by,
-          updatedBy: n.updated_by,
-          createdAt: n.created_at,
-          updatedAt: n.updated_at
-        })) : [],
-        masterTiposVehiculo: Array.isArray(tiposVehiculo) ? tiposVehiculo.map((tv: any) => ({
-          ...tv,
-          statusId: tv.status_id,
-          createdBy: tv.created_by,
-          updatedBy: tv.updated_by,
-          createdAt: tv.created_at,
-          updatedAt: tv.updated_at
-        })) : [],
-        masterTipoNotificacion: Array.isArray(tiposNotificacion) ? tiposNotificacion.map((tn: any) => ({
-          ...tn,
-          statusId: tn.status_id,
-          createdBy: tn.created_by,
-          updatedBy: tn.updated_by,
-          createdAt: tn.created_at,
-          updatedAt: tn.updated_at
-        })) : [],
+        masterCategorias: categories,
+        masterEstados: estados,
+        masterMarcas: marcas,
+        masterTipoDocumento: tiposDocumento,
+        masterUnidadMedida: unidadesMedida,
+        masterNotificaciones: notificacionesConfig,
+        masterTiposVehiculo: tiposVehiculo,
+        masterTipoNotificacion: tiposNotificacion,
         masterUsuarios: usersData,
-        masterRol: Array.isArray(rolesData) ? rolesData.map((r: any) => ({
-          ...r,
-          statusId: r.status_id,
-          createdBy: r.created_by,
-          updatedBy: r.updated_by,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at
-        })) : [],
+        masterRol: rolesData,
         masterPermisosRol: permsData,
         masterPermisosUsuario: userPermsData,
-        masterClientes: Array.isArray(clientsData) ? clientsData.map((c: any) => ({
-          ...c,
-          logoUrl: c.logo_url, // Map from DB column
-          createdAt: c.created_at,
-          updatedAt: c.updated_at,
-          createdBy: c.created_by,
-          updatedBy: c.updated_by
-        })) : [],
+        masterClientes: clientsData,
         masterArticulo: mappedArticles,
         masterVehiculos: mappedVehicles,
         masterConductores: mappedDrivers
@@ -579,6 +542,9 @@ const App: React.FC = () => {
         permissions: mappedPermissions,
         clientId: 'c1'
       } as any;
+
+      // Update store with dedicated tables
+      useAppStore.setState({ pages, modules });
 
       setUser(finalUser);
       localStorage.setItem('m7_user_session', JSON.stringify(finalUser));
@@ -929,6 +895,8 @@ const App: React.FC = () => {
     );
   }
 
+  const handleBack = () => setActiveTab('dashboard');
+
   if (!isAuthenticated || !user) {
     return <Login onLogin={handleLogin} />;
   }
@@ -945,14 +913,16 @@ const App: React.FC = () => {
         }}
       />
       <Layout
-        user={user}
+        user={user!}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         activeMasterCategory={activeMasterCategory}
         setActiveMasterCategory={setActiveMasterCategory}
+        activePageId={activePageId}
+        setActivePageId={setActivePageId}
         onUpdateUser={async (data) => {
           try {
-            const updatedUser = { ...user, ...data };
+            const updatedUser = { ...user, ...data } as User;
             setUser(updatedUser);
             // Persistir en Backend
             console.log('[M7-APP] Persistiendo usuario...', updatedUser);
@@ -968,9 +938,11 @@ const App: React.FC = () => {
             toast.error("Error al guardar en servidor", { description: "Los cambios son locales temporalmente." });
           }
         }}
-        onLogout={handleLogout}
-        modulesData={useAppStore.getState().modules}
-        pagesData={useAppStore.getState().pages}
+        onLogout={() => handleLogout()}
+        onBack={handleBack}
+        showBack={activeTab !== 'dashboard'}
+        modulesData={modules}
+        pagesData={pages}
       >
         {renderContent()}
       </Layout>

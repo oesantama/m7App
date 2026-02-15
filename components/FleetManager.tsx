@@ -327,7 +327,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
   };
 
   const isSuperUser = user.roleId === 'ROL-01';
-  const fleetPerms = user.permissions.find(p => p.module === 'PAG-OP-04');
+  const fleetPerms = user.permissions.find(p => p.module === 'PAG-08');
   const canCreate = isSuperUser || fleetPerms?.actions.includes('create');
   const canEdit = isSuperUser || fleetPerms?.actions.includes('edit');
   const canDelete = isSuperUser || fleetPerms?.actions.includes('delete');

@@ -22,7 +22,11 @@ export const getRolePermissions = async (req: Request, res: Response) => {
             id: row.id,
             roleId: row.role_id,
             roleName: row.role_name,
-            statusId: row.status_id
+            statusId: row.status_id,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+            createdBy: row.created_by,
+            updatedBy: row.updated_by
         };
     });
     

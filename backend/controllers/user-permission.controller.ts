@@ -21,7 +21,11 @@ export const getAllUserPermissions = async (req: Request, res: Response) => {
             id: row.id,
             userId: row.user_id,
             userName: row.user_name || row.user_email || row.user_id,
-            statusId: row.status_id
+            statusId: row.status_id,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+            createdBy: row.created_by,
+            updatedBy: row.updated_by
         };
     });
     

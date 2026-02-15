@@ -27,7 +27,7 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
 
   // ... (perms and memo logic remains same)
   const isSuperUser = user.roleId === 'ROL-01';
-  const assignmentPerms = user.permissions.find(p => p.module === 'PAG-OP-05');
+  const assignmentPerms = user.permissions.find(p => p.module === 'PAG-05');
   const canCreate = isSuperUser || assignmentPerms?.actions.includes('create');
 
   const activeAssignments = useMemo(() => 
