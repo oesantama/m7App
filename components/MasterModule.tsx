@@ -109,7 +109,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterPermisosRol: 'PRL',
     masterPermisosUsuario: 'PUS',
     masterTipoDocumento: 'DOC',
-    masterCategorias: 'CAT'
+    masterCategorias: 'CAT',
+    modules: 'MOD',
+    pages: 'PAG'
   };
 
   const MASTER_LABELS: Record<MasterCategory, string> = {
@@ -126,7 +128,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterPermisosRol: 'MATRIZ DE ROLES',
     masterPermisosUsuario: 'MATRIZ DE USUARIOS',
     masterTipoDocumento: 'TIPOS DE DOCUMENTO',
-    masterCategorias: 'CATEGORÍAS DE ARTÍCULO'
+    masterCategorias: 'CATEGORÍAS DE ARTÍCULO',
+    modules: 'MÓDULOS',
+    pages: 'PÁGINAS WEB'
   };
 
   const generateNextId = (category: MasterCategory, data: MasterRecord[]) => {
@@ -366,13 +370,13 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         saveResponse = await api.savePermission(newRecord);
       } else if (activeMaster === 'masterPermisosUsuario') {
         saveResponse = await api.saveUserPermission(newRecord);
-      } else if (activeMaster === 'masterPaginas') {
+      } else if (activeMaster === 'pages') {
         saveResponse = await api.savePage(newRecord);
       } else if (activeMaster === 'masterCategorias') {
         saveResponse = await saveCategory(newRecord);
       } else if (activeMaster === 'masterClientes') {
         saveResponse = await api.saveClient(newRecord);
-      } else if (activeMaster === 'masterModulos') {
+      } else if (activeMaster === 'modules') {
         saveResponse = await api.saveModule(newRecord);
       } else if (activeMaster === 'masterEstados') {
         const cleanData = {
@@ -408,6 +412,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         const cleanData = {
           id: newRecord.id,
           name: newRecord.name,
+          abbreviation: newRecord.abbreviation || '',
           description: newRecord.description || '',
           statusId: newRecord.statusId,
           createdBy: newRecord.createdBy || user.name,
@@ -418,6 +423,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         const cleanData = {
           id: newRecord.id,
           name: newRecord.name,
+          description: newRecord.description || '',
           notificationEmail: newRecord.notificationEmail || '',
           tipoNotificacionId: newRecord.tipoNotificacionId,
           statusId: newRecord.statusId,
@@ -497,12 +503,15 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               break;
             case 'masterRol':
               newData = await api.getRoles();
+              newData = newData.map((r: any) => ({ ...r, statusId: r.status_id, createdBy: r.created_by, updatedBy: r.updated_by, createdAt: r.created_at, updatedAt: r.updated_at }));
               break;
-            case 'masterModulos':
+            case 'modules':
               newData = await api.getModules();
+              newData = newData.map((m: any) => ({ ...m, statusId: m.status_id, createdBy: m.created_by, updatedBy: m.updated_by, createdAt: m.created_at, updatedAt: m.updated_at }));
               break;
-            case 'masterPaginas':
+            case 'pages':
               newData = await api.getPages();
+              newData = newData.map((p: any) => ({ ...p, moduleId: p.module_id, statusId: p.status_id, createdBy: p.created_by, updatedBy: p.updated_by, createdAt: p.created_at, updatedAt: p.updated_at }));
               break;
             case 'masterCategorias':
               const catData = await api.getCategories();
@@ -548,24 +557,42 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             }
             case 'masterEstados':
               newData = await api.getEstados();
+              newData = newData.map((e: any) => ({ ...e, statusId: e.status_id, createdBy: e.created_by, updatedBy: e.updated_by, createdAt: e.created_at, updatedAt: e.updated_at }));
               break;
             case 'masterMarcas':
               newData = await api.getMarcas();
+              newData = newData.map((m: any) => ({ ...m, statusId: m.status_id, createdBy: m.created_by, updatedBy: m.updated_by, createdAt: m.created_at, updatedAt: m.updated_at }));
               break;
             case 'masterTipoDocumento':
               newData = await api.getTiposDocumento();
+              newData = newData.map((td: any) => ({ ...td, statusId: td.status_id, createdBy: td.created_by, updatedBy: td.updated_by, createdAt: td.created_at, updatedAt: td.updated_at }));
               break;
             case 'masterUnidadMedida':
               newData = await api.getUnidadesMedida();
+              newData = newData.map((um: any) => ({ ...um, statusId: um.status_id, createdBy: um.created_by, updatedBy: um.updated_by, createdAt: um.created_at, updatedAt: um.updated_at }));
               break;
             case 'masterNotificaciones':
               newData = await api.getNotificacionesConfig();
+              // Map snake_case to camelCase like in App.tsx
+              newData = newData.map((n: any) => ({
+                ...n,
+                notificationEmail: n.notification_email,
+                tipoNotificacionId: n.tipo_notificacion_id,
+                tipoNotificacionName: n.tipo_notificacion_name,
+                statusId: n.status_id,
+                createdBy: n.created_by,
+                updatedBy: n.updated_by,
+                createdAt: n.created_at,
+                updatedAt: n.updated_at
+              }));
               break;
             case 'masterTiposVehiculo':
               newData = await api.getTiposVehiculo();
+              newData = newData.map((tv: any) => ({ ...tv, statusId: tv.status_id, createdBy: tv.created_by, updatedBy: tv.updated_by, createdAt: tv.created_at, updatedAt: tv.updated_at }));
               break;
             case 'masterTipoNotificacion':
               newData = await api.getTiposNotificacion();
+              newData = newData.map((tn: any) => ({ ...tn, statusId: tn.status_id, createdBy: tn.created_by, updatedBy: tn.updated_by, createdAt: tn.created_at, updatedAt: tn.updated_at }));
               break;
             default: {
               // Maestros Genéricos (filter from all generic masters)
@@ -643,16 +670,36 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         await api.deleteRole(recordToDelete.id, user.name);
       } else if (activeMaster === 'masterClientes') {
         await api.deleteClient(recordToDelete.id, user.name);
-      } else if (activeMaster === 'masterModulos') {
+      } else if (activeMaster === 'modules') {
         await api.deleteModule(recordToDelete.id, user.name);
-      } else if (activeMaster === 'masterPaginas') {
+      } else if (activeMaster === 'pages') {
         await api.deletePage(recordToDelete.id, user.name);
+      } else if (activeMaster === 'masterEstados') {
+        await api.deleteEstado(recordToDelete.id, user.name);
+      } else if (activeMaster === 'masterMarcas') {
+        await api.deleteMarca(recordToDelete.id, user.name);
+      } else if (activeMaster === 'masterTipoDocumento') {
+        await api.deleteTipoDocumento(recordToDelete.id, user.name);
+      } else if (activeMaster === 'masterUnidadMedida') {
+        await api.deleteUnidadMedida(recordToDelete.id, user.name);
+      } else if (activeMaster === 'masterNotificaciones') {
+        await api.deleteNotificacionConfig(recordToDelete.id, user.name);
+      } else if (activeMaster === 'masterTiposVehiculo') {
+        await api.deleteTipoVehiculo(recordToDelete.id, user.name);
+      } else if (activeMaster === 'masterTipoNotificacion') {
+        await api.deleteTipoNotificacion(recordToDelete.id, user.name);
       } else {
         await api.deleteMaster(activeMaster, recordToDelete.id, user.name);
       }
 
       toast.success("Registro Eliminado", { description: "La base de datos se ha actualizado." });
       if (onAudit) onAudit(activeMaster, 'DELETE');
+      
+      // Actualizar el store filtrando el registro eliminado
+      const currentData = allMasterData[activeMaster] || [];
+      const updatedData = currentData.filter((item: any) => item.id !== recordToDelete.id);
+      useAppStore.getState().updateMasterCategory(activeMaster, updatedData);
+      
       setIsModalOpen(false);
       setShowDeleteConfirm(false);
       setRecordToDelete(null);
@@ -1221,7 +1268,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
           </div>
         );
 
-      case 'masterModulos':
+
+      case 'modules':
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Módulo</label>
@@ -1241,7 +1289,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
           </div>
         );
 
-      case 'masterPaginas':
+      case 'pages':
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de la Página Web</label>
@@ -1264,6 +1312,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de Alerta / Grupo</label>
               <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Detalle de la alerta o contexto..." />
             </div>
             <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Email de Notificación</label>
               <input type="email" placeholder="ejemplo@correo.com" value={formData.notificationEmail || ''} onChange={e => setFormData({ ...formData, notificationEmail: e.target.value.toLowerCase() })} className={commonInputStyle} required />
@@ -1304,6 +1355,24 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
           </div>
         );
 
+      case 'masterUnidadMedida':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de la Unidad</label>
+              <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Abreviación</label>
+              <input type="text" value={formData.abbreviation || ''} onChange={e => setFormData({ ...formData, abbreviation: e.target.value.toUpperCase() })} className={commonInputStyle} placeholder="Ej: KG, M, L..." />
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Estado Operativo M7</label>
+              {renderStatusField()}
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Detalles sobre esta unidad de medida..." />
+            </div>
+          </div>
+        );
+
       case 'masterMarcas':
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
@@ -1312,6 +1381,45 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             </div>
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
               <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Información adicional sobre la marca..." />
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterTipoDocumento':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Tipo de Documento</label>
+              <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Detalles del tipo de documento..." />
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterTipoNotificacion':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Grupo de Alerta</label>
+              <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Propósito de este grupo de alertas..." />
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterTiposVehiculo':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Tipo de Vehículo</label>
+              <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
+              <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Características del tipo de vehículo..." />
             </div>
             {renderStatusField()}
           </div>
@@ -1434,9 +1542,10 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                                <span className="text-[8px] text-slate-400 font-medium italic truncate max-w-[200px]">{(item as any).description}</span>
                             )}
 
-                            {activeMaster === 'masterNotificaciones' && (
+
+                            {activeMaster === 'masterNotificaciones' && (item as any).tipoNotificacionName && (
                               <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-fit text-[8px] font-black uppercase mt-1">
-                                {notificationTypes.find(nt => nt.id === (item as any).tipoNotificacionId)?.name || 'TIPO DESCONOCIDO'}
+                                {(item as any).tipoNotificacionName}
                               </span>
                             )}
                           </div>

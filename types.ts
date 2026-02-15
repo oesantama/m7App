@@ -217,5 +217,7 @@ export type MasterCategory =
   | 'masterNotificaciones'
   | 'masterTipoNotificacion'
   | 'masterUnidadMedida'
-  | 'masterTipoDocumento';
+  | 'masterTipoDocumento'
+  | 'modules' // Direct table access
+  | 'pages'; // Direct table access
 

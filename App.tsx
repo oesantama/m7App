@@ -305,16 +305,82 @@ const App: React.FC = () => {
 
       setAllMasterData({
         ...groupedMasters,
-        masterCategorias: categories, // NEW: From dedicated table
-        masterEstados: estados, // NEW: From dedicated table
-        masterMarcas: marcas, // NEW: From dedicated table
-        masterTipoDocumento: tiposDocumento, // NEW: From dedicated table
-        masterUnidadMedida: unidadesMedida, // NEW: From dedicated table
-        masterNotificaciones: notificacionesConfig, // NEW: From dedicated table
-        masterTiposVehiculo: tiposVehiculo, // NEW: From dedicated table
-        masterTipoNotificacion: tiposNotificacion, // NEW: From dedicated table
+        masterCategorias: Array.isArray(categories) ? categories.map((c: any) => ({
+          ...c,
+          statusId: c.status_id,
+          createdBy: c.created_by,
+          updatedBy: c.updated_by,
+          createdAt: c.created_at,
+          updatedAt: c.updated_at
+        })) : [],
+        masterEstados: Array.isArray(estados) ? estados.map((e: any) => ({
+          ...e,
+          statusId: e.status_id,
+          createdBy: e.created_by,
+          updatedBy: e.updated_by,
+          createdAt: e.created_at,
+          updatedAt: e.updated_at
+        })) : [],
+        masterMarcas: Array.isArray(marcas) ? marcas.map((m: any) => ({
+          ...m,
+          statusId: m.status_id,
+          createdBy: m.created_by,
+          updatedBy: m.updated_by,
+          createdAt: m.created_at,
+          updatedAt: m.updated_at
+        })) : [],
+        masterTipoDocumento: Array.isArray(tiposDocumento) ? tiposDocumento.map((td: any) => ({
+          ...td,
+          statusId: td.status_id,
+          createdBy: td.created_by,
+          updatedBy: td.updated_by,
+          createdAt: td.created_at,
+          updatedAt: td.updated_at
+        })) : [],
+        masterUnidadMedida: Array.isArray(unidadesMedida) ? unidadesMedida.map((um: any) => ({
+          ...um,
+          statusId: um.status_id,
+          createdBy: um.created_by,
+          updatedBy: um.updated_by,
+          createdAt: um.created_at,
+          updatedAt: um.updated_at
+        })) : [],
+        masterNotificaciones: Array.isArray(notificacionesConfig) ? notificacionesConfig.map((n: any) => ({
+          ...n,
+          notificationEmail: n.notification_email,
+          tipoNotificacionId: n.tipo_notificacion_id,
+          tipoNotificacionName: n.tipo_notificacion_name,
+          statusId: n.status_id,
+          createdBy: n.created_by,
+          updatedBy: n.updated_by,
+          createdAt: n.created_at,
+          updatedAt: n.updated_at
+        })) : [],
+        masterTiposVehiculo: Array.isArray(tiposVehiculo) ? tiposVehiculo.map((tv: any) => ({
+          ...tv,
+          statusId: tv.status_id,
+          createdBy: tv.created_by,
+          updatedBy: tv.updated_by,
+          createdAt: tv.created_at,
+          updatedAt: tv.updated_at
+        })) : [],
+        masterTipoNotificacion: Array.isArray(tiposNotificacion) ? tiposNotificacion.map((tn: any) => ({
+          ...tn,
+          statusId: tn.status_id,
+          createdBy: tn.created_by,
+          updatedBy: tn.updated_by,
+          createdAt: tn.created_at,
+          updatedAt: tn.updated_at
+        })) : [],
         masterUsuarios: usersData,
-        masterRol: rolesData,
+        masterRol: Array.isArray(rolesData) ? rolesData.map((r: any) => ({
+          ...r,
+          statusId: r.status_id,
+          createdBy: r.created_by,
+          updatedBy: r.updated_by,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at
+        })) : [],
         masterPermisosRol: permsData,
         masterPermisosUsuario: userPermsData,
         masterClientes: Array.isArray(clientsData) ? clientsData.map((c: any) => ({
@@ -474,8 +540,6 @@ const App: React.FC = () => {
         masterClientes: Array.isArray(clients) ? clients : [],
         masterUsuarios: Array.isArray(users) ? users : [],
         masterRol: Array.isArray(roles) ? roles : [],
-        masterModulos: Array.isArray(modules) ? modules : [],
-        masterPaginas: Array.isArray(pages) ? pages : [],
         masterPermisosRol: Array.isArray(permissions) ? permissions : [],
         masterPermisosUsuario: Array.isArray(userPermissionsAll) ? userPermissionsAll : [],
         masterArticulo: Array.isArray(articData) ? articData.map((a: any) => ({
