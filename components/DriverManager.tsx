@@ -103,7 +103,7 @@ const DriverManager: React.FC<DriverManagerProps> = ({ drivers, user, masterData
             <button onClick={() => setDisplayType('grid')} className={`flex-1 p-2 rounded-xl transition-all relative z-10 ${displayType === 'grid' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.Grid className="mx-auto" /></button>
             <div className={`absolute top-1 bottom-1 w-[44px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayType === 'table' ? 'left-1' : 'left-[47px]'}`}></div>
           </div>
-          <button onClick={handleExportExcel} className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><Icons.Excel /></button>
+          <button onClick={handleExportExcel} className="p-3.5 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl"><Icons.Excel className="w-4 h-4" /></button>
           <div className="h-10 w-[1px] bg-slate-100 mx-2"></div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">M7 TALENT: {drivers.length}</p>
         </div>

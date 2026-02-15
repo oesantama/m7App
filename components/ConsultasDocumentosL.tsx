@@ -277,8 +277,8 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           </div>
         </div>
         <div className="flex justify-end gap-4">
-          <button onClick={() => exportToExcel(filteredDocs, "M7_Historial")} className="px-10 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center gap-3">
-            <Icons.Excel /> Exportar Excel
+          <button onClick={() => exportToExcel(filteredDocs, "M7_Historial")} className="px-10 py-4 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl flex items-center gap-3">
+            <Icons.Excel className="w-5 h-5" /> Exportar Excel
           </button>
           <button onClick={clearFilters} className="px-10 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all">Limpiar Filtros</button>
         </div>
@@ -432,7 +432,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     </div>
                     <button
                       onClick={handleDetailExport}
-                      className="bg-emerald-500 text-white px-3 py-2 rounded-lg hover:bg-emerald-600 transition-colors shadow-lg"
+                      className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white px-4 py-3 rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl"
                       title="Exportar a Excel"
                     >
                       <Icons.Excel className="w-4 h-4" />

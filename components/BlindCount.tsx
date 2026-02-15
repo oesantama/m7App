@@ -635,7 +635,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
               </div>
 
               {/* XLS BUTTON */}
-              <button onClick={exportToExcel} className="flex px-4 py-3 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all items-center gap-2 border border-emerald-100 shrink-0">
+              <button onClick={exportToExcel} className="flex px-4 py-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl items-center gap-2 border border-emerald-400/20 shrink-0 font-black text-[9px] uppercase tracking-widest">
                 <Icons.Excel className="w-3.5 h-3.5" /> XLS
               </button>
 

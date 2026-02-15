@@ -720,7 +720,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                          </div>
                        </div>
                       <div className="flex items-center gap-3">
-                         <button onClick={() => exportToExcel(filteredPreviewItems, "M7_Prevalidacion")} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-all"><Icons.Excel className="w-4 h-4" /></button>
+                         <button onClick={() => exportToExcel(filteredPreviewItems, "M7_Prevalidacion")} className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl"><Icons.Excel className="w-4 h-4" /></button>
                          <button onClick={()=>setPreview(null)} className="w-8 h-8 rounded-full hover:bg-red-500 transition-all flex items-center justify-center text-xl font-thin">×</button>
                       </div>
                    </div>
@@ -894,7 +894,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                     </div>
                  </div>
                  <div className="flex items-center gap-4">
-                    <button onClick={() => exportToExcel(selectedPendingDoc.items, `M7_Detalles_${selectedPendingDoc.externalDocId}`)} className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-all flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel /> Exportar</button>
+                    <button onClick={() => exportToExcel(selectedPendingDoc.items, `M7_Detalles_${selectedPendingDoc.externalDocId}`)} className="px-5 py-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel className="w-4 h-4" /> Exportar</button>
                     <button onClick={()=>setSelectedPendingDoc(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-3xl font-thin">×</button>
                  </div>
               </div>

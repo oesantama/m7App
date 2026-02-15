@@ -226,7 +226,16 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   };
 
   const filteredData = useMemo(() => {
-    const list = allMasterData[activeMaster] || [];
+    // For modules and pages, use dedicated store fields
+    let list: any[] = [];
+    if (activeMaster === 'masterModulos') {
+      list = modules || [];
+    } else if (activeMaster === 'masterPaginas') {
+      list = pages || [];
+    } else {
+      list = allMasterData[activeMaster] || [];
+    }
+    
     return list.filter(d => {
       const searchStr = searchTerm.toLowerCase();
       // Enhanced Search for Articles (include SKU/ID and Barcode)
@@ -239,7 +248,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       }
       return (d.name || d.email || d.id || '').toLowerCase().includes(searchStr);
     });
-  }, [allMasterData, activeMaster, searchTerm]);
+  }, [allMasterData, modules, pages, activeMaster, searchTerm]);
 
   const paginatedData = useMemo(() => {
     if (rowsPerPage === 'all') return filteredData;
@@ -370,13 +379,13 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         saveResponse = await api.savePermission(newRecord);
       } else if (activeMaster === 'masterPermisosUsuario') {
         saveResponse = await api.saveUserPermission(newRecord);
-      } else if (activeMaster === 'pages') {
+      } else if (activeMaster === 'masterPaginas') {
         saveResponse = await api.savePage(newRecord);
       } else if (activeMaster === 'masterCategorias') {
         saveResponse = await saveCategory(newRecord);
       } else if (activeMaster === 'masterClientes') {
         saveResponse = await api.saveClient(newRecord);
-      } else if (activeMaster === 'modules') {
+      } else if (activeMaster === 'masterModulos') {
         saveResponse = await api.saveModule(newRecord);
       } else if (activeMaster === 'masterEstados') {
         const cleanData = {
@@ -504,14 +513,6 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             case 'masterRol':
               newData = await api.getRoles();
               newData = newData.map((r: any) => ({ ...r, statusId: r.status_id, createdBy: r.created_by, updatedBy: r.updated_by, createdAt: r.created_at, updatedAt: r.updated_at }));
-              break;
-            case 'modules':
-              newData = await api.getModules();
-              newData = newData.map((m: any) => ({ ...m, statusId: m.status_id, createdBy: m.created_by, updatedBy: m.updated_by, createdAt: m.created_at, updatedAt: m.updated_at }));
-              break;
-            case 'pages':
-              newData = await api.getPages();
-              newData = newData.map((p: any) => ({ ...p, moduleId: p.module_id, statusId: p.status_id, createdBy: p.created_by, updatedBy: p.updated_by, createdAt: p.created_at, updatedAt: p.updated_at }));
               break;
             case 'masterCategorias':
               const catData = await api.getCategories();
@@ -670,9 +671,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         await api.deleteRole(recordToDelete.id, user.name);
       } else if (activeMaster === 'masterClientes') {
         await api.deleteClient(recordToDelete.id, user.name);
-      } else if (activeMaster === 'modules') {
+      } else if (activeMaster === 'masterModulos') {
         await api.deleteModule(recordToDelete.id, user.name);
-      } else if (activeMaster === 'pages') {
+      } else if (activeMaster === 'masterPaginas') {
         await api.deletePage(recordToDelete.id, user.name);
       } else if (activeMaster === 'masterEstados') {
         await api.deleteEstado(recordToDelete.id, user.name);
@@ -1460,12 +1461,15 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             <div className={`absolute top-1 bottom-1 w-[40px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayMode === 'table' ? 'left-1' : 'left-[44px]'}`}></div>
           </div>
 
-          <button onClick={() => setIsImportDialogOpen(true)} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase cursor-pointer">
-            <Icons.Excel />
+          <button onClick={() => setIsImportDialogOpen(true)} className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl hover:from-blue-600 hover:to-blue-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl flex items-center gap-2 font-black text-[9px] uppercase cursor-pointer">
+            <Icons.Excel className="w-4 h-4" />
             <span className="hidden xl:inline">Importar</span>
           </button>
 
-          <button onClick={handleExportExcel} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel /><span className="hidden xl:inline">Excel</span></button>
+          <button onClick={handleExportExcel} className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl flex items-center gap-2 font-black text-[9px] uppercase">
+            <Icons.Excel className="w-4 h-4" />
+            <span className="hidden xl:inline">Excel</span>
+          </button>
 
           {activeMaster === 'masterNotificaciones' && (
             <button onClick={() => setIsNotificationSenderOpen(true)} className="bg-emerald-500 text-slate-900 px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-all flex items-center gap-2">
@@ -1661,11 +1665,28 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               {[5, 10, 20, 50].map(v => <option key={v} value={v}>{v}</option>)}
               <option value="all">Todas</option>
             </select>
+            <span className="text-[9px] text-slate-500 font-medium ml-2">
+              Mostrando <span className="font-black text-slate-700">{paginatedData.length}</span> de <span className="font-black text-emerald-600">{filteredData.length}</span> registros
+            </span>
           </div>
-          <div className="flex items-center gap-4">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-300 disabled:opacity-20 hover:text-emerald-500 transition-all"><Icons.ChevronRight className="rotate-180 w-3 h-3" /></button>
-            <span className="text-[8px] font-black text-slate-900 uppercase">Pág {currentPage} de {totalPages}</span>
-            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-300 disabled:opacity-20 hover:text-emerald-500 transition-all"><Icons.ChevronRight className="w-3 h-3" /></button>
+          <div className="flex items-center gap-3">
+            <button 
+              disabled={currentPage === 1} 
+              onClick={() => setCurrentPage(p => p - 1)} 
+              className="px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-wider disabled:opacity-30 disabled:cursor-not-allowed hover:from-emerald-500 hover:to-emerald-600 hover:scale-105 active:scale-95 transition-all shadow-lg disabled:hover:scale-100 disabled:hover:from-slate-700 disabled:hover:to-slate-900"
+            >
+              ← Anterior
+            </button>
+            <span className="text-[10px] font-black text-slate-700 px-2">
+              Pág <span className="text-emerald-600">{currentPage}</span> de <span className="text-slate-900">{totalPages}</span>
+            </span>
+            <button 
+              disabled={currentPage >= totalPages} 
+              onClick={() => setCurrentPage(p => p + 1)} 
+              className="px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-wider disabled:opacity-30 disabled:cursor-not-allowed hover:from-emerald-500 hover:to-emerald-600 hover:scale-105 active:scale-95 transition-all shadow-lg disabled:hover:scale-100 disabled:hover:from-slate-700 disabled:hover:to-slate-900"
+            >
+              Siguiente →
+            </button>
           </div>
         </div>
       </div>
