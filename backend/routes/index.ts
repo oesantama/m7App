@@ -35,6 +35,7 @@ import notificacionRoutes from './notificacion.routes.js';
 import tipoVehiculoRoutes from './tipo-vehiculo.routes.js';
 import tipoNotificacionRoutes from './tipo-notificacion.routes.js';
 import dispatchRoutes from './dispatch.routes.js';
+import pickingRoutes from './picking.routes.js';
 
 
 const router = Router();

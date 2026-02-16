@@ -843,11 +843,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">ENTREGADAS</p>
                                     <p className="text-2xl font-black text-emerald-600">
                                         {(() => {
-                                            // Contador de facturas que tienen un registro en dispatch_assignments (asumiendo lógica de éxito previa)
-                                            // Por ahora, usamos una lógica visual basada en el estado de los items si estuviera disponible,
-                                            // o simplemente un marcador x de y.
+                                            // Contador de facturas en estado 'En ruta' (EST-11)
                                             const total = routeInvoices.length;
-                                            const delivered = routeInvoices.filter(inv => inv.status === 'COMPLETED' || inv.status === 'Entregado').length;
+                                            const delivered = routeInvoices.filter(inv => inv.status === 'EST-11' || inv.status === 'COMPLETED' || inv.status === 'Entregado').length;
                                             return delivered;
                                         })()}
                                         <span className="text-xs text-slate-400 ml-1">de {routeInvoices.length}</span>
@@ -937,13 +935,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         Artículos
                                                     </button>
                                                     
-                                                    <button 
-                                                        onClick={() => setAssigningInvoice(inv)}
-                                                        className="px-4 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 border border-emerald-100"
-                                                    >
-                                                        <Icons.Scan className="w-3.5 h-3.5" />
-                                                        Entregar Material
-                                                    </button>
+                                                    {inv.status !== 'EST-11' && inv.status !== 'Entregado' && !inv.dispatchId && (
+                                                        <button 
+                                                            onClick={() => setAssigningInvoice(inv)}
+                                                            className="px-4 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 border border-emerald-100"
+                                                        >
+                                                            <Icons.Scan className="w-3.5 h-3.5" />
+                                                            Entregar Material
+                                                        </button>
+                                                    )}
 
                                                     {hasPendingSignature && (
                                                         <button 
@@ -1311,6 +1311,29 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
              if (!confirmLess) return;
         }
 
+        // 2. Validar Firmas y Contraseñas
+        // Verificar conductor
+        const driverSignNow = signNowMap[user.id] !== false; // Default true
+        if (driverSignNow && !signatureKeys[user.id]) {
+            toast.error(`Falta la clave de firma del conductor (${user.name}). Ingrese su clave o seleccione "DESPUÉS".`);
+            return;
+        }
+
+        // Verificar auxiliares
+        if (isAccompanied) {
+            for (let i = 0; i < helperCount; i++) {
+                const hid = selectedHelpers[i];
+                if (hid) {
+                    const helper = drivers.find(d => d.id === hid);
+                    const helperSignNow = signNowMap[hid] !== false;
+                    if (helperSignNow && !signatureKeys[hid]) {
+                        toast.error(`Falta la clave de firma del auxiliar ${helper?.name || i+1}. Ingrese la clave o seleccione "DESPUÉS".`);
+                        return;
+                    }
+                }
+            }
+        }
+
         setIsValidating(true);
         try {
             const signatures = [
@@ -1339,7 +1362,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const res = await api.initDispatch(payload);
             
             if (res.success) {
-                toast.success("Despacho asignado correctamente.");
+                toast.success("Despacho asignado correctamente. " + (res.pendingSignatures > 0 ? "Quedan firmas pendientes." : "Todo firmado."));
                 setAssigningInvoice(null);
                 setScannedItems({});
                 onRefresh();
@@ -1359,7 +1382,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         setIsValidating(true);
         try {
             const res = await api.signDispatchPending({
-                dispatchId: inv.dispatchId || inv.id, // Necesitaríamos rastrear el ID de despacho
+                dispatchId: inv.dispatchId, 
                 userId: user.id,
                 password
             });

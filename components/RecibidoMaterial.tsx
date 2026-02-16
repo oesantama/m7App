@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { api } from '../services/api';
 import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem } from '../types';
 import BlindCount from './BlindCount';
+import PickingView from './PickingView';
+import PickingHistory from './PickingHistory';
 
 interface RecibidoMaterialProps {
   documents: DocumentL[];
@@ -27,6 +29,8 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [manualEmail, setManualEmail] = useState('');
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [resendTarget, setResendTarget] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'recibo' | 'picking'>('recibo');
+  const [pickingSearch, setPickingSearch] = useState('');
 
   const pendingRecibo = useMemo(() =>
     documents.filter(d => d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING),
@@ -161,21 +165,49 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         </div>
       ) : (
         <div className="bg-white overflow-hidden h-full flex flex-col">
-          {/* SUBHEADER DE CONTROL */}
-          <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center shrink-0 px-8">
-            <div className="flex items-center gap-4">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Planes en Espera</h3>
-              <span className="px-4 py-1.5 bg-emerald-500 text-slate-950 rounded-xl text-[9px] font-black uppercase shadow-md shadow-emerald-500/10">{pendingRecibo.length} ACTIVOS</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Filas:</label>
-              <select value={rowsPerPage} onChange={e => { setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1); }} className="p-2 bg-white border-2 border-slate-100 rounded-lg text-[10px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm cursor-pointer">
-                <option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value="all">Todas</option>
-              </select>
-            </div>
+          {/* TABS DE NAVEGACIÓN */}
+          <div className="flex bg-slate-100/50 p-2 shrink-0 border-b border-slate-200">
+            <button 
+              onClick={() => setActiveTab('recibo')}
+              className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'recibo' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Icons.Package className="w-4 h-4" />
+              Recibo / Auditoría
+            </button>
+            <button 
+              onClick={() => setActiveTab('picking')}
+              className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'picking' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Icons.Audit className="w-4 h-4" />
+              Alistado / Picking
+            </button>
+            <button 
+              onClick={() => setActiveTab('historico')}
+              className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'historico' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Icons.History className="w-4 h-4" />
+              Histórico / Auditoría
+            </button>
           </div>
 
-          <div className="p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar bg-slate-50/5">
+          {activeTab === 'recibo' ? (
+            <>
+              {/* SUBHEADER DE CONTROL (RECIBO) */}
+              <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center shrink-0 px-8">
+                <div className="flex items-center gap-4">
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Planes en Espera</h3>
+                  <span className="px-4 py-1.5 bg-emerald-500 text-slate-950 rounded-xl text-[9px] font-black uppercase shadow-md shadow-emerald-500/10">{pendingRecibo.length} ACTIVOS</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Filas:</label>
+                  <select value={rowsPerPage} onChange={e => { setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1); }} className="p-2 bg-white border-2 border-slate-100 rounded-lg text-[10px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm cursor-pointer">
+                    <option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value="all">Todas</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar bg-slate-50/5">
+                {/* ... (Contenido de Recibo existente) ... */}
             <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
               {paginatedPending.map(doc => (
                 <div key={doc.id} className="flex flex-col p-6 bg-white border-2 border-slate-50 rounded-[2.5rem] hover:border-emerald-500 transition-all group shadow-md hover:shadow-xl relative overflow-hidden">
@@ -236,14 +268,24 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
             </div>
           </div>
 
-          {/* PAGINACIÓN INFERIOR */}
-          <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-center items-center gap-8 shrink-0">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight className="rotate-180" /></button>
-            <span className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Página {currentPage} de {totalPages || 1}</span>
-            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight /></button>
+            {/* PAGINACIÓN INFERIOR (RECIBO) */}
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-center items-center gap-8 shrink-0">
+              <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight className="rotate-180" /></button>
+              <span className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Página {currentPage} de {totalPages || 1}</span>
+              <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight /></button>
+            </div>
+          </>
+        ) : activeTab === 'picking' ? (
+          <div className="p-8 flex-1 overflow-hidden flex flex-col">
+            <PickingView user={user} documents={documents} />
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="p-8 flex-1 overflow-hidden flex flex-col">
+            <PickingHistory />
+          </div>
+        )}
+      </div>
+    )}
       {/* DIÁLOGO REENVÍO */}
       {showResendDialog && (
         <div className="fixed inset-0 z-[600] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">

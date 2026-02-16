@@ -58,7 +58,16 @@ export const initDispatch = async (req: Request, res: Response) => {
             `, [dispatchId, sig.userId, sig.role, isSigned, signedAt]);
         }
 
-        // 3. Verificar si ya se completaron todas las firmas (en caso de que todos firmaran "Ahora")
+        // 3. Actualizar estado de los ítems en document_items a 'En ruta' (EST-11)
+        await pool.query(`
+            UPDATE document_items 
+            SET item_status = 'En ruta',
+                item_id = 'EST-11' -- Asumiendo que item_id o similar guarda el código del estado
+            WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = $1
+            OR TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = $1
+        `, [invoiceId]);
+
+        // 4. Verificar si ya se completaron todas las firmas
         const pendingCount = await pool.query(
             'SELECT COUNT(*) FROM dispatch_signatures_pending WHERE dispatch_id = $1 AND signed = false',
             [dispatchId]

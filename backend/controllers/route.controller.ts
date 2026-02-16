@@ -59,9 +59,9 @@ export const saveRoute = async (req: Request, res: Response) => {
     // 1. Insertar Cabecera de Ruta
     await client.query(`
       INSERT INTO routes (id, vehicle_id, driver_id, client_id, created_by, status)
-      VALUES ($1, $2, $3, $4, $5, 'Assigned')
+      VALUES ($1, $2, $3, $4, $5, 'EST-10')
       ON CONFLICT (id) DO UPDATE SET
-      vehicle_id = $2, driver_id = $3, updated_by = $5, updated_at = NOW()
+      vehicle_id = $2, driver_id = $3, updated_by = $5, updated_at = NOW(), status = 'EST-10'
     `, [id || `rt-${Date.now()}`, vehicleId, finalDriverId, clientId, createdBy]);
 
     // 2. Limpiar facturas previas si es una actualización
@@ -81,19 +81,19 @@ export const saveRoute = async (req: Request, res: Response) => {
 
       const updateResult = await client.query(`
          UPDATE document_items 
-         SET item_status = 'ASIGNADO'
+         SET item_status = 'EST-10' -- ASIGNADO
          WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = ANY($1)
          RETURNING id
        `, [uniqueInvoiceIds]);
 
-      console.log(`[DEBUG] Updated ${updateResult.rowCount} document_items to ASIGNADO`);
+      console.log(`[DEBUG] Updated ${updateResult.rowCount} document_items to EST-10`);
 
       if (updateResult.rowCount === 0) {
         console.warn('[WARN] No document_items were updated! Checking for whitespace mismatches...');
         // Intento secundario con TRIM si el primero falla
         await client.query(`
              UPDATE document_items 
-             SET item_status = 'ASIGNADO'
+             SET item_status = 'EST-10' -- ASIGNADO
              WHERE CONCAT(document_id, '_', TRIM(COALESCE(NULLIF(invoice, ''), order_number))) = ANY($1)
           `, [uniqueInvoiceIds]);
       }

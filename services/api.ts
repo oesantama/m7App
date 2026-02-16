@@ -400,4 +400,41 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }).then(r => r.json()),
+
+  // --- PICKING AUDIT ---
+  async initPicking(data: any) {
+    const res = await fetch(`${API_URL}/picking/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Error al iniciar alistado');
+    return res.json();
+  },
+  async finishPicking(data: any) {
+    const res = await fetch(`${API_URL}/picking/finish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Error al finalizar alistado');
+    return res.json();
+  },
+  async signPicking(data: any) {
+    const res = await fetch(`${API_URL}/picking/sign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al firmar alistado');
+    }
+    return res.json();
+  },
+  async getPickingStatus(invoiceId: string) {
+    const res = await fetch(`${API_URL}/picking/status/${encodeURIComponent(invoiceId)}`);
+    if (!res.ok) return null;
+    return res.json();
+  },
 };

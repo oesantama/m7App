@@ -278,14 +278,13 @@ export const syncInventory = async (req: Request, res: Response) => {
     // const docInfo = await client.query('SELECT client_id FROM documents_l WHERE id = $1', [docId]);
     // const clientId = docInfo.rows[0].client_id;
 
-    // 3. Actualizar DETALLE (Solo estado y notas)
+    // 3. Actualizar DETALLE (Solo notas, batch y conteos - item_status NO se toca por solicitud del usuario)
     for (const item of items) {
       await client.query(`
         UPDATE document_items 
-        SET item_status = $1, notes = $2, batch = $3, count_1 = $4, count_2 = $5
-        WHERE document_id = $6 AND article_id = $7
+        SET notes = $1, batch = $2, count_1 = $3, count_2 = $4
+        WHERE document_id = $5 AND article_id = $6
       `, [
-        newStatus,
         item.inventoryNote || '',
         item.batch || 'S/L',
         item.count1 || 0,
@@ -701,6 +700,8 @@ export const getInvoices = async (req: Request, res: Response) => {
         documents_l.codplan as "codplan",
         documents_l.plan_type as "planType",
         MAX(document_items.item_status) as "status",
+        MAX(da.id) as "dispatchId",
+        MAX(da.status) as "dispatchStatus",
         -- AGREGACIÓN DE ÍTEMS
         JSON_AGG(JSON_BUILD_OBJECT(
           'sku', document_items.article_id,
@@ -734,6 +735,10 @@ export const getInvoices = async (req: Request, res: Response) => {
       FROM document_items
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
       LEFT JOIN articles ON document_items.article_id = articles.id
+      LEFT JOIN dispatch_assignments da ON (
+        da.invoice_id = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
+        OR da.invoice_id = ${sqlIdGen}
+      )
       WHERE 1=1
     `;
 
