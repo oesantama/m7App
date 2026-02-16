@@ -2,6 +2,14 @@
 # Stage 1: Build
 FROM node:20-slim AS builder
 WORKDIR /app
+
+# Instalar dependencias necesarias para compilar módulos nativos (como bcrypt)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 # Instalamos TODO para poder compilar
 RUN npm install
@@ -13,6 +21,7 @@ RUN npm run build:server
 FROM node:20-slim
 
 # Instalar dependencias para Puppeteer/Chromium (necesario para PDFs/Whatsapp)
+# Y herramientas de compilación para módulos nativos (bcrypt)
 RUN apt-get update && apt-get install -y \
     chromium \
     libnss3 \
@@ -22,8 +31,9 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     libgbm-dev \
     libasound2 \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    build-essential \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
@@ -33,7 +43,8 @@ WORKDIR /app
 
 # Copiamos package.json para instalar solo dependencias de producción
 COPY package*.json ./
-RUN npm ci --omit=dev
+# Usamos install en lugar de ci para mayor resiliencia con el lockfile en Docker
+RUN npm install --omit=dev
 
 # Copiamos el código compilado desde el stage 'builder'
 # La estructura en dist_backend dependerá de como tsc genere la salida.
