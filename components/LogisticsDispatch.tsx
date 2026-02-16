@@ -62,6 +62,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const routeMarkersRef = useRef<L.Marker[]>([]);
     const routePolylineRef = useRef<L.Polyline | null>(null);
     const [fetchStatus, setFetchStatus] = useState<string>('IDLE');
+    
+    // MODALES DE INTERACCIÓN MEJORADA
+    const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
+    const [signatureInputModal, setSignatureInputModal] = useState<{ isOpen: boolean, invoice: any, onConfirm: (pass: string) => void } | null>(null);
 
     // 1. Inicialización del Mapa
     useEffect(() => {
@@ -1265,6 +1269,86 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     </div>
                 </div>
             )}
+            {/* MODAL CONFIRMACIÓN GENÉRICO */}
+            {confirmModal && (
+                <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md animate-in zoom-in-95">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
+                                <Icons.Alert className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">{confirmModal.title}</h3>
+                            <p className="text-sm font-bold text-slate-500 mb-6">{confirmModal.message}</p>
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => setConfirmModal(null)}
+                                    className="flex-1 py-3 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 rounded-xl"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setConfirmModal(null);
+                                        confirmModal.onConfirm();
+                                    }}
+                                    className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 transition-all"
+                                >
+                                    Confirmar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* MODAL INPUT FIRMA */}
+            {signatureInputModal && (
+                 <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md animate-in zoom-in-95">
+                        <div className="flex flex-col items-center">
+                            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4">
+                                <Icons.Signature className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-1">Firma Requerida</h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-6 tracking-widest">Ingrese su clave personal</p>
+                            
+                            <input 
+                                type="password" 
+                                autoFocus
+                                id="signature-modal-input"
+                                className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-lg font-black text-slate-900 outline-none focus:border-indigo-500 mb-6"
+                                placeholder="••••••"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const val = e.currentTarget.value;
+                                        setSignatureInputModal(null);
+                                        signatureInputModal.onConfirm(val);
+                                    }
+                                }}
+                            />
+
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => setSignatureInputModal(null)}
+                                    className="flex-1 py-3 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 rounded-xl"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const val = (document.getElementById('signature-modal-input') as HTMLInputElement).value;
+                                        setSignatureInputModal(null);
+                                        signatureInputModal.onConfirm(val);
+                                    }}
+                                    className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all"
+                                >
+                                    Firmar Ahora
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 
@@ -1307,10 +1391,21 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
         const totalExpected = (assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.expectedQty), 0);
         if (totalScanned < totalExpected) {
-             const confirmLess = window.confirm(`CUIDADO: Faltan artículos por escanear (${totalScanned} de ${totalExpected}). ¿Desea continuar con una entrega parcial?`);
-             if (!confirmLess) return;
+             setConfirmModal({
+                isOpen: true,
+                title: "Entrega Parcial Detectada",
+                message: `CUIDADO: Faltan artículos por escanear (${totalScanned} de ${totalExpected}). ¿Desea continuar con una entrega parcial?`,
+                onConfirm: processDispatchConfirmation
+             });
+             return;
         }
 
+        processDispatchConfirmation();
+    }
+
+    async function processDispatchConfirmation() {
+        if (!assigningInvoice) return;
+        
         // 2. Validar Firmas y Contraseñas
         // Verificar conductor
         const driverSignNow = signNowMap[user.id] !== false; // Default true
@@ -1376,13 +1471,32 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     }
 
     async function handleDelayedSignature(inv: any) {
-        const password = window.prompt("INGRESE SU CLAVE DE FIRMA PARA ESTE DESPACHO:");
+        setSignatureInputModal({
+            isOpen: true,
+            invoice: inv,
+            onConfirm: (password) => executeSignature(inv, password)
+        });
+    }
+
+    async function executeSignature(inv: any, password: string) {
         if (!password) return;
 
         setIsValidating(true);
         try {
+            // Robustez: Si inv no tiene dispatchId, buscarlo en pendingSignatures
+            let dId = inv.dispatchId;
+            if (!dId) {
+                const match = pendingSignatures.find(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
+                if (match) dId = match.dispatchId;
+            }
+
+            if (!dId) {
+                toast.error("Error: No se encontró el ID del despacho asociado.");
+                return;
+            }
+
             const res = await api.signDispatchPending({
-                dispatchId: inv.dispatchId, 
+                dispatchId: dId, 
                 userId: user.id,
                 password
             });

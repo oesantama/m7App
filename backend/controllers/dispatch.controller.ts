@@ -61,8 +61,7 @@ export const initDispatch = async (req: Request, res: Response) => {
         // 3. Actualizar estado de los ítems en document_items a 'En ruta' (EST-11)
         await pool.query(`
             UPDATE document_items 
-            SET item_status = 'En ruta',
-                item_id = 'EST-11' -- Asumiendo que item_id o similar guarda el código del estado
+            SET item_status = 'EST-11'
             WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = $1
             OR TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = $1
         `, [invoiceId]);

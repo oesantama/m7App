@@ -129,6 +129,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   }, [onRefresh]);
 
 
+
+
   const availableVehicles = useMemo(() => {
     // REGLA M7: Un vehículo es "disponible" si:
     // 1. Tiene un vínculo activo (VehicleAssignment) con el cliente seleccionado.
@@ -154,12 +156,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       if (vStatus !== 'DISPONIBLE') return null;
 
       // Validar si está en despacho o ruta activa
+      // Status IDs: EST-10 (Asignado), EST-11 (En Ruta)
+      // Status Text: Assigned, En Ruta, etc.
       const isBusy = activeRoutes.some(r =>
         r.vehicleId === v.id &&
-        ['Assigned', 'In Route', 'EN_RUTA', 'Asignada', 'En Ruta', 'PENDIENTE', 'CONFIRMADA'].includes(r.status.toUpperCase())
+        ['EST-10', 'EST-11', 'ASSIGNED', 'IN ROUTE', 'EN_RUTA', 'ASIGNADA', 'EN RUTA', 'PENDIENTE', 'CONFIRMADA', 'PENDING_SIGNATURES'].includes(String(r.status).toUpperCase())
       );
 
-      if (isBusy) return null;
+      // Regla estricta: Si el vehículo tiene estado ocupado en la BD, no se usa
+      if (vStatus === 'EST-10' || vStatus === 'EST-11' || vStatus === 'OCUPADO' || isBusy) return null;
 
       return {
         ...v,
@@ -172,73 +177,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return fleet;
   }, [assignments, vehicles, drivers, selectedClient, activeRoutes]);
 
-  const fleetGeneralMetrics = useMemo(() => {
-    const activeLinks = assignments.filter(a => {
-      const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
-      const cId = a.clientId || (a as any).client_id;
-      return active && (selectedClient === 'GLOBAL' || cId === selectedClient);
-    });
 
-    let onBase = 0;
-    let onRoute = 0;
 
-    activeLinks.forEach(link => {
-      const v = vehicles.find(veh => veh.id === link.vehicleId);
-      if (!v) return;
 
-      const normalizeId = (id: any) => String(id || '').trim().toUpperCase();
-      const vId = normalizeId(v.id);
-
-      const isBusy = activeRoutes.some(r =>
-        normalizeId(r.vehicleId || (r as any).vehicle_id) === vId &&
-        ['Assigned', 'In Route', 'EN_RUTA', 'Asignada', 'En Ruta', 'PENDIENTE', 'CONFIRMADA'].includes(String(r.status || '').toUpperCase())
-      );
-
-      if (isBusy) {
-        onRoute++;
-      } else {
-        // Solo contar "En Base" si está Disponible Y no tiene ruta
-        const vStatus = String(v.status || '').toUpperCase();
-        if (vStatus === 'DISPONIBLE') {
-          onBase++;
-        }
-      }
-    });
-
-    return { onBase, onRoute };
-  }, [assignments, vehicles, selectedClient, activeRoutes]);
-
-  // CÁLCULO DE DÉFICIT DE FLOTA
-  const unassignedMetrics = useMemo(() => {
-    const vol = unassignedInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
-    // Capacidad promedio de la flota actual para estimar vehículos faltantes
-    const avgCapacity = availableVehicles.length > 0
-      ? availableVehicles.reduce((acc, v) => acc + (Number(v.capacityM3) || 0), 0) / availableVehicles.length
-      : 10; // Fallback a 10m3 si no hay flota para promediar
-    const additionalVehicles = Math.ceil(vol / (avgCapacity > 0 ? avgCapacity : 10));
-
-    return {
-      count: unassignedInvoices.length,
-      volume: vol.toFixed(2),
-      additionalVehicles: additionalVehicles
-    };
-  }, [unassignedInvoices, availableVehicles]);
+  // ...
 
   const handleGeneralReadjustment = () => {
-    setReadjustmentModal({ isOpen: true, selectedDocIds: new Set() });
-  };
-
-  // Función interna para obtener items seleccionados.
-  // Si no hay selección manual, toma todos los pendientes validInvoices
-  const getOptimizationTargets = (specificDocIds?: Set<string>) => {
-    if (!specificDocIds || specificDocIds.size === 0) return [...validInvoices];
-    // Filtrar usando la misma lógica de agrupación "flexible"
-    return validInvoices.filter(inv => {
-      const groupKey = (inv.docLId && documents.some(d => d.id === inv.docLId))
-        ? inv.docLId
-        : (inv.externalDocId || inv.orderNumber || inv.invoiceNumber || inv.id);
-      return specificDocIds.has(groupKey);
-    });
+    runM7Optimization();
   };
 
   const runM7Optimization = (specificInvoices?: Invoice[]) => {
@@ -251,11 +196,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const suggestions: SuggestedRoute[] = [];
 
       // 1. Preparación de Facturas (Copias)
-      // Si se pasan facturas específicas (Reajuste Selectivo), usamos esas. Si no, usamos todas las válidas.
       let availableInvoices = (specificInvoices || [...validInvoices]).map(inv => ({ ...inv }));
 
-      // 2. Detección de Prioridades
-      // 2. Detección Inteligente de Prioridades y Horarios
+      // 2. Detección Inteligente de Prioridades, Horarios y DIRECCIONES
       const timeRegex = /\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM|PARA LAS|A LAS)\b/i;
       const priorityKeywords = ['URGENTE', 'PRIMERA HORA', 'PRIORIDAD'];
 
@@ -272,13 +215,36 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         inv.isPriority = priorityKeywords.some(kw => notes.includes(kw)) || !!timeMatch;
         // @ts-ignore
         inv.cityKey = (inv.city || 'SIN_CIUDAD').toUpperCase().trim();
+        
+        // NORMALIZACIÓN DE DIRECCIÓN PARA AGRUPAMIENTO
+        // Quitamos "CL", "CRA", "NO", caracteres especiales para dejar solo "10 5 5"
+        const rawAddr = (inv.address || '').toUpperCase();
+        // @ts-ignore
+        inv.startAddressForSort = rawAddr.replace(/[^0-9A-Z]/g, ''); 
+        // @ts-ignore
+        inv.neighborhoodKey = (inv.neighborhood || '').toUpperCase().trim();
       });
 
-      // 3. Ordenamiento Global Inicial (Prioridad > Volumen)
-      // Esto ayuda a que los items más difíciles de asignar se procesen primero
+      // 3. Ordenamiento Global: Prioridad > Barrio > Dirección > Volumen
+      // Esto agrupa entregas cercanas automáticamente
       availableInvoices.sort((a, b) => {
+        // 1. Prioridad
         // @ts-ignore
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
+        
+        // 2. Ciudad (Agrupación Macro)
+        // @ts-ignore
+        if (a.cityKey !== b.cityKey) return a.cityKey.localeCompare(b.cityKey);
+
+        // 3. Barrio (Agrupación Micro)
+        // @ts-ignore
+        if (a.neighborhoodKey !== b.neighborhoodKey) return a.neighborhoodKey.localeCompare(b.neighborhoodKey);
+
+        // 4. Dirección (Secuencialidad)
+        // @ts-ignore
+        if (a.startAddressForSort !== b.startAddressForSort) return a.startAddressForSort.localeCompare(b.startAddressForSort);
+
+        // 5. Volumen (Llenado)
         return b.volumeM3 - a.volumeM3;
       });
 
@@ -1279,17 +1245,27 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 <p className="text-[7px] font-bold text-slate-400 mt-2 uppercase tracking-widest">APTAS DESPACHO</p>
               </div>
               <div className="bg-white p-5 rounded-[1.5rem] border-2 border-slate-100 shadow-lg">
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3">Flota Operativa</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center border-r border-slate-100">
-                    <p className="text-2xl font-black text-slate-900">{fleetGeneralMetrics.onBase}</p>
-                    <p className="text-[7px] font-bold text-emerald-500 mt-1 uppercase tracking-widest">EN BASE</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-black text-slate-900">{fleetGeneralMetrics.onRoute}</p>
-                    <p className="text-[7px] font-bold text-amber-500 mt-1 uppercase tracking-widest">CON RUTA</p>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Flota Operativa</h3>
+              <div className="flex justify-between items-center">
+                <div className="text-center">
+                  <p className="text-3xl font-black text-slate-900">{fleetGeneralMetrics.onBase}</p>
+                  <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mt-1">En Base</p>
+                </div>
+                <div className="h-8 w-px bg-slate-100"></div>
+                <div className="text-center">
+                  <div className="flex gap-6">
+                      <div className="text-center">
+                        <p className="text-2xl font-black text-slate-900">{fleetGeneralMetrics.assigned}</p>
+                        <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-wider mt-1">Asignados</p>
+                      </div>
+                      <div className="w-px bg-slate-100 h-8 self-center"></div>
+                      <div className="text-center">
+                        <p className="text-2xl font-black text-slate-900">{fleetGeneralMetrics.inRoute}</p>
+                        <p className="text-[8px] font-bold text-amber-500 uppercase tracking-wider mt-1">En Ruta</p>
+                      </div>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
 

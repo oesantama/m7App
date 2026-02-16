@@ -8,6 +8,8 @@ export const restoreSystem = async () => {
     await client.query('BEGIN');
 
     // 1. Asegurar Tablas Base (Idempotencia)
+    await client.query(`CREATE SEQUENCE IF NOT EXISTS route_id_seq START 1;`);
+    
     await client.query(`
       CREATE TABLE IF NOT EXISTS modules (
           id TEXT PRIMARY KEY,
@@ -26,6 +28,8 @@ export const restoreSystem = async () => {
           parent_id TEXT REFERENCES modules(id),
           status_id TEXT DEFAULT 'EST-01'
       );
+      ALTER TABLE pages ADD COLUMN IF NOT EXISTS module_id TEXT;
+      ALTER TABLE pages ADD COLUMN IF NOT EXISTS parent_id TEXT;
     `);
 
     await client.query(`

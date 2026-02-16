@@ -10,19 +10,41 @@ interface LearningPatternData {
 export const getRoutes = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
-      SELECT r.*, v.plate, d.name as driver_name,
-      COALESCE(
-        (
-          SELECT json_agg(TRIM(invoice_id)) 
-          FROM route_invoices 
-          WHERE TRIM(route_id) = TRIM(r.id)
-        ),
-        '[]'::json
-      ) as invoice_ids
+      SELECT 
+        r.id, r.vehicle_id, r.driver_id, r.client_id, r.created_by, r.status, r.created_at,
+        v.plate, d.name as driver_name,
+        COALESCE(
+          (
+            SELECT json_agg(TRIM(invoice_id)) 
+            FROM route_invoices 
+            WHERE TRIM(route_id) = TRIM(r.id)
+          ),
+          '[]'::json
+        ) as invoice_ids
       FROM routes r
       LEFT JOIN vehicles v ON TRIM(r.vehicle_id) = TRIM(v.id)
       LEFT JOIN drivers d ON TRIM(r.driver_id) = TRIM(d.id)
-      ORDER BY r.created_at DESC
+
+      UNION ALL
+
+      SELECT 
+        da.id, 
+        COALESCE(a.vehicle_id, 'S/V') as vehicle_id, 
+        da.driver_id, 
+        'CLI-01' as client_id, 
+        da.created_by, 
+        da.status, 
+        da.created_at,
+        v.plate, 
+        d.name as driver_name,
+        json_build_array(da.invoice_id) as invoice_ids
+      FROM dispatch_assignments da
+      LEFT JOIN assignments a ON da.driver_id = a.driver_id AND a.is_active = true
+      LEFT JOIN vehicles v ON a.vehicle_id = v.id
+      LEFT JOIN drivers d ON da.driver_id = d.id
+      WHERE da.status IN ('PENDING_SIGNATURES', 'EN_RUTA', 'En repart', 'PENDING')
+      
+      ORDER BY created_at DESC
     `);
     res.json(result.rows);
   } catch (err: any) {
@@ -56,23 +78,31 @@ export const saveRoute = async (req: Request, res: Response) => {
       }
     }
 
+    // GENERATE AUTO-INCREMENT ID IF NEW
+    let finalRouteId = id;
+    // Si no hay ID, o es un ID temporal generado por el frontend (ej: rt-177..., route-...), generamos uno nuevo oficial
+    if (!id || String(id).startsWith('rt-') || String(id).startsWith('route-')) {
+       const seqRes = await client.query("SELECT CONCAT('RT-', LPAD(nextval('route_id_seq')::text, 5, '0')) as new_id");
+       finalRouteId = seqRes.rows[0].new_id;
+    }
+
     // 1. Insertar Cabecera de Ruta
     await client.query(`
       INSERT INTO routes (id, vehicle_id, driver_id, client_id, created_by, status)
       VALUES ($1, $2, $3, $4, $5, 'EST-10')
       ON CONFLICT (id) DO UPDATE SET
       vehicle_id = $2, driver_id = $3, updated_by = $5, updated_at = NOW(), status = 'EST-10'
-    `, [id || `rt-${Date.now()}`, vehicleId, finalDriverId, clientId, createdBy]);
+    `, [finalRouteId, vehicleId, finalDriverId, clientId, createdBy]);
 
     // 2. Limpiar facturas previas si es una actualización
-    await client.query('DELETE FROM route_invoices WHERE route_id = $1', [id]);
+    await client.query('DELETE FROM route_invoices WHERE route_id = $1', [finalRouteId]);
 
     // 3. Vincular Facturas y actualizar estado de las mismas (Deduplicating inputs)
     const uniqueInvoiceIds = [...new Set(invoiceIds as string[])];
 
     for (const invId of uniqueInvoiceIds) {
       // route_invoices usa text, asi que invId (string) esta bien
-      await client.query('INSERT INTO route_invoices (route_id, invoice_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, invId]);
+      await client.query('INSERT INTO route_invoices (route_id, invoice_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [finalRouteId, invId]);
     }
 
     // 4. Actualización Masiva de Estado en Document Items (con Fallback)
