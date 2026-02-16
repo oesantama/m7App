@@ -1,42 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
 interface ApprovalManagerProps {
     user: any;
-    allUsers: any[];
 }
 
-const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user, allUsers }) => {
+const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [signatures, setSignatures] = useState<any[]>([]);
+    const [selectedSig, setSelectedSig] = useState<any>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [previewSignature, setPreviewSignature] = useState<string | null>(null);
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
     const [approverKey, setApproverKey] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const filteredUsers = allUsers.filter(u => 
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const handleViewSignature = async (targetUser: any) => {
+    const loadSignatures = async () => {
         setLoading(true);
         try {
-            const res = await api.getSignature(targetUser.email);
-            if (res && res.digital_signature) {
-                setPreviewSignature(res.digital_signature);
-                setIsPreviewModalOpen(true);
-            } else {
-                toast.error('Este usuario no tiene una firma registrada.');
-            }
+            const data = await api.getAllSignatures();
+            setSignatures(Array.isArray(data) ? data : []);
         } catch (err) {
-            toast.error('Error al cargar la previsualización.');
+            toast.error('Error al cargar las firmas.');
         } finally {
             setLoading(false);
         }
+    };
+
+    useEffect(() => {
+        loadSignatures();
+    }, []);
+
+    const filteredSignatures = signatures.filter(s => 
+        (s.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (s.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.userId || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const canApprove = (sig: any) => {
+        // M7 Intelligence: Validación de permisos por PAG-27
+        const pagePerms = user.permissions?.find((p: any) => p.module === 'PAG-27');
+        const actions = pagePerms?.actions || [];
+        
+        // El usuario debe tener permiso de 'approve' o 'edit'
+        const hasPermission = actions.includes('approve') || actions.includes('edit');
+        if (!hasPermission) return false;
+
+        // Regla de NO auto-aprobar (excepto Super Administrador ROL-01)
+        if (sig.userId === user.id && user.roleId !== 'ROL-01') return false;
+
+        return true;
+    };
+
+    const handleViewSignature = (sig: any) => {
+        setPreviewSignature(sig.signature);
+        setIsPreviewModalOpen(true);
     };
 
     const handleApprove = async () => {
@@ -45,24 +65,31 @@ const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user, allUsers }) => 
             return;
         }
 
+        // Validación local (opcional, el backend lo hace también)
+        if (selectedSig.userId === user.id && user.roleId !== 'ROL-01') {
+            toast.error('No puede aprobar su propia firma.');
+            return;
+        }
+
         setLoading(true);
         try {
             const res = await api.approveSignature({
-                documentNumber: selectedUser.email,
+                userId: selectedSig.userId,
                 approverId: user.id,
-                approverPasswordSecret: approverKey
+                approverPassword: approverKey
             });
 
             if (res.success) {
-                toast.success(`Firma de ${selectedUser.name} aprobada correctamente.`);
+                toast.success(`Firma de ${selectedSig.userName} aprobada correctamente.`);
                 setIsConfirmModalOpen(false);
                 setApproverKey('');
-                // Forzar refresco si es necesario
+                setSelectedSig(null);
+                loadSignatures(); // Recargar lista
             } else {
                 toast.error(res.error || 'Error al aprobar la firma.');
             }
-        } catch (err) {
-            toast.error('Error de conexión al procesar la aprobación.');
+        } catch (err: any) {
+            toast.error('Error al procesar la aprobación: ' + (err.message || 'Error de conexión'));
         } finally {
             setLoading(false);
         }
@@ -81,13 +108,18 @@ const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user, allUsers }) => 
                             <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mt-1">Control de Seguridad M7 Intelligence</p>
                         </div>
                     </div>
+                    {loading && <Icons.Loader className="animate-spin w-6 h-6 text-emerald-400" />}
                 </div>
 
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4 relative">
+                    {/* Hack para evitar que el navegador auto-llene el filtro con el usuario al detectar un password modal */}
+                    <input type="text" name="chrome-is-annoying" style={{ display: 'none' }} />
                     <Icons.Search className="text-slate-400 w-5 h-5" />
                     <input 
                         type="text" 
-                        placeholder="BUSCAR USUARIO POR NOMBRE O CORREO..." 
+                        id="approval-search-filter"
+                        name="approval-search-filter"
+                        placeholder="BUSCAR FIRMA POR NOMBRE, CORREO O ID..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         autoComplete="off"
@@ -98,7 +130,7 @@ const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user, allUsers }) => 
                             onClick={() => setSearchTerm('')}
                             className="bg-slate-200 hover:bg-red-100 hover:text-red-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all"
                         >
-                            Limpiar Búsqueda
+                            Limpiar
                         </button>
                     )}
                 </div>
@@ -107,57 +139,67 @@ const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user, allUsers }) => 
                     <table className="w-full text-left">
                         <thead className="sticky top-0 bg-white z-10 border-b border-slate-100">
                             <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                <th className="px-8 py-5">Usuario</th>
+                                <th className="px-8 py-5">Usuario Solicitante</th>
                                 <th className="px-8 py-5 text-center">Estado Firma</th>
-                                <th className="px-8 py-5 text-center">Aprobación</th>
+                                <th className="px-8 py-5 text-center">Registro</th>
                                 <th className="px-8 py-5 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {filteredUsers.map(u => (
-                                <tr key={u.id} className="hover:bg-slate-50 transition-colors group">
+                            {filteredSignatures.length === 0 && !loading && (
+                                <tr>
+                                    <td colSpan={4} className="px-8 py-20 text-center text-slate-300 font-black uppercase text-xs">
+                                        No se encontraron firmas pendientes o registradas
+                                    </td>
+                                </tr>
+                            )}
+                            {filteredSignatures.map(s => (
+                                <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-4">
                                             <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-black">
-                                                {u.name.substring(0,2).toUpperCase()}
+                                                {s.userName?.substring(0,2).toUpperCase()}
                                             </div>
                                             <div>
-                                                <p className="font-black text-slate-900 text-xs uppercase">{u.name}</p>
-                                                <p className="text-[9px] text-slate-400 font-bold">{u.email}</p>
+                                                <p className="font-black text-slate-900 text-xs uppercase">{s.userName}</p>
+                                                <p className="text-[9px] text-slate-400 font-bold">{s.email} | {s.userId}</p>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-8 py-5 text-center">
-                                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${u.hasSignature ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
-                                            {u.hasSignature ? 'Registrada' : 'Sin Firma'}
+                                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${s.aprobada ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                            {s.aprobada ? 'Aprobada' : 'Pendiente'}
                                         </span>
                                     </td>
                                     <td className="px-8 py-5 text-center">
-                                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${u.isApproved ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                            {u.isApproved ? 'Aprobada' : 'Pendiente'}
-                                        </span>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase">
+                                            {s.createdAt ? new Date(s.createdAt).toLocaleDateString('es-CO') : 'S/F'}
+                                        </p>
                                     </td>
                                     <td className="px-8 py-5 text-right space-x-2">
-                                        {u.hasSignature && (
+                                        <button 
+                                            onClick={() => handleViewSignature(s)}
+                                            className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        >
+                                            Ver Firma
+                                        </button>
+                                        {canApprove(s) && !s.aprobada && (
                                             <button 
-                                                onClick={() => handleViewSignature(u)}
-                                                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all"
-                                            >
-                                                Ver
-                                            </button>
-                                        )}
-                                        {!u.isApproved && u.hasSignature && (
-                                            <button 
-                                                onClick={() => { setSelectedUser(u); setIsConfirmModalOpen(true); }}
+                                                onClick={() => { setSelectedSig(s); setIsConfirmModalOpen(true); }}
                                                 className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md active:scale-95"
                                             >
                                                 Aprobar
                                             </button>
                                         )}
-                                        {u.isApproved && (
+                                        {!s.aprobada && !canApprove(s) && (
+                                            <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest bg-slate-100 px-3 py-2 rounded-xl cursor-not-allowed">
+                                                Solo Vista
+                                            </span>
+                                        )}
+                                        {s.aprobada && (
                                            <div className="inline-flex items-center gap-2 px-6">
                                                <Icons.Check className="w-4 h-4 text-emerald-500" />
-                                               <span className="text-[9px] font-black uppercase text-emerald-600">Auditado</span>
+                                               <span className="text-[9px] font-black uppercase text-emerald-600">Auditado por {s.approvedBy}</span>
                                            </div>
                                         )}
                                     </td>
@@ -170,17 +212,17 @@ const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user, allUsers }) => 
 
             {/* Modal de Previsualización */}
             {isPreviewModalOpen && (
-                <div className="fixed inset-0 z-[1100] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
-                    <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl border border-white/10 flex flex-col gap-8">
+                <div className="fixed inset-0 z-[1100] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95" onClick={() => setIsPreviewModalOpen(false)}>
+                    <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl border border-white/10 flex flex-col gap-8" onClick={e => e.stopPropagation()}>
                         <div className="text-center">
                             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-2">Previsualización de Firma</h3>
                             <p className="text-slate-500 font-bold text-sm uppercase">Verificando autenticidad biometría M7</p>
                         </div>
-                        <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-8 flex items-center justify-center min-h-[300px]">
+                        <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-8 flex items-center justify-center min-h-[300px]">
                             {previewSignature ? (
                                 <img src={previewSignature} alt="Signature Preview" className="max-w-full max-h-[400px] object-contain" />
                             ) : (
-                                <p className="text-slate-400 font-black uppercase text-xs">Cargando...</p>
+                                <p className="text-slate-400 font-black uppercase text-xs">Sin imagen de firma</p>
                             )}
                         </div>
                         <button 
@@ -201,29 +243,30 @@ const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user, allUsers }) => 
                                 <Icons.Lock className="w-10 h-10" />
                             </div>
                             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-2">Confirmar Aprobación</h3>
-                            <p className="text-slate-500 font-bold text-sm">
-                                Está a punto de aprobar la firma de <span className="text-emerald-600">{selectedUser?.name}</span>. 
-                                Esta acción es irreversible y deja rastro de auditoría.
-                            </p>
+                            <div className="text-slate-500 font-bold text-sm space-y-2">
+                                <p>Está a punto de aprobar la firma de <span className="text-emerald-600">{selectedSig?.userName}</span>.</p>
+                                <p className="text-[10px] text-red-500 uppercase tracking-widest font-black">Esta acción es irreversible y deja rastro de auditoría.</p>
+                            </div>
                         </div>
 
                         <div className="space-y-3">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Su Clave de Firma (Aprobador)</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Su Clave de Acceso (Aprobador)</label>
                             <div className="bg-slate-50 p-5 rounded-2xl flex items-center gap-3 border-2 border-slate-100 focus-within:border-emerald-500 transition-all">
                                 <Icons.Key className="text-slate-400" />
                                 <input 
                                     type="password" 
                                     value={approverKey}
                                     onChange={(e) => setApproverKey(e.target.value)}
-                                    placeholder="INGRESE SU CLAVE PERSONAL"
+                                    placeholder="INGRESE SU CONTRASEÑA"
                                     className="bg-transparent flex-1 outline-none font-black text-slate-950 placeholder:text-slate-300"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleApprove()}
                                 />
                             </div>
                         </div>
 
                         <div className="flex gap-4 pt-4">
                             <button 
-                                onClick={() => setIsConfirmModalOpen(false)}
+                                onClick={() => { setIsConfirmModalOpen(false); setApproverKey(''); setSelectedSig(null); }}
                                 className="flex-1 py-5 bg-slate-100 text-slate-900 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all"
                             >
                                 Cancelar

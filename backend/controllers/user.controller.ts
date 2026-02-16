@@ -15,6 +15,7 @@ export const getUsers = async (req: Request, res: Response) => {
         u.document_number AS "documentNumber",
         ds.approved AS "isApproved",
         (ds.digital_signature IS NOT NULL) AS "hasSignature",
+        u.client_ids AS "clientIds",  -- NEW FIELD
         u.created_at AS "createdAt", u.updated_at AS "updatedAt", 
         u.created_by AS "createdBy", u.updated_by AS "updatedBy"
       FROM users u
@@ -49,8 +50,10 @@ export const saveUser = async (req: Request, res: Response) => {
              newPass = await bcrypt.hash(u.password, salt);
         }
 
-        const clientIds = Array.isArray(u.clientIds) ? u.clientIds : (u.clientId ? [u.clientId] : []);
-        
+        const clientIds = (Array.isArray(u.clientIds) && u.clientIds.length > 0) 
+                           ? JSON.stringify(u.clientIds) 
+                           : (u.clientId ? JSON.stringify([u.clientId]) : '[]');
+
         await pool.query(`
           UPDATE users 
           SET email = $2, name = $3, password = $4, role_id = $5, client_ids = $6, status_id = $7,
@@ -76,7 +79,10 @@ export const saveUser = async (req: Request, res: Response) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(u.password, salt);
 
-        const clientIds = Array.isArray(u.clientIds) ? u.clientIds : (u.clientId ? [u.clientId] : []);
+        // FIX: Let pg driver handle array serialization (works for both JSONB and text[])
+        const clientIds = (Array.isArray(u.clientIds) && u.clientIds.length > 0) 
+                           ? u.clientIds 
+                           : (u.clientId ? [u.clientId] : []);
 
         await pool.query(`
           INSERT INTO users (id, email, name, password, role_id, client_ids, status_id, phone, avatar, document_type, document_number, two_factor_enabled)

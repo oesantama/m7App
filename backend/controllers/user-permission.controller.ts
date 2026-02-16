@@ -48,7 +48,8 @@ export const getUserPermissions = async (req: Request, res: Response) => {
   // pero mantendremos la lista hardcoded por ahora solo para el fallback de admin real.
   const pages = [
     'PAG-01', 'PAG-02', 'PAG-03', 'PAG-04', 'PAG-05', 'PAG-06', 'PAG-07', 'PAG-08', 'PAG-09', 'PAG-10',
-    'PAG-11', 'PAG-12', 'PAG-13', 'PAG-14', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-18', 'PAG-19', 'PAG-20', 'PAG-21', 'PAG-22'
+    'PAG-11', 'PAG-12', 'PAG-13', 'PAG-14', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-18', 'PAG-19', 'PAG-20', 'PAG-21', 'PAG-22',
+    'PAG-23', 'PAG-24', 'PAG-25', 'PAG-26', 'PAG-27', 'PAG-28', 'PAG-29'
   ];
 
   if (isSuperAdmin) {
@@ -98,16 +99,32 @@ export const getUserPermissions = async (req: Request, res: Response) => {
 
 export const saveUserPermission = async (req: Request, res: Response) => {
   const p = req.body;
+  const client = await pool.connect();
+  
   try {
-    await pool.query(`
+    await client.query('BEGIN');
+
+    // 1. DELETE EXISTING PERMISSIONS FOR USER (Clean Slate Strategy)
+    // This ensures no old keys remain if they were removed from the frontend payload.
+    await client.query('DELETE FROM user_permissions WHERE user_id = $1', [p.userId]);
+
+    // 2. INSERT NEW PERMISSIONS
+    const newId = p.id || `PERM-USER-${p.userId}`;
+    await client.query(`
       INSERT INTO user_permissions (id, user_id, permissions, status_id, created_by, updated_by, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      ON CONFLICT (id) DO UPDATE SET
-      user_id = $2, permissions = $3, status_id = $4, updated_by = $5, updated_at = CURRENT_TIMESTAMP
-    `, [p.id, p.userId, JSON.stringify(p), p.statusId, p.createdBy || p.updatedBy || 'System']);
-    res.json({ success: true, message: 'Permisos de usuario guardados' });
+    `, [newId, p.userId, JSON.stringify(p), p.statusId, p.createdBy || p.updatedBy || 'System']);
+
+    await client.query('COMMIT');
+    
+    console.log(`[M7-PERMISSIONS] Permissions reset and updated for User: ${p.userId}`);
+    res.json({ success: true, message: 'Permisos de usuario actualizados correctamente (Reset Completo)' });
   } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-PERMISSIONS] Error saving:', err);
     res.status(500).json({ error: "Error al guardar permisos de usuario" });
+  } finally {
+    client.release();
   }
 };
 

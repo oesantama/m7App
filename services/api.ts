@@ -319,7 +319,10 @@ export const api = {
   getAllUserPermissions: () => fetch(`${API_URL}/user-permissions`).then(r => r.json()),
 
   // Firma Digital
-  createSignature: async (data: { documentNumber: string; digitalSignature: string; password: string; policyAccepted: boolean }) => {
+  // Firma Digital
+  getAllSignatures: () => fetch(`${API_URL}/signatures`).then(r => r.json()),
+  
+  saveSignature: async (data: any) => {
     const res = await fetch(`${API_URL}/signatures`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -328,9 +331,9 @@ export const api = {
     return res.json();
   },
 
-  getSignature: (documentNumber: string) => fetch(`${API_URL}/signatures/${documentNumber}`).then(r => r.json()),
+  getSignature: (userId: string) => fetch(`${API_URL}/signatures/${userId}`).then(r => r.json()),
 
-  approveSignature: (data: { documentNumber: string, approverId: string, approverPasswordSecret: string }) => fetch(`${API_URL}/signatures/approve`, {
+  approveSignature: (data: { userId: string, approverId: string, approverPassword: string }) => fetch(`${API_URL}/signatures/approve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)

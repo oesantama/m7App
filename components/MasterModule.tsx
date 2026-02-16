@@ -17,6 +17,7 @@ interface MasterModuleProps {
 const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit }) => {
   const { allMasterData, setAllMasterData, updateMasterCategory } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
+  const [permissionSearch, setPermissionSearch] = useState(''); // NEW STATE
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -138,6 +139,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   };
 
   const { canCreate, canEdit, canDelete } = getPagePermissions();
+
+  // DERIVED STATE FOR FILTERS
+  const filteredPages = useMemo(() => pages.filter(p => p.name.toLowerCase().includes(permissionSearch.toLowerCase())), [pages, permissionSearch]);
 
   const finalCanCreate = activeMaster === 'masterPermisosUsuario' ? false : canCreate;
   const finalCanDelete = activeMaster === 'masterPermisosUsuario' ? false : canDelete;
@@ -1118,13 +1122,26 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   {isAllPermsChecked ? 'QUITAR TODO' : 'SELECCIONAR TODO'}
                 </button>
               </div>
+              {/* SEARCH INPUT ADDITION */}
+              <div className="px-6 py-3 border-b border-white/5 bg-slate-900/50">
+                  <div className="relative">
+                      <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                      <input
+                          type="text"
+                          placeholder="FILTRAR PÁGINAS..."
+                          value={permissionSearch}
+                          onChange={(e) => setPermissionSearch(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 text-white pl-9 pr-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider focus:outline-none focus:border-emerald-500 transition-all placeholder:text-slate-600"
+                      />
+                  </div>
+              </div>
               <div className="overflow-x-auto max-h-[450px] custom-scrollbar">
                 <table className="w-full text-left text-[10px]">
                   <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20">
                     <tr><th className="p-4 bg-slate-900">Página</th>{['VIEW', 'CREATE', 'EDIT', 'DELETE', 'ACTIVE'].map(a => <th key={a} className="p-4 text-center bg-slate-900">{a}</th>)}<th className="p-4 text-center bg-slate-900">Fila</th></tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {pages.map(p => (
+                    {filteredPages.map(p => (
                       <tr key={p.id} className="hover:bg-white/5 transition-all">
                         <td className="p-4 text-white font-bold uppercase">{p.name}</td>
                         {['view', 'create', 'edit', 'delete', 'active'].map(a => (
@@ -1164,13 +1181,26 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   {isAllPermsChecked ? 'QUITAR TODO' : 'SELECCIONAR TODO'}
                 </button>
               </div>
+              {/* SEARCH INPUT ADDITION */}
+              <div className="px-6 py-3 border-b border-white/5 bg-slate-900/50">
+                  <div className="relative">
+                      <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                      <input
+                          type="text"
+                          placeholder="FILTRAR PÁGINAS..."
+                          value={permissionSearch}
+                          onChange={(e) => setPermissionSearch(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 text-white pl-9 pr-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider focus:outline-none focus:border-emerald-500 transition-all placeholder:text-slate-600"
+                      />
+                  </div>
+              </div>
               <div className="overflow-x-auto max-h-[450px] custom-scrollbar">
                 <table className="w-full text-left text-[10px]">
                   <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20">
                     <tr><th className="p-4 bg-slate-900">Página</th>{['VIEW', 'CREATE', 'EDIT', 'DELETE', 'ACTIVE'].map(a => <th key={a} className="p-4 text-center bg-slate-900">{a}</th>)}<th className="p-4 text-center bg-slate-900">Fila</th></tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {pages.map(p => (
+                    {filteredPages.map(p => (
                       <tr key={p.id} className="hover:bg-white/5 transition-all">
                         <td className="p-4 text-white font-bold uppercase">{p.name}</td>
                         {['view', 'create', 'edit', 'delete', 'active'].map(a => (
@@ -1571,6 +1601,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               <thead className="sticky top-0 z-10 bg-slate-900 text-white font-black uppercase tracking-widest text-[8px]">
                 <tr>
                   <th className="px-8 py-4">Descripción Registro</th>
+                  {activeMaster === 'pages' && <th className="px-8 py-4 text-center">Módulo</th>}
                   <th className="px-8 py-4 text-center">Creación</th>
                   <th className="px-8 py-4 text-center">Actualización</th>
                   {activeMaster === 'masterUsuarios' && <th className="px-8 py-4 text-center">Seguridad (2FA)</th>}
@@ -1637,11 +1668,19 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                       </div>
                     </td>
                     
+                    {activeMaster === 'pages' && (
+                      <td className="px-8 py-4 text-center">
+                        <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[8px] font-black uppercase tracking-wider">
+                          {(useAppStore.getState().modules || []).find(m => m.id === (item as any).parentId)?.name || 'SIN MÓDULO'}
+                        </span>
+                      </td>
+                    )}
+                    
                     <td className="px-8 py-4 text-center">
                       <div className="flex flex-col items-center">
                         <span className="font-bold text-[9px] uppercase text-slate-700">{(item as any).createdBy || 'Sistema'}</span>
                         <span className="text-[8px] text-slate-400 font-medium whitespace-nowrap">
-                          {safeFormatDate((item as any).createdAt)}
+                          {safeFormatDate((item as any).createdAt, item)}
                         </span>
                       </div>
                     </td>
@@ -1649,7 +1688,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                       <div className="flex flex-col items-center">
                         <span className="font-bold text-[9px] uppercase text-slate-700">{(item as any).updatedBy || (item as any).createdBy || 'Sistema'}</span>
                         <span className="text-[8px] text-slate-400 font-medium whitespace-nowrap">
-                          {safeFormatDate((item as any).updatedAt || (item as any).createdAt)}
+                          {safeFormatDate((item as any).updatedAt || (item as any).createdAt, item)}
                         </span>
                       </div>
                     </td>
@@ -1716,6 +1755,18 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">UOM:</span>
                          <span className="text-[9px] font-bold text-slate-600 truncate">
                            {uoms.find(u => u.id === (item as any).uomStdId)?.name || 'N/A'}
+                         </span>
+                       </div>
+                    </div>
+                  )}
+
+                  {/* DETALLES DE PÁGINAS (MÓDULO) */}
+                  {activeMaster === 'pages' && (
+                    <div className="mb-3">
+                       <div className="flex items-center gap-2">
+                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">MÓDULO:</span>
+                         <span className="text-[9px] font-bold text-emerald-600 truncate">
+                           {(allMasterData.modules || []).find(m => m.id === (item as any).parentId)?.name || 'SIN MÓDULO'}
                          </span>
                        </div>
                     </div>

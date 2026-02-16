@@ -492,9 +492,35 @@ const App: React.FC = () => {
         });
       }
 
-      let mappedPermissions: any[] = [];
-      if (Array.isArray(userPermissions)) {
-        mappedPermissions = userPermissions;
+      let mappedPermissions: any[] = userData.permissions || [];
+      
+      // LOGIC FIX: Handle both Array (Admin mock) and Object (DB flat) formats
+      if (userPermissions) {
+        if (Array.isArray(userPermissions) && userPermissions.length > 0) {
+           mappedPermissions = userPermissions;
+        } else if (typeof userPermissions === 'object' && !Array.isArray(userPermissions)) {
+           // Transform flat object (page_PAG-01_view: true) to Array format for Layout
+           const permMap = new Map<string, Set<string>>();
+           Object.keys(userPermissions).forEach(key => {
+               if (userPermissions[key] === true) {
+                   const parts = key.toLowerCase().split('_');
+                   if (parts.length >= 3 && parts[0] === 'page') {
+                       const action = parts.pop();
+                       const pageId = parts.slice(1).join('_').toUpperCase();
+                       if (pageId && action) {
+                           if (!permMap.has(pageId)) permMap.set(pageId, new Set());
+                           permMap.get(pageId)?.add(action);
+                       }
+                   }
+               }
+           });
+           const transformed = Array.from(permMap.entries()).map(([module, actions]) => ({ 
+               module, 
+               actions: Array.from(actions) 
+           }));
+           
+           if (transformed.length > 0) mappedPermissions = transformed;
+        }
       }
 
       setAllMasterData({
@@ -838,7 +864,7 @@ const App: React.FC = () => {
       case 'firmas':
         return <DigitalSignature user={user!} />;
       case 'aprobar-firma':
-        return <ApprovalManager user={user!} allUsers={allMasterData.masterUsuarios || []} />;
+        return <ApprovalManager user={user!} />;
       case 'gamification':
         // Casting de user a Driver temporal para visualización
         return <DriverGamification driver={{
