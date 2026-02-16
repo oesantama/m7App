@@ -118,6 +118,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return { planR, planNormal };
   }, [unassignedInvoices, documents]);
 
+  const unassignedMetrics = useMemo(() => {
+    const vol = unassignedInvoices.reduce((acc, inv) => acc + (inv.volumeM3 || 0), 0);
+    return {
+      count: unassignedInvoices.length,
+      volume: parseFloat(vol.toFixed(2)),
+      additionalVehicles: Math.ceil(vol / 25) // Asumiendo capacidad promedio de 25m3
+    };
+  }, [unassignedInvoices]);
+
   // Carga inicial de patrones de aprendizaje
   useEffect(() => {
     api.getRoutingPatterns().then(data => {
@@ -156,10 +165,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       if (vStatus !== 'DISPONIBLE') return null;
 
       // Validar si está en despacho o ruta activa
-      // Status IDs: EST-10 (Asignado), EST-11 (En Ruta)
-      // Status Text: Assigned, En Ruta, etc.
+      // Normalización robusta para comparación de IDs
+      const normalizeId = (id: any) => String(id || '').trim().toUpperCase();
+      const vId = normalizeId(v.id);
+
       const isBusy = activeRoutes.some(r =>
-        r.vehicleId === v.id &&
+        normalizeId(r.vehicleId || (r as any).vehicle_id) === vId &&
         ['EST-10', 'EST-11', 'ASSIGNED', 'IN ROUTE', 'EN_RUTA', 'ASIGNADA', 'EN RUTA', 'PENDIENTE', 'CONFIRMADA', 'PENDING_SIGNATURES'].includes(String(r.status).toUpperCase())
       );
 
@@ -177,13 +188,65 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return fleet;
   }, [assignments, vehicles, drivers, selectedClient, activeRoutes]);
 
+  const fleetGeneralMetrics = useMemo(() => {
+    const activeLinks = assignments.filter(a => {
+      const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+      const cId = a.clientId || (a as any).client_id;
+      return active && (selectedClient === 'GLOBAL' || cId === selectedClient);
+    });
+
+    let onBase = 0;
+    let assigned = 0;
+    let inRoute = 0;
+
+    activeLinks.forEach(link => {
+      const v = vehicles.find(veh => veh.id === link.vehicleId);
+      if (!v) return;
+
+      const normalizeId = (id: any) => String(id || '').trim().toUpperCase();
+      const vId = normalizeId(v.id);
+
+      // Buscar ruta activa para este vehículo
+      const activeRoute = activeRoutes.find(r => 
+        normalizeId(r.vehicleId || (r as any).vehicle_id) === vId &&
+        ['EST-10', 'EST-11', 'ASSIGNED', 'IN ROUTE', 'EN_RUTA', 'ASIGNADA', 'EN RUTA', 'PENDIENTE', 'CONFIRMADA', 'PENDING_SIGNATURES'].includes(String(r.status || '').toUpperCase())
+      );
+
+      if (activeRoute) {
+        const s = String(activeRoute.status || '').toUpperCase();
+        // EST-10 = Asignado (Ruta creada pero no despachada)
+        if (s === 'EST-10' || s === 'ASSIGNED' || s === 'ASIGNADA') {
+            assigned++;
+        } 
+        // EST-11 = En Ruta (Ya salió)
+        else {
+            inRoute++;
+        }
+      } else {
+        // Solo contar "En Base" si está Disponible Y NO tiene ruta
+        const vStatus = String(v.status || '').toUpperCase();
+        if (vStatus === 'DISPONIBLE') {
+          onBase++;
+        }
+      }
+    });
+
+    return { onBase, assigned, inRoute };
+  }, [assignments, vehicles, selectedClient, activeRoutes]);
+
+  const getOptimizationTargets = (selectedIds: Set<string | number>) => {
+    if (selectedIds.size === 0) return undefined;
+    const ids = Array.from(selectedIds).map(id => String(id));
+    return validInvoices.filter(inv => ids.includes(String(inv.docLId)));
+  };
+
 
 
 
   // ...
 
   const handleGeneralReadjustment = () => {
-    runM7Optimization();
+    setReadjustmentModal({ isOpen: true, selectedDocIds: new Set() });
   };
 
   const runM7Optimization = (specificInvoices?: Invoice[]) => {

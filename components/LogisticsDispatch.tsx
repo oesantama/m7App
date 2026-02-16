@@ -50,6 +50,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [pendingSignatures, setPendingSignatures] = useState<any[]>([]);
     const [signatureKeys, setSignatureKeys] = useState<Record<string, string>>({});
     const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
+    const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
 
     const [vehicleLocations, setVehicleLocations] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -625,11 +626,124 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         return activeRoutes;
     }, [activeRoutes, user, assignments, drivers]);
 
-    // Filtrar ubicaciones GPS basadas en las rutas visibles
+    // FILTRA UBICACIONES GPS BASADAS EN LAS RUTAS VISIBLES
     const filteredLocations = React.useMemo(() => {
         const visibleVehicleIds = new Set(filteredRoutes.map(r => r.vehicle_id));
         return vehicleLocations.filter(loc => visibleVehicleIds.has(loc.vehicle_id));
     }, [filteredRoutes, vehicleLocations]);
+
+    // LOGICA DE NEGOCIO PARA DESPACHO (MOVIDA ANTES DEL RETURN)
+    const handleBarcodeScan = async (barcode: string) => {
+        if (!assigningInvoice) return;
+        const item = (assigningInvoice.items || []).find((it: any) => it.sku === barcode || it.barcode === barcode);
+        if (!item) {
+            toast.error(`Artículo no encontrado: ${barcode}`);
+            return;
+        }
+        const currentCount = scannedItems[item.sku] || 0;
+        const expected = Number(item.expectedQty);
+        if (currentCount >= expected) {
+            toast.warning(`Cantidad máxima alcanzada para ${item.articleName || item.sku}`);
+            return;
+        }
+        setScannedItems({
+            ...scannedItems,
+            [item.sku]: currentCount + 1
+        });
+        toast.success(`Escaneado: ${item.articleName || item.sku}`);
+    };
+
+    const handleConfirmDispatch = async () => {
+        if (!assigningInvoice) return;
+        const totalScanned = Object.values(scannedItems).reduce((a,b)=>a+b, 0);
+        if (totalScanned === 0) {
+            toast.error("Debe escanear al menos un artículo.");
+            return;
+        }
+        const totalExpected = (assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.expectedQty), 0);
+        if (totalScanned < totalExpected) {
+             setConfirmModal({
+                isOpen: true,
+                title: "Entrega Parcial",
+                message: `Faltan artículos (${totalScanned}/${totalExpected}). ¿Continuar?`,
+                onConfirm: processDispatchConfirmation
+             });
+             return;
+        }
+        processDispatchConfirmation();
+    };
+
+    const processDispatchConfirmation = async () => {
+        if (!assigningInvoice) return;
+        const route = activeRoutes.find(r => r.id === (assigningInvoice.route_id || assigningInvoice.routeId));
+        // Priorizar conductor vinculado a la ruta
+        const actualDriver = drivers.find(d => d.id === route?.driver_id || d.id === route?.driverId);
+
+        if ((signNowMap[user.id] !== false && !signatureKeys[user.id])) {
+            toast.error(`Falta firma de ${user.name}`); return;
+        }
+        if (actualDriver && signNowMap[actualDriver.id] !== false && !signatureKeys[actualDriver.id]) {
+            toast.error(`Falta firma de ${actualDriver.name}`); return;
+        }
+
+        setIsValidating(true);
+        try {
+            const signatures = [];
+            signatures.push({ userId: user.id, role: 'DISPATCHER', signNow: signNowMap[user.id] !== false, password: signatureKeys[user.id] });
+            if (actualDriver) signatures.push({ userId: actualDriver.id, role: 'DRIVER', signNow: signNowMap[actualDriver.id] !== false, password: signatureKeys[actualDriver.id] });
+            
+            if (isAccompanied) {
+                selectedHelpers.slice(0, helperCount).forEach(hid => {
+                    if (hid) signatures.push({ userId: hid, role: 'HELPER', signNow: signNowMap[hid] !== false, password: signatureKeys[hid] });
+                });
+            }
+
+            const res = await api.initDispatch({
+                invoiceId: assigningInvoice.id || assigningInvoice.invoiceNumber,
+                driverId: actualDriver?.id || user.id,
+                helperIds: isAccompanied ? selectedHelpers.slice(0, helperCount).filter(Boolean) : [],
+                scannedItems,
+                isAccompanied,
+                helperCount: isAccompanied ? helperCount : 0,
+                createdBy: user.id,
+                signatures
+            });
+            if (res.success) {
+                toast.success("Despacho exitoso");
+                setAssigningInvoice(null);
+                setScannedItems({});
+                onRefresh();
+                fetchPendingSignatures();
+            }
+        } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
+    };
+
+    const handleDelayedSignature = async (inv: any) => {
+        setSignatureInputModal({
+            isOpen: true,
+            invoice: inv,
+            onConfirm: (pass: string) => executeSignature(inv, pass)
+        });
+    };
+
+    const executeSignature = async (inv: any, password: string) => {
+        if (!password) return;
+        setIsValidating(true);
+        try {
+            let dId = inv.dispatchId;
+            if (!dId) {
+                const match = pendingSignatures.find(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
+                if (match) dId = match.dispatchId;
+            }
+            if (!dId) { toast.error("No se encontró ID de despacho"); return; }
+            const res = await api.signDispatchPending({ dispatchId: dId, userId: user.id, password });
+            if (res.success) {
+                toast.success("Firma registrada");
+                fetchPendingSignatures();
+                onRefresh();
+            }
+        } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -837,41 +951,56 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-                            <div className="grid grid-cols-5 gap-4">
-                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">FACTURAS</p>
-                                    <p className="text-2xl font-black text-slate-950">{routeInvoices.length}</p>
+                        <div className="flex-1 overflow-y-auto p-8 pt-4 space-y-4 custom-scrollbar">
+                            {/* SECCIÓN DE BÚSQUEDA Y TÍTULO (AHORA ARRIBA) */}
+                            <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-[2rem] shadow-lg border border-slate-100 gap-4">
+                                <div className="flex items-center gap-4">
+                                    <p className="text-sm font-black text-slate-900 uppercase tracking-widest pl-2">Desglose de Documentos</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase">{routeInvoices.length} FACTURAS</span>
+                                        <div className="w-1 h-1 bg-slate-200 rounded-full"></div>
+                                        <p className="text-[9px] font-black text-emerald-500 uppercase">GESTIÓN DE RUTA</p>
+                                    </div>
                                 </div>
-                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">ENTREGADAS</p>
-                                    <p className="text-2xl font-black text-emerald-600">
-                                        {(() => {
-                                            // Contador de facturas en estado 'En ruta' (EST-11)
-                                            const total = routeInvoices.length;
-                                            const delivered = routeInvoices.filter(inv => inv.status === 'EST-11' || inv.status === 'COMPLETED' || inv.status === 'Entregado').length;
-                                            return delivered;
-                                        })()}
-                                        <span className="text-xs text-slate-400 ml-1">de {routeInvoices.length}</span>
+                                <div className="relative w-full md:w-80">
+                                    <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    <input 
+                                        type="text"
+                                        placeholder="BUSCAR FACTURA O CLIENTE..."
+                                        value={invoiceSearchQuery}
+                                        onChange={(e) => setInvoiceSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-emerald-500 transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* MÉTRICAS COMPACTAS (RIBBON) */}
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                                    <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">FACTURAS</p>
+                                    <p className="text-xl font-black text-slate-950 leading-none">{routeInvoices.length}</p>
+                                </div>
+                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                                    <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">ENTREGADAS</p>
+                                    <p className="text-xl font-black text-emerald-600 leading-none">
+                                        {routeInvoices.filter(inv => inv.status === 'EST-11' || inv.status === 'COMPLETED' || inv.status === 'Entregado').length}
+                                        <span className="text-[10px] text-slate-400 ml-1">/ {routeInvoices.length}</span>
                                     </p>
                                 </div>
-                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">VOLUMEN</p>
-                                    <p className="text-2xl font-black text-emerald-600">
+                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                                    <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">VOLUMEN</p>
+                                    <p className="text-xl font-black text-emerald-600 leading-none">
                                         {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(1)}m³
                                     </p>
-                                    <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">
-                                       Volumen {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(2)} de {(vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 0).toFixed(2)}
-                                    </p>
                                 </div>
-                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 relative overflow-hidden">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase">CAPACIDAD</p>
-                                        <span className="text-[10px] font-black text-emerald-600">
+                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 relative overflow-hidden flex flex-col items-center justify-center">
+                                    <div className="flex justify-between items-center w-full px-2 mb-0.5">
+                                        <p className="text-[7px] font-black text-slate-400 uppercase">CAPACIDAD</p>
+                                        <span className="text-[8px] font-black text-emerald-600">
                                             {Math.round((routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0) / (vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 1)) * 100)}%
                                         </span>
                                     </div>
-                                    <div className="w-full bg-slate-200 h-2 rounded-full">
+                                    <div className="w-full bg-slate-200 h-1.5 rounded-full px-2">
                                         <div
                                             className="bg-emerald-500 h-full rounded-full transition-all"
                                             style={{
@@ -879,34 +1008,28 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             }}
                                         ></div>
                                     </div>
-                                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">
-                                        Capacidad {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(2)} de {(vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 0).toFixed(2)}
-                                    </p>
                                 </div>
-                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">ESTADO</p>
-                                    <p className="text-[10px] font-black text-emerald-600 uppercase">
-                                        {selectedActiveRoute.status === 'EN_RUTA' ? '🚚 EN TRÁNSITO' : '✅ CONFIRMADA'}
+                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                                    <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">ESTADO</p>
+                                    <p className="text-[9px] font-black text-emerald-600 uppercase">
+                                        {selectedActiveRoute.status === 'EN_RUTA' ? '🚚 TRÁNSITO' : '✅ CONFIRMADA'}
                                     </p>
                                 </div>
                             </div>
-
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-[2rem] border border-slate-100">
-                                    <p className="text-sm font-bold text-slate-900 uppercase tracking-widest pl-4">Desglose de Documentos</p>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase">{routeInvoices.length} FACTURAS</span>
-                                        <div className="w-1 h-1 bg-slate-300 rounded-full"></div>
-                                        <span className="text-[10px] font-black text-emerald-500 uppercase">ASIGNACIÓN SEGURA (v2)</span>
-                                    </div>
-                                </div>
                                 
-                                <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-2">
-                                    {routeInvoices.map((inv: any, idx: number) => {
+                                <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-2 pb-10">
+                                {routeInvoices
+                                    .filter(inv => {
+                                        const query = invoiceSearchQuery.toLowerCase();
+                                        return (inv.invoiceNumber || "").toLowerCase().includes(query) || 
+                                               (inv.customerName || "").toLowerCase().includes(query) ||
+                                               (inv.id || "").toLowerCase().includes(query);
+                                    })
+                                    .map((inv: any, idx: number) => {
                                         const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
                                         
                                         return (
-                                            <div key={`${inv.id || idx}-${idx}`} className="p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-4 hover:border-emerald-500/30 hover:shadow-xl transition-all group relative overflow-hidden">
+                                            <div key={`${inv.id || idx}-${idx}`} className="p-5 bg-white border border-slate-100 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-4 hover:border-emerald-500/30 shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(16,185,129,0.08)] transition-all group relative overflow-hidden">
                                                 <div className="flex items-center gap-5 flex-1">
                                                     <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-emerald-500 font-black text-lg shadow-lg group-hover:scale-110 transition-all shrink-0">
                                                         {idx + 1}
@@ -920,7 +1043,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         </div>
                                                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight truncate max-w-[200px]">{inv?.customerName || 'Cliente Genérico'}</p>
                                                         <div className="flex items-center gap-3 mt-2">
-                                                             <div className="flex items-center gap-1">
+                                                            <div className="flex items-center gap-1">
                                                                 <Icons.MapPin className="w-3 h-3 text-slate-300" />
                                                                 <p className="text-[9px] font-bold text-slate-400 uppercase">{inv?.city || 'N/A'}</p>
                                                             </div>
@@ -962,10 +1085,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             </div>
                                         );
                                     })}
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-
                         <div className="p-8 bg-gradient-to-r from-slate-50 to-emerald-50 border-t border-slate-100 rounded-b-[2.5rem] flex gap-4">
                             <button
                                 className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
@@ -1012,17 +1133,17 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-8 space-y-3 custom-scrollbar">
-                           {(viewingItemsInvoice.items || []).map((item: any, i: number) => (
-                               <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:bg-white hover:shadow-md transition-all">
-                                   <div>
-                                       <p className="text-sm font-black text-slate-900">{item.articleName || item.sku || 'Artículo'}</p>
-                                       <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku || 'N/A'}</p>
-                                   </div>
-                                   <div className="text-right">
-                                       <p className="text-lg font-black text-indigo-600">{item.expectedQty} <span className="text-[10px] text-slate-400">{item.unit || 'UND'}</span></p>
-                                   </div>
-                               </div>
-                           ))}
+                                {(viewingItemsInvoice.items || []).map((item: any, i: number) => (
+                                    <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:bg-white hover:shadow-md transition-all">
+                                        <div>
+                                            <p className="text-sm font-black text-slate-900">{item.articleName || item.sku || 'Artículo'}</p>
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku || 'N/A'}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-lg font-black text-indigo-600">{item.expectedQty} <span className="text-[10px] text-slate-400">{item.unit || 'UND'}</span></p>
+                                        </div>
+                                    </div>
+                                ))}
                         </div>
                     </div>
                 </div>
@@ -1160,24 +1281,27 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     </div>
 
                                     {/* Panel de Validación de Firmas */}
-                                    <div className="bg-slate-900 p-6 rounded-[2rem] shadow-xl space-y-4">
+                                    <div className="bg-slate-900 p-6 rounded-[2rem] shadow-2xl space-y-4 border border-white/5">
                                         <h4 className="text-xs font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                                            <Icons.Signature className="w-4 h-4" />
-                                            Validación de Seguridad
+                                            <Icons.Shield className="w-4 h-4" />
+                                            PROTOCOLOS DE SEGURIDAD M7
                                         </h4>
                                         <div className="space-y-3">
-                                            {/* Firma del Conductor (Logueado) */}
-                                            <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                                            {/* Firma del Despachador (USUARIO ACTUAL) */}
+                                            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg shadow-black/20">
                                                 <div className="flex justify-between items-center mb-2">
-                                                    <p className="text-[9px] font-black text-white uppercase">{user.name} (CONDUCTOR)</p>
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">RESPONSABLE TIENDA</p>
+                                                        <p className="text-[11px] font-black text-white uppercase">{user.name}</p>
+                                                    </div>
                                                     <div className="flex bg-white/10 p-1 rounded-lg">
                                                         <button 
                                                             onClick={() => setSignNowMap({...signNowMap, [user.id]: true})}
-                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] !== false ? 'bg-emerald-500 text-slate-900' : 'text-slate-400'}`}
+                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] !== false ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20' : 'text-slate-400'}`}
                                                         >AHORA</button>
                                                         <button 
                                                             onClick={() => setSignNowMap({...signNowMap, [user.id]: false})}
-                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] === false ? 'bg-rose-500 text-white' : 'text-slate-400'}`}
+                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] === false ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'text-slate-400'}`}
                                                         >DESPUÉS</button>
                                                     </div>
                                                 </div>
@@ -1185,21 +1309,69 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     <div className="relative">
                                                         <input 
                                                             type={showPasswordMap[user.id] ? "text" : "password"}
-                                                            placeholder="INGRESE SU CLAVE DE FIRMA..."
+                                                            placeholder="SU CLAVE DE FIRMA..."
                                                             autoComplete="new-password"
-                                                            className="w-full bg-white/10 border border-white/20 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500 pr-10"
+                                                            className="w-full bg-slate-950 border border-white/5 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500/50 pr-10 shadow-inner"
                                                             onChange={(e) => setSignatureKeys({...signatureKeys, [user.id]: e.target.value})}
                                                         />
                                                         <button 
                                                             type="button"
                                                             onClick={() => setShowPasswordMap({...showPasswordMap, [user.id]: !showPasswordMap[user.id]})}
-                                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
                                                         >
                                                             {showPasswordMap[user.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
                                                         </button>
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Firma del Conductor Real */}
+                                            {(() => {
+                                                const route = activeRoutes.find(r => r.id === (assigningInvoice.route_id || assigningInvoice.routeId));
+                                                // Priorizar conductor vinculado a la ruta
+                                                const actualDriver = drivers.find(d => d.id === route?.driver_id || d.id === route?.driverId);
+                                                
+                                                if (!actualDriver) return null;
+
+                                                return (
+                                                    <div className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg shadow-black/20">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <div>
+                                                                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">RESPONSABLE LOGÍSTICO</p>
+                                                                <p className="text-[11px] font-black text-white uppercase">{actualDriver.name} (CONDUCTOR)</p>
+                                                            </div>
+                                                            <div className="flex bg-white/10 p-1 rounded-lg">
+                                                                <button 
+                                                                    onClick={() => setSignNowMap({...signNowMap, [actualDriver.id]: true})}
+                                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] !== false ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20' : 'text-slate-400'}`}
+                                                                >AHORA</button>
+                                                                <button 
+                                                                    onClick={() => setSignNowMap({...signNowMap, [actualDriver.id]: false})}
+                                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] === false ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'text-slate-400'}`}
+                                                                >DESPUÉS</button>
+                                                            </div>
+                                                        </div>
+                                                        {signNowMap[actualDriver.id] !== false && (
+                                                            <div className="relative">
+                                                                <input 
+                                                                    type={showPasswordMap[actualDriver.id] ? "text" : "password"}
+                                                                    placeholder="CLAVE CONDUCTOR..."
+                                                                    autoComplete="new-password"
+                                                                    className="w-full bg-slate-950 border border-white/5 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500/50 pr-10 shadow-inner"
+                                                                    onChange={(e) => setSignatureKeys({...signatureKeys, [actualDriver.id]: e.target.value})}
+                                                                />
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => setShowPasswordMap({...showPasswordMap, [actualDriver.id]: !showPasswordMap[actualDriver.id]})}
+                                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                                                >
+                                                                    {showPasswordMap[actualDriver.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
 
                                             {/* Firmas de Auxiliares */}
                                             {isAccompanied && selectedHelpers.slice(0, helperCount).map((hid) => {
@@ -1351,167 +1523,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             )}
         </div>
     );
-
-    // LOGICA DE NEGOCIO PARA DESPACHO
-    async function handleBarcodeScan(barcode: string) {
-        if (!assigningInvoice) return;
-        
-        // Buscar artículo por SKU o Código de Barras
-        const item = (assigningInvoice.items || []).find((it: any) => it.sku === barcode || it.barcode === barcode);
-        
-        if (!item) {
-            toast.error(`Artículo no encontrado: ${barcode}`);
-            return;
-        }
-
-        const currentCount = scannedItems[item.sku] || 0;
-        const expected = Number(item.expectedQty);
-
-        if (currentCount >= expected) {
-            toast.warning(`Cantidad máxima alcanzada para ${item.articleName || item.sku}`);
-            return;
-        }
-
-        setScannedItems({
-            ...scannedItems,
-            [item.sku]: currentCount + 1
-        });
-        toast.success(`Escaneado: ${item.articleName || item.sku}`);
-    }
-
-    async function handleConfirmDispatch() {
-        if (!assigningInvoice) return;
-        
-        // 1. Validar que al menos se escaneó algo
-        const totalScanned = Object.values(scannedItems).reduce((a,b)=>a+b, 0);
-        if (totalScanned === 0) {
-            toast.error("Debe escanear al menos un artículo para realizar la asignación.");
-            return;
-        }
-
-        const totalExpected = (assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.expectedQty), 0);
-        if (totalScanned < totalExpected) {
-             setConfirmModal({
-                isOpen: true,
-                title: "Entrega Parcial Detectada",
-                message: `CUIDADO: Faltan artículos por escanear (${totalScanned} de ${totalExpected}). ¿Desea continuar con una entrega parcial?`,
-                onConfirm: processDispatchConfirmation
-             });
-             return;
-        }
-
-        processDispatchConfirmation();
-    }
-
-    async function processDispatchConfirmation() {
-        if (!assigningInvoice) return;
-        
-        // 2. Validar Firmas y Contraseñas
-        // Verificar conductor
-        const driverSignNow = signNowMap[user.id] !== false; // Default true
-        if (driverSignNow && !signatureKeys[user.id]) {
-            toast.error(`Falta la clave de firma del conductor (${user.name}). Ingrese su clave o seleccione "DESPUÉS".`);
-            return;
-        }
-
-        // Verificar auxiliares
-        if (isAccompanied) {
-            for (let i = 0; i < helperCount; i++) {
-                const hid = selectedHelpers[i];
-                if (hid) {
-                    const helper = drivers.find(d => d.id === hid);
-                    const helperSignNow = signNowMap[hid] !== false;
-                    if (helperSignNow && !signatureKeys[hid]) {
-                        toast.error(`Falta la clave de firma del auxiliar ${helper?.name || i+1}. Ingrese la clave o seleccione "DESPUÉS".`);
-                        return;
-                    }
-                }
-            }
-        }
-
-        setIsValidating(true);
-        try {
-            const signatures = [
-                { userId: user.id, role: 'DRIVER', signNow: signNowMap[user.id] !== false, password: signatureKeys[user.id] }
-            ];
-
-            if (isAccompanied) {
-                selectedHelpers.slice(0, helperCount).forEach(hid => {
-                    if (hid) {
-                        signatures.push({ userId: hid, role: 'HELPER', signNow: signNowMap[hid] !== false, password: signatureKeys[hid] });
-                    }
-                });
-            }
-
-            const payload = {
-                invoiceId: assigningInvoice.id || assigningInvoice.invoiceNumber,
-                driverId: user.id,
-                helperIds: isAccompanied ? selectedHelpers.slice(0, helperCount) : [],
-                scannedItems: scannedItems,
-                isAccompanied,
-                helperCount: isAccompanied ? helperCount : 0,
-                createdBy: user.id,
-                signatures
-            };
-
-            const res = await api.initDispatch(payload);
-            
-            if (res.success) {
-                toast.success("Despacho asignado correctamente. " + (res.pendingSignatures > 0 ? "Quedan firmas pendientes." : "Todo firmado."));
-                setAssigningInvoice(null);
-                setScannedItems({});
-                onRefresh();
-                fetchPendingSignatures();
-            }
-        } catch (e: any) {
-            toast.error(e.message || "Error al confirmar despacho");
-        } finally {
-            setIsValidating(false);
-        }
-    }
-
-    async function handleDelayedSignature(inv: any) {
-        setSignatureInputModal({
-            isOpen: true,
-            invoice: inv,
-            onConfirm: (password) => executeSignature(inv, password)
-        });
-    }
-
-    async function executeSignature(inv: any, password: string) {
-        if (!password) return;
-
-        setIsValidating(true);
-        try {
-            // Robustez: Si inv no tiene dispatchId, buscarlo en pendingSignatures
-            let dId = inv.dispatchId;
-            if (!dId) {
-                const match = pendingSignatures.find(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
-                if (match) dId = match.dispatchId;
-            }
-
-            if (!dId) {
-                toast.error("Error: No se encontró el ID del despacho asociado.");
-                return;
-            }
-
-            const res = await api.signDispatchPending({
-                dispatchId: dId, 
-                userId: user.id,
-                password
-            });
-
-            if (res.success) {
-                toast.success("Firma registrada con éxito.");
-                fetchPendingSignatures();
-                onRefresh();
-            }
-        } catch (e: any) {
-            toast.error(e.message || "Error al registrar firma");
-        } finally {
-            setIsValidating(false);
-        }
-    }
 };
 
 export default LogisticsDispatch;

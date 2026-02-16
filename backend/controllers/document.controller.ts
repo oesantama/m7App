@@ -95,6 +95,32 @@ export const getDocuments = async (req: Request, res: Response) => {
       ON CONFLICT (id) DO NOTHING;
     `);
 
+    // Asegurar tablas de Alistado (Picking)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS picking_assignments (
+          id TEXT PRIMARY KEY,
+          invoice_id TEXT NOT NULL,
+          leader_id TEXT NOT NULL,
+          helper_ids JSONB DEFAULT '[]',
+          status TEXT DEFAULT 'IN_PROGRESS', 
+          created_by TEXT,
+          started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          completed_at TIMESTAMP WITH TIME ZONE,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS picking_signatures (
+          id SERIAL PRIMARY KEY,
+          picking_id TEXT REFERENCES picking_assignments(id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL,
+          signed BOOLEAN DEFAULT false,
+          signed_at TIMESTAMP WITH TIME ZONE,
+          UNIQUE(picking_id, user_id)
+      );
+    `);
+
     // SANEAMIENTO: Limpiar duplicados en consolidados
     await pool.query(`
       DELETE FROM document_consolidated_items a USING (
@@ -674,9 +700,34 @@ export const updateStatus = async (req: Request, res: Response) => {
 
 export const getInvoices = async (req: Request, res: Response) => {
   try {
+    // ASEGURAR TABLAS DE PICKING PARA EVITAR ERROR 500
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS picking_assignments (
+          id TEXT PRIMARY KEY,
+          invoice_id TEXT NOT NULL,
+          leader_id TEXT NOT NULL,
+          helper_ids JSONB DEFAULT '[]',
+          status TEXT DEFAULT 'IN_PROGRESS', 
+          created_by TEXT,
+          started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          completed_at TIMESTAMP WITH TIME ZONE,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS picking_signatures (
+          id SERIAL PRIMARY KEY,
+          picking_id TEXT REFERENCES picking_assignments(id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL,
+          signed BOOLEAN DEFAULT false,
+          signed_at TIMESTAMP WITH TIME ZONE,
+          UNIQUE(picking_id, user_id)
+      );
+    `);
+
     // Obtener facturas únicas (agrupadas por invoice, city, address) que estén pendientes
-    // Obtener facturas únicas (agrupadas por invoice, city, address)
-    const { clientId, ids } = req.query;
+    const { clientId, ids, history } = req.query;
     
     // Helper para ID robusto en SQL
     const sqlIdGen = `CONCAT(TRIM(document_items.document_id), '_', TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)))`;
@@ -691,7 +742,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         document_items.city,
         document_items.neighborhood,
         document_items.address,
-        document_items.address as "customerName", -- Proxy if not available
+        document_items.address as "customerName",
         SUM(document_items.expected_qty) as "totalItems",
         SUM(document_items.volume) as "volumeM3",
         SUM(document_items.peso) as "invoiceValue",
@@ -699,10 +750,13 @@ export const getInvoices = async (req: Request, res: Response) => {
         documents_l.client_id as "clientId", 
         documents_l.codplan as "codplan",
         documents_l.plan_type as "planType",
+        MAX(documents_l.vehicle_plate) as "plate",
         MAX(document_items.item_status) as "status",
         MAX(da.id) as "dispatchId",
         MAX(da.status) as "dispatchStatus",
-        -- AGREGACIÓN DE ÍTEMS
+        MAX(pa.leader_id) as "pickerLeader",
+        (JSONB_AGG(pa.helper_ids) -> 0) as "pickerHelpers",
+        MAX(pa.started_at) as "pickingDate",
         JSON_AGG(JSON_BUILD_OBJECT(
           'sku', document_items.article_id,
           'expectedQty', document_items.expected_qty,
@@ -739,47 +793,25 @@ export const getInvoices = async (req: Request, res: Response) => {
         da.invoice_id = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
         OR da.invoice_id = ${sqlIdGen}
       )
+      LEFT JOIN picking_assignments pa ON (
+        pa.invoice_id = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
+        OR pa.invoice_id = ${sqlIdGen}
+      )
       WHERE 1=1
     `;
 
-    const queryParams: any[] = [];
+    const queryParams = [];
 
-    // Si vienen IDs específicos (para ver detalle de ruta), filtramos por ellos e ignoramos el estado
+    // LÓGICA DE FILTRADO REFINADA
     if (ids) {
-      const idList = (ids as string).split(',').map(id => id.trim());
-      
-      // ESTRATEGIA DE BÚSQUEDA HÍBRIDA ROBUSTA
-      // 1. Descomponer los IDs compuestos (DocID_Invoice) para buscar por columnas exactas
-      // ID Típico: "doc-AAA-123_INV-001" -> Doc="doc-AAA-123", Inv="INV-001"
-      
-      const conditions: string[] = [];
-      const flatParams: any[] = [];
-      let paramIdx = 1; // Start after existing params if any (none here usually, but good practice)
-      
-      // Add existing query params offset if we had any (queryParams is empty at start of this block but check scope)
-      // Actually queryParams has nothing yet.
-      
-      // Construimos un mega-OR combinando búsqueda exacta por columnas y fallback por LIKE invoice
-      // Es menos eficiente que ANY() pero garantiza encontrar el registro si existe
-      
+      const idList = String(ids).split(',').map(id => id.trim());
       const orClauses = idList.map((compId) => {
          const lastUnderscore = compId.lastIndexOf('_');
          let searchTerm = compId;
-         
-         if (lastUnderscore > 0) {
-             // Extract suffix (Invoice/Order)
-             searchTerm = compId.substring(lastUnderscore + 1);
-         }
-         
-         // Remove ALL whitespace from the search term to match the storage logic
+         if (lastUnderscore > 0) searchTerm = compId.substring(lastUnderscore + 1);
          searchTerm = searchTerm.replace(/\s/g, '');
-         
-         // Parameterize
          queryParams.push(searchTerm);
          const pIdx = `$${queryParams.length}`;
-         
-         // Match: Invoice OR Order equal to suffix (ignoring whitespace in DB columns too)
-         // Postgres REGEXP_REPLACE(col, '\s', '', 'g') removes all whitespace characters
          return `(
             REGEXP_REPLACE(COALESCE(document_items.invoice, ''), '\\s', '', 'g') = ${pIdx} 
             OR 
@@ -788,16 +820,24 @@ export const getInvoices = async (req: Request, res: Response) => {
             REGEXP_REPLACE(COALESCE(document_items.client_ref, ''), '\\s', '', 'g') = ${pIdx}
          )`;
       });
-
-      if (orClauses.length > 0) {
-          query += ` AND (${orClauses.join(' OR ')})`;
-      }
-      
-    } else {
-      // Comportamiento normal (Solo pendientes)
+      if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;
+    } else if (history === 'true') {
+      // HISTORIAL: Mostrar lo ya alistado o finalizado
       query += ` AND (
-        (document_items.item_status IS NULL OR TRIM(UPPER(document_items.item_status)) NOT IN ('ELIMINADO', 'CANCELADO', 'ENTREGADO', 'FINALIZADO', 'ASIGNADO', 'EN RUTA', 'EN_RUTA'))
-        AND (documents_l.status IS NULL OR UPPER(documents_l.status) IN ('PENDIENTE', 'AUDITADO', 'EN PROCESO'))
+        pa.id IS NOT NULL 
+        OR document_items.item_status IN ('ALISTADO', 'ENTREGADO', 'FINALIZADO', 'ASIGNADO', 'EN RUTA', 'EN_RUTA')
+      )`;
+    } else {
+      // VISTA DE ALISTADO (PICKING): 
+      // 1. Debe estar en estado "En Conteo" (Auditado)
+      // 2. NO debe tener un proceso de alistado ya completado o en curso
+      query += ` AND documents_l.status = 'En Conteo'`;
+      query += ` AND (pa.id IS NULL OR pa.status = 'CANCELLED')`;
+      
+      // Filtro adicional de seguridad para estados de ítem
+      query += ` AND (
+        document_items.item_status IS NULL 
+        OR TRIM(UPPER(document_items.item_status)) NOT IN ('ELIMINADO', 'CANCELADO', 'ENTREGADO', 'FINALIZADO', 'ASIGNADO', 'EN RUTA', 'EN_RUTA', 'ALISTADO')
       )`;
     }
 
@@ -810,14 +850,6 @@ export const getInvoices = async (req: Request, res: Response) => {
       )
     `;
 
-    /* 
-      COMENTADO POR SOLICITUD DE USUARIO: 
-      Los planes se cargan sin depender del cliente, el filtro bloquea la visibilidad.
-    if (!ids && clientId && clientId !== 'undefined' && clientId !== 'null' && clientId !== 'all' && clientId !== '') {
-       // ... existing client filter logic if needed ...
-    }
-    */
-
     query += ` GROUP BY 
         COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number), 
         document_items.city, 
@@ -827,7 +859,8 @@ export const getInvoices = async (req: Request, res: Response) => {
         documents_l.client_id, 
         documents_l.external_doc_id,
         documents_l.codplan,
-        documents_l.plan_type
+        documents_l.plan_type,
+        documents_l.vehicle_plate
       ORDER BY "invoiceNumber" ASC`;
 
     const result = await pool.query(query, queryParams);

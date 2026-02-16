@@ -24,6 +24,7 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
     // Picking Progress
     const [confirmedItems, setConfirmedItems] = useState<string[]>([]); // SKU list
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [itemSearch, setItemSearch] = useState('');
 
     useEffect(() => {
         loadInvoices();
@@ -48,14 +49,21 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
     }
 
     const filteredInvoices = useMemo(() => {
-        if (!searchTerm) return invoices;
+        // Solo mostrar facturas cuyos documentos maestros estén en proceso de Auditoría/Conteo o Inventariado
+        const pickingDocIds = (documents || [])
+            .filter(d => (d.status as any) === 'En Conteo' || (d.status as any) === 'Inventariado' || (d.status as any) === 'INVENTARIADO')
+            .map(d => d.id);
+
+        let list = invoices.filter(inv => pickingDocIds.includes(inv.docLId));
+
+        if (!searchTerm) return list;
         const lower = searchTerm.toLowerCase();
-        return invoices.filter((inv: any) => 
+        return list.filter((inv: any) => 
             (inv.invoiceNumber || '').toLowerCase().includes(lower) ||
             (inv.customerName || '').toLowerCase().includes(lower) ||
             (inv.id || '').toLowerCase().includes(lower)
         );
-    }, [invoices, searchTerm]);
+    }, [invoices, documents, searchTerm]);
 
     const helpersList = useMemo(() => {
         return allUsers.filter(u => u.id !== user.id);
@@ -122,53 +130,68 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
         return (
             <div className="flex flex-col h-full bg-slate-50/50 rounded-[3rem] overflow-hidden border border-slate-200 shadow-2xl animate-in slide-in-from-right duration-500">
                 {/* Header Detalle */}
-                <div className="p-8 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-6">
-                        <button onClick={() => setActiveInvoice(null)} className="p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all">
-                            <Icons.ChevronRight className="w-6 h-6 rotate-180" />
+                <div className="p-4 bg-white border-b border-slate-100 flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => { setActiveInvoice(null); setItemSearch(''); }} className="p-2.5 bg-slate-50 rounded-lg hover:bg-slate-100 transition-all">
+                            <Icons.ChevronRight className="w-4 h-4 rotate-180" />
                         </button>
                         <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detalle de Alistado</p>
-                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">
+                            <p className="text-[8px] font-black text-slate-400 theme-text-secondary uppercase tracking-widest">Alistando Factura</p>
+                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter leading-none">
                                 {activeInvoice.invoiceNumber || activeInvoice.id}
                             </h3>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="text-right">
-                            <p className="text-[10px] font-black text-slate-400 uppercase">Progreso</p>
-                            <p className="text-sm font-black text-emerald-600">{confirmedItems.length} / {activeInvoice.items?.length} OK</p>
-                        </div>
-                        <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                                className="h-full bg-emerald-500 transition-all duration-500" 
-                                style={{ width: `${(confirmedItems.length / (activeInvoice.items?.length || 1)) * 100}%` }}
-                            />
-                        </div>
+                </div>
+
+                {/* Buscador Interno de Artículos */}
+                <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100 shrink-0">
+                    <div className="relative group">
+                        <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                        <input 
+                            type="text" 
+                            placeholder="FILTRAR ARTÍCULOS (SKU O NOMBRE)..." 
+                            value={itemSearch}
+                            onChange={(e) => setItemSearch(e.target.value.toUpperCase())}
+                            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-900 uppercase outline-none focus:border-emerald-500 shadow-sm transition-all"
+                        />
                     </div>
                 </div>
 
                 {/* Lista de Artículos */}
-                <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar">
-                    {activeInvoice.items?.map((item: any, idx: number) => (
-                        <div key={idx} className={`p-6 rounded-[2rem] border-2 transition-all flex items-center justify-between gap-6 ${confirmedItems.includes(item.sku) ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 shadow-sm'}`}>
-                            <div className="flex items-center gap-5 flex-1 min-w-0">
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${confirmedItems.includes(item.sku) ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                    {activeInvoice.items?.filter((item: any) => {
+                        if (!itemSearch) return true;
+                        const lowerSearch = itemSearch.toLowerCase();
+                        return (item.sku || '').toLowerCase().includes(lowerSearch) || 
+                               (item.articleName || '').toLowerCase().includes(lowerSearch);
+                    }).map((item: any, idx: number) => (
+                        <div key={idx} className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-4 ${confirmedItems.includes(item.sku) ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 shadow-sm'}`}>
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] shrink-0 ${confirmedItems.includes(item.sku) ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
                                     {idx + 1}
                                 </div>
-                                <div className="truncate">
-                                    <h4 className="font-black text-slate-900 uppercase text-sm truncate">{item.articleName || item.sku}</h4>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">SKU: {item.sku} | Cantidad: {item.expectedQty} {item.unit}</p>
+                                <div className="truncate flex flex-col">
+                                    <h4 className="font-black text-slate-900 uppercase text-[11px] truncate leading-tight">SKU: {item.sku}</h4>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{item.articleName || 'Descripción no disponible'}</p>
+                                    <p className="text-[8px] font-black text-emerald-600 uppercase mt-0.5">Cantidad: {item.expectedQty} {item.unit}</p>
                                 </div>
                             </div>
                             <button 
                                 onClick={() => handleItemToggle(item.sku)}
-                                className={`px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${confirmedItems.includes(item.sku) ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-slate-900 text-white hover:bg-emerald-500'}`}
+                                className={`px-5 py-2 rounded-lg font-black text-[8px] uppercase tracking-widest transition-all shrink-0 ${confirmedItems.includes(item.sku) ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-slate-900 text-white hover:bg-emerald-500'}`}
                             >
-                                {confirmedItems.includes(item.sku) ? 'ALISTADO OK' : 'CONFIRMAR'}
+                                {confirmedItems.includes(item.sku) ? 'LISTO' : 'CONFIRMAR'}
                             </button>
                         </div>
                     ))}
+                    
+                    {activeInvoice.items?.length === 0 && (
+                        <div className="py-20 text-center opacity-20 filter grayscale">
+                            <Icons.Package className="w-16 h-16 mx-auto mb-4" />
+                            <p className="font-black text-xs">Sin artículos registrados</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer Acciones */}
@@ -266,57 +289,77 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 content-start">
-                {filteredInvoices.map((inv, idx) => {
-                    const isDispatched = inv.status === 'EST-11';
-                    const isPending = !inv.pickingId && !isDispatched;
-                    
-                    return (
-                        <div key={inv.id || idx} className={`p-8 bg-white border-2 rounded-[3.5rem] transition-all group relative flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-2xl ${isDispatched ? 'border-slate-100 opacity-60' : 'border-slate-100 hover:border-emerald-500'}`}>
-                            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                                <Icons.Package className="w-24 h-24" />
-                            </div>
-                            
-                            <div className="space-y-4 relative z-10">
-                                <div className="flex justify-between items-start">
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-all ${isDispatched ? 'bg-slate-400' : 'bg-slate-900'}`}>
-                                        {isDispatched ? <Icons.Truck className="w-7 h-7" /> : <Icons.Clipboard className="w-7 h-7" />}
-                                    </div>
-                                    <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border tracking-widest ${isDispatched ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                                        {isDispatched ? 'EN RUTA' : 'PENDIENTE'}
-                                    </span>
-                                </div>
-    
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate">{inv.customerName}</p>
-                                    <h4 className="text-xl font-black text-slate-900 uppercase truncate tracking-tighter">
-                                        {inv.invoiceNumber || inv.id}
-                                    </h4>
-                                </div>
-    
-                                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-50">
-                                    <div className="p-3 bg-slate-50 rounded-2xl">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase">Items</p>
-                                        <p className="text-sm font-black text-slate-900">{inv.items?.length || 0} SKU</p>
-                                    </div>
-                                    <div className="p-3 bg-slate-50 rounded-2xl">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase">Volumen</p>
-                                        <p className="text-sm font-black text-slate-900">{Number(inv.volumeM3 || 0).toFixed(2)} m³</p>
-                                    </div>
-                                </div>
-                            </div>
-    
-                            <button 
-                                onClick={() => handleStartActivity(inv)}
-                                disabled={isDispatched}
-                                className={`mt-8 w-full py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3 ${isDispatched ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-emerald-600'}`}
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 content-start">
+                    {filteredInvoices.map((inv, idx) => {
+                        const isDispatched = inv.status === 'EST-11' || inv.status === 'Entregado';
+                        const isInventored = (documents || []).find(d => d.id === inv.docLId)?.status?.toUpperCase() === 'INVENTARIADO';
+                        
+                        return (
+                            <div 
+                                key={inv.id || idx} 
+                                className="group relative bg-white border border-slate-100 rounded-[3rem] p-8 transition-all hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] hover:border-emerald-500/30 flex flex-col justify-between min-h-[380px] overflow-hidden"
                             >
-                                <Icons.Zap className="w-4 h-4" />
-                                {isDispatched ? 'Ya Despachado' : 'Iniciar Alistado'}
-                            </button>
-                        </div>
-                    );
-                })}
+                                {/* Fondo Decorativo */}
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-bl-[4rem] -z-0 transition-all group-hover:bg-emerald-50/50" />
+                                
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-8">
+                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transition-all group-hover:scale-110 group-hover:rotate-3 ${isInventored ? 'bg-indigo-600 shadow-indigo-100' : 'bg-slate-900 shadow-slate-200'}`}>
+                                            {isDispatched ? <Icons.Truck className="w-7 h-7" /> : <Icons.Package className="w-7 h-7" />}
+                                        </div>
+                                        <div className="flex flex-col items-end gap-2">
+                                            <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm ${
+                                                isInventored ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                            }`}>
+                                                {isInventored ? 'INVENTARIADO' : 'EN CONTEO'}
+                                            </span>
+                                            {inv.plate && (
+                                                <span className="bg-slate-900 text-white text-[8px] font-black px-3 py-1 rounded-lg tracking-[0.2em] shadow-lg">
+                                                    {inv.plate}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 mb-8">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            {inv.customerName || 'CLIENTE PENDIENTE'}
+                                        </p>
+                                        <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-tight">
+                                            #{inv.invoiceNumber || inv.id}
+                                        </h4>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 mb-8">
+                                        <div className="p-4 bg-slate-50 border border-slate-100 rounded-3xl group-hover:bg-white group-hover:border-emerald-100 transition-all">
+                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Refs</p>
+                                            <p className="text-sm font-black text-slate-900">{inv.items?.length || 0} SKU</p>
+                                        </div>
+                                        <div className="p-4 bg-slate-50 border border-slate-100 rounded-3xl group-hover:bg-white group-hover:border-emerald-100 transition-all">
+                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Volumen</p>
+                                            <p className="text-sm font-black text-slate-900">{Number(inv.volumeM3 || 0).toFixed(2)} m³</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={() => handleStartActivity(inv)}
+                                    disabled={isDispatched}
+                                    className={`relative z-10 w-full py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 overflow-hidden ${
+                                        isDispatched 
+                                        ? 'bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed' 
+                                        : 'bg-slate-900 text-white hover:bg-emerald-600 shadow-xl hover:shadow-emerald-200 active:scale-95'
+                                    }`}
+                                >
+                                    {isDispatched ? 'PROCESADO' : 'INICIAR ALISTADO'}
+                                    {!isDispatched && <Icons.ChevronRight className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
     
                 {filteredInvoices.length === 0 && !loading && (
                     <div className="col-span-full py-40 text-center space-y-6">

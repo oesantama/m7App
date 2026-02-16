@@ -75,6 +75,6 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/portal', portalRoutes);
 router.use('/telemetry', telemetryRoutes);
 router.use('/dispatch', dispatchRoutes);
-
+router.use('/picking', pickingRoutes);
 
 export default router;

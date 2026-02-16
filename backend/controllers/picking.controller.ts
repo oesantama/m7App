@@ -124,7 +124,7 @@ export const getPickingStatus = async (req: Request, res: Response) => {
             (SELECT json_agg(ps.*) FROM picking_signatures ps WHERE ps.picking_id = pa.id) as signatures
             FROM picking_assignments pa
             WHERE pa.invoice_id = $1
-            ORDER BY pa.created_at DESC LIMIT 1
+            ORDER BY pa.started_at DESC LIMIT 1
         `, [invoiceId]);
         res.json(result.rows[0] || null);
     } catch (error: any) {
