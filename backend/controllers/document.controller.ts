@@ -697,10 +697,18 @@ export const getInvoices = async (req: Request, res: Response) => {
         SUM(document_items.volume) as "volumeM3",
         SUM(document_items.peso) as "invoiceValue",
         document_items.document_id as "docLId",
-        documents_l.client_id as "clientId", -- Importante para filtrado por cliente
+        documents_l.client_id as "clientId", 
         documents_l.codplan as "codplan",
         documents_l.plan_type as "planType",
         MAX(document_items.item_status) as "status",
+        -- AGREGACIÓN DE ÍTEMS
+        JSON_AGG(JSON_BUILD_OBJECT(
+          'sku', document_items.article_id,
+          'expectedQty', document_items.expected_qty,
+          'receivedQty', document_items.received_qty,
+          'articleName', COALESCE(articles.name, document_items.article_id),
+          'unit', document_items.unit
+        )) as "items",
         CASE 
           WHEN document_items.city ILIKE '%MEDELLIN%' OR document_items.city ILIKE '%MEDELLÍN%' OR document_items.city ILIKE '%ANTIOQUIA%' THEN 6.2442
           WHEN document_items.city ILIKE '%CALI%' OR document_items.city ILIKE '%VALLE%' THEN 3.4516
@@ -710,7 +718,7 @@ export const getInvoices = async (req: Request, res: Response) => {
           WHEN document_items.city ILIKE '%PEREIRA%' OR document_items.city ILIKE '%RISARALDA%' THEN 4.8133
           WHEN document_items.city ILIKE '%MANIZALES%' OR document_items.city ILIKE '%CALDAS%' THEN 5.0703
           WHEN document_items.city ILIKE '%ARMENIA%' OR document_items.city ILIKE '%QUINDIO%' THEN 4.5339
-          ELSE 4.6097 -- Default Bogotá
+          ELSE 4.6097 
         END + (random() * 0.01 - 0.005) as lat,
         CASE 
           WHEN document_items.city ILIKE '%MEDELLIN%' OR document_items.city ILIKE '%MEDELLÍN%' OR document_items.city ILIKE '%ANTIOQUIA%' THEN -75.5812
@@ -721,10 +729,11 @@ export const getInvoices = async (req: Request, res: Response) => {
           WHEN document_items.city ILIKE '%PEREIRA%' OR document_items.city ILIKE '%RISARALDA%' THEN -75.6961
           WHEN document_items.city ILIKE '%MANIZALES%' OR document_items.city ILIKE '%CALDAS%' THEN -75.5138
           WHEN document_items.city ILIKE '%ARMENIA%' OR document_items.city ILIKE '%QUINDIO%' THEN -75.6811
-          ELSE -74.0817 -- Default Bogotá
+          ELSE -74.0817 
         END + (random() * 0.01 - 0.005) as lng
       FROM document_items
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
+      LEFT JOIN articles ON document_items.article_id = articles.id
       WHERE 1=1
     `;
 

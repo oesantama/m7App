@@ -56,7 +56,7 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
 
   // Conductores disponibles: TODOS los activos y sin asignación
   const availableDrivers = useMemo(() => 
-    drivers.filter(d => d.status === 'Activo' && !activeAssignments.some(a => a.driverId === d.id)),
+    drivers.filter(d => (d.status === 'Activo' || d.statusId === 'EST-01') && !activeAssignments.some(a => a.driverId === d.id)),
     [drivers, activeAssignments]
   );
 

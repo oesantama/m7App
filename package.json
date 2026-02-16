@@ -17,6 +17,7 @@
     "@google/generative-ai": "^0.24.1",
     "@types/bcrypt": "^6.0.0",
     "@types/react-signature-canvas": "^1.0.7",
+    "@types/uuid": "^10.0.0",
     "axios": "^1.13.4",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
@@ -38,6 +39,7 @@
     "recharts": "^3.7.0",
     "sonner": "^2.0.7",
     "speakeasy": "^2.0.0",
+    "uuid": "^10.0.0",
     "whatsapp-web.js": "^1.34.4",
     "xlsx": "0.18.5",
     "zustand": "^5.0.11"

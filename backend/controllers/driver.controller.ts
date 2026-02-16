@@ -4,10 +4,15 @@ import pool from '../config/database.js';
 
 export const getDrivers = async (req: Request, res: Response) => {
   try {
+    // Reparación de esquema bajo demanda
+    await pool.query('ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_side_a TEXT;');
+    await pool.query('ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_side_b TEXT;');
+    await pool.query('ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_category TEXT;');
+
     const result = await pool.query('SELECT * FROM drivers ORDER BY name ASC');
     res.json(result.rows);
   } catch (err: any) {
-    console.error('[M7-DRIVERS] Error fetching:', err);
+    console.warn('[M7-DRIVERS] Error fetching or repairing schema:', err.message);
     res.json([]);
   }
 };
@@ -15,6 +20,13 @@ export const getDrivers = async (req: Request, res: Response) => {
 export const saveDriver = async (req: Request, res: Response) => {
   const d = req.body;
   try {
+    let driverId = d.id;
+    if (!driverId) {
+      // Filtrar por IDs que terminan en exactamente 3 dígitos para evitar desbordamientos con IDs antiguos
+      const lastIdResult = await pool.query("SELECT MAX(substring(id from 5)::bigint) as max_id FROM drivers WHERE id ~ '^DRV-[0-9]{3}$'");
+      const maxId = lastIdResult.rows[0].max_id || 0;
+      driverId = `DRV-${(Number(maxId) + 1).toString().padStart(3, '0')}`;
+    }
     await pool.query(`
       INSERT INTO drivers (
         id, name, document_type, document_number, phone, client_id, 
@@ -27,11 +39,14 @@ export const saveDriver = async (req: Request, res: Response) => {
         license_expiry = $7, license_pdf = $8, status_id = $9, license_side_a = $10, license_side_b = $11,
         license_category = $12
     `, [
-      d.id, d.name, d.documentType, d.documentNumber, d.phone, d.clientId,
-      d.licenseExpiry, d.licensePdf, d.statusId, d.licenseSideA, d.licenseSideB,
-      d.licenseCategory
+      driverId, d.name, d.documentType || d.document_type, d.documentNumber || d.document_number, 
+      d.phone, d.clientId || d.client_id,
+      d.licenseExpiry || d.license_expiry, d.licensePdf || d.license_pdf, 
+      d.statusId || d.status_id || 'EST-01', 
+      d.licenseSideA || d.license_side_a, d.licenseSideB || d.license_side_b,
+      d.licenseCategory || d.license_category
     ]);
-    res.json({ success: true, message: 'Conductor guardado' });
+    res.json({ success: true, message: 'Conductor guardado', id: driverId });
   } catch (err: any) {
     console.error('[M7-DRIVERS] Error saving:', err);
     res.status(500).json({ error: "Error al guardar el conductor" });

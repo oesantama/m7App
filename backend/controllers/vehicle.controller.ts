@@ -21,6 +21,13 @@ export const getVehicles = async (req: Request, res: Response) => {
 export const saveVehicle = async (req: Request, res: Response) => {
   const v = req.body;
   try {
+    let vehicleId = v.id;
+    if (!vehicleId) {
+      // Filtrar por IDs que terminan en exactamente 3 dígitos para evitar desbordamientos con IDs antiguos (timestamps)
+      const lastIdResult = await pool.query("SELECT MAX(substring(id from 5)::bigint) as max_id FROM vehicles WHERE id ~ '^VEH-[0-9]{3}$'");
+      const maxId = lastIdResult.rows[0].max_id || 0;
+      vehicleId = `VEH-${(Number(maxId) + 1).toString().padStart(3, '0')}`;
+    }
     await pool.query(`
       INSERT INTO vehicles (
         id, plate, brand, owner, capacity_m3, client_id, 
@@ -33,11 +40,11 @@ export const saveVehicle = async (req: Request, res: Response) => {
         soat_expiry = $7, techno_expiry = $8, status_id = $9,
         soat_pdf = $10, techno_pdf = $11, model_year = $12, color = $13, vehicle_type = $14
     `, [
-      v.id, v.plate, v.brand, v.owner, v.capacityM3 || v.capacity_m3, v.clientId || v.client_id, 
+      vehicleId, v.plate, v.brand, v.owner, v.capacityM3 || v.capacity_m3, v.clientId || v.client_id, 
       v.soatExpiry || v.soat_expiry, v.technoExpiry || v.techno_expiry, v.statusId || v.status_id,
       v.soatPdfUrl || v.soat_pdf, v.technoPdfUrl || v.techno_pdf, v.modelYear || v.model_year, v.color, v.vehicleTypeId || v.vehicle_type || v.vehicleType
     ]);
-    res.json({ success: true, message: 'Vehículo guardado' });
+    res.json({ success: true, message: 'Vehículo guardado', id: vehicleId });
   } catch (err: any) {
     console.error('[M7-VEHICLES] Error saving:', err);
     res.status(500).json({ error: "Error al guardar el vehículo" });

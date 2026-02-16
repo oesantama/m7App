@@ -198,9 +198,15 @@ export interface Route extends AuditBase {
   id: string;
   clientId: string;
   vehicleId: string;
+  vehicle_id?: string; // Aliased for backend compatibility
   driverId: string;
+  driver_id?: string; // Aliased for backend compatibility
   invoiceIds: string[];
-  status: 'Assigned' | 'In Route' | 'Completed';
+  invoice_ids?: string[]; // Aliased for backend compatibility
+  status: 'Assigned' | 'In Route' | 'Completed' | 'EN_RUTA' | 'Asignada' | 'En Ruta' | 'PENDIENTE' | 'CONFIRMADA';
+  driver_document?: string;
+  driver_name?: string;
+  plate?: string;
 }
 
 export type MasterCategory = 

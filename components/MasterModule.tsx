@@ -289,6 +289,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       list = allMasterData[activeMaster] || [];
     }
     
+    if (!Array.isArray(list)) list = [];
+    
     return list.filter(d => {
       const searchStr = searchTerm.toLowerCase();
       // Enhanced Search for Articles (include SKU/ID and Barcode)
@@ -1776,6 +1778,31 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   {activeMaster === 'masterCategorias' && (item as any).description && (
                      <p className="text-[9px] text-slate-500 italic mb-3 line-clamp-2">{(item as any).description}</p>
                   )}
+
+                   {/* METADATOS DE AUDITORÍA (GRID) */}
+                   <div className="mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                         <div className="flex flex-col">
+                            <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Creado por</span>
+                            <span className="text-[8px] font-bold text-slate-700 uppercase truncate max-w-[80px]">{(item as any).createdBy || 'Sistema'}</span>
+                         </div>
+                         <div className="text-right">
+                            <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none block">Fecha Creación</span>
+                            <span className="text-[8px] font-bold text-slate-500 whitespace-nowrap">{safeFormatDate((item as any).createdAt, item)}</span>
+                         </div>
+                      </div>
+                      <div className="h-px bg-slate-200/50"></div>
+                      <div className="flex items-center justify-between">
+                         <div className="flex flex-col">
+                            <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Actualizado por</span>
+                            <span className="text-[8px] font-bold text-slate-700 uppercase truncate max-w-[80px]">{(item as any).updatedBy || (item as any).createdBy || 'Sistema'}</span>
+                         </div>
+                         <div className="text-right">
+                            <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none block">Última Act.</span>
+                            <span className="text-[8px] font-bold text-slate-500 whitespace-nowrap">{safeFormatDate((item as any).updatedAt || (item as any).createdAt, item)}</span>
+                         </div>
+                      </div>
+                   </div>
 
                   <div className="flex gap-2">
                     <button onClick={() => { setEditingRecord(item); setFormData(getInitialFormData(activeMaster, item)); setIsReadOnly(true); setError(null); setIsModalOpen(true); }} className="flex-1 py-3 bg-blue-50 text-blue-600 rounded-xl font-black text-[8px] uppercase tracking-widest hover:bg-blue-600 hover:text-white hover:scale-105 active:scale-95 transition-all shadow-md">Detalle</button>

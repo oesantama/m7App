@@ -230,7 +230,10 @@ const App: React.FC = () => {
               }
             }
 
-            setUser(parsedUser);
+            setUser({
+              ...parsedUser,
+              documentNumber: parsedUser.documentNumber || parsedUser.document_number
+            });
             setIsAuthenticated(true);
 
             // CARGAR DATOS MAESTROS FRESCOS CON EL CLIENTE RESTAURADO
@@ -330,7 +333,7 @@ const App: React.FC = () => {
 
       const mappedDrivers = normalize(Array.isArray(drivers) ? drivers.map((d: any) => ({
         ...d,
-        status: (d.status_id === 'EST-01' || d.status_id === '1' || d.status === 'Activo') ? 'Activo' : 'Inactivo',
+        status: (d.status_id === 'EST-01' || d.status_id === '1' || d.status === 'Activo' || (d as any).is_active === true) ? 'Activo' : 'Inactivo',
         documentType: d.document_type,
         documentNumber: d.document_number,
         licenseExpiry: d.license_expiry,
@@ -570,6 +573,7 @@ const App: React.FC = () => {
         email: userData.email,
         name: userData.name,
         roleId: userData.role_id,
+        documentNumber: userData.document_number || userData.documentNumber,
         permissions: mappedPermissions,
         clientId: firstClientId,
         clientIds: userData.client_ids || [firstClientId]
@@ -811,11 +815,12 @@ const App: React.FC = () => {
             masterData={allMasterData}
             onAddVehicle={async (v) => {
               try {
-                const res = await api.saveMaster('masterVehiculos', v);
+                const res = await api.saveVehicle(v);
+                if (!res.success) throw new Error(res.error || 'Error al guardar vehículo');
                 // Normalización local inmediata para reactividad
                 const newVeh = {
                   ...v,
-                  id: res.id || `veh-${Date.now()}`,
+                  id: res.id,
                   statusId: v.statusId || 'EST-01', // Default Disponible
                   capacityM3: Number(v.capacityM3) || 0
                 };
@@ -832,7 +837,7 @@ const App: React.FC = () => {
                 return { success: true };
               } catch (e) {
                 console.error(e);
-                return { success: false, error: 'Error al guardar vehículo' };
+                return { success: false, error: e.message || 'Error al guardar vehículo' };
               }
             }}
             onUpdateVehicle={async (id, data) => {
@@ -861,9 +866,10 @@ const App: React.FC = () => {
             onAddDriver={async (d) => {
               try {
                 const res = await api.saveDriver(d);
+                if (!res.success) throw new Error(res.error || 'Fallo en servidor');
                 const newDriver = {
                   ...d,
-                  id: res.id || `drv-${Date.now()}`,
+                  id: res.id,
                   statusId: d.statusId || 'EST-01'
                 };
                 addDriver(newDriver);
@@ -877,7 +883,7 @@ const App: React.FC = () => {
                 return { success: true };
               } catch (e) {
                 console.error(e);
-                return { success: false, error: 'Error al guardar conductor' };
+                return { success: false, error: e.message || 'Error al guardar conductor' };
               }
             }}
             onUpdateDriver={async (id, data) => {

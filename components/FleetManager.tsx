@@ -72,10 +72,10 @@ interface FleetManagerProps {
   drivers: Driver[];
   user: User;
   masterData: { [key in MasterCategory]?: MasterRecord[] };
-  onAddVehicle: (v: Partial<Vehicle>) => void;
-  onAddDriver: (d: Partial<Driver>) => void;
-  onUpdateVehicle: (id: string, data: Partial<Vehicle>) => void;
-  onUpdateDriver: (id: string, data: Partial<Driver>) => void;
+  onAddVehicle: (v: Partial<Vehicle>) => Promise<{ success: boolean; error?: string }>;
+  onAddDriver: (d: Partial<Driver>) => Promise<{ success: boolean; error?: string }>;
+  onUpdateVehicle: (id: string, data: Partial<Vehicle>) => Promise<{ success: boolean; error?: string }>;
+  onUpdateDriver: (id: string, data: Partial<Driver>) => Promise<{ success: boolean; error?: string }>;
   onDeleteVehicle?: (id: string) => void;
   onDeleteDriver?: (id: string) => void;
 }
@@ -274,18 +274,44 @@ const FleetManager: React.FC<FleetManagerProps> = ({
     reader.readAsDataURL(file);
   };
 
-  /* STATE FOR ANALYSIS MODAL */
+  /* STATE FOR ANALYSIS RESULTS */
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState({ 
+    totalAlerts: 0, 
+    expiredSoat: 0, 
+    expiredTechno: 0, 
+    expiredLicense: 0,
+    healthScore: 100 
+  });
 
   const handleAnalyze = () => {
       setAnalyzing(true);
-      setShowAnalysis(false); // Reset to ensure animation triggers if it was already open
-      toast.info("Generando reporte de salud de flota...");
+      setShowAnalysis(false);
+      toast.info("Analizando documentación de flota...");
+      
       setTimeout(() => {
+          let alerts = 0;
+          let soat = 0;
+          let techno = 0;
+          let license = 0;
+
+          vehicles.forEach(v => {
+            if (!validateDate(v.soatExpiry)) { soat++; alerts++; }
+            if (!validateDate(v.technoExpiry)) { techno++; alerts++; }
+          });
+
+          drivers.forEach(d => {
+            if (!validateDate(d.licenseExpiry)) { license++; alerts++; }
+          });
+
+          const totalItems = (vehicles.length * 2) + drivers.length;
+          const healthScore = totalItems > 0 ? Math.max(0, Math.floor(((totalItems - alerts) / totalItems) * 100)) : 100;
+
+          setAnalysisResults({ totalAlerts: alerts, expiredSoat: soat, expiredTechno: techno, expiredLicense: license, healthScore });
           setAnalyzing(false);
           setShowAnalysis(true);
-      }, 2500);
+      }, 1500);
   };
 
   const handleSave = async () => {
@@ -305,12 +331,12 @@ const FleetManager: React.FC<FleetManagerProps> = ({
       setIsProcessingAI(true); // Reutilizamos el estado de carga
       
       if (modalMode === 'single') { 
-        if (viewTab === 'vehicles') await onAddVehicle(formData);
-        else await onAddDriver(formData);
+        const result = viewTab === 'vehicles' ? await onAddVehicle(formData) : await onAddDriver(formData);
+        if (!result.success) throw new Error(result.error || "Fallo al guardar");
       } else { 
-        if (!selectedItem?.id) throw new Error("No hay item seleccionado para editar");
-        if (viewTab === 'vehicles') await onUpdateVehicle(selectedItem.id, formData);
-        else await onUpdateDriver(selectedItem.id, formData);
+        if (!selectedItem?.id) throw new Error("No hay item seleccionado");
+        const result = viewTab === 'vehicles' ? await onUpdateVehicle(selectedItem.id, formData) : await onUpdateDriver(selectedItem.id, formData);
+        if (!result.success) throw new Error(result.error || "Fallo al actualizar");
       }
 
       setIsModalOpen(false); 
@@ -356,10 +382,19 @@ const FleetManager: React.FC<FleetManagerProps> = ({
             {viewTab === 'vehicles' ? <Icons.Truck /> : <Icons.Users />}
           </div>
           <div>
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">
-              {viewTab === 'vehicles' ? 'M7 FLEET' : 'M7 TALENT'}
-            </h2>
-            <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-1">SEGURIDAD OPERATIVA</p>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">
+                {viewTab === 'vehicles' ? 'Vehículos' : 'Conductores'}
+              </h2>
+              <button 
+                onClick={handleAnalyze} 
+                disabled={analyzing}
+                className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-500 hover:text-white transition-all group shadow-sm active:scale-95"
+              >
+                <Icons.Sparkles className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin' : 'text-emerald-500 group-hover:text-white'}`} />
+                <span className="text-[9px] font-black uppercase tracking-widest">{analyzing ? 'Analizando...' : 'Analizar Salud'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -401,26 +436,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
         </div>
       </div>
 
-      {/* Sugerencia Proactiva M7 - Flotas */}
-      <div className="bg-slate-900 mx-6 p-6 rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row items-center gap-6 animate-in slide-in-from-left-10 duration-700">
-          <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
-              <Icons.Sparkles className="text-slate-950 w-7 h-7" />
-          </div>
-          <div className="flex-1">
-              <h5 className="text-emerald-400 font-black text-[9px] uppercase tracking-widest mb-1">Análisis de Flota M7</h5>
-              <p className="text-slate-300 text-xs font-medium leading-relaxed">
-                  {viewTab === 'vehicles' 
-                    ? (vehicles.length > 0 
-                        ? `He detectado que el 90% de tu flota está operativa. El vehículo ${vehicles[0].brand} [${vehicles[0].plate}] ha mostrado alta eficiencia esta semana.` 
-                        : "No se detectan vehículos activos. Registre su flota para iniciar análisis.")
-                    : "Analizando disponibilidad: 3 conductores están en zona urbana con alta eficiencia de entrega. Sugerido para rutas críticas de hoy."}
-              </p>
-          </div>
-          <button onClick={handleAnalyze} disabled={analyzing} className="px-5 py-2.5 bg-white/5 border border-white/10 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/10 transition-all shrink-0 flex items-center gap-2">
-              {analyzing ? 'Analizando...' : 'Analizar Salud'}
-              {analyzing && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>}
-          </button>
-      </div>
+      {/* Banner de Sugerencia Removido por Solicitud del Usuario */}
 
       {/* MODAL RESULTADOS ANÁLISIS */}
       {showAnalysis && (
@@ -434,23 +450,47 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                     <h3 className="text-xl font-black text-slate-900 uppercase">Reporte de Salud M7</h3>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inteligencia Operativa</p>
                 </div>
-                <div className="space-y-4 bg-slate-50 p-6 rounded-3xl mb-6">
+                <div className="space-y-4 bg-slate-50 p-6 rounded-3xl mb-6 flex-1 overflow-y-auto custom-scrollbar">
                     <div className="flex justify-between items-center border-b border-slate-200 pb-3">
                         <span className="text-xs font-bold text-slate-500">Estado General</span>
-                        <span className="text-xs font-black text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full">ÓPTIMO (92%)</span>
+                        <span className={`text-xs font-black px-3 py-1 rounded-full ${analysisResults.healthScore > 80 ? 'text-emerald-600 bg-emerald-100' : 'text-amber-600 bg-amber-100'}`}>
+                           {analysisResults.healthScore === 100 ? 'PERFECTO' : analysisResults.healthScore > 80 ? 'ÓPTIMO' : 'ATENCIÓN'} ({analysisResults.healthScore}%)
+                        </span>
                     </div>
                     <div className="flex justify-between items-center border-b border-slate-200 pb-3">
                         <span className="text-xs font-bold text-slate-500">Documentación Vencida</span>
-                        <span className="text-xs font-black text-red-500 bg-red-50 px-3 py-1 rounded-full">0 ALERTAS</span>
+                        <span className={`text-xs font-black px-3 py-1 rounded-full ${analysisResults.totalAlerts === 0 ? 'text-emerald-600 bg-emerald-100' : 'text-red-500 bg-red-50'}`}>
+                           {analysisResults.totalAlerts} ALERTAS
+                        </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-500">Eficiencia de Rutas</span>
-                        <span className="text-xs font-black text-blue-600">ALTA</span>
+                    {analysisResults.expiredSoat > 0 && (
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-3 px-4 italic text-red-500">
+                          <span className="text-[10px] font-bold">SOATs Vencidos</span>
+                          <span className="text-[10px] font-black">-{analysisResults.expiredSoat}</span>
+                      </div>
+                    )}
+                    {analysisResults.expiredTechno > 0 && (
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-3 px-4 italic text-red-500">
+                          <span className="text-[10px] font-bold">T-Mecánicas Vencidas</span>
+                          <span className="text-[10px] font-black">-{analysisResults.expiredTechno}</span>
+                      </div>
+                    )}
+                    {analysisResults.expiredLicense > 0 && (
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-3 px-4 italic text-red-500">
+                          <span className="text-[10px] font-bold">Licencias Vencidas</span>
+                          <span className="text-[10px] font-black">-{analysisResults.expiredLicense}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-3">
+                        <span className="text-xs font-bold text-slate-500">Eficiencia de Registro</span>
+                        <span className="text-xs font-black text-blue-600 uppercase">Verificado M7 AI</span>
                     </div>
                 </div>
-                <button onClick={() => setShowAnalysis(false)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all">
-                    Entendido
-                </button>
+                <div className="p-8 border-t shrink-0">
+                  <button onClick={() => setShowAnalysis(false)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all">
+                      Entendido
+                  </button>
+                </div>
             </div>
         </div>
       )}
@@ -478,7 +518,14 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                                {viewTab === 'vehicles' ? item.plate.slice(0,3) : item.name.slice(0,1)}
                             </div>
                             <div>
-                               <p className="font-black text-slate-900 text-[12px] uppercase">{viewTab === 'vehicles' ? item.plate : item.name}</p>
+                               <p className="font-black text-slate-900 text-[12px] uppercase">
+                                 {viewTab === 'vehicles' ? item.plate : item.name}
+                                 {viewTab === 'drivers' && (item.licenseCategory || item.license_category) && (
+                                   <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black border border-emerald-200">
+                                     {item.licenseCategory || item.license_category}
+                                   </span>
+                                 )}
+                               </p>
                                <p className="text-[8px] text-slate-400 font-bold uppercase">{viewTab === 'vehicles' ? item.brand : item.documentNumber}</p>
                             </div>
                          </div>
@@ -558,7 +605,14 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                          )}
                      </div>
                   </div>
-                  <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">{viewTab === 'vehicles' ? item.plate : item.name}</h3>
+                  <h3 className="font-black text-slate-900 text-sm uppercase truncate mb-1">
+                    {viewTab === 'vehicles' ? item.plate : item.name}
+                    {viewTab === 'drivers' && (item.licenseCategory || item.license_category) && (
+                      <span className="ml-2 px-1 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[7px] font-black border border-emerald-200">
+                        {item.licenseCategory || item.license_category}
+                      </span>
+                    )}
+                  </h3>
                   <p className={`text-[8px] font-black uppercase mb-4 ${!validateDate(item.soatExpiry || item.licenseExpiry) ? 'text-red-500' : 'text-slate-400'}`}>
                     {viewTab === 'vehicles' ? `SOAT: ${item.soatExpiry || 'N/A'}` : `LIC: ${item.licenseExpiry || 'N/A'}`}
                   </p>
@@ -788,10 +842,14 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Vencimiento Licencia</label>
                         <input type="date" value={formData.licenseExpiry || formData.license_expiry || ''} onChange={e => setFormData({...formData, licenseExpiry: e.target.value})} className={commonInputClass} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Categoría Licencia</label>
+                        <input type="text" value={formData.licenseCategory || formData.license_category || ''} onChange={e => setFormData({...formData, licenseCategory: e.target.value.toUpperCase()})} placeholder="Ej: B1, C2..." className={commonInputClass} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-widest">Número Telefónico</label>
@@ -814,8 +872,33 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                <div className="pt-8 flex flex-col md:flex-row gap-4">
                 {modalMode === 'detail' ? (
                   <>
-                    <div className="flex-1 space-y-4">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Visualizador de Soportes</p>
+                     <div className="flex-1 space-y-4">
+                        <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 grid grid-cols-2 gap-4">
+                          {viewTab === 'vehicles' ? (
+                            <>
+                              <div>
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Placa</p>
+                                <p className="font-black text-slate-900 text-sm uppercase">{formData.plate}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Marca</p>
+                                <p className="font-black text-slate-900 text-sm uppercase">{masterData['masterMarcas']?.find(m => m.id === formData.brand)?.name || formData.brand}</p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div>
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Nombre</p>
+                                <p className="font-black text-slate-900 text-sm uppercase">{formData.name}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Categoría</p>
+                                <p className="font-black text-emerald-600 text-sm uppercase">{formData.licenseCategory || formData.license_category || 'N/A'}</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Visualizador de Soportes</p>
                        <div className="flex flex-wrap gap-4 justify-center">
                           {viewTab === 'vehicles' ? (
                             <>

@@ -4,6 +4,18 @@ import pool from '../config/database.js';
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
+    // Reparación de esquema bajo demanda M7
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS client_ids JSONB DEFAULT \'[]\';');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS document_type TEXT;');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS document_number TEXT;');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT false;');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS created_by TEXT;');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_by TEXT;');
+
     const result = await pool.query(`
       SELECT 
         u.id, u.email, u.name, 
@@ -13,23 +25,19 @@ export const getUsers = async (req: Request, res: Response) => {
         u.phone, u.avatar,
         u.document_type AS "documentType",
         u.document_number AS "documentNumber",
-        ds.approved AS "isApproved",
-        (ds.digital_signature IS NOT NULL) AS "hasSignature",
-        u.client_ids AS "clientIds",  -- NEW FIELD
+        COALESCE(ds.aprobada, false) AS "isApproved",
+        (ds.firma IS NOT NULL) AS "hasSignature",
+        u.client_ids AS "clientIds",
         u.created_at AS "createdAt", u.updated_at AS "updatedAt", 
         u.created_by AS "createdBy", u.updated_by AS "updatedBy"
       FROM users u
-      LEFT JOIN digital_signatures ds ON u.email = ds.document_number
+      LEFT JOIN digital_signatures ds ON u.id = ds.idusuario
       ORDER BY u.name ASC
     `);
     res.json(result.rows);
   } catch (err: any) {
-    console.warn('[M7-USERS] Offline Mode activo');
-    res.json([
-        { id: 'U-001', name: 'ADMINISTRADOR PRINCIPAL', email: 'admin@millasiete.com', roleId: 'ROL-01', statusId: 'EST-01' },
-        { id: 'U-002', name: 'OPERADOR LOGÍSTICO', email: 'operaciones@millasiete.com', roleId: 'ROL-03', statusId: 'EST-01' },
-        { id: 'U-003', name: 'AUDITOR CALIDAD', email: 'calidad@millasiete.com', roleId: 'ROL-04', statusId: 'EST-01' }
-    ]); 
+    console.error('[M7-USERS] Error fetching users:', err);
+    res.status(500).json({ error: "Error al obtener usuarios: " + err.message });
   }
 };
 

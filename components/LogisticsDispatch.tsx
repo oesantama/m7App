@@ -7,6 +7,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Route, Invoice } from '../types';
 
 interface LogisticsDispatchProps {
     user: any;
@@ -14,8 +15,8 @@ interface LogisticsDispatchProps {
     vehicles: any[];
     drivers: any[];
     assignments: any[];
-    invoices: any[];
-    activeRoutes: any[];
+    invoices: Invoice[];
+    activeRoutes: Route[];
     onRefresh: () => void;
 }
 
@@ -35,9 +36,24 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     activeRoutes,
     onRefresh
 }) => {
-    const [selectedActiveRoute, setSelectedActiveRoute] = useState<any | null>(null); // For Modal
-    const [visualizedRoute, setVisualizedRoute] = useState<any | null>(null); // For Map
+    const [selectedActiveRoute, setSelectedActiveRoute] = useState<Route | null>(null);
+    const [visualizedRoute, setVisualizedRoute] = useState<Route | null>(null);
+    const [routeInvoices, setRouteInvoices] = useState<any[]>([]);
+    
+    // MODALES Y FLUJO DE ASIGNACIÓN
+    const [viewingItemsInvoice, setViewingItemsInvoice] = useState<any | null>(null);
+    const [assigningInvoice, setAssigningInvoice] = useState<any | null>(null);
+    const [scannedItems, setScannedItems] = useState<Record<string, number>>({});
+    const [isAccompanied, setIsAccompanied] = useState(false);
+    const [helperCount, setHelperCount] = useState(1);
+    const [selectedHelpers, setSelectedHelpers] = useState<string[]>([]);
+    const [pendingSignatures, setPendingSignatures] = useState<any[]>([]);
+    const [signatureKeys, setSignatureKeys] = useState<Record<string, string>>({});
+    const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
+
     const [vehicleLocations, setVehicleLocations] = useState<any[]>([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const mapRef = useRef<L.Map | null>(null);
@@ -45,7 +61,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const routeLinesRef = useRef<{ [key: string]: L.Polyline }>({});
     const routeMarkersRef = useRef<L.Marker[]>([]);
     const routePolylineRef = useRef<L.Polyline | null>(null);
-    const [routeInvoices, setRouteInvoices] = useState<any[]>([]);
     const [fetchStatus, setFetchStatus] = useState<string>('IDLE');
 
     // 1. Inicialización del Mapa
@@ -557,11 +572,60 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         };
     }, [user, assignments]);
 
+    const fetchPendingSignatures = async () => {
+        if (!user?.id) return;
+        try {
+            const data = await api.getPendingSignatures(user.id);
+            setPendingSignatures(data);
+        } catch (e) {
+            console.error("Error fetching pending signatures:", e);
+        }
+    };
+
+    const fetchAllUsers = async () => {
+        try {
+            const data = await api.getUsers();
+            setAllUsers(data);
+        } catch (e) {
+            console.error("Error fetching all users:", e);
+        }
+    };
+
     useEffect(() => {
         fetchLocations();
-        const interval = setInterval(fetchLocations, 60000); // Actualizar cada 60 segundos
+        fetchPendingSignatures();
+        fetchAllUsers();
+        const interval = setInterval(fetchLocations, 60000); 
         return () => clearInterval(interval);
     }, []);
+
+    // FILTRO DE PRIVACIDAD POR ROL DE CONDUCTOR
+    const filteredRoutes = React.useMemo(() => {
+        if (!user) return [];
+        // Si es CONDUCTOR (ROL-03), solo mostrar sus rutas por documento
+        if (user.roleId === 'ROL-03' || user.roleId === 'CONDUCTOR') {
+            const userDoc = String(user.documentNumber || '').trim();
+            if (!userDoc) return [];
+            
+            return activeRoutes.filter(route => {
+                // 1. Verificar si la ruta tiene el documento pegado
+                if (String(route.driver_document || '').trim() === userDoc) return true;
+                
+                // 2. Verificar vía asignación activa
+                const link = assignments.find(a => a.vehicleId === route.vehicle_id && a.isActive);
+                const drv = drivers.find(d => d.id === link?.driverId);
+                return String(drv?.documentNumber || '').trim() === userDoc;
+            });
+        }
+        // Admin u otros roles ven todo
+        return activeRoutes;
+    }, [activeRoutes, user, assignments, drivers]);
+
+    // Filtrar ubicaciones GPS basadas en las rutas visibles
+    const filteredLocations = React.useMemo(() => {
+        const visibleVehicleIds = new Set(filteredRoutes.map(r => r.vehicle_id));
+        return vehicleLocations.filter(loc => visibleVehicleIds.has(loc.vehicle_id));
+    }, [filteredRoutes, vehicleLocations]);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -576,7 +640,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">Centro de Mando</h2>
                         <div className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rastreo GPS (v1.2-FIX)</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rastreo GPS (v1.2-PRIVACY)</p>
                         </div>
                     </div>
                 </div>
@@ -584,16 +648,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 <div className="flex flex-wrap items-center gap-2 md:gap-4 justify-center">
                     <div className="flex bg-slate-50 p-1 rounded-xl items-center gap-1 border border-slate-100">
                          <div className="text-center px-3 py-1 bg-white rounded-lg shadow-sm border border-slate-100">
-                            <p className="text-[6px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-0.5">Activas</p>
-                            <p className="text-sm font-black text-slate-900 leading-none">{activeRoutes.length}</p>
+                            <p className="text-[6px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-0.5">Visibles</p>
+                            <p className="text-sm font-black text-slate-900 leading-none">{filteredRoutes.length}</p>
                         </div>
                         <div className="text-center px-3 py-1">
                             <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">GPS Ok</p>
-                            <p className="text-sm font-black text-slate-700 leading-none">{vehicleLocations.length}</p>
+                            <p className="text-sm font-black text-slate-700 leading-none">{filteredLocations.length}</p>
                         </div>
                         <div className="text-center px-3 py-1">
                             <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest leading-none mb-0.5">Sin Señal</p>
-                            <p className="text-sm font-black text-slate-700 leading-none">{Math.max(0, activeRoutes.length - vehicleLocations.length)}</p>
+                            <p className="text-sm font-black text-slate-700 leading-none">{Math.max(0, filteredRoutes.length - filteredLocations.length)}</p>
                         </div>
                     </div>
 
@@ -742,8 +806,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
             {/* Modal de Detalle Mejorado */}
             {selectedActiveRoute && (
-                <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-300">
+                <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-[95vw] max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-300">
                         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-emerald-50 rounded-t-[2.5rem]">
                             <div className="flex items-center gap-4">
                                 <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
@@ -759,26 +823,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             return drv?.name || 'CONDUCTOR EXTERNO';
                                         })()}
                                     </p>
-                                    
-                                    {/* DEBUG BLOCK - TEMPORARY */}
-                                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-[10px] font-mono text-red-800 overflow-x-auto max-w-lg">
-                                        <p><strong>DEBUG INFO:</strong></p>
-                                        <p>Route IDs (Sample): {JSON.stringify((selectedActiveRoute.invoice_ids || []).slice(0, 2))}</p>
-                                        <p>First Link ID: {selectedActiveRoute.invoice_ids?.[0]}</p>
-                                        <hr className="border-red-200 my-1"/>
-                                        <p><strong>LOCAL INVOICES SAMPLE (First 2):</strong></p>
-                                        {invoices.slice(0, 2).map((inv, i) => (
-                                            <p key={i}>
-                                                #{i+1}: ID=[{inv.id}] / Num=[{inv.invoiceNumber}] / DocL=[{inv.docLId}]
-                                            </p>
-                                        ))}
-                                        <hr className="border-red-200 my-1"/>
-                                        <p>Matching Logic Check:</p>
-                                        <p>Trying to find RouteID in Local IDs or Numbers...</p>
-                                        <hr className="border-red-200 my-1"/>
-                                        <p><strong>FETCH STATUS:</strong> {fetchStatus}</p>
-                                    </div>
-
                                     <p className="text-[10px] text-emerald-600 font-bold mt-1">
                                         📌 {routeInvoices.length} Puntos de Entrega (Visible en Mapa)
                                     </p>
@@ -790,20 +834,42 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-                            <div className="grid grid-cols-4 gap-4">
+                            <div className="grid grid-cols-5 gap-4">
                                 <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">FACTURAS</p>
                                     <p className="text-2xl font-black text-slate-950">{routeInvoices.length}</p>
+                                </div>
+                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">ENTREGADAS</p>
+                                    <p className="text-2xl font-black text-emerald-600">
+                                        {(() => {
+                                            // Contador de facturas que tienen un registro en dispatch_assignments (asumiendo lógica de éxito previa)
+                                            // Por ahora, usamos una lógica visual basada en el estado de los items si estuviera disponible,
+                                            // o simplemente un marcador x de y.
+                                            const total = routeInvoices.length;
+                                            const delivered = routeInvoices.filter(inv => inv.status === 'COMPLETED' || inv.status === 'Entregado').length;
+                                            return delivered;
+                                        })()}
+                                        <span className="text-xs text-slate-400 ml-1">de {routeInvoices.length}</span>
+                                    </p>
                                 </div>
                                 <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">VOLUMEN</p>
                                     <p className="text-2xl font-black text-emerald-600">
                                         {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(1)}m³
                                     </p>
+                                    <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">
+                                       Volumen {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(2)} de {(vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 0).toFixed(2)}
+                                    </p>
                                 </div>
-                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">CAPACIDAD</p>
-                                    <div className="w-full bg-slate-200 h-2 rounded-full mt-2">
+                                <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 relative overflow-hidden">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <p className="text-[8px] font-black text-slate-400 uppercase">CAPACIDAD</p>
+                                        <span className="text-[10px] font-black text-emerald-600">
+                                            {Math.round((routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0) / (vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 1)) * 100)}%
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 h-2 rounded-full">
                                         <div
                                             className="bg-emerald-500 h-full rounded-full transition-all"
                                             style={{
@@ -811,6 +877,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             }}
                                         ></div>
                                     </div>
+                                    <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">
+                                        Capacidad {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(2)} de {(vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 0).toFixed(2)}
+                                    </p>
                                 </div>
                                 <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">ESTADO</p>
@@ -820,30 +889,71 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <p className="text-sm font-black text-slate-900 uppercase tracking-wider">Desglose de Documentos</p>
-                                    <p className="text-xs text-slate-400 font-bold">{(selectedActiveRoute.invoice_ids || []).length} items</p>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-[2rem] border border-slate-100">
+                                    <p className="text-sm font-bold text-slate-900 uppercase tracking-widest pl-4">Desglose de Documentos</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase">{routeInvoices.length} FACTURAS</span>
+                                        <div className="w-1 h-1 bg-slate-300 rounded-full"></div>
+                                        <span className="text-[10px] font-black text-emerald-500 uppercase">ASIGNACIÓN SEGURA (v2)</span>
+                                    </div>
                                 </div>
-                                <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                                
+                                <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-2">
                                     {routeInvoices.map((inv: any, idx: number) => {
+                                        const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
+                                        
                                         return (
-                                            <div key={`${inv.id || idx}-${idx}`} className="p-4 bg-gradient-to-r from-white to-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:shadow-md transition-all group">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-emerald-500 font-black text-xs">
+                                            <div key={`${inv.id || idx}-${idx}`} className="p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-4 hover:border-emerald-500/30 hover:shadow-xl transition-all group relative overflow-hidden">
+                                                <div className="flex items-center gap-5 flex-1">
+                                                    <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-emerald-500 font-black text-lg shadow-lg group-hover:scale-110 transition-all shrink-0">
                                                         {idx + 1}
                                                     </div>
-                                                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-500 transition-all">
-                                                        <Icons.FileText className="w-5 h-5 text-slate-400 group-hover:text-slate-950" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-black text-slate-900">{inv?.invoiceNumber || inv.id || 'N/A'}</p>
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{inv?.customerName || 'Cliente Genérico'}</p>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <p className="text-base font-black text-slate-900 truncate">#{inv?.invoiceNumber || inv.id || 'N/A'}</p>
+                                                            {hasPendingSignature && (
+                                                                <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-2 py-0.5 rounded-full animate-pulse uppercase">FIRMA PENDIENTE</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight truncate max-w-[200px]">{inv?.customerName || 'Cliente Genérico'}</p>
+                                                        <div className="flex items-center gap-3 mt-2">
+                                                             <div className="flex items-center gap-1">
+                                                                <Icons.MapPin className="w-3 h-3 text-slate-300" />
+                                                                <p className="text-[9px] font-bold text-slate-400 uppercase">{inv?.city || 'N/A'}</p>
+                                                            </div>
+                                                            <div className="w-1 h-1 bg-slate-200 rounded-full"></div>
+                                                            <p className="text-[9px] font-black text-emerald-600 uppercase">{Number(inv?.volumeM3 || 0).toFixed(2)} m³</p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm font-black text-emerald-600">{Number(inv?.volumeM3 || 0).toFixed(2)} m³</p>
-                                                    <p className="text-[8px] font-bold text-slate-400 uppercase">{inv?.city || 'N/A'}</p>
+
+                                                <div className="flex flex-wrap items-center gap-2 justify-end shrink-0">
+                                                    <button 
+                                                        onClick={() => setViewingItemsInvoice(inv)}
+                                                        className="px-4 py-2.5 bg-slate-50 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center gap-2 border border-slate-200"
+                                                    >
+                                                        <Icons.Eye className="w-3.5 h-3.5" />
+                                                        Artículos
+                                                    </button>
+                                                    
+                                                    <button 
+                                                        onClick={() => setAssigningInvoice(inv)}
+                                                        className="px-4 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 border border-emerald-100"
+                                                    >
+                                                        <Icons.Scan className="w-3.5 h-3.5" />
+                                                        Entregar Material
+                                                    </button>
+
+                                                    {hasPendingSignature && (
+                                                        <button 
+                                                            onClick={() => handleDelayedSignature(inv)}
+                                                            className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-200"
+                                                        >
+                                                            <Icons.Signature className="w-3.5 h-3.5" />
+                                                            Firmar
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -883,8 +993,388 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* MODAL: VER ARTÍCULOS */}
+            {viewingItemsInvoice && (
+                <div className="fixed inset-0 z-[700] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Artículos del Documento</h3>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase">Factura: {viewingItemsInvoice.invoiceNumber || viewingItemsInvoice.id}</p>
+                            </div>
+                            <button onClick={() => setViewingItemsInvoice(null)} className="w-10 h-10 hover:bg-slate-200 rounded-full flex items-center justify-center transition-all">
+                                <Icons.X className="w-5 h-5 text-slate-400" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-8 space-y-3 custom-scrollbar">
+                           {(viewingItemsInvoice.items || []).map((item: any, i: number) => (
+                               <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:bg-white hover:shadow-md transition-all">
+                                   <div>
+                                       <p className="text-sm font-black text-slate-900">{item.articleName || item.sku || 'Artículo'}</p>
+                                       <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku || 'N/A'}</p>
+                                   </div>
+                                   <div className="text-right">
+                                       <p className="text-lg font-black text-indigo-600">{item.expectedQty} <span className="text-[10px] text-slate-400">{item.unit || 'UND'}</span></p>
+                                   </div>
+                               </div>
+                           ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: ASIGNACIÓN DE ENTREGA (ESCANEADO) */}
+            {assigningInvoice && (
+                <div className="fixed inset-0 z-[700] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
+                                    <Icons.Scan className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">Control de Despacho</h3>
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Validación de carga por escaneo</p>
+                                </div>
+                            </div>
+                            <button onClick={() => { setAssigningInvoice(null); setScannedItems({}); }} className="w-10 h-10 hover:bg-slate-200 rounded-full flex items-center justify-center transition-all">
+                                <Icons.X className="w-5 h-5 text-slate-400" />
+                            </button>
+                        </div>
+
+                        <div className="bg-amber-50 p-4 border-b border-amber-100 flex items-center justify-center gap-4">
+                             <input 
+                                id="m7-dispatch-barcode-input"
+                                type="text"
+                                autoFocus
+                                autoComplete="off"
+                                placeholder="ESCANEANDO... ESPERANDO BARCODE"
+                                className="bg-transparent text-center text-sm font-mono font-black text-slate-900 outline-none w-full max-w-md"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const val = e.currentTarget.value.trim();
+                                        if (val) {
+                                            handleBarcodeScan(val);
+                                            e.currentTarget.value = '';
+                                        }
+                                    }
+                                }}
+                             />
+                             <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Lectora Activa</span>
+                             </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* Lista de Artículos y Progreso */}
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b pb-2 flex justify-between">
+                                        <span>Artículos a Cargar</span>
+                                        <span className="text-emerald-600">PROGRESO: {Object.values(scannedItems).reduce((a,b)=>a+b, 0)} / {(assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.expectedQty), 0)}</span>
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {(assigningInvoice.items || []).map((item: any, i: number) => {
+                                            const scanned = scannedItems[item.sku] || 0;
+                                            const expected = Number(item.expectedQty);
+                                            const isDone = scanned >= expected;
+                                            
+                                            return (
+                                                <div key={i} className={`p-4 rounded-2xl border transition-all flex justify-between items-center ${isDone ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100 opacity-80'}`}>
+                                                    <div>
+                                                        <p className="text-sm font-black text-slate-900">{item.articleName || 'Artículo'}</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className={`text-xl font-black ${isDone ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                                            {scanned} / {expected}
+                                                        </p>
+                                                        <p className="text-[8px] font-bold text-slate-400 uppercase">{item.unit || 'UND'}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Configuración de Entrega y Firmas */}
+                                <div className="space-y-6">
+                                    <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
+                                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Equipo de Entrega</h4>
+                                        <div className="flex items-center justify-between p-3 bg-white rounded-2xl border border-slate-100">
+                                            <div className="flex items-center gap-3">
+                                                <Icons.Users className="w-5 h-5 text-slate-400" />
+                                                <span className="text-[10px] font-black text-slate-900 uppercase">¿Entrega Acompañada?</span>
+                                            </div>
+                                            <button 
+                                                onClick={() => setIsAccompanied(!isAccompanied)}
+                                                className={`w-12 h-6 rounded-full transition-all relative ${isAccompanied ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                            >
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isAccompanied ? 'left-7' : 'left-1'}`}></div>
+                                            </button>
+                                        </div>
+
+                                        {isAccompanied && (
+                                            <div className="space-y-4 animate-in slide-in-from-top-2">
+                                                <div className="flex items-center gap-4">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase">Cantidad Auxiliares:</p>
+                                                    <div className="flex items-center gap-2">
+                                                        {[1, 2, 3].map(n => (
+                                                            <button 
+                                                                key={n}
+                                                                onClick={() => setHelperCount(n)}
+                                                                className={`w-8 h-8 rounded-lg text-xs font-black transition-all ${helperCount === n ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
+                                                            >
+                                                                {n}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {Array.from({ length: helperCount }).map((_, i) => (
+                                                        <select 
+                                                            key={i}
+                                                            value={selectedHelpers[i] || ''}
+                                                            onChange={(e) => {
+                                                                const newHelpers = [...selectedHelpers];
+                                                                newHelpers[i] = e.target.value;
+                                                                setSelectedHelpers(newHelpers);
+                                                            }}
+                                                            className="w-full bg-white border border-slate-200 p-3 rounded-xl text-xs font-bold outline-none focus:border-emerald-500"
+                                                        >
+                                                            <option value="">Seleccionar Auxiliar {i+1}...</option>
+                                                            {allUsers.filter(u => u.id !== user.id).map(u => (
+                                                                <option key={u.id} value={u.id}>{u.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Panel de Validación de Firmas */}
+                                    <div className="bg-slate-900 p-6 rounded-[2rem] shadow-xl space-y-4">
+                                        <h4 className="text-xs font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                                            <Icons.Signature className="w-4 h-4" />
+                                            Validación de Seguridad
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {/* Firma del Conductor (Logueado) */}
+                                            <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <p className="text-[9px] font-black text-white uppercase">{user.name} (CONDUCTOR)</p>
+                                                    <div className="flex bg-white/10 p-1 rounded-lg">
+                                                        <button 
+                                                            onClick={() => setSignNowMap({...signNowMap, [user.id]: true})}
+                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] !== false ? 'bg-emerald-500 text-slate-900' : 'text-slate-400'}`}
+                                                        >AHORA</button>
+                                                        <button 
+                                                            onClick={() => setSignNowMap({...signNowMap, [user.id]: false})}
+                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] === false ? 'bg-rose-500 text-white' : 'text-slate-400'}`}
+                                                        >DESPUÉS</button>
+                                                    </div>
+                                                </div>
+                                                {signNowMap[user.id] !== false && (
+                                                    <div className="relative">
+                                                        <input 
+                                                            type={showPasswordMap[user.id] ? "text" : "password"}
+                                                            placeholder="INGRESE SU CLAVE DE FIRMA..."
+                                                            autoComplete="new-password"
+                                                            className="w-full bg-white/10 border border-white/20 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500 pr-10"
+                                                            onChange={(e) => setSignatureKeys({...signatureKeys, [user.id]: e.target.value})}
+                                                        />
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setShowPasswordMap({...showPasswordMap, [user.id]: !showPasswordMap[user.id]})}
+                                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                                                        >
+                                                            {showPasswordMap[user.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Firmas de Auxiliares */}
+                                            {isAccompanied && selectedHelpers.slice(0, helperCount).map((hid) => {
+                                                const helper = drivers.find(d => d.id === hid);
+                                                if (!helper) return null;
+                                                return (
+                                                    <div key={hid} className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <p className="text-[9px] font-black text-white uppercase">{helper.name} (AUXILIAR)</p>
+                                                            <div className="flex bg-white/10 p-1 rounded-lg">
+                                                                <button 
+                                                                    onClick={() => setSignNowMap({...signNowMap, [hid]: true})}
+                                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[hid] !== false ? 'bg-emerald-500 text-slate-900' : 'text-slate-400'}`}
+                                                                >AHORA</button>
+                                                                <button 
+                                                                    onClick={() => setSignNowMap({...signNowMap, [hid]: false})}
+                                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[hid] === false ? 'bg-rose-500 text-white' : 'text-slate-400'}`}
+                                                                >DESPUÉS</button>
+                                                            </div>
+                                                        </div>
+                                                        {signNowMap[hid] !== false && (
+                                                            <div className="relative">
+                                                                <input 
+                                                                    type={showPasswordMap[hid] ? "text" : "password"}
+                                                                    placeholder="CLAVE DE FIRMA AUXILIAR..."
+                                                                    autoComplete="new-password"
+                                                                    className="w-full bg-white/10 border border-white/20 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500 pr-10"
+                                                                    onChange={(e) => setSignatureKeys({...signatureKeys, [hid]: e.target.value})}
+                                                                />
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => setShowPasswordMap({...showPasswordMap, [hid]: !showPasswordMap[hid]})}
+                                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                                                                >
+                                                                    {showPasswordMap[hid] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-8 border-t border-slate-100 bg-slate-50 flex gap-4">
+                            <button 
+                                className="flex-1 py-4 bg-emerald-500 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
+                                onClick={handleConfirmDispatch}
+                                disabled={isValidating}
+                            >
+                                {isValidating ? (
+                                    <>
+                                        <Icons.RotateCcw className="w-4 h-4 animate-spin" />
+                                        PROCESANDO...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icons.Check className="w-4 h-4" />
+                                        CONFIRMAR ENTREGA
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
+
+    // LOGICA DE NEGOCIO PARA DESPACHO
+    async function handleBarcodeScan(barcode: string) {
+        if (!assigningInvoice) return;
+        
+        // Buscar artículo por SKU o Código de Barras
+        const item = (assigningInvoice.items || []).find((it: any) => it.sku === barcode || it.barcode === barcode);
+        
+        if (!item) {
+            toast.error(`Artículo no encontrado: ${barcode}`);
+            return;
+        }
+
+        const currentCount = scannedItems[item.sku] || 0;
+        const expected = Number(item.expectedQty);
+
+        if (currentCount >= expected) {
+            toast.warning(`Cantidad máxima alcanzada para ${item.articleName || item.sku}`);
+            return;
+        }
+
+        setScannedItems({
+            ...scannedItems,
+            [item.sku]: currentCount + 1
+        });
+        toast.success(`Escaneado: ${item.articleName || item.sku}`);
+    }
+
+    async function handleConfirmDispatch() {
+        if (!assigningInvoice) return;
+        
+        // 1. Validar que al menos se escaneó algo
+        const totalScanned = Object.values(scannedItems).reduce((a,b)=>a+b, 0);
+        if (totalScanned === 0) {
+            toast.error("Debe escanear al menos un artículo para realizar la asignación.");
+            return;
+        }
+
+        const totalExpected = (assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.expectedQty), 0);
+        if (totalScanned < totalExpected) {
+             const confirmLess = window.confirm(`CUIDADO: Faltan artículos por escanear (${totalScanned} de ${totalExpected}). ¿Desea continuar con una entrega parcial?`);
+             if (!confirmLess) return;
+        }
+
+        setIsValidating(true);
+        try {
+            const signatures = [
+                { userId: user.id, role: 'DRIVER', signNow: signNowMap[user.id] !== false, password: signatureKeys[user.id] }
+            ];
+
+            if (isAccompanied) {
+                selectedHelpers.slice(0, helperCount).forEach(hid => {
+                    if (hid) {
+                        signatures.push({ userId: hid, role: 'HELPER', signNow: signNowMap[hid] !== false, password: signatureKeys[hid] });
+                    }
+                });
+            }
+
+            const payload = {
+                invoiceId: assigningInvoice.id || assigningInvoice.invoiceNumber,
+                driverId: user.id,
+                helperIds: isAccompanied ? selectedHelpers.slice(0, helperCount) : [],
+                scannedItems: scannedItems,
+                isAccompanied,
+                helperCount: isAccompanied ? helperCount : 0,
+                createdBy: user.id,
+                signatures
+            };
+
+            const res = await api.initDispatch(payload);
+            
+            if (res.success) {
+                toast.success("Despacho asignado correctamente.");
+                setAssigningInvoice(null);
+                setScannedItems({});
+                onRefresh();
+                fetchPendingSignatures();
+            }
+        } catch (e: any) {
+            toast.error(e.message || "Error al confirmar despacho");
+        } finally {
+            setIsValidating(false);
+        }
+    }
+
+    async function handleDelayedSignature(inv: any) {
+        const password = window.prompt("INGRESE SU CLAVE DE FIRMA PARA ESTE DESPACHO:");
+        if (!password) return;
+
+        setIsValidating(true);
+        try {
+            const res = await api.signDispatchPending({
+                dispatchId: inv.dispatchId || inv.id, // Necesitaríamos rastrear el ID de despacho
+                userId: user.id,
+                password
+            });
+
+            if (res.success) {
+                toast.success("Firma registrada con éxito.");
+                fetchPendingSignatures();
+                onRefresh();
+            }
+        } catch (e: any) {
+            toast.error(e.message || "Error al registrar firma");
+        } finally {
+            setIsValidating(false);
+        }
+    }
 };
 
 export default LogisticsDispatch;

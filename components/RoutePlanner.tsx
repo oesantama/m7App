@@ -156,7 +156,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // Validar si está en despacho o ruta activa
       const isBusy = activeRoutes.some(r =>
         r.vehicleId === v.id &&
-        ['Assigned', 'In Route', 'EN_RUTA', 'Asignada', 'En Ruta', 'PENDIENTE'].includes(r.status.toUpperCase())
+        ['Assigned', 'In Route', 'EN_RUTA', 'Asignada', 'En Ruta', 'PENDIENTE', 'CONFIRMADA'].includes(r.status.toUpperCase())
       );
 
       if (isBusy) return null;
@@ -171,6 +171,42 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
     return fleet;
   }, [assignments, vehicles, drivers, selectedClient, activeRoutes]);
+
+  const fleetGeneralMetrics = useMemo(() => {
+    const activeLinks = assignments.filter(a => {
+      const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+      const cId = a.clientId || (a as any).client_id;
+      return active && (selectedClient === 'GLOBAL' || cId === selectedClient);
+    });
+
+    let onBase = 0;
+    let onRoute = 0;
+
+    activeLinks.forEach(link => {
+      const v = vehicles.find(veh => veh.id === link.vehicleId);
+      if (!v) return;
+
+      const normalizeId = (id: any) => String(id || '').trim().toUpperCase();
+      const vId = normalizeId(v.id);
+
+      const isBusy = activeRoutes.some(r =>
+        normalizeId(r.vehicleId || (r as any).vehicle_id) === vId &&
+        ['Assigned', 'In Route', 'EN_RUTA', 'Asignada', 'En Ruta', 'PENDIENTE', 'CONFIRMADA'].includes(String(r.status || '').toUpperCase())
+      );
+
+      if (isBusy) {
+        onRoute++;
+      } else {
+        // Solo contar "En Base" si está Disponible Y no tiene ruta
+        const vStatus = String(v.status || '').toUpperCase();
+        if (vStatus === 'DISPONIBLE') {
+          onBase++;
+        }
+      }
+    });
+
+    return { onBase, onRoute };
+  }, [assignments, vehicles, selectedClient, activeRoutes]);
 
   // CÁLCULO DE DÉFICIT DE FLOTA
   const unassignedMetrics = useMemo(() => {
@@ -1243,9 +1279,17 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 <p className="text-[7px] font-bold text-slate-400 mt-2 uppercase tracking-widest">APTAS DESPACHO</p>
               </div>
               <div className="bg-white p-5 rounded-[1.5rem] border-2 border-slate-100 shadow-lg">
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Vehículos</p>
-                <p className="text-3xl font-black text-slate-900">{availableVehicles.length}</p>
-                <p className="text-[7px] font-bold text-slate-400 mt-2 uppercase tracking-widest">EN BASE</p>
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3">Flota Operativa</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center border-r border-slate-100">
+                    <p className="text-2xl font-black text-slate-900">{fleetGeneralMetrics.onBase}</p>
+                    <p className="text-[7px] font-bold text-emerald-500 mt-1 uppercase tracking-widest">EN BASE</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-black text-slate-900">{fleetGeneralMetrics.onRoute}</p>
+                    <p className="text-[7px] font-bold text-amber-500 mt-1 uppercase tracking-widest">CON RUTA</p>
+                  </div>
+                </div>
               </div>
             </div>
 

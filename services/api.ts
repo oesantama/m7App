@@ -18,6 +18,41 @@ export const api = {
     return res.json();
   },
 
+  // --- DISPATCH AUDIT ---
+  async initDispatch(data: any) {
+    const res = await fetch(`${API_URL}/dispatch/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al iniciar despacho');
+    }
+    return res.json();
+  },
+  async signDispatchPending(data: any) {
+    const res = await fetch(`${API_URL}/dispatch/sign-pending`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al firmar pendientes');
+    }
+    return res.json();
+  },
+  async getPendingSignatures(userId: string) {
+    const res = await fetch(`${API_URL}/dispatch/pending-signatures/${userId}`);
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al obtener firmas pendientes');
+    }
+    return res.json();
+  },
+
+  // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO
   getUsers: () => fetch(`${API_URL}/users?_t=${Date.now()}`).then(r => r.json()),
   saveUser: (data: any) => fetch(`${API_URL}/users`, {
@@ -26,11 +61,18 @@ export const api = {
     body: JSON.stringify(data)
   }).then(r => r.json()),
 
-  saveMaster: (category: string, data: any) => fetch(`${API_URL}/masters/${category}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).then(r => r.json()),
+  saveMaster: async (category: string, data: any) => {
+    const res = await fetch(`${API_URL}/masters/${category}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `Error al guardar en ${category}`);
+    }
+    return res.json();
+  },
 
   getGenericMasters: () => fetch(`${API_URL}/masters?_t=${Date.now()}`).then(r => r.json()),
 
@@ -160,19 +202,33 @@ export const api = {
   deleteRole: (id: string, deletedBy?: string) => fetch(`${API_URL}/roles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
 
   getVehicles: () => fetch(`${API_URL}/vehicles`).then(r => r.json()),
-  saveVehicle: (data: any) => fetch(`${API_URL}/vehicles`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).then(r => r.json()),
+  saveVehicle: async (data: any) => {
+    const res = await fetch(`${API_URL}/vehicles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al guardar el vehículo');
+    }
+    return res.json();
+  },
   deleteVehicle: (id: string, deletedBy?: string) => fetch(`${API_URL}/vehicles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
 
   getDrivers: () => fetch(`${API_URL}/drivers`).then(r => r.json()),
-  saveDriver: (data: any) => fetch(`${API_URL}/drivers`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).then(r => r.json()),
+  saveDriver: async (data: any) => {
+    const res = await fetch(`${API_URL}/drivers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al guardar el conductor');
+    }
+    return res.json();
+  },
   deleteDriver: (id: string, deletedBy?: string) => fetch(`${API_URL}/drivers/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
 
   getDocuments: (clientId?: string) => fetch(`${API_URL}/documents${clientId ? `?clientId=${clientId}` : ''}`).then(r => r.json()),

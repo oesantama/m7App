@@ -34,6 +34,7 @@ import unidadMedidaRoutes from './unidad-medida.routes.js';
 import notificacionRoutes from './notificacion.routes.js';
 import tipoVehiculoRoutes from './tipo-vehiculo.routes.js';
 import tipoNotificacionRoutes from './tipo-notificacion.routes.js';
+import dispatchRoutes from './dispatch.routes.js';
 
 
 const router = Router();
@@ -72,6 +73,7 @@ router.use('/locations', locationRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/portal', portalRoutes);
 router.use('/telemetry', telemetryRoutes);
+router.use('/dispatch', dispatchRoutes);
 
 
 export default router;
