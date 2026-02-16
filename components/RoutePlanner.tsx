@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
-import { Invoice, Vehicle, Route, VehicleStatus, Driver, VehicleAssignment, DocumentL, DocStatus, RouteLog, User } from '../types';
+import { Invoice, Vehicle, Route, VehicleStatus, Driver, VehicleAssignment, DocumentL, DocStatus, RouteLog, User, MasterRecord } from '../types';
 import { Icons, INITIAL_CLIENTS } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
@@ -14,6 +14,7 @@ interface RoutePlannerProps {
   documents: DocumentL[];
   activeRoutes: Route[]; // Nueva prop
   user: User;
+  clients: MasterRecord[]; // Nueva prop
   onAssign: (vId: string, dId: string, cId: string) => void;
   onSaveRoute: (route: Partial<Route>) => void;
   onRefresh?: () => void;
@@ -41,7 +42,7 @@ interface SuggestedRoute {
 }
 
 const RoutePlanner: React.FC<RoutePlannerProps> = ({
-  invoices, vehicles, drivers, assignments, documents, activeRoutes, user, onAssign, onSaveRoute, onRefresh
+  invoices, vehicles, drivers, assignments, documents, activeRoutes, user, clients, onAssign, onSaveRoute, onRefresh
 }) => {
   const mapRef = useRef<L.Map | null>(null);
   const [selectedClient, setSelectedClient] = useState(user.clientId || 'c1');
@@ -129,30 +130,36 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
 
   const availableVehicles = useMemo(() => {
+    // REGLA M7: Un vehículo es "disponible" si:
+    // 1. Tiene un vínculo activo (VehicleAssignment) con el cliente seleccionado.
+    // 2. Su estado es 'Disponible'.
+    // 3. NO tiene una ruta activa (despacho pendiente o en curso).
 
-
-    const activeLinks = assignments.filter(a =>
-      a.isActive &&
-      (a.clientId === selectedClient)
-    );
+    const activeLinks = assignments.filter(a => {
+      const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+      const cId = a.clientId || (a as any).client_id;
+      // Permitir ver todos si selectedClient es GLOBAL o si coincide
+      const clientMatch = selectedClient === 'GLOBAL' || cId === selectedClient;
+      return active && clientMatch;
+    });
 
     const fleet = activeLinks.map(link => {
       const v = vehicles.find(veh => veh.id === link.vehicleId);
       const d = drivers.find(drv => drv.id === link.driverId);
 
-      // Si el vehículo o conductor no existe, o si el vehículo está en una RUTA ACTIVA, lo ocultamos
       if (!v || !d) return null;
 
-      // ST-FIX: Validar estado del vehículo 'Disponible' (Case insensitive y cast seguro)
+      // Validar estado 'Disponible'
       const vStatus = String(v.status || '').toUpperCase();
       if (vStatus !== 'DISPONIBLE') return null;
 
+      // Validar si está en despacho o ruta activa
       const isBusy = activeRoutes.some(r =>
         r.vehicleId === v.id &&
-        ['Assigned', 'In Route', 'EN_RUTA', 'Asignada', 'En Ruta'].includes(r.status)
+        ['Assigned', 'In Route', 'EN_RUTA', 'Asignada', 'En Ruta', 'PENDIENTE'].includes(r.status.toUpperCase())
       );
 
-      if (isBusy) return null; // Ocultar vehículos ocupados
+      if (isBusy) return null;
 
       return {
         ...v,
@@ -352,7 +359,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // Reporte final para el usuario
       if (suggestions.length === 0) {
         if (availableVehicles.length === 0) {
-          toast.error(`NO HAY TRIPULACIONES ACTIVAS PARA ${INITIAL_CLIENTS.find(c => c.id === selectedClient)?.name || 'EL CLIENTE'}.`);
+          toast.error(`NO HAY TRIPULACIONES DISPONIBLES PARA ${clients.find(c => c.id === selectedClient)?.name || 'EL CLIENTE'}.`);
         } else {
           toast.info("No se hallaron rutas factibles.");
         }
@@ -934,7 +941,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 onChange={(e) => { setSelectedClient(e.target.value); setSuggestedRoutes([]); }}
                 className="bg-slate-50 border border-slate-200 px-3 py-0.5 rounded-md text-[9px] font-black uppercase outline-none focus:border-emerald-500"
               >
-                {INITIAL_CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="GLOBAL">FLOTA GLOBAL M7</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
           </div>

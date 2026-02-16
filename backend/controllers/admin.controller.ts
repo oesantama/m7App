@@ -176,6 +176,28 @@ export const deleteRecord = async (req: Request, res: Response) => {
   }
 };
 
+export const bulkDeleteRecords = async (req: Request, res: Response) => {
+  const { tableName, ids, user } = req.body;
+  try {
+    if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
+    if (!tableName || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "Datos incompletos o inválidos" });
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
+      return res.status(400).json({ error: "Nombre de tabla inválido" });
+    }
+
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+    await pool.query(`DELETE FROM ${tableName} WHERE id IN (${placeholders})`, ids);
+    
+    res.json({ success: true, action: 'BULK_DELETE', count: ids.length });
+  } catch (err: any) {
+    console.error('[ADMIN-BULK-DELETE]', err.message);
+    res.status(500).json({ error: "Error al eliminar registros masivamente", details: err.message });
+  }
+};
+
 export const getTableSchema = async (req: Request, res: Response) => {
     const { tableName, user } = req.body;
     try {

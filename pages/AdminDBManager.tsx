@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/useAppStore';
 import { api } from '../services/api'; 
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { Icons } from '../constants';
 
 const AdminDBManager: React.FC = () => {
   const { user } = useAppStore();
@@ -13,6 +14,12 @@ const AdminDBManager: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [tableColumns, setTableColumns] = useState<string[]>([]);
+  
+  const getRowId = (row: any) => {
+      if (!row) return undefined;
+      return row.id ?? row.ID ?? row.Id ?? row.iD ?? Object.values(row)[0];
+  };
   
   // Params
   const [page, setPage] = useState(1);
@@ -20,6 +27,9 @@ const AdminDBManager: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('ASC');
+
+  // Selection State
+  const [selectedIds, setSelectedIds] = useState<Set<any>>(new Set());
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,6 +48,9 @@ const AdminDBManager: React.FC = () => {
   // Schema Info State
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [schemaInfo, setSchemaInfo] = useState<{description: string, columns: any[]} | null>(null);
+
+  // Custom Confirm State
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean, type: 'SINGLE' | 'BULK', id?: any } | null>(null);
 
   const exportToExcel = (dataToExport: any[], fileName: string) => {
     if (!dataToExport || dataToExport.length === 0) {
@@ -136,9 +149,27 @@ const AdminDBManager: React.FC = () => {
     }
   };
 
+  const fetchSchemaColumns = async (tableName: string) => {
+    try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/schema`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tableName, user })
+        });
+        const result = await res.json();
+        if (res.ok && result.columns) {
+            setTableColumns(result.columns.map((c: any) => c.column_name));
+        }
+    } catch (e) {
+        console.error("Error fetching schema columns:", e);
+    }
+  };
+
   const loadData = async (newPage: number, newLimit?: number, newSortBy?: string, newSortOrder?: 'ASC' | 'DESC') => {
     if (!selectedTable) return;
     setLoading(true);
+    setSelectedIds(new Set()); // Clear selection on load
+    fetchSchemaColumns(selectedTable); // Fetch columns too
     
     const currentLimit = newLimit ?? limit;
     const currentSortBy = newSortBy !== undefined ? newSortBy : sortBy;
@@ -250,8 +281,10 @@ const AdminDBManager: React.FC = () => {
   };
 
   const handleDelete = async (id: any) => {
-    if (!window.confirm('¿Está seguro de eliminar este registro? Esta acción es IRREVERSIBLE.')) return;
-    
+    setConfirmDelete({ isOpen: true, type: 'SINGLE', id });
+  };
+
+  const executeDelete = async (id: any) => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/delete`, {
          method: 'POST',
@@ -271,7 +304,58 @@ const AdminDBManager: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       toast.error("Error de Base de Datos", { description: e.message, duration: 6000 });
+    } finally {
+      setConfirmDelete(null);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setConfirmDelete({ isOpen: true, type: 'BULK' });
+  };
+
+  const executeBulkDelete = async () => {
+    setLoading(true);
+    try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/bulk-delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                tableName: selectedTable, 
+                ids: Array.from(selectedIds), 
+                user 
+            })
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.details || result.error || 'Error en eliminación masiva');
+        
+        toast.success(`${result.count} registros eliminados exitosamente`);
+        setSelectedIds(new Set());
+        loadData(page);
+    } catch (e: any) {
+        toast.error("Error en Eliminación Masiva", { description: e.message, duration: 6000 });
+    } finally {
+        setLoading(false);
+        setConfirmDelete(null);
+    }
+  };
+
+  const toggleSelectAll = () => {
+      if (selectedIds.size === data.length) {
+          setSelectedIds(new Set());
+      } else {
+          setSelectedIds(new Set(data.map(r => getRowId(r))));
+      }
+  };
+
+  const toggleSelectRow = (id: any) => {
+      const newSelection = new Set(selectedIds);
+      if (newSelection.has(id)) {
+          newSelection.delete(id);
+      } else {
+          newSelection.add(id);
+      }
+      setSelectedIds(newSelection);
   };
 
   const openModal = (record: any = null) => {
@@ -369,7 +453,7 @@ const AdminDBManager: React.FC = () => {
       });
   };
 
-  const columns = data.length > 0 ? Object.keys(data[0]) : [];
+  const columns = tableColumns.length > 0 ? tableColumns : (data.length > 0 ? Object.keys(data[0]) : []);
   const totalPages = Math.ceil(totalRecords / limit);
 
   return (
@@ -454,6 +538,16 @@ const AdminDBManager: React.FC = () => {
 
                 <div className="flex-1"></div>
                 
+                {selectedIds.size > 0 && (
+                    <button 
+                        onClick={handleBulkDelete}
+                        disabled={loading}
+                        className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded text-sm font-bold shadow transition-all flex items-center gap-2 animate-in fade-in zoom-in duration-300"
+                    >
+                        🗑️ Eliminar ({selectedIds.size})
+                    </button>
+                )}
+
                 <button 
                     onClick={() => openModal(null)}
                     disabled={!selectedTable}
@@ -467,7 +561,15 @@ const AdminDBManager: React.FC = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left text-slate-600">
                         <thead className="bg-slate-100 text-slate-700 font-bold uppercase">
-                             <tr>
+                              <tr>
+                                <th className="px-4 py-3 text-center w-10">
+                                    <input 
+                                        type="checkbox" 
+                                        className="w-4 h-4 cursor-pointer accent-blue-600"
+                                        checked={data.length > 0 && selectedIds.size === data.length}
+                                        onChange={toggleSelectAll}
+                                    />
+                                </th>
                                 <th className="px-4 py-3 text-center w-20">Acciones</th>
                                 {columns.map(col => (
                                     <th 
@@ -486,11 +588,21 @@ const AdminDBManager: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {data.map((row, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                            {data.map((row, idx) => {
+                                const rowId = getRowId(row);
+                                return (
+                                <tr key={idx} className={`hover:bg-slate-50 transition-colors ${selectedIds.has(rowId) ? 'bg-blue-50/50' : ''}`}>
+                                    <td className="px-4 py-2 text-center">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 cursor-pointer accent-blue-600"
+                                            checked={selectedIds.has(rowId)}
+                                            onChange={() => toggleSelectRow(rowId)}
+                                        />
+                                    </td>
                                     <td className="px-4 py-2 text-center flex gap-1 justify-center">
                                         <button onClick={() => openModal(row)} className="text-blue-600 hover:text-blue-800 p-1">✏️</button>
-                                        <button onClick={() => handleDelete(row.id)} className="text-red-500 hover:text-red-700 p-1">🗑️</button>
+                                        <button onClick={() => handleDelete(rowId)} className="text-red-500 hover:text-red-700 p-1">🗑️</button>
                                     </td>
                                     {columns.map(col => {
                                         let content = row[col];
@@ -504,10 +616,11 @@ const AdminDBManager: React.FC = () => {
                                         );
                                     })}
                                 </tr>
-                            ))}
+                                )
+                            })}
                             {data.length === 0 && (
                                 <tr>
-                                    <td colSpan={columns.length + 1} className="px-4 py-8 text-center text-slate-400 italic">
+                                    <td colSpan={columns.length + 2} className="px-4 py-8 text-center text-slate-400 italic">
                                         {selectedTable ? 'No hay registros.' : 'Seleccione una tabla.'}
                                     </td>
                                 </tr>
@@ -685,6 +798,48 @@ const AdminDBManager: React.FC = () => {
                 </div>
             </div>
         </div>
+      )}
+
+      {/* CONFIRM DELETE MODAL */}
+      {confirmDelete?.isOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden transform animate-in zoom-in slide-in-from-bottom-4 duration-300">
+                  <div className="p-8 text-center">
+                      <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner ring-4 ring-red-50">
+                          <Icons.Trash className="w-10 h-10 animate-bounce" />
+                      </div>
+                      <h3 className="text-2xl font-black text-slate-800 mb-2 uppercase tracking-tight">
+                          {confirmDelete.type === 'SINGLE' ? '¿Eliminar Registro?' : `¿Eliminar ${selectedIds.size} Registros?`}
+                      </h3>
+                      <p className="text-slate-500 text-sm mb-8 leading-relaxed font-medium">
+                          Esta acción es <span className="text-red-600 font-bold underline">IRREVERSIBLE</span> y podría afectar la integridad de otros datos asociados.
+                      </p>
+
+                      <div className="flex flex-col gap-3">
+                          <button 
+                            onClick={() => {
+                                if (confirmDelete.type === 'SINGLE') executeDelete(confirmDelete.id);
+                                else executeBulkDelete();
+                            }}
+                            className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2 group active:scale-95"
+                          >
+                             CONFIRMAR ELIMINACIÓN
+                             <span className="group-hover:translate-x-1 transition-transform">➔</span>
+                          </button>
+                          
+                          <button 
+                            onClick={() => setConfirmDelete(null)}
+                            className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all"
+                          >
+                             Cancelar
+                          </button>
+                      </div>
+                  </div>
+                  <div className="bg-slate-50 p-4 border-t text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center">
+                      Administrador de Base de Datos M7
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );

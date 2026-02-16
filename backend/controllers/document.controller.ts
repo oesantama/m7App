@@ -232,8 +232,8 @@ export const syncInventory = async (req: Request, res: Response) => {
         const artCheck = await client.query('SELECT 1 FROM articles WHERE UPPER(TRIM(id)) = $1', [artId]);
         if (artCheck.rows.length === 0) {
           await client.query(`
-            INSERT INTO articles (id, sku, name, client_id, uom_std, factor_std, status_id)
-            VALUES ($1, $1, $2, $3, 'und', 1, 'EST-01')
+            INSERT INTO articles (id, name, client_id, uom_std, factor_std, status_id)
+            VALUES ($1, $2, $3, 'und', 1, 'EST-01')
           `, [artId, `ARTÍCULO AUTO-CREADO: ${artId}`, clientId]);
         }
       }
@@ -567,8 +567,8 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
           const artCheck = await client.query('SELECT 1 FROM articles WHERE id = $1', [artId]);
           if (artCheck.rowCount === 0) {
             await client.query(`
-               INSERT INTO articles (id, sku, name, client_id, uom_std, factor_std, status_id)
-               VALUES ($1, $1, $2, $3, 'und', 1, 'EST-01')
+               INSERT INTO articles (id, name, client_id, uom_std, factor_std, status_id)
+               VALUES ($1, $2, $3, 'und', 1, 'EST-01')
              `, [artId, `AUTO-CREATED ${artId}`, doc.clientId]);
             console.log(`[M7-AUTO] Artículo creado automáticamente: ${artId}`);
           }

@@ -46,6 +46,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [previewPage, setPreviewPage] = useState(1);
   const [previewPageSize, setPreviewPageSize] = useState<number | 'all'>(5);
   const [detectedHeaders, setDetectedHeaders] = useState<{ placa: string; carga: string } | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState(user.clientId || 'CLI-01');
+  const [allClients, setAllClients] = useState<{id: string, name: string}[]>([]);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
   // Estados para Modal de Detalle (Recepción/Auditoría)
@@ -106,6 +108,12 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       (d.city || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [documents, searchTerm]);
+
+  React.useEffect(() => {
+    api.getClients().then(data => {
+      if (Array.isArray(data)) setAllClients(data);
+    }).catch(console.error);
+  }, []);
 
   const handleDeleteDocument = (docId: string) => {
     setDocToDelete(docId);
@@ -449,7 +457,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
           return {
             id: `doc-${data.placa}-${data.carga}`,
-            clientId: user.clientId,
+            clientId: selectedClientId,
             externalDocId: data.carga,
             vehicleData: data.placa,
             codplan: data.codplan,
@@ -711,7 +719,30 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                        <div className="flex items-center gap-6">
                          <div className={`px-10 py-4 rounded-2xl text-[14px] font-black uppercase tracking-[0.2em] shadow-2xl ${preview.type === 'Plan R' ? 'bg-blue-600' : 'bg-emerald-600'}`}>{preview.type}</div>
                          <div>
-                           <h4 className="font-black uppercase text-lg tracking-tighter leading-none">Pre-Validación M7 <span className="bg-white text-slate-900 px-2 rounded text-[9px]">v1.0.4-FIX</span></h4>
+                           <div className="flex items-center gap-3">
+                              <h4 className="font-black uppercase text-lg tracking-tighter leading-none">Pre-Validación M7</h4>
+                              
+                              {/* [NEW] Selector de Cliente para Carga Masiva */}
+                              {(user.clientIds && user.clientIds.length > 1) && (
+                                  <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-lg border border-white/20">
+                                      <span className="text-[9px] font-black text-white/50 uppercase">Destino:</span>
+                                      <select 
+                                        value={selectedClientId}
+                                        onChange={(e) => setSelectedClientId(e.target.value)}
+                                        className="bg-transparent text-white font-black text-[10px] outline-none cursor-pointer"
+                                      >
+                                          {user.clientIds.map(cid => {
+                                              const clin = allClients.find(c => c.id === cid);
+                                              return (
+                                                  <option key={cid} value={cid} className="text-slate-900">
+                                                      {clin ? clin.name.toUpperCase() : cid}
+                                                  </option>
+                                              );
+                                          })}
+                                      </select>
+                                  </div>
+                              )}
+                           </div>
                            <div className="flex gap-4 items-center mt-1">
                               <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{preview.fileName}</p>
                               <div className="h-4 w-[1px] bg-slate-800"></div>

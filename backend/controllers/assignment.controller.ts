@@ -9,7 +9,7 @@ export const getAssignments = async (req: Request, res: Response) => {
       FROM assignments a
       JOIN vehicles v ON a.vehicle_id = v.id
       JOIN drivers d ON a.driver_id = d.id
-      WHERE a.is_active = true
+      ORDER BY a.created_at DESC
     `);
     res.json(result.rows);
   } catch (err: any) {

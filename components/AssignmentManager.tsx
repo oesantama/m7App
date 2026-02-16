@@ -1,19 +1,20 @@
 
 import React, { useState, useMemo } from 'react';
 import { Icons, INITIAL_CLIENTS } from '../constants';
-import { Vehicle, Driver, VehicleAssignment, User, VehicleStatus } from '../types';
+import { Vehicle, Driver, VehicleAssignment, User, VehicleStatus, MasterRecord } from '../types';
 
 interface AssignmentManagerProps {
   vehicles: Vehicle[];
   drivers: Driver[];
   assignments: VehicleAssignment[];
   user: User;
+  clients: MasterRecord[];
   onAssign: (vId: string, dId: string, cId: string) => void;
   onEndAssignment: (aId: string) => void;
 }
 
 const AssignmentManager: React.FC<AssignmentManagerProps> = ({ 
-  vehicles, drivers, assignments, user, onAssign, onEndAssignment 
+  vehicles, drivers, assignments, user, clients, onAssign, onEndAssignment 
 }) => {
   // Estado local para almacenar la selección de cliente temporal por cada vehículo (fila)
   // Clave: vehicleId, Valor: clientId seleccionado
@@ -30,14 +31,21 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
   const assignmentPerms = user.permissions.find(p => p.module === 'PAG-05');
   const canCreate = isSuperUser || assignmentPerms?.actions.includes('create');
 
+  // No filtrar por clientId en el frontend por ahora para debuggear visibilidad
   const activeAssignments = useMemo(() => 
-    assignments.filter(a => a.isActive && (user.clientId === 'GLOBAL' || a.clientId === user.clientId)),
-    [assignments, user.clientId]
+    assignments.filter(a => {
+      const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+      return active;
+    }),
+    [assignments]
   );
 
   const historyAssignments = useMemo(() => 
-    assignments.filter(a => !a.isActive && (user.clientId === 'GLOBAL' || a.clientId === user.clientId)),
-    [assignments, user.clientId]
+    assignments.filter(a => {
+      const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+      return !active;
+    }),
+    [assignments]
   );
 
   // Vehículos pendientes: TODOS los que no tienen asignación activa actualmente
@@ -101,59 +109,54 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in h-full">
-      {/* Header Inteligente */}
-      <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-slate-100">
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8 mb-10">
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 bg-slate-900 rounded-3xl flex items-center justify-center text-emerald-500 shadow-xl">
-              <Icons.Link />
-            </div>
-            <div>
-              <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Despacho Diario M7</h2>
-              <p className="text-slate-500 font-bold mt-2 uppercase text-[10px] tracking-widest">Planificación de Tripulaciones y Activos</p>
-            </div>
-          </div>
-          
-          <div className="flex gap-4">
-             {canCreate && !showHistory && (
+    <div className="space-y-6 animate-in fade-in h-full">
+      {/* Barra de Acciones Superior Compacta */}
+      <div className="flex flex-wrap items-center gap-4 bg-white/50 p-4 rounded-3xl border border-slate-100 backdrop-blur-sm">
+        <div className="flex items-center gap-3 px-4 border-r border-slate-200">
+           <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-emerald-500 shadow-lg">
+              <Icons.Link className="w-5 h-5" />
+           </div>
+           <span className="font-black text-slate-800 uppercase tracking-tighter text-sm">Operativa de Vínculos</span>
+        </div>
+
+        <div className="flex flex-1 gap-2 justify-end">
+            {canCreate && !showHistory && (
               <button 
                 onClick={handleAutoSuggest}
                 disabled={isSuggesting || pendingVehicles.length === 0}
-                className="bg-emerald-500 text-slate-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-400 transition-all flex items-center gap-3 disabled:opacity-30"
+                className="bg-emerald-500 text-slate-900 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all flex items-center gap-2 disabled:opacity-30"
               >
-                {isSuggesting ? <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent animate-spin rounded-full"></div> : <Icons.Scan />}
-                SUGERIR VÍNCULOS POR HISTORIAL
+                {isSuggesting ? <div className="w-3 h-3 border-2 border-slate-900 border-t-transparent animate-spin rounded-full"></div> : <Icons.Scan className="w-4 h-4" />}
+                SUGERIR POR HISTORIAL
               </button>
             )}
 
             <button 
               onClick={() => setShowHistory(!showHistory)}
-              className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 shadow-xl transition-all"
+              className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 shadow-lg transition-all"
             >
               {showHistory ? 'Volver al Plan' : 'Ver Histórico'}
             </button>
-          </div>
         </div>
+      </div>
 
-        {/* Sugerencia IA M7 - Vínculos */}
-        {!showHistory && pendingVehicles.length > 0 && availableDrivers.length > 0 && (
-          <div className="mb-10 p-6 bg-slate-900 rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row items-center gap-6 animate-in slide-in-from-top-4 duration-700">
-            <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
-                <Icons.Brain className="text-slate-950 w-7 h-7" />
-            </div>
-            <div className="flex-1">
-                <h5 className="text-emerald-400 font-black text-[9px] uppercase tracking-widest mb-1">Optimizador de Tripulaciones M7</h5>
-                <p className="text-slate-300 text-xs font-medium leading-relaxed">
-                    M7 Analysis: Detecto <span className="text-white font-black">{pendingVehicles.length} vehículos</span> listos para operación.
-                    Puedo sugerir tripulaciones basadas en los últimos despachos exitosos para ahorrar tiempo.
-                </p>
-            </div>
-            <button onClick={handleAutoSuggest} className="px-6 py-3 bg-emerald-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all shrink-0">
-                Confirmar Vínculo IA
-            </button>
+      {/* Sugerencia IA M7 - Ahora más compacta y arriba */}
+      {!showHistory && pendingVehicles.length > 0 && availableDrivers.length > 0 && (
+        <div className="p-4 bg-slate-900 rounded-3xl border border-white/5 flex items-center gap-6 animate-in slide-in-from-top-2 duration-500">
+          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
+              <Icons.Brain className="text-slate-950 w-5 h-5" />
           </div>
-        )}
+          <div className="flex-1">
+              <p className="text-slate-300 text-[11px] font-medium leading-tight">
+                  <span className="text-emerald-400 font-black uppercase mr-2">M7 AI Analysis:</span>
+                  Detecto <span className="text-white font-black">{pendingVehicles.length} vehículos</span> listos. Sugiero vincular por historial para optimizar despacho.
+              </p>
+          </div>
+          <button onClick={handleAutoSuggest} className="px-5 py-2.5 bg-emerald-500 text-slate-950 rounded-lg font-black text-[9px] uppercase tracking-widest hover:bg-emerald-400 transition-all shrink-0">
+              Confirmar Vínculo IA
+          </button>
+        </div>
+      )}
 
         {!showHistory ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -183,7 +186,7 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
                                 className="flex-1 bg-white border border-slate-200 px-3 py-3 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
                             >
                                 <option value="">1. CLIENTE...</option>
-                                {INITIAL_CLIENTS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
 
                             <select 
@@ -224,7 +227,12 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
                         <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg"><Icons.Truck /></div>
                         <div>
                           <p className="font-black text-slate-900 uppercase text-sm">{v?.plate} <span className="text-emerald-500 mx-2">↔</span> {d?.name.split(' ')[0]}</p>
-                          <p className="text-[9px] text-slate-400 font-black uppercase mt-1">Vínculo Activo M7 Operaciones</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="px-2 py-0.5 bg-slate-900 text-white text-[8px] font-black rounded-md uppercase tracking-wider">
+                              {clients.find(c => c.id === (a.clientId || (a as any).client_id))?.name || 'S/C'}
+                            </span>
+                            <p className="text-[9px] text-slate-400 font-black uppercase">Vínculo Activo M7</p>
+                          </div>
                         </div>
                       </div>
                       <button 
@@ -245,7 +253,10 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
              <div className="space-y-4">
                 {historyAssignments.length === 0 ? <p className="text-slate-400 text-center py-20 font-black uppercase text-xs tracking-widest">Sin registros históricos</p> : historyAssignments.map(a => (
                   <div key={a.id} className="bg-white p-6 rounded-2xl border border-slate-100 flex justify-between items-center opacity-60">
-                    <p className="font-black text-slate-900 uppercase text-xs">{vehicles.find(v => v.id === a.vehicleId)?.plate} <span className="text-slate-300 mx-4">|</span> {drivers.find(d => d.id === a.driverId)?.name}</p>
+                    <div>
+                      <p className="font-black text-slate-900 uppercase text-xs">{vehicles.find(v => v.id === a.vehicleId)?.plate} <span className="text-slate-300 mx-4">|</span> {drivers.find(d => d.id === a.driverId)?.name}</p>
+                      <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">{clients.find(c => c.id === (a.clientId || (a as any).client_id))?.name || 'Cliente Desconocido'}</p>
+                    </div>
                     <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Cierre: {new Date(a.updatedAt).toLocaleDateString()}</p>
                   </div>
                 ))}
@@ -253,7 +264,6 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
           </div>
         )}
       </div>
-    </div>
   );
 };
 

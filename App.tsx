@@ -256,7 +256,7 @@ const App: React.FC = () => {
   }, []);
 
   const refreshAppData = React.useCallback(async (forcedClientId?: string) => {
-    const targetClientId = forcedClientId || user?.clientId || 'c1';
+    const targetClientId = forcedClientId || user?.clientId || 'CLI-01';
     try {
       const [
         modules, pages, genericMasters, categories, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData, routesData,
@@ -317,6 +317,7 @@ const App: React.FC = () => {
         ...v,
         clientId: v.client_id,
         statusId: v.status_id,
+        status: (v.status_id === 'EST-01' || v.status === 'Disponible') ? 'Disponible' : v.status,
         capacityM3: parseFloat(v.capacity_m3 || '0'),
         soatExpiry: v.soat_expiry,
         technoExpiry: v.techno_expiry,
@@ -367,13 +368,13 @@ const App: React.FC = () => {
 
       const mappedAssignments = Array.isArray(assignmentsData) ? assignmentsData.map((a: any) => ({
         id: a.id,
-        vehicleId: a.vehicle_id,
-        driverId: a.driver_id,
-        clientId: a.client_id,
-        isActive: a.is_active,
+        vehicleId: a.vehicle_id || a.vehicleId,
+        driverId: a.driver_id || a.driverId,
+        clientId: a.client_id || a.clientId,
+        isActive: a.is_active !== undefined ? a.is_active : a.isActive,
         statusId: 'EST-01',
-        createdAt: a.created_at,
-        updatedAt: a.updated_at
+        createdAt: a.created_at || a.createdAt,
+        updatedAt: a.updated_at || a.updatedAt
       })) : [];
       setAssignments(mappedAssignments);
 
@@ -560,13 +561,18 @@ const App: React.FC = () => {
       setVehicles(Array.isArray(vehData) ? vehData : []);
       setDrivers(Array.isArray(driversData) ? driversData : []);
 
+      const firstClientId = (userData.client_ids && userData.client_ids.length > 0) 
+        ? userData.client_ids[0] 
+        : (userData.client_id || 'CLI-01');
+
       const finalUser = {
         id: userData.id,
         email: userData.email,
         name: userData.name,
         roleId: userData.role_id,
         permissions: mappedPermissions,
-        clientId: 'c1'
+        clientId: firstClientId,
+        clientIds: userData.client_ids || [firstClientId]
       } as any;
 
       // Update store with dedicated tables
@@ -758,6 +764,7 @@ const App: React.FC = () => {
             documents={documents}
             activeRoutes={routes} // Pasamos rutas activas para filtrar vehículos ocupados
             user={user!}
+            clients={allMasterData.masterClientes || []}
             onRefresh={refreshAppData}
             onAssign={(vId, dId, cId) => {
               const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, statusId: 'EST-01' };
@@ -828,11 +835,74 @@ const App: React.FC = () => {
                 return { success: false, error: 'Error al guardar vehículo' };
               }
             }}
-            onUpdateVehicle={updateVehicle}
-            onDeleteVehicle={deleteVehicle}
-            onAddDriver={addDriver}
-            onUpdateDriver={updateDriver}
-            onDeleteDriver={deleteDriver}
+            onUpdateVehicle={async (id, data) => {
+              try {
+                await api.saveVehicle({ ...data, id });
+                updateVehicle(id, data);
+                // También actualizar master data para consistencia
+                const currentMaster = (allMasterData as any).masterVehiculos || [];
+                setAllMasterData({
+                  ...allMasterData,
+                  // @ts-ignore
+                  masterVehiculos: currentMaster.map((v: any) => v.id === id ? { ...v, ...data, name: data.plate || v.name } : v)
+                });
+                return { success: true };
+              } catch (e) {
+                console.error(e);
+                return { success: false, error: 'Error al actualizar vehículo' };
+              }
+            }}
+            onDeleteVehicle={async (id) => {
+               try {
+                 await api.deleteVehicle(id);
+                 deleteVehicle(id);
+               } catch (e) { console.error(e); }
+            }}
+            onAddDriver={async (d) => {
+              try {
+                const res = await api.saveDriver(d);
+                const newDriver = {
+                  ...d,
+                  id: res.id || `drv-${Date.now()}`,
+                  statusId: d.statusId || 'EST-01'
+                };
+                addDriver(newDriver);
+                
+                const currentMaster = (allMasterData as any).masterConductores || [];
+                setAllMasterData({
+                  ...allMasterData,
+                  // @ts-ignore
+                  masterConductores: [...currentMaster, { ...newDriver, name: newDriver.name } as MasterRecord]
+                });
+                return { success: true };
+              } catch (e) {
+                console.error(e);
+                return { success: false, error: 'Error al guardar conductor' };
+              }
+            }}
+            onUpdateDriver={async (id, data) => {
+              try {
+                await api.saveDriver({ ...data, id });
+                updateDriver(id, data);
+                
+                const currentMaster = (allMasterData as any).masterConductores || [];
+                setAllMasterData({
+                  ...allMasterData,
+                  // @ts-ignore
+                  masterConductores: currentMaster.map((d: any) => d.id === id ? { ...d, ...data, name: data.name || d.name } : d)
+                });
+                return { success: true };
+              } catch (e) {
+                console.error(e);
+                return { success: false, error: 'Error al actualizar conductor' };
+              }
+            }}
+            onDeleteDriver={async (id) => {
+              try {
+                await api.deleteDriver(id);
+                deleteDriver(id);
+              } catch (e) { console.error(e); }
+            }}
           />
         );
       case 'vinculo':
@@ -842,21 +912,28 @@ const App: React.FC = () => {
             drivers={drivers}
             assignments={assignments}
             user={user!}
+            clients={allMasterData.masterClientes || []}
             onAssign={async (vId, dId, cId) => {
               const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-              addAssignment(newAssign); // Usa acción del store
+              addAssignment(newAssign); // Actualización optimista
               try {
                 await api.saveAssignment(newAssign);
-              } catch (e) {
+                toast.success("Asignación guardada con éxito");
+                refreshAppData(); // Sincronización real
+              } catch (e: any) {
                 console.error("Error saving assignment:", e);
+                toast.error("Error en asignación", { description: e.message || "Conflicto en el servidor" });
               }
             }}
             onEndAssignment={async (aId) => {
-              endAssignment(aId); // Usa acción del store
+              endAssignment(aId); // Actualización optimista
               try {
                 await api.endAssignment(aId, user?.name);
+                toast.success("Asignación finalizada");
+                refreshAppData(); // Sincronización real
               } catch (e) {
                 console.error("Error ending assignment:", e);
+                toast.error("Error al finalizar asignación");
               }
             }}
           />
@@ -872,7 +949,7 @@ const App: React.FC = () => {
           name: user!.name,
           documentNumber: user!.id,
           statusId: 'EST-01',
-          clientId: user!.clientId || 'c1',
+          clientId: user!.clientId || 'CLI-01',
           licenseCategory: 'C2',
           status: 'Activo'
         } as any} />;
@@ -882,7 +959,7 @@ const App: React.FC = () => {
         return (
           <LogisticsDispatch
             user={user!}
-            selectedClient={user!.clientId || 'c1'}
+            selectedClient={user!.clientId || 'CLI-01'}
             vehicles={vehicles}
             drivers={drivers}
             assignments={assignments}

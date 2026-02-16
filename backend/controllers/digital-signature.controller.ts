@@ -112,7 +112,7 @@ export const approveSignature = async (req: Request, res: Response) => {
     try {
         // 1. Validar que el aprobador NO sea el mismo usuario (a menos que sea superusuario)
         // Necesitamos el rol_id del aprobador
-        const approverResult = await pool.query('SELECT pasword, role_id FROM users WHERE id = $1', [approverId]);
+        const approverResult = await pool.query('SELECT password, role_id FROM users WHERE id = $1', [approverId]);
         if (approverResult.rows.length === 0) {
             return res.status(404).json({ error: 'Aprobador no encontrado.' });
         }
@@ -125,11 +125,11 @@ export const approveSignature = async (req: Request, res: Response) => {
         }
 
         // 2. Validar que el aprobador tenga contraseña y sea correcta
-        if (!approver.pasword) {
+        if (!approver.password) {
             return res.status(400).json({ error: 'Su usuario no tiene una contraseña asignada para realizar aprobaciones. Por favor asigne una en Gestión de Usuarios.' });
         }
 
-        const validPassword = await bcrypt.compare(approverPassword, approver.pasword);
+        const validPassword = await bcrypt.compare(approverPassword, approver.password);
         if (!validPassword) {
             return res.status(401).json({ error: 'Contraseña de aprobador incorrecta.' });
         }

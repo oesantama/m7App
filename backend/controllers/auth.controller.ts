@@ -9,7 +9,7 @@ export const login = async (req: Request, res: Response) => {
   
   try {
     const result = await pool.query(
-      'SELECT id, email, password, name, role_id, two_factor_enabled, two_factor_secret FROM users WHERE email = $1',
+      'SELECT id, email, password, name, role_id, client_ids, two_factor_enabled, two_factor_secret FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
@@ -79,6 +79,7 @@ export const login = async (req: Request, res: Response) => {
                     role_id: user.role_id,
                     roleId: user.role_id, // Add camelCase for frontend compatibility
                     role: user.role_id, // Add 'role' just in case
+                    client_ids: user.client_ids,
                     permissions: permissions 
                 } 
             });

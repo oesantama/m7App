@@ -15,6 +15,7 @@ const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user }) => {
     const [previewSignature, setPreviewSignature] = useState<string | null>(null);
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
     const [approverKey, setApproverKey] = useState('');
+    const [showApproverKey, setShowApproverKey] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const loadSignatures = async () => {
@@ -254,19 +255,26 @@ const ApprovalManager: React.FC<ApprovalManagerProps> = ({ user }) => {
                             <div className="bg-slate-50 p-5 rounded-2xl flex items-center gap-3 border-2 border-slate-100 focus-within:border-emerald-500 transition-all">
                                 <Icons.Key className="text-slate-400" />
                                 <input 
-                                    type="password" 
+                                    type={showApproverKey ? "text" : "password"} 
                                     value={approverKey}
                                     onChange={(e) => setApproverKey(e.target.value)}
                                     placeholder="INGRESE SU CONTRASEÑA"
                                     className="bg-transparent flex-1 outline-none font-black text-slate-950 placeholder:text-slate-300"
                                     onKeyDown={(e) => e.key === 'Enter' && handleApprove()}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowApproverKey(!showApproverKey)}
+                                    className="text-slate-400 hover:text-slate-600 transition-colors px-2"
+                                >
+                                    {showApproverKey ? <Icons.EyeOff className="w-5 h-5" /> : <Icons.Eye className="w-5 h-5" />}
+                                </button>
                             </div>
                         </div>
 
                         <div className="flex gap-4 pt-4">
                             <button 
-                                onClick={() => { setIsConfirmModalOpen(false); setApproverKey(''); setSelectedSig(null); }}
+                                onClick={() => { setIsConfirmModalOpen(false); setApproverKey(''); setSelectedSig(null); setShowApproverKey(false); }}
                                 className="flex-1 py-5 bg-slate-100 text-slate-900 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all"
                             >
                                 Cancelar
