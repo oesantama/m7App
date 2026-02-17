@@ -84,7 +84,6 @@ export const restoreSystem = async () => {
         two_factor_secret TEXT
       );
     `);
-
     await client.query(`
       CREATE TABLE IF NOT EXISTS drivers (
         id TEXT PRIMARY KEY,
@@ -204,12 +203,11 @@ export const restoreSystem = async () => {
       );
     `);
 
-    // Tablas Originales (Ya existentes en el código pero movidas para respetar orden)
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_permissions (
          id TEXT PRIMARY KEY,
          user_id TEXT REFERENCES users(id),
-         permissions TEXT,
+         permissions JSONB,
          status_id TEXT DEFAULT 'EST-01'
       );
     `);
