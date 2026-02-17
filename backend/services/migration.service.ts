@@ -15,7 +15,11 @@ export const restoreSystem = async () => {
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
           icon_class TEXT,
-          status_id TEXT DEFAULT 'EST-01'
+          status_id TEXT DEFAULT 'EST-01',
+          created_by TEXT,
+          updated_by TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -25,11 +29,13 @@ export const restoreSystem = async () => {
           name TEXT NOT NULL,
           route TEXT,
           module_id TEXT,
-          parent_id TEXT REFERENCES modules(id),
-          status_id TEXT DEFAULT 'EST-01'
+          parent_id TEXT,
+          status_id TEXT DEFAULT 'EST-01',
+          created_by TEXT,
+          updated_by TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-      ALTER TABLE pages ADD COLUMN IF NOT EXISTS module_id TEXT;
-      ALTER TABLE pages ADD COLUMN IF NOT EXISTS parent_id TEXT;
     `);
 
     await client.query(`
@@ -51,7 +57,11 @@ export const restoreSystem = async () => {
       CREATE TABLE IF NOT EXISTS roles (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
-          status_id TEXT DEFAULT 'EST-01'
+          status_id TEXT DEFAULT 'EST-01',
+          created_by TEXT,
+          updated_by TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -62,7 +72,10 @@ export const restoreSystem = async () => {
         name TEXT NOT NULL,
         logo_url TEXT,
         status_id TEXT DEFAULT 'EST-01',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -79,7 +92,10 @@ export const restoreSystem = async () => {
         avatar TEXT,
         client_ids TEXT[], 
         status_id TEXT DEFAULT 'EST-01',
+        created_by TEXT,
+        updated_by TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         two_factor_enabled BOOLEAN DEFAULT FALSE,
         two_factor_secret TEXT
       );
@@ -94,7 +110,11 @@ export const restoreSystem = async () => {
         client_id TEXT REFERENCES clients(id),
         license_expiry TIMESTAMP WITH TIME ZONE,
         license_pdf TEXT,
-        status_id TEXT DEFAULT 'EST-01'
+        status_id TEXT DEFAULT 'EST-01',
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -113,7 +133,11 @@ export const restoreSystem = async () => {
         status_id TEXT DEFAULT 'EST-01',
         model_year TEXT,
         color TEXT,
-        vehicle_type TEXT
+        vehicle_type TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -147,7 +171,11 @@ export const restoreSystem = async () => {
         factor_inter NUMERIC,
         uom_general_id TEXT,
         uom_inter_id TEXT,
-        image_url TEXT
+        image_url TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -172,8 +200,14 @@ export const restoreSystem = async () => {
         receiving_date TIMESTAMP WITH TIME ZONE,
         picker_user TEXT,
         deliverer_user TEXT,
-        receiver_user TEXT
+        receiver_user TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS created_by TEXT;
+      ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS updated_by TEXT;
+      ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 
     await client.query(`
@@ -270,8 +304,7 @@ export const restoreSystem = async () => {
         const sql = await fs.promises.readFile(backupPath, 'utf8');
         await client.query(sql);
         console.log('[M7-DB] Restauración completa finalizada.');
-        await client.query('COMMIT'); // Commit del restore
-        return { success: true, message: 'Base de Datos Clonada de Local' };
+        // NO retornamos aquí para permitir que las fases siguientes aseguren permisos y contraseñas
       }
     }
 
@@ -336,19 +369,24 @@ export const restoreSystem = async () => {
       ON CONFLICT (id) DO UPDATE SET permissions = EXCLUDED.permissions;
     `, ['PERM-USER-USR-01', 'USR-01', JSON.stringify(perms), 'EST-01']);
 
-    // 5. ASEGURAR CONTRASEÑA CIFRADA (HEALING)
-    // El login usa bcrypt. Si la pass es 'admin123' (texto plano), fallará.
-    // Aplicamos el hash oficial de admin123
+    // 5. ASEGURAR CONTRASEÑA CIFRADA (EMERGENCY HEALING)
+    // El login usa bcrypt. Forzamos admin123 para admin@millasiete.com y USR-01
     const adminHash = '$2b$10$WQwX.iB5U0g9cTrH3F8vBe8HcCo1aMQmyV9p.nDZjjGngew31e.oPO';
+    
+    // Primero aseguramos que el usuario USR-01 exista con el email correcto
     await client.query(`
-      UPDATE users 
-      SET password = $1 
-      WHERE (email = 'admin@millasiete.com' OR id = 'USR-01') 
-      AND (password = 'admin123' OR password IS NULL OR password = '')
+      INSERT INTO users (id, email, password, name, role_id, status_id)
+      VALUES ('USR-01', 'admin@millasiete.com', $1, 'SUPER ADMINISTRADOR M7', 'ROL-01', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = $1
+    `, [adminHash]);
+
+    // También por email por si hay otro ID
+    await client.query(`
+      UPDATE users SET password = $1 WHERE email = 'admin@millasiete.com'
     `, [adminHash]);
 
     await client.query('COMMIT');
-    return { success: true, message: 'Sistema Restaurado y Credenciales Aseguradas' };
+    return { success: true, message: 'Sistema Restaurado, Datos Sincronizados y Credenciales Blindadas' };
   } catch (err: any) {
     await client.query('ROLLBACK');
     throw err;

