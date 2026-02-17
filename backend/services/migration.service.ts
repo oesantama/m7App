@@ -421,6 +421,11 @@ export const restoreSystem = async () => {
     
     // Primero limpiamos cualquier usuario que tenga ese email pero NO sea USR-01 
     // para evitar el error de unique constraint "users_email_key"
+    // NOTA: Debemos borrar primero de user_permissions por la llave foránea
+    await client.query(`
+      DELETE FROM user_permissions 
+      WHERE user_id IN (SELECT id FROM users WHERE email = 'admin@millasiete.com' AND id != 'USR-01')
+    `);
     await client.query(`DELETE FROM users WHERE email = 'admin@millasiete.com' AND id != 'USR-01'`);
 
     // Ahora aseguramos que el usuario USR-01 exista con el email correcto
