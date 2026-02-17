@@ -19,6 +19,20 @@ export const restoreSystem = async () => {
         await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_by TEXT`);
         await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
         await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
+        
+        // Healing Específico para Conductores
+        if (table === 'drivers') {
+          await client.query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_side_a TEXT`);
+          await client.query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_side_b TEXT`);
+          await client.query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_category TEXT`);
+        }
+        // Healing Específico para Vehículos
+        if (table === 'vehicles') {
+          await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS soat_side_a TEXT`);
+          await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS soat_side_b TEXT`);
+          await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS techno_side_a TEXT`);
+          await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS techno_side_b TEXT`);
+        }
       } catch (e) {
         // Ignorar si la tabla no existe (se creará abajo)
       }
