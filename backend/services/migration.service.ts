@@ -5,10 +5,8 @@ export const restoreSystem = async () => {
   console.log('[M7-SYSTEM] Checking Database Consistency... (Emergency Deploy)');
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-
-    // 1. PHASE: UNIVERSAL SCHEMA HEALING
-    // Este mapa define todas las columnas obligatorias por tabla para asegurar integridad antes de restaurar o usar el sistema.
+    // 1. PHASE: UNIVERSAL SCHEMA HEALING (FUERA DE TRANSACCIÓN PARA PERSISTENCIA)
+    // Este mapa define todas las columnas obligatorias por tabla para asegurar integridad.
     const UNIVERSAL_SCHEMA: Record<string, string[]> = {
       'roles': ['name', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
       'modules': ['name', 'icon_class', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
@@ -37,14 +35,9 @@ export const restoreSystem = async () => {
 
     console.log('[M7-DB] Iniciando Curación de Esquema Universal...');
     for (const [table, columns] of Object.entries(UNIVERSAL_SCHEMA)) {
-      // 1.1 Asegurar que la tabla exista (con ID por defecto si no existe)
       await client.query(`CREATE TABLE IF NOT EXISTS ${table} (id TEXT PRIMARY KEY)`);
-      
-      // 1.2 Asegurar cada columna
       for (const col of columns) {
         try {
-          // Determinar tipo de dato básico (usamos TEXT por defecto para máxima compatibilidad, 
-          // excepto campos conocidos de fecha o número)
           let type = 'TEXT';
           if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry')) type = 'TIMESTAMP WITH TIME ZONE';
           if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume') type = 'NUMERIC DEFAULT 0';
@@ -60,6 +53,7 @@ export const restoreSystem = async () => {
     }
     console.log('[M7-DB] Curación de Esquema Universal Finalizada.');
 
+    await client.query('BEGIN');
     await client.query(`CREATE SEQUENCE IF NOT EXISTS route_id_seq START 1;`);
 
     await client.query(`

@@ -9,8 +9,6 @@ services:
       - .:/app
       - ./.wwebjs_auth:/app/.wwebjs_auth
       - /app/node_modules
-    env_file:
-      - .env
     restart: always
     networks:
       - m7-network
@@ -19,7 +17,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      target: build
     ports:
       - "3010:3000"
     volumes:
