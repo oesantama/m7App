@@ -18,11 +18,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "3010:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    command: npm run dev
+      - "80:80"
     depends_on:
       - m7app-backend
     restart: always
