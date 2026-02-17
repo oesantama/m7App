@@ -23,7 +23,13 @@
         "src",
         "**/*.test.ts",
         "backend/tests/**/*",
-        "backend/test_wa.ts",
-        "backend/telemetry_simulator.ts"
+        "backend/debug_*.ts",
+        "backend/test_*.ts",
+        "backend/fix_*.ts",
+        "backend/inspect_*.ts",
+        "backend/read_*.ts",
+        "backend/telemetry_*.ts",
+        "backend/*.js",
+        "backend/*.cjs"
     ]
 }

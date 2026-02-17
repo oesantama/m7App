@@ -800,7 +800,7 @@ export const getInvoices = async (req: Request, res: Response) => {
       WHERE 1=1
     `;
 
-    const queryParams = [];
+    const queryParams: any[] = [];
 
     // LÓGICA DE FILTRADO REFINADA
     if (ids) {

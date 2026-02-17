@@ -1,11 +1,7 @@
-
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-import { evolutionService } from './evolution.service.js';
-
-dotenv.config();
-
 import { Resend } from 'resend';
+import { evolutionService } from './evolution.service.js';
 
 dotenv.config();
 

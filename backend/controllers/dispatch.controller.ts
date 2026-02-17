@@ -36,7 +36,7 @@ export const initDispatch = async (req: Request, res: Response) => {
         // 2. Procesar firmas (Inmediatas y Pendientes)
         for (const sig of (signatures || [])) {
             let isSigned = false;
-            let signedAt = null;
+            let signedAt: Date | null = null;
 
             if (sig.signNow && sig.password) {
                 // Validar firma inmediata
