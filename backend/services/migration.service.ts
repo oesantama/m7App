@@ -25,12 +25,19 @@ export const restoreSystem = async () => {
       'whatsapp_logs': ['user_id', 'phone_number', 'message_body', 'status', 'direction', 'sent_at', 'external_message_id', 'error_message'],
       'whatsapp_quick_replies': ['user_id', 'title', 'content', 'created_at'],
       'whatsapp_auto_responses': ['user_id', 'trigger_keyword', 'response_content', 'is_active', 'use_ai', 'created_at'],
-      'digital_signatures': ['document_number', 'digital_signature', 'encrypted_password', 'policy_accepted', 'approved', 'approved_at', 'approved_by', 'created_at', 'updated_at'],
+      'digital_signatures': ['idusuario', 'pasword', 'firma', 'aceptapolitica', 'usuariocreacion', 'estado', 'aprobada', 'usuarioaprobo', 'fechaparobacion', 'fecha_creacion', 'usaurioactualizacion', 'fecha_actualizacion'],
+      'tipos_documento': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'marcas': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'tipos_vehiculo': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'unidades_medida': ['name', 'description', 'abbreviation', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'estados': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'notificaciones': ['name', 'description', 'notification_email', 'tipo_notificacion_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'tipos_notificacion': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
       'document_consolidated_items': ['document_id', 'article_id', 'expected_qty', 'count_1', 'count_2', 'inventory_user', 'inventory_observation', 'picked_qty', 'dispatched_qty'],
       'inventario_clientes': ['client_id', 'article_id', 'batch', 'quantity', 'last_user', 'last_updated'],
       'picking_assignments': ['invoice_id', 'leader_id', 'helper_ids', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
       'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at'],
-      'dispatch_assignments': ['invoice_id', 'vehicle_id', 'driver_id', 'status', 'created_at', 'updated_at']
+      'routes': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at']
     };
 
     console.log('[M7-DB] Iniciando Curación de Esquema Universal...');
@@ -87,17 +94,30 @@ export const restoreSystem = async () => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS digital_signatures (
           id SERIAL PRIMARY KEY,
-          document_number TEXT UNIQUE NOT NULL,
-          digital_signature TEXT NOT NULL,
-          encrypted_password TEXT NOT NULL,
-          policy_accepted BOOLEAN DEFAULT FALSE,
-          approved BOOLEAN DEFAULT FALSE,
-          approved_at TIMESTAMP WITH TIME ZONE,
-          approved_by TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          idusuario TEXT UNIQUE NOT NULL,
+          pasword TEXT NOT NULL,
+          firma TEXT,
+          aceptapolitica BOOLEAN DEFAULT FALSE,
+          usuariocreacion TEXT,
+          estado TEXT DEFAULT 'EST-01',
+          aprobada BOOLEAN DEFAULT FALSE,
+          usuarioaprobo TEXT,
+          fechaparobacion TIMESTAMP WITH TIME ZONE,
+          fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          usaurioactualizacion TEXT,
+          fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Tablas maestras adicionales
+    await client.query(`CREATE TABLE IF NOT EXISTS tipos_documento (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, status_id TEXT, created_by TEXT, updated_by TEXT, created_at TIMESTAMP WITH TIME ZONE, updated_at TIMESTAMP WITH TIME ZONE);`);
+    await client.query(`CREATE TABLE IF NOT EXISTS marcas (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, status_id TEXT, created_by TEXT, updated_by TEXT, created_at TIMESTAMP WITH TIME ZONE, updated_at TIMESTAMP WITH TIME ZONE);`);
+    await client.query(`CREATE TABLE IF NOT EXISTS tipos_vehiculo (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, status_id TEXT, created_by TEXT, updated_by TEXT, created_at TIMESTAMP WITH TIME ZONE, updated_at TIMESTAMP WITH TIME ZONE);`);
+    await client.query(`CREATE TABLE IF NOT EXISTS unidades_medida (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, abbreviation TEXT, status_id TEXT, created_by TEXT, updated_by TEXT, created_at TIMESTAMP WITH TIME ZONE, updated_at TIMESTAMP WITH TIME ZONE);`);
+    await client.query(`CREATE TABLE IF NOT EXISTS estados (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, status_id TEXT, created_by TEXT, updated_by TEXT, created_at TIMESTAMP WITH TIME ZONE, updated_at TIMESTAMP WITH TIME ZONE);`);
+    await client.query(`CREATE TABLE IF NOT EXISTS tipos_notificacion (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, status_id TEXT, created_by TEXT, updated_by TEXT, created_at TIMESTAMP WITH TIME ZONE, updated_at TIMESTAMP WITH TIME ZONE);`);
+    await client.query(`CREATE TABLE IF NOT EXISTS notificaciones (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, notification_email TEXT, tipo_notificacion_id TEXT, status_id TEXT, created_by TEXT, updated_by TEXT, created_at TIMESTAMP WITH TIME ZONE, updated_at TIMESTAMP WITH TIME ZONE);`);
+
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS roles (
