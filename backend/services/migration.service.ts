@@ -10,10 +10,9 @@ export const restoreSystem = async () => {
     // 1. Asegurar Tablas Base (Idempotencia)
     await client.query(`CREATE SEQUENCE IF NOT EXISTS route_id_seq START 1;`);
     
-    // SCHEMA HEALING PHASE: Forzar columnas de auditoría en tablas existentes
+    // SCHEMA HEALING PHASE: Forzar columnas de auditoría y campos específicos en tablas existentes
     const tablesToHeal = ['roles', 'modules', 'pages', 'clients', 'users', 'drivers', 'vehicles', 'master_records', 'articles', 'documents_l'];
     for (const table of tablesToHeal) {
-      // Intentamos añadir cada columna. Si falla (ej: tabla no existe aún), el catch lo ignora.
       try {
         await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS created_by TEXT`);
         await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_by TEXT`);
@@ -33,10 +32,23 @@ export const restoreSystem = async () => {
           await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS techno_side_a TEXT`);
           await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS techno_side_b TEXT`);
         }
+        // Healing Específico para Documentos L
+        if (table === 'documents_l') {
+          await client.query(`ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS codplan TEXT`);
+          await client.query(`ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS plan_type TEXT`);
+          await client.query(`ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS tracking_token TEXT`);
+        }
       } catch (e) {
-        // Ignorar si la tabla no existe (se creará abajo)
+        // Ignorar errores si las tablas no existen (se crean abajo)
       }
     }
+
+    // Curación extra para document_items (que no está en tablesToHeal pero es crítica)
+    try {
+      await client.query(`ALTER TABLE document_items ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0`);
+      await client.query(`ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC DEFAULT 0`);
+      await client.query(`ALTER TABLE document_items ADD COLUMN IF NOT EXISTS neighborhood TEXT`);
+    } catch (e) {}
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS modules (
