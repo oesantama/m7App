@@ -336,8 +336,19 @@ export const restoreSystem = async () => {
       ON CONFLICT (id) DO UPDATE SET permissions = EXCLUDED.permissions;
     `, ['PERM-USER-USR-01', 'USR-01', JSON.stringify(perms), 'EST-01']);
 
+    // 5. ASEGURAR CONTRASEÑA CIFRADA (HEALING)
+    // El login usa bcrypt. Si la pass es 'admin123' (texto plano), fallará.
+    // Aplicamos el hash oficial de admin123
+    const adminHash = '$2b$10$WQwX.iB5U0g9cTrH3F8vBe8HcCo1aMQmyV9p.nDZjjGngew31e.oPO';
+    await client.query(`
+      UPDATE users 
+      SET password = $1 
+      WHERE (email = 'admin@millasiete.com' OR id = 'USR-01') 
+      AND (password = 'admin123' OR password IS NULL OR password = '')
+    `, [adminHash]);
+
     await client.query('COMMIT');
-    return { success: true, message: 'Sistema Restaurado Exitosamente' };
+    return { success: true, message: 'Sistema Restaurado y Credenciales Aseguradas' };
   } catch (err: any) {
     await client.query('ROLLBACK');
     throw err;

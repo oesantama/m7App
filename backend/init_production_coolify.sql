@@ -254,8 +254,8 @@ INSERT INTO clients (id, name) VALUES ('c1', 'AJOVER S.A.S') ON CONFLICT (id) DO
 
 -- Usuario Admin (admin@millasiete.com / admin123) --
 INSERT INTO users (id, email, password, name, role_id, client_ids, status_id) 
-VALUES ('USR-01', 'admin@millasiete.com', 'admin123', 'SUPER ADMINISTRADOR M7', 'ROL-01', ARRAY['c1'], 'EST-01') 
-ON CONFLICT (id) DO NOTHING;
+VALUES ('USR-01', 'admin@millasiete.com', '$2b$10$WQwX.iB5U0g9cTrH3F8vBe8HcCo1aMQmyV9p.nDZjjGngew31e.oPO', 'SUPER ADMINISTRADOR M7', 'ROL-01', ARRAY['c1'], 'EST-01') 
+ON CONFLICT (id) DO UPDATE SET password = EXCLUDED.password;
 
 -- Maestro de Estados --
 INSERT INTO master_records (id, category, name, status_id) VALUES 
