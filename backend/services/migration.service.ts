@@ -20,7 +20,19 @@ export const restoreSystem = async () => {
       'master_records': ['category', 'name', 'description', 'parent_id', 'notification_email', 'icon_class', 'status_id', 'created_at', 'created_by', 'updated_at', 'tipo_notificacion_id'],
       'articles': ['name', 'client_id', 'uom_std', 'factor_std', 'status_id', 'barcode', 'category_articulo_id', 'factor_inter', 'uom_general_id', 'uom_inter_id', 'image_url', 'created_by', 'updated_by', 'created_at', 'updated_at', 'sku'],
       'documents_l': ['external_doc_id', 'client_id', 'vehicle_plate', 'codplan', 'delivery_date', 'city', 'status', 'inventory_date', 'inventory_user', 'created_at', 'inventory_observation', 'plan_type', 'inventory_notes', 'tracking_token', 'picking_date', 'receiving_date', 'picker_user', 'deliverer_user', 'receiver_user', 'created_by', 'updated_by', 'updated_at'],
-      'document_items': ['document_id', 'article_id', 'expected_qty', 'count_1', 'count_2', 'order_number', 'unit', 'notes', 'item_status', 'un_code', 'client_ref', 'peso', 'invoice', 'volume', 'city', 'address', 'batch', 'observation', 'received_qty', 'unit_volume', 'neighborhood']
+      'document_items': ['document_id', 'article_id', 'expected_qty', 'count_1', 'count_2', 'order_number', 'unit', 'notes', 'item_status', 'un_code', 'client_ref', 'peso', 'invoice', 'volume', 'city', 'address', 'batch', 'observation', 'received_qty', 'unit_volume', 'neighborhood'],
+      'user_permissions': ['user_id', 'permissions', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'role_permissions': ['role_id', 'permissions', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'assignments': ['vehicle_id', 'driver_id', 'client_id', 'is_active', 'created_at', 'updated_at'],
+      'whatsapp_logs': ['user_id', 'phone_number', 'message_body', 'status', 'direction', 'sent_at', 'external_message_id', 'error_message'],
+      'whatsapp_quick_replies': ['user_id', 'title', 'content', 'created_at'],
+      'whatsapp_auto_responses': ['user_id', 'trigger_keyword', 'response_content', 'is_active', 'use_ai', 'created_at'],
+      'digital_signatures': ['document_number', 'digital_signature', 'encrypted_password', 'policy_accepted', 'approved', 'approved_at', 'approved_by', 'created_at', 'updated_at'],
+      'document_consolidated_items': ['document_id', 'article_id', 'expected_qty', 'count_1', 'count_2', 'inventory_user', 'inventory_observation', 'picked_qty', 'dispatched_qty'],
+      'inventario_clientes': ['client_id', 'article_id', 'batch', 'quantity', 'last_user', 'last_updated'],
+      'picking_assignments': ['invoice_id', 'leader_id', 'helper_ids', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
+      'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at'],
+      'dispatch_assignments': ['invoice_id', 'vehicle_id', 'driver_id', 'status', 'created_at', 'updated_at']
     };
 
     console.log('[M7-DB] Iniciando Curación de Esquema Universal...');
