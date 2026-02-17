@@ -419,14 +419,18 @@ export const restoreSystem = async () => {
     // El login usa bcrypt. Forzamos admin123 para admin@millasiete.com y USR-01
     const adminHash = '$2b$10$WQwX.iB5U0g9cTrH3F8vBe8HcCo1aMQmyV9p.nDZjjGngew31e.oPO';
     
-    // Primero aseguramos que el usuario USR-01 exista con el email correcto
+    // Primero limpiamos cualquier usuario que tenga ese email pero NO sea USR-01 
+    // para evitar el error de unique constraint "users_email_key"
+    await client.query(`DELETE FROM users WHERE email = 'admin@millasiete.com' AND id != 'USR-01'`);
+
+    // Ahora aseguramos que el usuario USR-01 exista con el email correcto
     await client.query(`
       INSERT INTO users (id, email, password, name, role_id, status_id)
       VALUES ('USR-01', 'admin@millasiete.com', $1, 'SUPER ADMINISTRADOR M7', 'ROL-01', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = $1
     `, [adminHash]);
 
-    // También por email por si hay otro ID
+    // Aseguramos la contraseña por si acaso ya existía con ese ID
     await client.query(`
       UPDATE users SET password = $1 WHERE email = 'admin@millasiete.com'
     `, [adminHash]);
