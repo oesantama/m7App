@@ -417,7 +417,7 @@ export const restoreSystem = async () => {
 
     // 5. ASEGURAR CONTRASEÑA CIFRADA (EMERGENCY HEALING)
     // El login usa bcrypt. Forzamos admin123 para admin@millasiete.com y USR-01
-    const adminHash = '$2b$10$WQwX.iB5U0g9cTrH3F8vBe8HcCo1aMQmyV9p.nDZjjGngew31e.oPO';
+    const adminHash = '$2b$10$UTsZ4TYRyOkmMXKOgeXiSOoaeBL6igHONn5DftAsBBNBGpwwUsOXna';
     
     // Primero limpiamos cualquier usuario que tenga ese email pero NO sea USR-01 
     // para evitar el error de unique constraint "users_email_key"
