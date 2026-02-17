@@ -7,48 +7,48 @@ export const restoreSystem = async () => {
   try {
     await client.query('BEGIN');
 
-    // 1. Asegurar Tablas Base (Idempotencia)
-    await client.query(`CREATE SEQUENCE IF NOT EXISTS route_id_seq START 1;`);
-    
-    // SCHEMA HEALING PHASE: Forzar columnas de auditoría y campos específicos en tablas existentes
-    const tablesToHeal = ['roles', 'modules', 'pages', 'clients', 'users', 'drivers', 'vehicles', 'master_records', 'articles', 'documents_l'];
-    for (const table of tablesToHeal) {
-      try {
-        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS created_by TEXT`);
-        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_by TEXT`);
-        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
-        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
-        
-        // Healing Específico para Conductores
-        if (table === 'drivers') {
-          await client.query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_side_a TEXT`);
-          await client.query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_side_b TEXT`);
-          await client.query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_category TEXT`);
+    // 1. PHASE: UNIVERSAL SCHEMA HEALING
+    // Este mapa define todas las columnas obligatorias por tabla para asegurar integridad antes de restaurar o usar el sistema.
+    const UNIVERSAL_SCHEMA: Record<string, string[]> = {
+      'roles': ['name', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'modules': ['name', 'icon_class', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'pages': ['name', 'route', 'module_id', 'parent_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'clients': ['name', 'logo_url', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'users': ['email', 'password', 'name', 'role_id', 'document_type', 'document_number', 'phone', 'avatar', 'client_ids', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at', 'two_factor_enabled', 'two_factor_secret'],
+      'drivers': ['name', 'document_type', 'document_number', 'phone', 'client_id', 'license_expiry', 'license_pdf', 'status_id', 'license_side_a', 'license_side_b', 'license_category', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'vehicles': ['plate', 'brand', 'owner', 'capacity_m3', 'client_id', 'soat_expiry', 'techno_expiry', 'soat_pdf', 'techno_pdf', 'status_id', 'model_year', 'color', 'vehicle_type', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+      'master_records': ['category', 'name', 'description', 'parent_id', 'notification_email', 'icon_class', 'status_id', 'created_at', 'created_by', 'updated_at', 'tipo_notificacion_id'],
+      'articles': ['name', 'client_id', 'uom_std', 'factor_std', 'status_id', 'barcode', 'category_articulo_id', 'factor_inter', 'uom_general_id', 'uom_inter_id', 'image_url', 'created_by', 'updated_by', 'created_at', 'updated_at', 'sku'],
+      'documents_l': ['external_doc_id', 'client_id', 'vehicle_plate', 'codplan', 'delivery_date', 'city', 'status', 'inventory_date', 'inventory_user', 'created_at', 'inventory_observation', 'plan_type', 'inventory_notes', 'tracking_token', 'picking_date', 'receiving_date', 'picker_user', 'deliverer_user', 'receiver_user', 'created_by', 'updated_by', 'updated_at'],
+      'document_items': ['document_id', 'article_id', 'expected_qty', 'count_1', 'count_2', 'order_number', 'unit', 'notes', 'item_status', 'un_code', 'client_ref', 'peso', 'invoice', 'volume', 'city', 'address', 'batch', 'observation', 'received_qty', 'unit_volume', 'neighborhood']
+    };
+
+    console.log('[M7-DB] Iniciando Curación de Esquema Universal...');
+    for (const [table, columns] of Object.entries(UNIVERSAL_SCHEMA)) {
+      // 1.1 Asegurar que la tabla exista (con ID por defecto si no existe)
+      await client.query(`CREATE TABLE IF NOT EXISTS ${table} (id TEXT PRIMARY KEY)`);
+      
+      // 1.2 Asegurar cada columna
+      for (const col of columns) {
+        try {
+          // Determinar tipo de dato básico (usamos TEXT por defecto para máxima compatibilidad, 
+          // excepto campos conocidos de fecha o número)
+          let type = 'TEXT';
+          if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry')) type = 'TIMESTAMP WITH TIME ZONE';
+          if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume') type = 'NUMERIC DEFAULT 0';
+          if (col === 'client_ids') type = 'TEXT[]';
+          if (col === 'permissions') type = 'JSONB';
+          if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved')) type = 'BOOLEAN DEFAULT FALSE';
+
+          await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+        } catch (colErr: any) {
+          console.error(`[M7-DB-HEAL] Error en tabla ${table} columna ${col}:`, colErr.message);
         }
-        // Healing Específico para Vehículos
-        if (table === 'vehicles') {
-          await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS soat_side_a TEXT`);
-          await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS soat_side_b TEXT`);
-          await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS techno_side_a TEXT`);
-          await client.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS techno_side_b TEXT`);
-        }
-        // Healing Específico para Documentos L
-        if (table === 'documents_l') {
-          await client.query(`ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS codplan TEXT`);
-          await client.query(`ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS plan_type TEXT`);
-          await client.query(`ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS tracking_token TEXT`);
-        }
-      } catch (e) {
-        // Ignorar errores si las tablas no existen (se crean abajo)
       }
     }
+    console.log('[M7-DB] Curación de Esquema Universal Finalizada.');
 
-    // Curación extra para document_items (que no está en tablesToHeal pero es crítica)
-    try {
-      await client.query(`ALTER TABLE document_items ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0`);
-      await client.query(`ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC DEFAULT 0`);
-      await client.query(`ALTER TABLE document_items ADD COLUMN IF NOT EXISTS neighborhood TEXT`);
-    } catch (e) {}
+    await client.query(`CREATE SEQUENCE IF NOT EXISTS route_id_seq START 1;`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS modules (
