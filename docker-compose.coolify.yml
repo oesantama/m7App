@@ -23,8 +23,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    ports:
-      - "80:80"
     restart: always
     depends_on:
       - m7app-backend
