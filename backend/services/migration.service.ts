@@ -10,6 +10,20 @@ export const restoreSystem = async () => {
     // 1. Asegurar Tablas Base (Idempotencia)
     await client.query(`CREATE SEQUENCE IF NOT EXISTS route_id_seq START 1;`);
     
+    // SCHEMA HEALING PHASE: Forzar columnas de auditoría en tablas existentes
+    const tablesToHeal = ['roles', 'modules', 'pages', 'clients', 'users', 'drivers', 'vehicles', 'master_records', 'articles', 'documents_l'];
+    for (const table of tablesToHeal) {
+      // Intentamos añadir cada columna. Si falla (ej: tabla no existe aún), el catch lo ignora.
+      try {
+        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS created_by TEXT`);
+        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_by TEXT`);
+        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
+        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
+      } catch (e) {
+        // Ignorar si la tabla no existe (se creará abajo)
+      }
+    }
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS modules (
           id TEXT PRIMARY KEY,
