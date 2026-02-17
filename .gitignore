@@ -27,6 +27,8 @@ dist-ssr
 # Base de Datos (Ocultar scripts de desarrollo, mantener el MASTER)
 *.sql
 !M7_PRODUCTION_SETUP.sql
+!backend/init_production_coolify.sql
+!backend/full_restore.sql
 
 # Editor directories and files
 .vscode/*
