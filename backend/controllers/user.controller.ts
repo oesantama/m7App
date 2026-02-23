@@ -5,7 +5,7 @@ import pool from '../config/database.js';
 export const getUsers = async (req: Request, res: Response) => {
   try {
     // Reparación de esquema bajo demanda M7
-    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS client_ids JSONB DEFAULT \'[]\';');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS client_ids TEXT[] DEFAULT \'{}\';');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS document_type TEXT;');
@@ -59,8 +59,8 @@ export const saveUser = async (req: Request, res: Response) => {
         }
 
         const clientIds = (Array.isArray(u.clientIds) && u.clientIds.length > 0) 
-                           ? JSON.stringify(u.clientIds) 
-                           : (u.clientId ? JSON.stringify([u.clientId]) : '[]');
+                           ? u.clientIds 
+                           : (u.clientId ? [u.clientId] : []);
 
         await pool.query(`
           UPDATE users 

@@ -146,6 +146,7 @@ export interface DocumentL extends AuditBase {
   codplan?: string;
   deliveryDate?: string;
   inventoryUser?: string;
+  paymentsCount?: number;
 }
 
 export interface DocumentLItem {
@@ -174,6 +175,9 @@ export interface DocumentLItem {
   unCode?: string;
   clientRef?: string;
   peso?: number;
+  paymentMethod?: string;
+  paymentValue?: string;
+  paymentRef?: string;
 }
 
 export interface Invoice extends AuditBase {

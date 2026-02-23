@@ -22,16 +22,19 @@ export const initDispatch = async (req: Request, res: Response) => {
         await pool.query('BEGIN');
 
         // 1. Crear registro de despacho
-        await pool.query(`
+        const insertRes = await pool.query(`
             INSERT INTO dispatch_assignments (
-                id, invoice_id, driver_id, helper_ids, scanned_items, 
+                invoice_id, driver_id, helper_ids, scanned_items, 
                 is_accompanied, helper_count, status, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
         `, [
-            dispatchId, invoiceId, driverId, JSON.stringify(helperIds || []), 
+            invoiceId, driverId, JSON.stringify(helperIds || []), 
             JSON.stringify(scannedItems || []), isAccompanied, helperCount, 
             'PENDING_SIGNATURES', createdBy
         ]);
+
+        const dispatchId = insertRes.rows[0].id;
 
         // 2. Procesar firmas (Inmediatas y Pendientes)
         for (const sig of (signatures || [])) {

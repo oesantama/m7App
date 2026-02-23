@@ -37,8 +37,10 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación de Esquema...');
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices'];
   for (const [table, columns] of Object.entries(UNIVERSAL_SCHEMA)) {
-    await client.query(`CREATE TABLE IF NOT EXISTS ${table} (id TEXT PRIMARY KEY)`);
+    const idType = serialTables.includes(table) ? 'SERIAL' : 'TEXT';
+    await client.query(`CREATE TABLE IF NOT EXISTS ${table} (id ${idType} PRIMARY KEY)`);
     for (const col of columns) {
       try {
         let type = 'TEXT';

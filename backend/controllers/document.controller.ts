@@ -142,6 +142,22 @@ export const getDocuments = async (req: Request, res: Response) => {
       END $$;
     `);
 
+    // NUEVA TABLA: document_l_payments (Auto-healing)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS document_l_payments (
+        id SERIAL PRIMARY KEY,
+        document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE,
+        invoice TEXT,
+        client_ref TEXT,
+        un_code TEXT,
+        metodo_pago TEXT,
+        vmetodo TEXT,
+        processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        user_id TEXT,
+        UNIQUE(invoice)
+      );
+    `);
+
     const { clientId } = req.query;
     let query = `
       SELECT d.*, 
@@ -151,7 +167,16 @@ export const getDocuments = async (req: Request, res: Response) => {
       vehicle_plate as "vehicleData",
       inventory_user as "inventoryUser",
       inventory_date as "inventoryDate",
-      (SELECT json_agg(i.*) FROM document_items i WHERE i.document_id = d.id) as items,
+      (SELECT COUNT(*) FROM document_l_payments p WHERE p.document_id = d.id) as "paymentsCount",
+      (SELECT json_agg(item_with_payment) FROM (
+        SELECT i.*, 
+               p.metodo_pago as "paymentMethod", 
+               p.vmetodo as "paymentValue", 
+               p.client_ref as "paymentRef"
+        FROM document_items i
+        LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND TRIM(UPPER(i.invoice)) = TRIM(UPPER(p.invoice))
+        WHERE i.document_id = d.id
+      ) item_with_payment) as items,
       (SELECT json_agg(c.*) FROM document_consolidated_items c WHERE c.document_id = d.id) as "consolidatedItems"
       FROM documents_l d
       WHERE d.status != 'ELIMINADO'
@@ -868,6 +893,77 @@ export const getInvoices = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[M7-INVOICES] Error:', err.message);
     res.status(500).json({ error: "Error al obtener facturas" });
+  }
+};
+
+export const processDocumentLPayment = async (req: Request, res: Response) => {
+  const { documentId, payments, userId } = req.body;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const results = {
+      processed: 0,
+      errors: [] as any[]
+    };
+
+    for (const pay of payments) {
+      try {
+        // Validar si la factura existe en document_items para este documento
+        // Nota: El usuario confirmó columnas (B: Factura, L: CLIENT_REF, A: UN_CODE)
+        const checkItem = await client.query(`
+          SELECT 1 FROM document_items 
+          WHERE document_id = $1 AND invoice = $2
+          LIMIT 1
+        `, [documentId, pay.invoice]);
+
+        if (checkItem.rowCount === 0) {
+          results.errors.push({
+            invoice: pay.invoice,
+            reason: 'Factura no encontrada en este Documento L',
+            data: pay
+          });
+          continue;
+        }
+
+        // Insertar en la nueva tabla de pagos
+        await client.query(`
+          INSERT INTO document_l_payments (document_id, invoice, client_ref, un_code, metodo_pago, vmetodo, user_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (invoice) DO UPDATE SET
+          metodo_pago = EXCLUDED.metodo_pago,
+          vmetodo = EXCLUDED.vmetodo,
+          processed_at = CURRENT_TIMESTAMP,
+          user_id = EXCLUDED.user_id
+        `, [
+          documentId,
+          pay.invoice,
+          pay.clientRef,
+          pay.unCode,
+          pay.metodoPago,
+          pay.vmetodo,
+          userId
+        ]);
+
+        results.processed++;
+      } catch (rowErr: any) {
+        results.errors.push({
+          invoice: pay.invoice,
+          reason: rowErr.message,
+          data: pay
+        });
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, ...results });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-PAY-PROCESS-ERR]', err.message);
+    res.status(500).json({ error: "Error procesando pagos", details: err.message });
+  } finally {
+    client.release();
   }
 };
 

@@ -78,30 +78,19 @@ export const saveRoute = async (req: Request, res: Response) => {
       }
     }
 
-    // GENERATE AUTO-INCREMENT ID IF NEW
-    let finalRouteId = id;
-    // Si no hay ID, o es un ID temporal generado por el frontend (ej: rt-177..., route-...), generamos uno nuevo oficial
-    if (!id || String(id).startsWith('rt-') || String(id).startsWith('route-')) {
-       const seqRes = await client.query("SELECT CONCAT('RT-', LPAD(nextval('route_id_seq')::text, 5, '0')) as new_id");
-       finalRouteId = seqRes.rows[0].new_id;
-    }
-
     // 1. Insertar Cabecera de Ruta
-    await client.query(`
-      INSERT INTO routes (id, vehicle_id, driver_id, client_id, created_by, status)
-      VALUES ($1, $2, $3, $4, $5, 'EST-10')
-      ON CONFLICT (id) DO UPDATE SET
-      vehicle_id = $2, driver_id = $3, updated_by = $5, updated_at = NOW(), status = 'EST-10'
-    `, [finalRouteId, vehicleId, finalDriverId, clientId, createdBy]);
+    const routeRes = await client.query(`
+      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status)
+      VALUES ($1, $2, $3, $4, 'EST-10')
+      RETURNING id
+    `, [vehicleId, finalDriverId, clientId, createdBy]);
 
-    // 2. Limpiar facturas previas si es una actualización
-    await client.query('DELETE FROM route_invoices WHERE route_id = $1', [finalRouteId]);
+    const finalRouteId = routeRes.rows[0].id;
 
-    // 3. Vincular Facturas y actualizar estado de las mismas (Deduplicating inputs)
+    // 2. Vincular Facturas y actualizar estado de las mismas (Deduplicating inputs)
     const uniqueInvoiceIds = [...new Set(invoiceIds as string[])];
 
     for (const invId of uniqueInvoiceIds) {
-      // route_invoices usa text, asi que invId (string) esta bien
       await client.query('INSERT INTO route_invoices (route_id, invoice_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [finalRouteId, invId]);
     }
 

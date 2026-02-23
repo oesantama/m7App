@@ -4,6 +4,7 @@ import { Icons } from '../constants';
 import { DocumentL, User, DocStatus, MasterRecord, Invoice } from '../types';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
 
 interface ConsultasDocumentosLProps {
@@ -11,9 +12,10 @@ interface ConsultasDocumentosLProps {
   invoices: Invoice[];
   user: User;
   masterEstados: MasterRecord[];
+  onRefresh?: () => void;
 }
 
-const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, invoices, user, masterEstados }) => {
+const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, invoices, user, masterEstados, onRefresh }) => {
   const [filters, setFilters] = useState({
     plate: '',
     docL: '',
@@ -29,6 +31,10 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
+  // States for Document L Payment Upload
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentTarget, setPaymentTarget] = useState<DocumentL | null>(null);
+
   // ESTADOS para el modal de detalle
   const [detailSearch, setDetailSearch] = useState('');
   const [detailPage, setDetailPage] = useState(1);
@@ -39,6 +45,35 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [manualEmail, setManualEmail] = useState('');
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [resendTarget, setResendTarget] = useState<DocumentL | null>(null);
+  const [docToDelete, setDocToDelete] = useState<string | null>(null);
+
+  const isAuthorizedToDelete = useMemo(() => {
+    if (user.roleId === 'ROL-01' || user.id === 'USR-01') return true;
+    return user.permissions?.some(p => 
+      (p.module === 'inventory' || p.module === 'routing' || p.module === 'PAG-11' || (p.module as any) === 'masterPaginas') && 
+      p.actions.includes('delete')
+    );
+  }, [user]);
+
+  const handleDeleteDocument = (docId: string) => {
+    setDocToDelete(docId);
+  };
+
+  const confirmDelete = async () => {
+    if (!docToDelete) return;
+    try {
+        const res = await api.deleteDocument(docToDelete, user.name);
+        if (res.success) {
+            toast.success("Documento eliminado");
+            if (onRefresh) onRefresh();
+            setDocToDelete(null);
+        } else {
+            toast.error("Error: " + res.error);
+        }
+    } catch (err) {
+        toast.error("Error de conexión");
+    }
+  };
 
   const handleResendClick = (doc: DocumentL) => {
     setResendTarget(doc);
@@ -311,13 +346,20 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                   <td className="p-8 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => setSelectedDoc(doc)} className="p-4 bg-slate-100 text-slate-400 rounded-2xl hover:bg-slate-900 hover:text-white transition-all"><Icons.Eye /></button>
-                      {doc.status === DocStatus.INVENTORED && (
-                        <button
-                          onClick={() => handleResendClick(doc)}
-                          className="p-4 bg-slate-100 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all"
-                          title="Reenviar Correo"
+                      <button 
+                        onClick={() => { setPaymentTarget(doc); setShowPaymentModal(true); }} 
+                        className="p-4 bg-emerald-100 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all"
+                        title="Cargar Pagos L"
+                      >
+                        <Icons.Excel className="w-4 h-4" />
+                      </button>
+                      {isAuthorizedToDelete && (
+                        <button 
+                          onClick={() => handleDeleteDocument(doc.id)} 
+                          className="p-4 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all"
+                          title="Eliminar Documento"
                         >
-                          <Icons.Send className="w-4 h-4" />
+                          <Icons.Trash className="w-4 h-4" />
                         </button>
                       )}
                     </div>
@@ -340,7 +382,15 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                   <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">Trazabilidad Total de Inventario</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedDoc(null)} className="text-3xl font-thin hover:text-red-500 transition-all leading-none">&times;</button>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => { setPaymentTarget(selectedDoc); setShowPaymentModal(true); }}
+                  className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2 font-black text-[9px] uppercase"
+                >
+                  <Icons.Excel className="w-4 h-4" /> Cargar Pagos L
+                </button>
+                <button onClick={() => setSelectedDoc(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-3xl font-thin">×</button>
+              </div>
             </div>
 
             <div className="p-10 md:p-14 overflow-y-auto space-y-10 custom-scrollbar bg-slate-50/20 flex-1">
@@ -568,6 +618,38 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
             </div>
           </div>
         </div>
+      )}
+
+      {showPaymentModal && paymentTarget && (
+        <ProcessPaymentLModal 
+          document={paymentTarget}
+          userId={user.id}
+          onClose={() => { setShowPaymentModal(false); setPaymentTarget(null); }}
+          onSuccess={() => { if (onRefresh) onRefresh(); }}
+        />
+      )}
+
+      {/* Modal de Confirmación de Eliminación */}
+      {docToDelete && (
+         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setDocToDelete(null)} />
+            <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 border border-white/20">
+               <div className="h-3 bg-rose-600" />
+               <div className="p-10 flex flex-col items-center text-center">
+                  <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-3xl flex items-center justify-center mb-6">
+                     <Icons.Trash className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">Eliminar Documento</h3>
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest leading-relaxed px-4">
+                     ¿Está seguro de eliminar este registro? Esta acción quedará grabada en la auditoría del sistema.
+                  </p>
+                  <div className="grid grid-cols-2 gap-4 w-full mt-8">
+                     <button onClick={() => setDocToDelete(null)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[9px] uppercase hover:bg-slate-200 transition-all">Cancelar</button>
+                     <button onClick={confirmDelete} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[9px] uppercase shadow-lg hover:bg-rose-700 transition-all">Confirmar</button>
+                  </div>
+               </div>
+            </div>
+         </div>
       )}
 
     </div>

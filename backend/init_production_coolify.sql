@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS document_items (
 );
 
 CREATE TABLE IF NOT EXISTS assignments (
-    id TEXT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     vehicle_id TEXT REFERENCES vehicles(id),
     driver_id TEXT REFERENCES drivers(id),
     client_id TEXT REFERENCES clients(id),
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS assignments (
 -- 2. TABLAS DE PICKING Y AUDITORÍA --
 
 CREATE TABLE IF NOT EXISTS picking_assignments (
-    id TEXT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     invoice_id TEXT NOT NULL,
     leader_id TEXT NOT NULL,
     helper_ids JSONB DEFAULT '[]',
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS picking_assignments (
 
 CREATE TABLE IF NOT EXISTS picking_signatures (
     id SERIAL PRIMARY KEY,
-    picking_id TEXT REFERENCES picking_assignments(id) ON DELETE CASCADE,
+    picking_id INTEGER REFERENCES picking_assignments(id) ON DELETE CASCADE,
     user_id TEXT NOT NULL,
     signed BOOLEAN DEFAULT false,
     signed_at TIMESTAMP WITH TIME ZONE,

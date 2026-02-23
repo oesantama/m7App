@@ -46,11 +46,9 @@ export const saveAssignment = async (req: Request, res: Response) => {
     }
 
     await client.query(`
-      INSERT INTO assignments (id, vehicle_id, driver_id, client_id, is_active)
-      VALUES ($1, $2, $3, $4, true)
-      ON CONFLICT (id) DO UPDATE SET
-      vehicle_id = $2, driver_id = $3, client_id = $4, is_active = true, updated_at = NOW()
-    `, [id || `as-${Date.now()}`, vehicleId, driverId, clientId]);
+      INSERT INTO assignments (vehicle_id, driver_id, client_id, is_active)
+      VALUES ($1, $2, $3, true)
+    `, [vehicleId, driverId, clientId]);
 
     await client.query('COMMIT');
     res.json({ success: true, message: 'Asignación guardada con éxito' });

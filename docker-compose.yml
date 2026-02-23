@@ -5,8 +5,12 @@ services:
       dockerfile: Dockerfile.backend
     ports:
       - "8090:8080"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env
     volumes:
-      - .:/app
+      - .env:/app/.env
       - ./.wwebjs_auth:/app/.wwebjs_auth
       - /app/node_modules
     restart: always

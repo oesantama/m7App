@@ -11,13 +11,16 @@ export const initPicking = async (req: Request, res: Response) => {
         await pool.query('BEGIN');
 
         // 1. Crear registro de alistado (inicialmente solo con el líder)
-        await pool.query(`
+        const insertRes = await pool.query(`
             INSERT INTO picking_assignments (
-                id, invoice_id, leader_id, status, created_by, started_at
-            ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+                invoice_id, leader_id, status, created_by, started_at
+            ) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+            RETURNING id
         `, [
-            pickingId, invoiceId, leaderId, 'IN_PROGRESS', createdBy
+            invoiceId, leaderId, 'IN_PROGRESS', createdBy
         ]);
+
+        const pickingId = insertRes.rows[0].id;
 
         await pool.query('COMMIT');
         res.json({ success: true, pickingId });

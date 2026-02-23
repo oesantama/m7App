@@ -437,4 +437,10 @@ export const api = {
     if (!res.ok) return null;
     return res.json();
   },
+
+  processDocumentLPayment: (data: { documentId: string, payments: any[], userId: string }) => fetch(`${API_URL}/documents/process-l-payment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(r => r.json()),
 };
