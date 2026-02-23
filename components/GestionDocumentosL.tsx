@@ -644,7 +644,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
          </div>
          <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner h-10 relative">
             <button onClick={()=>setActiveTab('cargue')} className={`px-5 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all relative z-10 ${activeTab === 'cargue' ? 'text-slate-900' : 'text-slate-400'}`}>Cargue Masivo</button>
-            <button onClick={()=>setActiveTab('consultas')} className={`px-5 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all relative z-10 ${activeTab === 'consultas' ? 'text-slate-900' : 'text-slate-400'}`}>Consulta HistÃ³rica</button>
+            <button onClick={()=>setActiveTab('consultas')} className={`px-5 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all relative z-10 ${activeTab === 'consultas' ? 'text-slate-900' : 'text-slate-400'}`}>Consulta Histórica</button>
             <div className={`absolute top-1 bottom-1 bg-white rounded-lg shadow-md transition-all duration-300 ${activeTab === 'cargue' ? 'left-1 w-[110px]' : 'left-[114px] w-[110px]'}`}></div>
          </div>
       </div>
@@ -964,19 +964,19 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                     <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-950 shadow-xl"><Icons.Audit /></div>
                     <div>
                       <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Expediente M7: {selectedPendingDoc.externalDocId}</h3>
-                      <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">AUDITORÃA INTEGRAL DE CARGA</p>
+                      <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">AUDITORÍA INTEGRAL DE CARGA</p>
                     </div>
                  </div>
                  <div className="flex items-center gap-4">
                     <button onClick={() => exportToExcel(selectedPendingDoc.items, `M7_Detalles_${selectedPendingDoc.externalDocId}`)} className="px-5 py-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel className="w-4 h-4" /> Exportar</button>
-                    <button onClick={()=>setSelectedPendingDoc(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-3xl font-thin">Ã—</button>
+                     <button onClick={()=>setSelectedPendingDoc(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-3xl font-thin">×</button>
                  </div>
               </div>
               
               <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar flex-1 bg-slate-50/20">
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">UN Orig</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.codplan || 'S/I'}</p></div>
-                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. EnvÃ­o</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.deliveryDate || 'S/I'}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.deliveryDate || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm">
                       <p className="text-[8px] font-black text-slate-400 uppercase mb-1">PLACA</p>
                       <p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.vehicleData || 'S/I'}</p>
@@ -992,7 +992,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                         </p>
                     </div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm">
-                        <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Nota AuditorÃ­a</p>
+                        <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Nota Auditoría</p>
                         <p className="font-black text-slate-600 text-[10px] uppercase italic truncate" title={selectedPendingDoc.inventoryNotes}>{selectedPendingDoc.inventoryNotes || 'SIN NOVEDAD'}</p>
                     </div>
                  </div>
@@ -1000,8 +1000,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                  <div className="space-y-6">
                      <div className="flex flex-col md:flex-row justify-between items-center gap-4 px-2">
                         <div className="flex gap-2">
-                           <button onClick={() => {setActiveModalTab('reception'); setModalPage(1);}} className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${activeModalTab === 'reception' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>RecepciÃ³n</button>
-                           <button onClick={() => {setActiveModalTab('audit'); setModalPage(1);}} className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${activeModalTab === 'audit' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>AuditorÃ­a</button>
+                           <button onClick={() => {setActiveModalTab('reception'); setModalPage(1);}} className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${activeModalTab === 'reception' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>Recepción</button>
+                           <button onClick={() => {setActiveModalTab('audit'); setModalPage(1);}} className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${activeModalTab === 'audit' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>Auditoría</button>
                             <button onClick={() => {setActiveModalTab('payments'); setModalPage(1);}} className={`px-4 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${activeModalTab === 'payments' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>Pagos</button>
                         </div>
                         <div className="flex-1 w-full md:max-w-xl">
@@ -1015,11 +1015,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                         </div>
                      </div>
                   
-                     {/* VISUALIZACIÃ“N DE TABS */}
+                     {/* VISUALIZACIÓN DE TABS */}
                      {activeModalTab === 'reception' ? (
-                       // TABLA RECEPCIÃ“N
+                       // TABLA RECEPCIÓN
                        <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-left-4 duration-300">
-                          <h5 className="px-6 py-4 bg-slate-50 text-[9px] font-black uppercase text-slate-400 tracking-widest border-b">Vista de RecepciÃ³n (Conductor)</h5>
+                          <h5 className="px-6 py-4 bg-slate-50 text-[9px] font-black uppercase text-slate-400 tracking-widest border-b">Vista de Recepción (Conductor)</h5>
                           <div className="overflow-x-auto">
                              <table className="w-full text-left border-collapse">
                                <thead>
@@ -1032,10 +1032,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                    <th className="py-6 px-4 font-black min-w-[80px]">UM</th>
                                    <th className="py-6 px-4 font-black text-right min-w-[100px]">VOL</th>
                                    <th className="py-6 px-4 font-black text-center min-w-[100px] text-orange-600">PESO</th>
-                                   <th className="py-6 px-4 font-black text-right min-w-[120px]">NÂº PEDIDO</th>
+                                   <th className="py-6 px-4 font-black text-right min-w-[120px]">Nº PEDIDO</th>
                                    <th className="py-6 px-4 font-black text-right min-w-[120px]">FACTURA</th>
                                    <th className="py-6 px-4 font-black text-right min-w-[150px]">CIUDAD</th>
-                                   <th className="py-6 px-4 font-black text-right min-w-[200px]">DIRECCIÃ“N</th>
+                                   <th className="py-6 px-4 font-black text-right min-w-[200px]">DIRECCIÓN</th>
                                    <th className="py-6 px-4 font-black text-right min-w-[200px]">OBS. CONDUCTOR</th>
                                  </tr>
                                </thead>
@@ -1057,28 +1057,28 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                     <td className="py-5 px-4 text-right text-slate-400 italic truncate">{it.driverNote || 'SIN OBS.'}</td>
                                   </tr>
                                 ))}
-                                {paginatedModalItems.length === 0 && (
-                                  <tr>
-                                    <td colSpan={13} className="py-10 text-center text-slate-500 text-[10px] italic">
-                                      No hay datos de recepciÃ³n disponibles para este documento o no coinciden con la bÃºsqueda.
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
-                         </div>
-                         {totalModalPages > 1 && (
-                           <div className="flex justify-center items-center gap-4 mt-4 p-4 border-t bg-slate-50">
-                              <button disabled={modalPage === 1} onClick={()=>setModalPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
-                              <span className="text-[10px] font-black uppercase">PÃ¡g {modalPage} de {totalModalPages}</span>
-                              <button disabled={modalPage >= totalModalPages} onClick={()=>setModalPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
-                           </div>
-                         )}
-                      </div>
+                                 {paginatedModalItems.length === 0 && (
+                                   <tr>
+                                     <td colSpan={13} className="py-10 text-center text-slate-500 text-[10px] italic">
+                                       No hay datos de recepción disponibles para este documento o no coinciden con la búsqueda.
+                                     </td>
+                                   </tr>
+                                 )}
+                               </tbody>
+                             </table>
+                          </div>
+                          {totalModalPages > 1 && (
+                            <div className="flex justify-center items-center gap-4 mt-4 p-4 border-t bg-slate-50">
+                               <button disabled={modalPage === 1} onClick={()=>setModalPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
+                               <span className="text-[10px] font-black uppercase">Pág {modalPage} de {totalModalPages}</span>
+                               <button disabled={modalPage >= totalModalPages} onClick={()=>setModalPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
+                            </div>
+                          )}
+                       </div>
                      ) : activeModalTab === 'audit' ? (
-                      // TABLA AUDITORÃA
+                      // TABLA AUDITORÍA
                       <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-right-4 duration-300">
-                         <h5 className="px-6 py-4 bg-emerald-50 text-[9px] font-black uppercase text-emerald-600 tracking-widest border-b border-emerald-100">Vista de AuditorÃ­a (Consolidado)</h5>
+                         <h5 className="px-6 py-4 bg-emerald-50 text-[9px] font-black uppercase text-emerald-600 tracking-widest border-b border-emerald-100">Vista de Auditoría (Consolidado)</h5>
                          <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                               <thead>
@@ -1107,7 +1107,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                 {paginatedModalItems.length === 0 && (
                                   <tr>
                                     <td colSpan={7} className="py-10 text-center text-slate-500 text-[10px] italic">
-                                      No hay datos de consolidado disponibles para este documento o no coinciden con la bÃºsqueda.
+                                      No hay datos de consolidado disponibles para este documento o no coinciden con la búsqueda.
                                     </td>
                                   </tr>
                                 )}
@@ -1131,9 +1131,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                <thead>
                                  <tr className="text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-100">
                                    <th className="py-6 px-4 font-black min-w-[200px]">FACTURA / REF</th>
-                                   <th className="py-6 px-4 font-black min-w-[150px]">SKU</th>
-                                   <th className="py-6 px-4 font-black text-center min-w-[120px] text-indigo-600">VALOR MÃ‰TODO</th>
-                                   <th className="py-6 px-4 font-black min-w-[150px]">MÃ‰TODO PAGO</th>
+                                   <th className="py-6 px-4 font-black text-center min-w-[120px] text-indigo-600">VALOR MÉTODO</th>
+                                   <th className="py-6 px-4 font-black min-w-[150px]">MÉTODO PAGO</th>
                                    <th className="py-6 px-4 font-black text-center min-w-[120px]">UN CODE</th>
                                  </tr>
                                </thead>
@@ -1144,7 +1143,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                        {it.invoice}
                                        <div className="text-[8px] text-slate-400 font-bold uppercase">{it.paymentRef || 'S/R'}</div>
                                      </td>
-                                     <td className="py-5 px-4 uppercase font-bold text-slate-500">{it.articleId}</td>
                                      <td className="py-5 px-4 text-center font-black text-indigo-600 bg-indigo-50/20">{it.paymentValue || '0'}</td>
                                      <td className="py-5 px-4 text-slate-900 font-bold uppercase">{it.paymentMethod || 'S/M'}</td>
                                      <td className="py-5 px-4 text-center text-slate-400 font-mono">{it.unCode || '-'}</td>

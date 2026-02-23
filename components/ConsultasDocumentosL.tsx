@@ -39,7 +39,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [detailSearch, setDetailSearch] = useState('');
   const [detailPage, setDetailPage] = useState(1);
   const [detailPageSize, setDetailPageSize] = useState<number | 'all'>(10);
-  const [activeDetailTab, setActiveDetailTab] = useState<'reception' | 'audit'>('reception');
+  const [activeDetailTab, setActiveDetailTab] = useState<'reception' | 'audit' | 'payments'>('reception');
 
   // Estados para Reenvío de Correo
   const [manualEmail, setManualEmail] = useState('');
@@ -126,6 +126,20 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
           return 0;
         });
+      }
+      return items;
+    }
+
+    // Si estamos en la pestaña de Pagos (Recaudos)
+    else if (activeDetailTab === 'payments') {
+      const items = (selectedDoc.items?.filter((it: any) => it.paymentValue) || []);
+      if (detailSearch) {
+        const lower = detailSearch.toLowerCase();
+        return items.filter((it: any) => 
+          String(it.articleId || '').toLowerCase().includes(lower) ||
+          String(it.orderNumber || '').toLowerCase().includes(lower) ||
+          String(it.invoice || '').toLowerCase().includes(lower)
+        );
       }
       return items;
     }
@@ -347,9 +361,17 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => setSelectedDoc(doc)} className="p-4 bg-slate-100 text-slate-400 rounded-2xl hover:bg-slate-900 hover:text-white transition-all"><Icons.Eye /></button>
                       <button 
-                        onClick={() => { setPaymentTarget(doc); setShowPaymentModal(true); }} 
-                        className="p-4 bg-emerald-100 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all"
-                        title="Cargar Pagos L"
+                        onClick={() => { 
+                          if ((doc as any).paymentsCount > 0) {
+                            setSelectedDoc(doc);
+                            setActiveDetailTab('payments');
+                          } else {
+                            setPaymentTarget(doc); 
+                            setShowPaymentModal(true); 
+                          }
+                        }} 
+                        className={`p-4 rounded-2xl transition-all ${(doc as any).paymentsCount > 0 ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
+                        title={(doc as any).paymentsCount > 0 ? `Pagos: ${(doc as any).paymentsCount} Cargados` : 'Cargar Pagos L'}
                       >
                         <Icons.Excel className="w-4 h-4" />
                       </button>
@@ -384,7 +406,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
               </div>
               <div className="flex items-center gap-4">
                 <button 
-                  onClick={() => { setPaymentTarget(selectedDoc); setShowPaymentModal(true); }}
+                  onClick={() => { setActiveDetailTab('payments'); setPaymentTarget(selectedDoc); setShowPaymentModal(true); }}
                   className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2 font-black text-[9px] uppercase"
                 >
                   <Icons.Excel className="w-4 h-4" /> Cargar Pagos L
@@ -476,6 +498,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     <div className="flex bg-slate-100 p-1 rounded-lg shadow-inner">
                       <button onClick={() => { setActiveDetailTab('reception'); setDetailPage(1); }} className={`px-5 py-2 rounded-md text-[9px] font-black uppercase transition-all ${activeDetailTab === 'reception' ? 'bg-white shadow-md text-slate-900' : 'text-slate-400'}`}>Recepción</button>
                       <button onClick={() => { setActiveDetailTab('audit'); setDetailPage(1); }} className={`px-5 py-2 rounded-md text-[9px] font-black uppercase transition-all ${activeDetailTab === 'audit' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-400'}`}>Auditoría</button>
+                      <button onClick={() => { setActiveDetailTab('payments'); setDetailPage(1); }} className={`px-5 py-2 rounded-md text-[9px] font-black uppercase transition-all ${activeDetailTab === 'payments' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Pagos</button>
                     </div>
                     <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg">
                       Reg: {sortedDetailItems.length}
@@ -537,7 +560,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                         ))}
                       </tbody>
                     </table>
-                  ) : (
+                  ) : activeDetailTab === 'audit' ? (
                     // TABLA DE AUDITORÍA (Consolidado)
                     <table className="w-full text-left text-[10px] animate-in fade-in slide-in-from-right-4 duration-300">
                       <thead className="bg-emerald-900 text-white uppercase tracking-widest font-black sticky top-0 z-10">
@@ -557,7 +580,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                             <td className="p-4 font-black uppercase text-slate-800 tracking-tight">{it.article_id || it.articleId || it.sku}</td>
                             <td className="p-4 text-center text-slate-900">{it.expected_qty || it.expectedQty || 0}</td>
                             <td className="p-4 text-center text-emerald-600 font-black bg-emerald-50/30">{it.count_1 || it.count1 || 0}</td>
-                            <td className="p-4 text-center text-amber-600 font-black bg-amber-50/30">{it.count_2 || it.count2 || 0}</td>
+                            <td className="p-4 text-center text-amber-600 font-black bg-amber-50/30">{it.count_2 || it.count1 || 0}</td>
                             <td className="p-4 text-center text-slate-500">{it.picked_qty || it.pickedQty || 0}</td>
                             <td className="p-4 text-center text-slate-500">{it.dispatched_qty || it.dispatchedQty || 0}</td>
                             <td className="p-4 uppercase italic text-slate-400 max-w-[200px] truncate" title={it.inventory_observation || it.inventoryObservation}>{it.inventory_observation || it.inventoryObservation || '-'}</td>
@@ -568,6 +591,31 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                             <td colSpan={7} className="p-10 text-center text-slate-500 italic">No hay datos consolidados disponibles.</td>
                           </tr>
                         )}
+                      </tbody>
+                    </table>
+                  ) : (
+                    // TABLA DE PAGOS (Recaudos)
+                    <table className="w-full text-left text-[10px] animate-in fade-in zoom-in-95 duration-300">
+                      <thead className="bg-indigo-900 text-white uppercase tracking-widest font-black sticky top-0 z-10">
+                        <tr>
+                          <th className="p-4">FACTURA / REF</th>
+                          <th className="p-4 text-center">VALOR MÉTODO</th>
+                          <th className="p-4">MÉTODO PAGO</th>
+                          <th className="p-4 text-center">UN CODE</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-bold">
+                        {paginatedDetailItems.map((it: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50 transition-colors text-[9px]">
+                            <td className="p-4 font-black uppercase text-slate-800 tracking-tight">
+                              {it.invoice}
+                              <div className="text-[7px] text-slate-400 font-bold uppercase">{it.paymentRef || 'S/R'}</div>
+                            </td>
+                            <td className="p-4 text-center text-indigo-600 font-black bg-indigo-50/30">{it.paymentValue || '0'}</td>
+                            <td className="p-4 uppercase text-slate-900 font-bold">{(it as any).paymentMethod || 'S/M'}</td>
+                            <td className="p-4 text-center text-slate-400 font-mono">{(it as any).unCode || '-'}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   )}

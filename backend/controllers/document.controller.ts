@@ -167,6 +167,11 @@ export const getDocuments = async (req: Request, res: Response) => {
       vehicle_plate as "vehicleData",
       inventory_user as "inventoryUser",
       inventory_date as "inventoryDate",
+      picking_date as "pickingDate",
+      receiving_date as "receivingDate",
+      picker_user as "pickerUser",
+      deliverer_user as "delivererUser",
+      receiver_user as "receiverUser",
       (SELECT COUNT(*) FROM document_l_payments p WHERE p.document_id = d.id) as "paymentsCount",
       (SELECT json_agg(item_with_payment) FROM (
         SELECT i.*, 
@@ -177,7 +182,11 @@ export const getDocuments = async (req: Request, res: Response) => {
         LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND TRIM(UPPER(i.invoice)) = TRIM(UPPER(p.invoice))
         WHERE i.document_id = d.id
       ) item_with_payment) as items,
-      (SELECT json_agg(c.*) FROM document_consolidated_items c WHERE c.document_id = d.id) as "consolidatedItems"
+      (SELECT json_agg(item_mapped) FROM (
+        SELECT article_id as "articleId", expected_qty as "expectedQty", count_1 as "count1", count_2 as "count2", 
+               picked_qty as "pickedQty", dispatched_qty as "dispatchedQty", inventory_observation as "inventoryObservation"
+        FROM document_consolidated_items WHERE document_id = d.id
+      ) item_mapped) as "consolidatedItems"
       FROM documents_l d
       WHERE d.status != 'ELIMINADO'
     `;
