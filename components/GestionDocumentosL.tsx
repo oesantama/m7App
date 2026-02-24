@@ -1165,7 +1165,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               </div>
 
               <div className="p-10 border-t bg-white flex justify-end shrink-0">
-                <button onClick={()=>setSelectedPendingDoc(null)} className="px-12 py-5 bg-slate-900 text-white rounded-[1.8rem] font-black text-xs uppercase hover:bg-emerald-600 transition-all shadow-xl">Cerrar AuditorÃ­a</button>
+                <button onClick={()=>setSelectedPendingDoc(null)} className="px-12 py-5 bg-slate-900 text-white rounded-[1.8rem] font-black text-xs uppercase hover:bg-emerald-600 transition-all shadow-xl">Cerrar Auditorí­a</button>
               </div>
            </div>
         </div>
@@ -1185,11 +1185,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                   </div>
                   
                   <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-4">
-                     Â¿Confirmar EliminaciÃ³n?
+                     ¿Confirmar Eliminación?
                   </h3>
                   
                   <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed px-4">
-                     Este documento operativo serÃ¡ marcado como <span className="text-rose-600 font-black">ELIMINADO</span>. Esta acciÃ³n quedarÃ¡ registrada para auditorÃ­a de <span className="text-slate-900">Milla Siete</span>.
+                     Este documento operativo será marcado como <span className="text-rose-600 font-black">ELIMINADO</span>. Esta acción quedará registrada para auditoría de <span className="text-slate-900">OrbitM7 (Milla Siete)</span>.
                   </p>
 
                   <div className="grid grid-cols-2 gap-4 w-full mt-10">

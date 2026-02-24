@@ -20,7 +20,7 @@ interface RoutePlannerProps {
   onRefresh?: () => void;
 }
 
-const M7_HUB_ORIGIN = {
+const ORBIT_HUB_ORIGIN = {
   lat: 6.110595,
   lng: -75.641505,
   address: "CR 48C N°100 Sur - 72 Bodega 4 y 10, La Tablaza"
@@ -90,7 +90,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   // FILTRADO DE FACTURAS APTAS: Real (basado en lo que viene del API de facturas)
   const validInvoices = useMemo(() => {
-    // REGLA M7: Solo planificar items en estado 'Pendiente' o 'Auditado'
+    // REGLA ORBIT: Solo planificar items en estado 'Pendiente' o 'Auditado'
     const filtered = invoices.filter(inv => {
       if (learningExemptions.includes(inv.id)) return false;
       const s = String(inv.status || '').toUpperCase();
@@ -112,7 +112,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     let planNormal = 0;
     unassignedInvoices.forEach(inv => {
       const doc = documents.find(d => d.id === inv.docLId);
-      if (doc?.planType === 'Plan R') planR++;
+      if (doc?.planType === 'Orbit (R)') planR++;
       else planNormal++;
     });
     return { planR, planNormal };
@@ -131,7 +131,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   useEffect(() => {
     api.getRoutingPatterns().then(data => {
       if (Array.isArray(data)) {
-        // console.log(`[M7-INTELLIGENCE] Cargados ${data.length} patrones de aprendizaje regenerativo.`);
+        // console.log(`[ORBIT-INTELLIGENCE] Cargados ${data.length} patrones de aprendizaje regenerativo.`);
         setLearningPatterns(data);
       }
     }).catch(err => console.error("Error cargando patrones IA:", err));
@@ -249,7 +249,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     setReadjustmentModal({ isOpen: true, selectedDocIds: new Set() });
   };
 
-  const runM7Optimization = (specificInvoices?: Invoice[]) => {
+  const runOrbitOptimization = (specificInvoices?: Invoice[]) => {
     setIsOptimizing(true);
     setSuggestedRoutes([]);
     if (!specificInvoices) setLastReadjustmentResult(null);
@@ -324,7 +324,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const load: Invoice[] = [];
         let currentLoadVolume = 0;
 
-        // Capacidad REGLA M7: MÁXIMO 90% (TECHO DURO)
+        // Capacidad REGLA ORBIT: MÁXIMO 90% (TECHO DURO)
         const nominalCapacity = vehicle.capacityM3 > 0 ? vehicle.capacityM3 : 30;
         const targetMaxCapacity = nominalCapacity * 0.90; // Meta y límite: 90%
         const absoluteMaxCapacity = targetMaxCapacity;      // Techo duro estricto
@@ -400,7 +400,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // -- FASE 3: UBICACIÓN DE VEHÍCULO --
         // Asignamos el vehículo si lleva carga significativa
         if (load.length > 0) {
-          // IA REGENERATIVA M7: Aprender de la ciudad dominante para fortalecer el patrón
+          // IA REGENERATIVA ORBIT: Aprender de la ciudad dominante para fortalecer el patrón
           const cityCounts: { [key: string]: number } = {};
           load.forEach(inv => {
             // @ts-ignore
@@ -429,7 +429,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           toast.info("No se hallaron rutas factibles.");
         }
       } else {
-        toast.success(`Algoritmo M7 (Fuerza 90%): ${suggestions.length} rutas generadas.`);
+        toast.success(`Algoritmo OrbitM7 (Fuerza 90%): ${suggestions.length} rutas generadas.`);
       }
 
       setSuggestedRoutes(suggestions);
@@ -494,7 +494,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       details: {
         comment: auditComment,
         volume: data.invoice.volumeM3,
-        city: data.invoice.city // REGLA M7: Enviamos ciudad para aprendizaje IA
+        city: data.invoice.city // REGLA ORBIT: Enviamos ciudad para aprendizaje IA
       }
     }).catch(err => console.error("Error logging movement:", err));
 
@@ -625,7 +625,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       if (res.success) {
-        toast.success("Despacho M7 Confirmado Exitosamente");
+        toast.success("Despacho Orbit Confirmado Exitosamente");
         setSuggestedRoutes(prev => prev.filter(r => r.id !== route.id));
         if (onRefresh) onRefresh();
       } else {
@@ -641,10 +641,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   // 1. Efecto para Instancia del Mapa (Crear/Destruir)
   useEffect(() => {
     if (viewMode === 'map' && !mapRef.current) {
-      console.log('[M7-MAP] Inicializando instancia Leaflet Premium...');
-      const container = document.getElementById('m7-routing-map');
+      console.log('[ORBIT-MAP] Inicializando instancia Leaflet Premium...');
+      const container = document.getElementById('orbit-routing-map');
       if (container) {
-        mapRef.current = L.map('m7-routing-map', {
+        mapRef.current = L.map('orbit-routing-map', {
           zoomControl: false, // Desactivar nativo para personalizar
           attributionControl: false
         }).setView([4.6097, -74.0817], 12);
@@ -661,7 +661,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
     return () => {
       if (mapRef.current) {
-        console.log('[M7-MAP] Destruyendo instancia Leaflet...');
+        console.log('[ORBIT-MAP] Destruyendo instancia Leaflet...');
         mapRef.current.remove();
         mapRef.current = null;
       }
@@ -673,7 +673,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const map = mapRef.current;
     if (!map || (viewMode !== 'map' && viewMode !== 'active')) return;
 
-    console.log('[M7-MAP] Actualizando capas de datos...');
+    console.log('[ORBIT-MAP] Actualizando capas de datos...');
 
     // Invalidar tamaño con retardo para asegurar que el contenedor está listo
     setTimeout(() => { map.invalidateSize(); }, 400);
@@ -692,10 +692,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       ((r.vehicle as any).driverName || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const allPoints: L.LatLngExpression[] = [[M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng]];
+    const allPoints: L.LatLngExpression[] = [[ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng]];
 
     // Marker de ORIGEN MAESTRO (HUB LA TABLAZA)
-    L.marker([M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng], {
+    L.marker([ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng], {
       icon: L.divIcon({
         html: `<div class="w-10 h-10 flex items-center justify-center bg-slate-900 rounded-[1rem] shadow-2xl border-2 border-slate-700 text-emerald-400 rotate-45 transform hover:scale-110 transition-transform duration-300">
                     <div class="-rotate-45">
@@ -707,7 +707,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       })
     }).addTo(map).bindPopup(`<div class="p-4 font-sans">
         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ORIGEN MAESTRO M7</p>
-        <p class="font-black text-slate-800 text-sm leading-tight">${M7_HUB_ORIGIN.address}</p>
+        <p class="font-black text-slate-800 text-sm leading-tight">${ORBIT_HUB_ORIGIN.address}</p>
         <div class="mt-2 w-full h-1 bg-emerald-500 rounded-full"></div>
     </div>`);
 
@@ -862,7 +862,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const html = `
       <html>
         <head>
-          <title>PLANILLA M7 - ${route.vehicle.plate}</title>
+          <title>PLANILLA ORBIT - ${route.vehicle.plate}</title>
           <style>
             @page { size: letter; margin: 1cm; }
             body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; padding: 20px; }
@@ -895,7 +895,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           <table class="header-table" style="border:none;">
             <tr style="background:none;">
               <td style="border:none; padding:0;">
-                <div class="logo-placeholder">MILLA<span class="m7-accent">7</span></div>
+                <div class="logo-placeholder uppercase">ORBITM7</div>
                 <div style="font-size: 9px; font-bold; color: #64748b;">SOFTWARE DE LOGÍSTICA INTELIGENTE</div>
               </td>
               <td class="doc-title" style="border:none; padding:0;">
@@ -974,7 +974,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           </div>
 
           <div style="margin-top: 40px; text-align: center; font-size: 8px; color: #94a3b8; font-weight: 700;">
-            DOCUMENTO GENERADO POR SISTEMA MILLA 7 LOGÍSTICA - ${new Date().toLocaleString()}
+            DOCUMENTO GENERADO POR SISTEMA ORBIT LOGÍSTICA - ${new Date().toLocaleString()}
           </div>
 
           <script>window.print();</script>
@@ -998,7 +998,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             <Icons.Route className="w-6 h-6" />
           </div>
           <div className="space-y-1 text-center md:text-left">
-            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">M7 Intelligence</h2>
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">OrbitM7 Intelligence</h2>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
               <span className="px-2 py-0.5 bg-emerald-500 text-slate-950 rounded-md text-[8px] font-black uppercase tracking-widest">Optimización 90%</span>
               <select
@@ -1006,7 +1006,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 onChange={(e) => { setSelectedClient(e.target.value); setSuggestedRoutes([]); }}
                 className="bg-slate-50 border border-slate-200 px-3 py-0.5 rounded-md text-[9px] font-black uppercase outline-none focus:border-emerald-500"
               >
-                <option value="GLOBAL">FLOTA GLOBAL M7</option>
+                <option value="GLOBAL">FLOTA GLOBAL ORBIT</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -1041,7 +1041,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           </button>
 
           <button
-            onClick={() => runM7Optimization(undefined)}
+            onClick={() => runOrbitOptimization(undefined)}
             disabled={isOptimizing || validInvoices.length === 0}
             className="w-full md:w-auto bg-slate-900 text-emerald-500 px-6 py-3 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-500 hover:text-slate-900 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95 whitespace-nowrap"
           >
@@ -1080,7 +1080,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               <Icons.Zap className="w-4 h-4 text-indigo-400" />
             </div>
             <div className="flex flex-col">
-              <p className="text-[7px] font-black text-indigo-300 uppercase tracking-widest leading-none mb-1">Resultado M7 aplicado</p>
+              <p className="text-[7px] font-black text-indigo-300 uppercase tracking-widest leading-none mb-1">Resultado Orbit aplicado</p>
               <div className="flex items-center gap-2">
                 <p className="text-[10px] font-black text-white uppercase tracking-tighter">
                   DOCS: <span className="text-indigo-300">{lastReadjustmentResult.docIds.join(', ')}</span>
@@ -1118,7 +1118,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 <Icons.Audit className="w-10 h-10" />
               </div>
               <div>
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Motor M7 en Reposo</h3>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Motor Orbit en Reposo</h3>
                 <p className="text-xs text-slate-400 font-bold max-w-sm mt-2 uppercase tracking-wide">
                   Inicie el análisis basado en facturas aprobadas listas para despacho.
                 </p>
@@ -1134,7 +1134,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     <Icons.Brain className="text-emerald-500 w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="text-slate-950 font-black text-[10px] uppercase tracking-[0.2em] mb-1">M7 Intelligence</h4>
+                    <h4 className="text-slate-950 font-black text-[10px] uppercase tracking-[0.2em] mb-1">OrbitM7 Intelligence</h4>
                     <p className="text-slate-900 text-xs font-bold leading-tight">
                       Opt. Promedio: {Math.round(suggestedRoutes.reduce((acc, r) => acc + r.utilization, 0) / suggestedRoutes.length)}% | Rutas: {suggestedRoutes.length}
                     </p>
@@ -1471,7 +1471,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                             DOC: {inv.externalDocId}
                           </span>
                         )}
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Plan R' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Orbit (R)' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                           {documents.find(d => d.id === inv.docLId)?.planType || 'Plan Normal'}
                         </span>
                       </div>
@@ -1644,7 +1644,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     const label = doc?.externalDocId
                       ? `Documento Maestro: ${doc.externalDocId}`
                       : `Documento L: ${String(inv.docLId).slice(-8)}`;
-                    const desc = doc?.inventory_observation || "Carga Masiva M7";
+                    const desc = doc?.inventory_observation || "Carga Masiva Orbit";
 
                     if (!docMap.has(groupKey)) {
                       docMap.set(groupKey, { label, desc, invoices: [], volume: 0 });
@@ -1744,7 +1744,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   onClick={() => {
                     const targets = getOptimizationTargets(readjustmentModal.selectedDocIds);
                     setSuggestedRoutes([]);
-                    runM7Optimization(targets);
+                    runOrbitOptimization(targets);
                   }}
                   disabled={readjustmentModal.selectedDocIds.size === 0}
                   className="flex-[2] py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"

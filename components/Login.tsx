@@ -110,7 +110,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       
       const demoEmail = import.meta.env.VITE_APP_DEMO_EMAIL || 'admin@millasiete.com';
       if (email.toLowerCase() !== demoEmail.toLowerCase()) {
-          setError("M7 SECURITY: El correo ingresado no se encuentra en nuestra base de datos.");
+          setError("ORBIT SECURITY: El correo ingresado no se encuentra en nuestra base de datos.");
           setIsLoading(false);
           return;
       }
@@ -132,11 +132,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="w-full max-w-sm p-4 relative z-10 animate-in fade-in zoom-in duration-500">
         <div className="bg-slate-900/60 backdrop-blur-2xl border border-white/10 p-8 sm:p-10 rounded-[2.5rem] shadow-2xl">
           <div className="flex flex-col items-center mb-10">
-            <div className="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center shadow-[0_0_40px_rgba(16,185,129,0.3)] mb-6 transition-transform hover:scale-105 active:scale-95 cursor-pointer">
-              <span className="text-4xl font-black text-slate-950">M7</span>
+            <div className="w-20 h-20 mb-4 transition-transform hover:scale-105 active:scale-95 cursor-pointer relative group">
+              <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl group-hover:bg-emerald-500/30 transition-all"></div>
+              <img 
+                src="/assets/brand/orbitm7_logo.png" 
+                alt="OrbitM7 Logo" 
+                className="w-full h-full object-contain relative z-10"
+              />
             </div>
-            <h1 className="text-3xl font-black text-white tracking-tight">Milla Siete</h1>
-            <p className="text-slate-400 font-bold text-[10px] sm:text-[11px] mt-2 uppercase tracking-[0.2em] text-center text-balance">Logística Inteligente</p>
+            <h1 className="text-2xl font-black text-white tracking-tighter uppercase leading-none">ORBITM7</h1>
+            <p className="text-emerald-500 font-bold text-[8px] uppercase tracking-[0.5em] mt-3">Logística Circular</p>
           </div>
 
           {error && (
@@ -370,8 +375,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
               Estado: Operativo 99.9%
             </p>
-            <p className="text-[7px] text-slate-700 font-bold uppercase mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              Monitoreo en tiempo real (Últimos 30 días)
+            <div className="mt-2 space-y-1">
+              <p className="text-[7px] text-slate-500 font-black uppercase tracking-widest">
+                OrbitM7 es propiedad de Milla 7
+              </p>
+              <p className="text-[7px] text-slate-600 font-bold uppercase">
+                Arquitectura y Desarrollo por Oscar Santamaría
+              </p>
+            </div>
+            <p className="text-[7px] text-slate-800 font-bold uppercase mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              © {new Date().getFullYear()} OrbitM7 Logistics Systems
             </p>
           </div>
         </div>

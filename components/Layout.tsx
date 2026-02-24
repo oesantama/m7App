@@ -197,14 +197,19 @@ const Layout: React.FC<LayoutProps> = ({
       )}
 
       <aside className={`fixed inset-y-0 left-0 z-30 bg-slate-900 text-white flex flex-col transition-all duration-300 shadow-2xl md:static md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-24' : 'md:w-72'} w-72`}>
-        <div className={`flex items-center gap-4 mb-10 px-4 py-6 ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
-            <span className="text-2xl font-black text-slate-900">M7</span>
+        <div className="p-6 flex items-center gap-4 border-b border-slate-800 shrink-0">
+          <div className="w-12 h-12 relative group cursor-pointer">
+            <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-xl group-hover:bg-emerald-500/30 transition-all"></div>
+            <img 
+              src="/assets/brand/orbitm7_logo.png" 
+              alt="OrbitM7" 
+              className="w-full h-full object-contain relative z-10"
+            />
           </div>
           {!isCollapsed && (
-            <div className="animate-in fade-in overflow-hidden">
-              <h1 className="font-black text-xl tracking-tighter">MILLA SIETE</h1>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">M7 GLOBAL V1.0.3-FIX</span>
+            <div className="flex flex-col">
+              <h1 className="font-black text-xl tracking-tighter">ORBITM7</h1>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">GLOBAL V1.0.4</span>
             </div>
           )}
         </div>
@@ -233,7 +238,6 @@ const Layout: React.FC<LayoutProps> = ({
         </nav>
 
         <div className="mt-auto p-4 border-t border-slate-800 space-y-3">
-
           <div className={`bg-slate-800/40 rounded-3xl flex items-center p-4 gap-4 relative`}>
             <button onClick={() => setIsProfileModalOpen(true)} className="absolute inset-0 z-10 opacity-0 cursor-pointer"></button>
             <div className="w-10 h-10 rounded-full bg-slate-700 overflow-hidden border-2 border-emerald-500 shrink-0">
@@ -242,6 +246,9 @@ const Layout: React.FC<LayoutProps> = ({
             {!isCollapsed && <div className="flex-1 min-w-0"><p className="text-xs font-black truncate uppercase">{user.name}</p><p className="text-[10px] text-emerald-500 font-black uppercase">{user.role}</p></div>}
             <button onClick={onLogout} title="Cerrar Sesión" className="p-2 text-slate-500 hover:text-red-500 z-20 relative transition-colors"><Icons.LogOut /></button>
           </div>
+          {!isCollapsed && (
+             <p className="text-[8px] text-slate-500 font-bold uppercase text-center opacity-40">Milla 7 • Oscar Santamaría</p>
+          )}
         </div>
       </aside>
 
@@ -259,8 +266,8 @@ const Layout: React.FC<LayoutProps> = ({
               <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{activeTab.replace('-', ' ')}</h2>
             </div>
           </div>
-          <div id="m7-header-chat-target" className="flex items-center gap-4 transition-all pr-4">
-            {/* Aquí se inyectará el disparador de M7 IQ vía Portal */}
+          <div id="orbit-header-chat-target" className="flex items-center gap-4 transition-all">
+            {/* Aquí se inyectará el disparador de Orbit IQ vía Portal */}
           </div>
         </header>
         <section className="flex-1 overflow-y-auto p-0 bg-slate-50/50 custom-scrollbar">{children}</section>
@@ -270,7 +277,7 @@ const Layout: React.FC<LayoutProps> = ({
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-[90vw] h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
             <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
-              <h3 className="text-lg font-black uppercase tracking-tight">Mi Identidad M7</h3>
+              <h3 className="text-lg font-black uppercase tracking-tight">Mi Identidad Orbit</h3>
               <button onClick={() => setIsProfileModalOpen(false)} className="text-2xl font-thin hover:text-red-500 transition-colors">&times;</button>
             </div>
             <form onSubmit={handleUpdateProfile} className="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">

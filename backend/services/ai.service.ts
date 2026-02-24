@@ -76,7 +76,7 @@ export const aiService = {
     const knowledgeRules = getKnowledgeBase().map((k: any) => `- ${k.rule}`).join('\n');
 
     const systemPrompt = `
-    Eres "M7 Intelligence" (M7 IQ), el núcleo de inteligencia artificial AUTÓNOMO y REGENERATIVO de Milla Siete (M7).
+    Eres "OrbitM7 Intelligence" (OrbitM7 IQ), el núcleo de inteligencia artificial AUTÓNOMO y REGENERATIVO de OrbitM7.
     Tu especialidad es la optimización logística, gestión de flotas y auditoría de documentos de transporte.
     
     TUS CAPACIDADES:

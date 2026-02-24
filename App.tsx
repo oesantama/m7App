@@ -611,7 +611,7 @@ const App: React.FC = () => {
       <div className="flex h-screen w-full items-center justify-center bg-slate-950">
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-emerald-500 font-bold uppercase tracking-widest text-xs animate-pulse">Restaurando Sistema M7...</p>
+          <p className="text-emerald-500 font-bold uppercase tracking-widest text-xs animate-pulse">Restaurando Sistema OrbitM7...</p>
         </div>
       </div>
     );
@@ -623,8 +623,8 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard':
         return (
-          <div className="p-10 text-center animate-in fade-in duration-700">
-            <h2 className="text-5xl font-black text-slate-900 mb-6 uppercase tracking-tighter">PROCESADOR MILLA SIETE</h2>
+          <div className="min-h-full flex flex-col p-6 md:p-10 text-center animate-in fade-in duration-700 bg-slate-50">
+            <h2 className="text-5xl font-black text-slate-900 mb-6 uppercase tracking-tighter">PROCESADOR ORBITM7</h2>
             <div className="w-32 h-2 bg-emerald-500 mx-auto rounded-full mb-10"></div>
 
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${waStatus === 'CONNECTED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'} mb-10`}>
@@ -651,7 +651,7 @@ const App: React.FC = () => {
                 <div className="text-left flex-1 relative z-10">
                   <div className={`inline-block px-4 py-1.5 rounded-full mb-6 border ${documents.length === 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
                     }`}>
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em]">Centro de Mando Inteligente M7</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em]">Centro de Mando Inteligente OrbitM7</span>
                   </div>
 
                   <h3 className="text-white font-black text-3xl md:text-5xl uppercase tracking-tighter mb-4 leading-none">
@@ -662,7 +662,7 @@ const App: React.FC = () => {
 
                   <p className="text-slate-400 text-lg md:text-xl font-medium leading-relaxed max-w-3xl">
                     {documents.length === 0
-                      ? "Tu panel está limpio. Sube un archivo de preventa para que M7 IQ pueda generar tus rutas optimizadas ahora."
+                      ? "Tu panel está limpio. Sube un archivo de preventa para que OrbitM7 IQ pueda generar tus rutas optimizadas ahora."
                       : `He detectado ${documents.length} documentos detenidos. ¿Quieres que audite la carga para liberar rutas de inmediato?`}
                   </p>
 
@@ -677,7 +677,7 @@ const App: React.FC = () => {
                       {documents.length === 0 ? "Abrir Gestor de Documentos" : "Iniciar Auditoría IA"}
                     </button>
                     <button
-                      onClick={() => toast.success("M7 IQ: Consultando núcleo de inteligencia...", { description: "Usa el widget inferior para ver mi reporte completo." })}
+                      onClick={() => toast.success("OrbitM7 IQ: Consultando núcleo de inteligencia...", { description: "Usa el widget inferior para ver mi reporte completo." })}
                       className="px-8 py-5 border border-white/10 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all"
                     >
                       Informe Narrativo
@@ -710,7 +710,7 @@ const App: React.FC = () => {
                   <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">IA PROYECCIÓN</p>
                   <Icons.Route className="text-emerald-500 animate-pulse" />
                 </div>
-                <h4 className="text-2xl font-black text-white tracking-tighter mb-2">Plan de Vuelo IQ</h4>
+                <h4 className="text-2xl font-black text-white tracking-tighter mb-2">Plan de Vuelo OrbitM7 IQ</h4>
                 <p className="text-xs text-slate-400">Ahorro estimado despacho: <span className="text-emerald-500 font-black">12 min</span></p>
               </div>
             </div>
@@ -776,7 +776,7 @@ const App: React.FC = () => {
             }}
             onSaveRoute={(route) => {
               console.log('Ruta Guardada:', route);
-              alert('Ruta M7 Guardada Exitosamente');
+              alert('Ruta OrbitM7 Guardada Exitosamente');
             }}
           />
         );
@@ -1056,17 +1056,20 @@ const App: React.FC = () => {
         {renderContent()}
       </Layout>
 
-      <AIChat
-        context={{
-          user: user.name,
-          activeTab,
-          documentsCount: documents.length,
-          invoicesCount: invoices.length,
-          availableVehicles: vehicles.filter(v => v.status === 'Disponible').length,
-          activeDrivers: drivers.filter(d => d.status === 'Activo').length,
-          recentAssignments: assignments.slice(-5)
-        }}
-      />
+      {/* CHATBOT POSICIÓN ABSOLUTA AL FRENTE */}
+      <div className="fixed bottom-6 right-6 z-[9999]">
+        <AIChat
+          context={{
+            user: user.name,
+            activeTab,
+            documentsCount: documents.length,
+            invoicesCount: invoices.length,
+            availableVehicles: vehicles.filter(v => v.status === 'Disponible').length,
+            activeDrivers: drivers.filter(d => d.status === 'Activo').length,
+            recentAssignments: assignments.slice(-5)
+          }}
+        />
+      </div>
       {showTimeoutWarning && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in zoom-in duration-300">
           <div className="bg-white max-w-md w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6">

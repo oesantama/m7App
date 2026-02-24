@@ -228,7 +228,7 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                         <Icons.MessageSquare />
                     </div>
                     <div>
-                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Centro de Mensajería M7</h2>
+                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Centro de Mensajería Orbit</h2>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                              Estado: <span className={status === 'CONNECTED' ? 'text-emerald-500' : 'text-slate-400'}>{status}</span>
                              {status === 'CONNECTED' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
@@ -265,7 +265,7 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                             <Icons.Check />
                                         </div>
                                         <div className="space-y-2">
-                                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter">¡Línea M7 Vinculada!</p>
+                                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter">¡Línea Orbit Vinculada!</p>
                                             <p className="text-xs text-slate-400 font-medium italic">Tu cuenta de WhatsApp empresarial está lista para operar.</p>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
@@ -299,7 +299,7 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                         )}
                                         <div className="space-y-4">
                                             <p className="text-sm font-bold text-slate-500 leading-relaxed max-w-sm mx-auto">
-                                                Escanea con tu WhatsApp para habilitar la **Inteligencia Logística M7**.
+                                                Escanea con tu WhatsApp para habilitar la **Inteligencia Logística Orbit**.
                                             </p>
                                             <button 
                                                 onClick={handleConnect}
@@ -320,7 +320,7 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                         <Icons.Rocket />
                                     </div>
                                     <div className="space-y-2">
-                                        <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Guía de Operación M7</h4>
+                                        <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Guía de Operación Orbit</h4>
                                         <p className="text-xs text-slate-400 font-medium leading-relaxed max-w-xs">
                                             Descubre cómo la **Inteligencia WhatsApp** transforma tu gestión logística y de envíos.
                                         </p>
@@ -556,7 +556,7 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                         <Icons.MessageCircle />
                                     </div>
                                     <div className="space-y-2">
-                                        <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Tu Bandeja M7</h4>
+                                        <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Tu Bandeja Orbit</h4>
                                         <p className="text-xs text-slate-400 font-medium max-w-xs mx-auto">Selecciona un chat de la izquierda para ver el historial y responder profesionalmente.</p>
                                     </div>
                                     <div className="flex gap-4">
@@ -584,7 +584,7 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                     <Icons.Rocket />
                                 </div>
                                 <div>
-                                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Ecosistema WhatsApp M7</h3>
+                                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Ecosistema WhatsApp Orbit</h3>
                                     <p className="text-[8px] font-black text-indigo-500 uppercase tracking-[0.2em]">Guía de Alto Desempeño</p>
                                 </div>
                             </div>
@@ -614,7 +614,7 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                         <Icons.Zap />
                                     </div>
                                     <h5 className="font-black text-xs uppercase text-slate-900">Respuestas Ultra-Rápidas</h5>
-                                    <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Utiliza **Plantillas M7** para responder preguntas frecuentes en segundos. Configura respuestas predefinidas para estados de carga, rutas y confirmaciones.</p>
+                                    <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Utiliza **Plantillas Orbit** para responder preguntas frecuentes en segundos. Configura respuestas predefinidas para estados de carga, rutas y confirmaciones.</p>
                                 </div>
 
                                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-4 hover:bg-white hover:shadow-xl transition-all duration-500 group">
@@ -622,14 +622,14 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                         <Icons.Brain />
                                     </div>
                                     <h5 className="font-black text-xs uppercase text-slate-900">Arquitectura Multi-Agente</h5>
-                                    <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Cada administrador del sistema M7 puede vincular su propia línea de WhatsApp de forma independiente, manteniendo la privacidad y eficiencia por usuario.</p>
+                                    <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Cada administrador del sistema Orbit puede vincular su propia línea de WhatsApp de forma independiente, manteniendo la privacidad y eficiencia por usuario.</p>
                                 </div>
                             </div>
 
                             <div className="mt-10 p-8 bg-indigo-900 rounded-[2.5rem] text-white flex flex-col md:flex-row items-center gap-8 shadow-2xl shadow-indigo-200">
                                 <div className="flex-1 space-y-2 text-center md:text-left">
                                     <h4 className="text-xl font-black uppercase tracking-tighter">¿Listo para escalar la operación?</h4>
-                                    <p className="text-indigo-200 text-[10px] font-medium leading-relaxed">Vincule su línea ahora mismo a través del código QR y empiece a disfrutar de la comunicación logística elite de Milla 7.</p>
+                                    <p className="text-indigo-200 text-[10px] font-medium leading-relaxed">Vincule su línea ahora mismo a través del código QR y empiece a disfrutar de la comunicación logística elite de Orbit.</p>
                                 </div>
                                 <button onClick={() => setShowInfo(false)} className="px-10 py-5 bg-white text-indigo-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-400 hover:text-white transition-all shadow-xl">Entendido</button>
                             </div>
@@ -643,7 +643,7 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl border border-slate-100 animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Mis Plantillas M7</h3>
+                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Mis Plantillas Orbit</h3>
                             <button onClick={()=>setShowQuickReplyModal(false)} className="text-slate-400 hover:text-slate-600"><Icons.X /></button>
                         </div>
                         <div className="space-y-6">

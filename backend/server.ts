@@ -30,7 +30,7 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`[M7-LOG] ${new Date().toISOString()} - ${req.method} ${req.url} [${res.statusCode}] - ${duration}ms`);
+    console.log(`[ORBIT-LOG] ${new Date().toISOString()} - ${req.method} ${req.url} [${res.statusCode}] - ${duration}ms`);
   });
   next();
 });
@@ -41,14 +41,14 @@ app.use('/api', apiRoutes);
 
 // Health Check Global
 app.get('/health', (req, res) => {
-  res.json({ status: 'UP', service: 'Milla 7 Backend', timestamp: new Date() });
+  res.json({ status: 'UP', service: 'Orbit Logistics Backend', timestamp: new Date() });
 });
 
 // Manejo Seguro de Rutas no Encontradas (Hallazgo QA: Ocultar nginx/express)
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    error: "Recurso no disponible en el núcleo M7",
+    error: "Recurso no disponible en el núcleo Orbit",
     code: 404
   });
 });
@@ -56,18 +56,18 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
-  console.log(`[M7-SYSTEM] Servidor Operacional en Puerto ${PORT}`);
-  console.log(`[M7-SYSTEM] Versión: 1.0.4 - BK-FORCE-RELOAD`);
-  console.log(`[M7-SYSTEM] Entorno Módulo Nativo ESM activo`);
+  console.log(`[ORBIT-SYSTEM] Servidor Operacional en Puerto ${PORT}`);
+  console.log(`[ORBIT-SYSTEM] Versión: 1.0.4 - BK-FORCE-RELOAD`);
+  console.log(`[ORBIT-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
 
   // Inicialización de WhatsApp 
-  console.log('[M7-SYSTEM] Evolution API Integration Active');
+  console.log('[ORBIT-SYSTEM] Evolution API Integration Active');
 
   // RESTAURACIÓN AUTOMÁTICA M7 (MIGRACIONES)
   import('./services/migration.service.js').then(m => {
     m.restoreSystem()
-      .then(r => console.log('[M7-AUTO] Sistema configurado:', r.message))
-      .catch(e => console.error('[M7-AUTO] Fallo en configuración inicial:', e.message));
+      .then(r => console.log('[ORBIT-AUTO] Sistema configurado:', r.message))
+      .catch(e => console.error('[ORBIT-AUTO] Fallo en configuración inicial:', e.message));
   });
 });

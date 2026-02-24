@@ -16,7 +16,7 @@ interface AIChatProps {
 const AIChat: React.FC<AIChatProps> = ({ context }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '¡Bienvenido al Centro de Inteligencia **M7 IQ**! 🚀\n\nEstoy conectado al núcleo operativo de Milla Siete. Puedo ayudarte a:\n- **Optimizar rutas** de despacho.\n- **Auditar documentos** pendientes.\n- **Analizar disponibilidad** de tu flota.\n\n¿Por dónde empezamos hoy?' }
+    { role: 'assistant', content: '¡Bienvenido al Centro de Inteligencia **OrbitM7 IQ**! 🚀\n\nEstoy conectado al núcleo operativo de OrbitM7. Puedo ayudarte a:\n- **Optimizar rutas** de despacho.\n- **Auditar documentos** pendientes.\n- **Analizar disponibilidad** de tu flota.\n\n¿Por dónde empezamos hoy?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +61,7 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    const target = document.getElementById('m7-header-chat-target');
+    const target = document.getElementById('orbit-header-chat-target');
     if (target) setHeaderPortal(target);
   }, []);
 
@@ -72,14 +72,14 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
         isOpen 
           ? 'bg-slate-900 w-14 h-14' 
           : 'bg-emerald-500 px-6 h-14 shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:shadow-emerald-500/40'
-      } ${headerPortal ? '' : 'fixed bottom-10 right-10 z-[2147483647] w-24 h-24 rounded-[2.5rem]'}`}
+      } ${headerPortal ? 'h-10 px-4 bg-slate-900 border border-white/10' : 'fixed bottom-10 right-10 z-[2147483647] w-24 h-24 rounded-[2.5rem]'}`}
     >
       {isOpen ? (
         <Icons.X className="text-white w-6 h-6" />
       ) : (
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-center">
-            <span className="text-slate-950 font-black text-lg leading-none tracking-tighter">M7</span>
+            <span className="text-slate-950 font-black text-lg leading-none tracking-tighter">OrbitM7</span>
             <span className="text-slate-950 text-[8px] font-black uppercase tracking-[0.2em] opacity-60">IQ</span>
           </div>
           {headerPortal && (
@@ -106,7 +106,7 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
             <Icons.Brain className="text-emerald-400 w-6 h-6 animate-pulse" />
           </div>
           <div>
-            <h3 className="font-black text-slate-950 uppercase tracking-tighter text-base leading-none">M7 Intelligence</h3>
+            <h3 className="font-black text-slate-950 uppercase tracking-tighter text-base leading-none">OrbitM7 Intelligence</h3>
             <div className="flex items-center gap-1.5 mt-1">
                 <div className="w-1 h-1 bg-slate-950 rounded-full animate-ping"></div>
                 <span className="text-[8px] text-slate-950 font-black uppercase tracking-[0.2em] opacity-80">Núcleo Online</span>

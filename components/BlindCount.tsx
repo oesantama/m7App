@@ -92,7 +92,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const groupedItems = useMemo(() => {
     const groups: { [id: string]: DocumentLItem } = {};
     docL.items.forEach(item => {
-      const id = item.articleId.toUpperCase();
+      const id = item.articleId?.toUpperCase() || '';
       if (!groups[id]) {
         groups[id] = { ...item, expectedQty: 0 };
       }
@@ -164,14 +164,14 @@ const BlindCount: React.FC<BlindCountProps> = ({
     const input = rawCode.trim().toUpperCase().replace(/'/g, '-');
     if (!input) return;
 
-    const itemInDoc = groupedItems.find(it => it.articleId.toUpperCase() === input);
+    const itemInDoc = groupedItems.find(it => it.articleId?.toUpperCase() === input);
     if (!itemInDoc) {
       setLastScan({ article: null, message: `Código "${input}" fuera de plan.`, status: 'error' });
       setScanInput('');
       return;
     }
 
-    let articleMaster = (masterArticulo as Article[]).find(a => a.sku.toUpperCase() === input || a.barcode === input);
+    let articleMaster = (masterArticulo as Article[]).find(a => a.sku?.toUpperCase() === input || a.barcode === input);
     if (!articleMaster) {
       const newArticle: Article = {
         id: itemInDoc.articleId, sku: itemInDoc.articleId, barcode: itemInDoc.articleId,

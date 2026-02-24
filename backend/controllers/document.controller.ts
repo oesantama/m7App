@@ -431,7 +431,7 @@ export const syncInventory = async (req: Request, res: Response) => {
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">MILLA SIETE</div>
+              <div class="logo">ORBITM7</div>
               <div class="subtitle">Confirmación de Recibo Auditoría</div>
             </div>
             

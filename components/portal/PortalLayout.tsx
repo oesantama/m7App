@@ -16,7 +16,7 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({ children }) => {
                         <span className="font-black text-slate-950 text-xl tracking-tighter">M7</span>
                     </div>
                     <div className="flex flex-col">
-                        <h1 className="font-black text-lg tracking-tight leading-none">MILLA SIETE</h1>
+                        <h1 className="font-black text-lg tracking-tight leading-none">ORBITM7</h1>
                         <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Portal de Cliente</span>
                     </div>
                 </div>
@@ -35,7 +35,7 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({ children }) => {
 
         {/* Footer */}
         <footer className="py-10 text-center text-slate-600 text-xs border-t border-white/5 mt-auto">
-            <p>&copy; {new Date().getFullYear()} MILLA SIETE GLOBAL. Todos los derechos reservados.</p>
+            <p>&copy; {new Date().getFullYear()} ORBITM7 GLOBAL. Todos los derechos reservados.</p>
         </footer>
     </div>
   );
