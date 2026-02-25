@@ -147,7 +147,7 @@ export const getPendingSignaturesForUser = async (req: Request, res: Response) =
                 da.created_at AS "createdAt",
                 dsp.role_type AS "role"
             FROM dispatch_signatures_pending dsp
-            JOIN dispatch_assignments da ON dsp.dispatch_id = da.id
+            JOIN dispatch_assignments da ON dsp.dispatch_id::integer = da.id
             WHERE dsp.user_id = $1 AND dsp.signed = false
             ORDER BY da.created_at DESC
         `, [userId]);

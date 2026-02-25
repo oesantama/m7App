@@ -76,3 +76,53 @@ export const deleteVehicle = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Error al eliminar vehículo" });
   }
 };
+
+export const bulkSaveVehicles = async (req: Request, res: Response) => {
+  const { vehicles } = req.body;
+  if (!Array.isArray(vehicles)) return res.status(400).json({ error: 'Data must be an array' });
+
+  try {
+    await pool.query('BEGIN');
+    
+    // Obtener el último ID base para autoincrementar
+    const lastIdResult = await pool.query("SELECT MAX(substring(id from 5)::bigint) as max_id FROM vehicles WHERE id ~ '^VEH-[0-9]{3}$'");
+    let currentMax = Number(lastIdResult.rows[0].max_id || 0);
+
+    for (const v of vehicles) {
+      let vehicleId = v.id;
+      if (!vehicleId) {
+        currentMax++;
+        vehicleId = `VEH-${currentMax.toString().padStart(3, '0')}`;
+      }
+
+      await pool.query(`
+        INSERT INTO vehicles (
+          id, plate, brand, owner, capacity_m3, client_id, 
+          soat_expiry, techno_expiry, status_id, model_year, color, vehicle_type
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (plate) DO UPDATE SET
+          brand = EXCLUDED.brand, 
+          owner = EXCLUDED.owner, 
+          capacity_m3 = EXCLUDED.capacity_m3, 
+          soat_expiry = EXCLUDED.soat_expiry, 
+          techno_expiry = EXCLUDED.techno_expiry,
+          model_year = EXCLUDED.model_year,
+          color = EXCLUDED.color,
+          vehicle_type = EXCLUDED.vehicle_type,
+          status_id = EXCLUDED.status_id
+      `, [
+        vehicleId, v.plate, v.brand, v.owner || '', v.capacityM3 || 0, v.clientId || 'CLI-01',
+        v.soatExpiry || null, v.technoExpiry || null, v.statusId || 'EST-01',
+        v.modelYear || '', v.color || '', v.vehicleTypeId || ''
+      ]);
+    }
+
+    await pool.query('COMMIT');
+    res.json({ success: true, message: `Se procesaron ${vehicles.length} vehículos` });
+  } catch (err: any) {
+    await pool.query('ROLLBACK');
+    console.error('[M7-VEHICLES] Bulk Save Error:', err);
+    res.status(500).json({ error: "Error en carga masiva: " + err.message });
+  }
+};

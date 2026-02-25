@@ -39,7 +39,7 @@ export const getRoutes = async (req: Request, res: Response) => {
         d.name as driver_name,
         json_build_array(da.invoice_id) as invoice_ids
       FROM dispatch_assignments da
-      LEFT JOIN assignments a ON da.driver_id::text = a.driver_id::text AND a.is_active = true
+      LEFT JOIN assignments a ON da.driver_id::text = a.driver_id::text AND a.is_active::boolean = true
       LEFT JOIN vehicles v ON a.vehicle_id::text = v.id::text
       LEFT JOIN drivers d ON da.driver_id::text = d.id::text
       WHERE da.status IN ('PENDING_SIGNATURES', 'EN_RUTA', 'En repart', 'PENDING')

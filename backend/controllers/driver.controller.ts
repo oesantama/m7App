@@ -74,3 +74,51 @@ export const deleteDriver = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Error al eliminar conductor" });
   }
 };
+
+export const bulkSaveDrivers = async (req: Request, res: Response) => {
+  const { drivers } = req.body;
+  if (!Array.isArray(drivers)) return res.status(400).json({ error: 'Data must be an array' });
+
+  try {
+    await pool.query('BEGIN');
+
+    // Obtener el último ID base para autoincrementar
+    const lastIdResult = await pool.query("SELECT MAX(substring(id from 5)::bigint) as max_id FROM drivers WHERE id ~ '^DRV-[0-9]{3}$'");
+    let currentMax = Number(lastIdResult.rows[0].max_id || 0);
+
+    for (const d of drivers) {
+      let driverId = d.id;
+      if (!driverId) {
+        currentMax++;
+        driverId = `DRV-${currentMax.toString().padStart(3, '0')}`;
+      }
+
+      await pool.query(`
+        INSERT INTO drivers (
+          id, name, document_type, document_number, phone, client_id, 
+          license_expiry, status_id, license_category
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          document_type = EXCLUDED.document_type,
+          document_number = EXCLUDED.document_number,
+          phone = EXCLUDED.phone,
+          license_expiry = EXCLUDED.license_expiry,
+          license_category = EXCLUDED.license_category,
+          status_id = EXCLUDED.status_id
+      `, [
+        driverId, d.name, d.documentType || 'CC', d.documentNumber, 
+        d.phone || '', d.clientId || 'CLI-01',
+        d.licenseExpiry || null, d.statusId || 'EST-01', d.licenseCategory || ''
+      ]);
+    }
+
+    await pool.query('COMMIT');
+    res.json({ success: true, message: `Se procesaron ${drivers.length} conductores` });
+  } catch (err: any) {
+    await pool.query('ROLLBACK');
+    console.error('[M7-DRIVERS] Bulk Save Error:', err);
+    res.status(500).json({ error: "Error en carga masiva: " + err.message });
+  }
+};

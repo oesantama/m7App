@@ -25,7 +25,7 @@ export const getUsers = async (req: Request, res: Response) => {
         u.phone, u.avatar,
         u.document_type AS "documentType",
         u.document_number AS "documentNumber",
-        COALESCE(ds.aprobada, false) AS "isApproved",
+        COALESCE(ds.aprobada::boolean, false) AS "isApproved",
         (ds.firma IS NOT NULL) AS "hasSignature",
         u.client_ids AS "clientIds",
         u.created_at AS "createdAt", u.updated_at AS "updatedAt", 

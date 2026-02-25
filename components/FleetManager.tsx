@@ -155,6 +155,103 @@ const FleetManager: React.FC<FleetManagerProps> = ({
     XLSX.writeFile(workbook, `M7_${viewTab}_${Date.now()}.xlsx`);
   };
 
+  const handleDownloadTemplate = () => {
+    const isVehicles = viewTab === 'vehicles';
+    const data = isVehicles ? [
+      {
+        'Placa': 'FGH789',
+        'Marca': 'Foton',
+        'Propietario': 'Milla Siete SAS',
+        'Capacidad_m3': 35,
+        'Modelo': '2024',
+        'Color': 'Blanco',
+        'Tipo': 'Sencillo'
+      }
+    ] : [
+      {
+        'Nombre': 'Juan Perez',
+        'Tipo_ID': 'CC',
+        'Numero_ID': '12345678',
+        'Telefono': '3001234567',
+        'Categoria_Licencia': 'C2',
+        'Vencimiento_Licencia': '2028-12-31'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Plantilla');
+    XLSX.writeFile(workbook, `Plantilla_${isVehicles ? 'Vehiculos' : 'Conductores'}.xlsx`);
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          toast.error("El archivo está vacío");
+          return;
+        }
+
+        setIsProcessingAI(true);
+        const isVehicles = viewTab === 'vehicles';
+        
+        if (isVehicles) {
+          const mapped = data.map((row: any) => ({
+            plate: row.Placa || row.placa,
+            brand: row.Marca || row.marca,
+            owner: row.Propietario || row.propietario,
+            capacityM3: row.Capacidad_m3 || row.capacidad_m3 || row.Capacidad,
+            modelYear: row.Modelo || row.modelo || row.Anio,
+            color: row.Color || row.color,
+            vehicleTypeId: row.Tipo || row.tipo,
+            statusId: 'EST-01',
+            clientId: user.clientId || 'CLI-01'
+          }));
+          
+          const { api } = await import('../services/api');
+          const res = await api.bulkSaveVehicles(mapped);
+          if (res.success) toast.success(`Se cargaron ${mapped.length} vehículos`);
+          else throw new Error(res.error);
+        } else {
+          const mapped = data.map((row: any) => ({
+            name: row.Nombre || row.nombre,
+            documentType: row.Tipo_ID || row.tipo_id || 'CC',
+            documentNumber: row.Numero_ID || row.numero_id,
+            phone: row.Telefono || row.telefono,
+            licenseCategory: row.Categoria_Licencia || row.categoria_licencia,
+            licenseExpiry: row.Vencimiento_Licencia || row.vencimiento_licencia,
+            statusId: 'EST-01',
+            clientId: user.clientId || 'CLI-01'
+          }));
+          const { api } = await import('../services/api');
+          const res = await api.bulkSaveDrivers(mapped);
+          if (res.success) toast.success(`Se cargaron ${mapped.length} conductores`);
+          else throw new Error(res.error);
+        }
+        
+        window.location.reload(); 
+      } catch (err: any) {
+        toast.error("Error al procesar el archivo: " + err.message);
+      } finally {
+        setIsProcessingAI(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const handleConfirmDelete = async () => {
     if (!recordToDelete) return;
     try {
@@ -423,7 +520,27 @@ const FleetManager: React.FC<FleetManagerProps> = ({
             <div className={`absolute top-1 bottom-1 w-[40px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayType === 'table' ? 'left-1' : 'left-[44px]'}`}></div>
           </div>
 
-          <button onClick={handleExportExcel} className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl"><Icons.Excel className="w-4 h-4" /></button>
+          <button onClick={handleExportExcel} className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl group relative" title="Exportar a Excel">
+            <Icons.Excel className="w-4 h-4" />
+          </button>
+
+          {canCreate && (
+            <div className="flex gap-2">
+              <input type="file" ref={fileInputRef} onChange={handleBulkUpload} className="hidden" accept=".xlsx,.xls" />
+              <div className="relative group">
+                 <button onClick={() => fileInputRef.current?.click()} className="p-3 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-900 hover:text-white transition-all shadow-md group border border-slate-200" title="Carga Masiva (Excel)">
+                    <Icons.Shield className="w-4 h-4 rotate-180" />
+                 </button>
+                 <button 
+                   onClick={handleDownloadTemplate}
+                   className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-lg border-2 border-white hover:scale-110 transition-all"
+                   title="Descargar Plantilla"
+                 >
+                   <Icons.Check className="w-2.5 h-2.5" />
+                 </button>
+              </div>
+            </div>
+          )}
 
           {canCreate && (
             <button 
