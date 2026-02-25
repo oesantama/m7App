@@ -1017,182 +1017,125 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
     return (
         <>
-        <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Cabecera de Control */}
-            {/* Cabecera de Control Compacta */}
-            <div className="bg-white rounded-[1.5rem] p-3 shadow-md border border-slate-100 flex flex-nowrap items-center justify-between gap-4 overflow-x-auto custom-scrollbar">
-                <div className="flex items-center gap-3 shrink-0">
-                    <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center shadow-md border border-emerald-500">
-                        <Icons.Radar className="w-4 h-4 text-emerald-500 animate-pulse" />
+        <div className="flex flex-col h-screen bg-slate-100 overflow-hidden font-inter">
+            {/* Header M7 Inteligencia - Ultra Compacto (UNA SOLA LÍNEA) */}
+            <header className="h-14 bg-slate-900 flex items-center justify-between px-6 shrink-0 z-50 border-b border-white/5 shadow-2xl">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <Icons.Radar className="text-slate-950 w-4 h-4 animate-pulse" />
+                        </div>
+                        <div>
+                            <h1 className="text-xs font-black text-white uppercase tracking-tighter leading-none flex items-center gap-2">
+                                 Centro de Mando
+                                 <span className="bg-emerald-500/20 text-emerald-400 text-[6px] px-1.5 py-0.5 rounded-full border border-emerald-500/30 font-black tracking-widest">IQ V1.8</span>
+                            </h1>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-none">Centro de Mando</h2>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                            <div className="w-1 h-1 rounded-full bg-emerald-500 animate-ping"></div>
-                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">GPS v1.2</p>
+
+                    {/* KPIs INTEGRADOS EN EL HEADER (UNA SOLA LÍNEA) */}
+                    <div className="hidden lg:flex items-center gap-4 ml-6 border-l border-white/10 pl-6">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Visibles</span>
+                            <span className="text-xs font-black text-white">{vehicleLocations.length}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                            <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">GPS OK</span>
+                            <span className="text-xs font-black text-emerald-400">
+                                {vehicleLocations.filter(l => (Date.now() - new Date(l.updated_at).getTime()) < 600000).length}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></div>
+                            <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Sin Señal</span>
+                            <span className="text-xs font-black text-rose-400">
+                                {vehicleLocations.filter(l => (Date.now() - new Date(l.updated_at).getTime()) >= 600000).length}
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4 shrink-0">
-                    <div className="flex bg-slate-50 p-1 rounded-lg items-center gap-1 border border-slate-100 h-9">
-                         <div className="text-center px-2 py-0.5 bg-white rounded flex flex-col justify-center">
-                            <p className="text-[5px] font-black text-emerald-500 uppercase leading-none">Visi</p>
-                            <p className="text-[10px] font-black text-slate-900 leading-none">{filteredRoutes.length}</p>
-                        </div>
-                        <div className="text-center px-2 py-0.5 flex flex-col justify-center">
-                            <p className="text-[5px] font-black text-slate-400 uppercase leading-none">Ok</p>
-                            <p className="text-[10px] font-black text-slate-700 leading-none">{filteredLocations.length}</p>
-                        </div>
-                        <div className="text-center px-2 py-0.5 flex flex-col justify-center">
-                            <p className="text-[5px] font-black text-rose-500 uppercase leading-none">Off</p>
-                            <p className="text-[10px] font-black text-slate-700 leading-none">{Math.max(0, filteredRoutes.length - filteredLocations.length)}</p>
-                        </div>
-                    </div>
-
-                    <div className="hidden sm:flex bg-slate-50 p-1 rounded-lg items-center gap-2 border border-slate-100 px-2 h-9">
-                        <div className="flex items-center gap-1">
-                            <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
-                            <p className="text-[6px] font-black text-slate-600 uppercase">Hub</p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                             <div className="w-1.5 h-1.5 bg-slate-900 rounded-sm rotate-45"></div>
-                            <p className="text-[6px] font-black text-slate-600 uppercase">Ruta</p>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                        <button
-                            onClick={fetchLocations}
-                            disabled={isValidating}
-                            className={`px-3 py-1.5 bg-slate-900 text-white rounded-lg font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-1.5 ${isValidating ? 'opacity-50' : ''}`}
-                        >
-                            {isValidating ? <Icons.RotateCcw className="w-3 h-3 animate-spin" /> : <Icons.MapPin className="w-3 h-3" />}
-                            GPS
-                        </button>
-                        <button
-                            onClick={() => { setHistoryData([]); setShowHistoryModal(true); }}
-                            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-black text-[8px] uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-1.5"
-                        >
-                            <Icons.History className="w-3 h-3" />
-                            Historial
-                        </button>
-                        <button
-                            onClick={onRefresh}
-                            className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-emerald-500 transition-all"
-                        >
-                            <Icons.RefreshCw className="w-3 h-3" />
-                        </button>
-                    </div>
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => setShowHistoryModal(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/5 text-[8px] font-black uppercase tracking-widest transition-all group"
+                    >
+                        <Icons.History className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                        <span>Historial</span>
+                    </button>
+                    <button 
+                        onClick={fetchLocations}
+                        disabled={isValidating}
+                        className={`w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-slate-950 hover:bg-emerald-400 transition-all ${isValidating ? 'animate-spin' : ''}`}
+                    >
+                        <Icons.RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                 </div>
-            </div>
+            </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[calc(100vh-210px)]">
-                <div className="lg:col-span-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 pb-10">
-                    {activeRoutes.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center p-10 bg-white/40 backdrop-blur-xl rounded-[3rem] border border-white/20 shadow-xl">
-                            <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-                                <Icons.Truck className="w-12 h-12 text-slate-300" />
+                <main className="flex-1 flex overflow-hidden">
+                    {/* Lista de Rutas Lateral - Más delgada y sólida */}
+                    <div className="w-[340px] border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar p-4 space-y-3 shrink-0">
+                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Unidades en Ruta</h3>
+                        {activeRoutes.length === 0 ? (
+                            <div className="text-center p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Esperando despacho...</p>
                             </div>
-                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Sin Despachos</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-2">No hay vehículos en ruta.</p>
-                        </div>
-                    ) : (
-                        activeRoutes.map((route) => {
-                            const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
-                                const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
-                                const inv = invoices.find(i => String(i.id).trim().replace(/[\r\n\t\f\v ]/g, '') === cleanId);
-                                return acc + Number(inv?.volumeM3 || 0);
-                            }, 0);
+                        ) : (
+                            activeRoutes.map((route) => {
+                                const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
+                                const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
+                                    const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
+                                    const inv = invoices.find(i => String(i.id).trim().replace(/[\r\n\t\f\v ]/g, '') === cleanId);
+                                    return acc + Number(inv?.volumeM3 || 0);
+                                }, 0);
+                                const utilizationPercent = vehicleData ? (totalVolume / vehicleData.capacityM3) * 100 : 0;
 
-                            const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
-                            const utilizationPercent = vehicleData ? (totalVolume / vehicleData.capacityM3) * 100 : 0;
-
-                            return (
-                                <div key={route.id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden flex flex-col group hover:shadow-2xl transition-all border-l-8 border-l-slate-900 hover:border-l-emerald-500">
-                                    <div className="p-6">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="bg-emerald-500 text-slate-900 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">
-                                                {route.status === 'EN_RUTA' ? '🚚 EN RUTA' : '✅ CONFIRMADA'}
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">PLACA</p>
-                                                <h4 className="text-xl font-black text-slate-900">{route.plate}</h4>
+                                return (
+                                    <div key={route.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 group hover:shadow-md transition-all border-l-4 border-l-slate-900 hover:border-l-emerald-500">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="text-sm font-black text-slate-900 leading-none">{route.plate}</h4>
+                                            <div className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                                {utilizationPercent.toFixed(0)}% Cap.
                                             </div>
                                         </div>
 
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100">
-                                                    <Icons.User className="w-4 h-4 text-slate-400" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black text-slate-900 uppercase">
-                                                        {(() => {
-                                                            if (route.driver_name && route.driver_name !== 'S/A') return route.driver_name;
-                                                            const link = assignments.find(a => a.vehicleId === route.vehicle_id && a.isActive);
-                                                            const drv = drivers.find(d => d.id === link?.driverId);
-                                                            return drv?.name || 'SIN CONDUCTOR';
-                                                        })()}
-                                                    </p>
-                                                    <p className="text-[8px] text-slate-500 font-black uppercase">Responsable Operativo</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-center">
-                                                    <p className="text-[7px] font-black text-slate-400 uppercase">DOCUMENTOS</p>
-                                                    <p className="text-sm font-black text-slate-900">{(route.invoice_ids || []).length}</p>
-                                                </div>
-                                                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-center">
-                                                    <p className="text-[7px] font-black text-slate-400 uppercase">OCUPACIÓN</p>
-                                                    <p className="text-sm font-black text-emerald-600">
-                                                        {utilizationPercent.toFixed(0)}%
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex gap-2">
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => setVisualizedRoute(route)}
-                                                        className={`flex-1 py-3 border border-slate-200 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${visualizedRoute?.id === route.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-white hover:bg-slate-50'}`}
-                                                    >
-                                                        {visualizedRoute?.id === route.id ? 'Viendo Mapa' : '🗺️ Ver Mapa'}
-                                                    </button>
-                                                    <div className="flex gap-1 flex-1">
-                                                        <button
-                                                            onClick={() => setSelectedActiveRoute(route)}
-                                                            className="flex-1 py-3 bg-slate-50 hover:bg-slate-900 hover:text-white border border-slate-200 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
-                                                        >
-                                                            Detalles
-                                                        </button>
-                                                        <button
-                                                            onClick={() => generateRoutePDF(route)}
-                                                            disabled={isGeneratingPDF}
-                                                            className="px-3 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
-                                                        >
-                                                            {isGeneratingPDF ? '...' : 'PDF'}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={() => setVisualizedRoute(route)}
+                                                className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${visualizedRoute?.id === route.id ? 'bg-slate-900 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+                                            >
+                                                {visualizedRoute?.id === route.id ? '📍 Rastreo On' : 'Ver Mapa'}
+                                            </button>
+                                            <button 
+                                                onClick={() => setSelectedActiveRoute(route)}
+                                                className="px-2.5 py-1.5 bg-emerald-500/10 text-emerald-700 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all"
+                                            >
+                                                Docs
+                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
+                                );
+                            })
+                        )}
+                    </div>
 
-                {/* Mapa del Centro de Mando */}
-                <div className="lg:col-span-2 bg-slate-200 rounded-[3rem] shadow-xl border-8 border-white overflow-hidden relative group h-full">
-                    <div id="logistics-dispatch-map" className="w-full min-h-[500px] h-full"></div>
-
-
-
-
-                </div>
+                    {/* MAPA EXPANDIDO TOTAL */}
+                    <div className="flex-1 relative bg-slate-950">
+                        <div id="logistics-dispatch-map" className="absolute inset-0 w-full h-full grayscale-[0.1] contrast-[1.05]" />
+                        
+                        {/* Indicador Flotante Sutil */}
+                        <div className="absolute top-4 left-4 z-[400] bg-slate-900/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Monitor Live</span>
+                            </div>
+                            <div className="w-px h-3 bg-white/20"></div>
+                            <div className="text-[9px] font-black text-white">{vehicleLocations.length} Activos</div>
+                        </div>
+                    </div>
+                </main>
             </div>
 
             {/* Modal de Detalle Mejorado */}
@@ -1814,7 +1757,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     </div>
                 </div>
             )}
-        </div>
 
         {/* ═══════════════════════════════════════════════════════════
              MODAL: ENTREGAR CLIENTE

@@ -23,7 +23,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const result = await pool.query(
-      'SELECT id, email, password, name, role_id, client_ids, two_factor_enabled, two_factor_secret FROM users WHERE email = $1',
+      'SELECT id, email, password, name, role_id, client_ids, two_factor_enabled, two_factor_secret FROM users WHERE (LOWER(email) = $1 OR document_number = $1 OR phone = $1)',
       [email.toLowerCase()]
     );
 

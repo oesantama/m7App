@@ -1068,6 +1068,7 @@ const App: React.FC = () => {
 
       {/* CHATBOT POSICIÓN ABSOLUTA AL FRENTE - ALINEADO CON HEADER 'RUTAS' */}
       <AIChat
+        key="global-ai-chat-v8"
         context={{
           user: user.name,
           activeTab,

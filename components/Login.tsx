@@ -155,7 +155,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1 mb-1">
-                  Correo Electrónico
+                  Usuario / Documento / Teléfono
                 </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-emerald-500 transition-colors">
@@ -163,13 +163,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </div>
                   <input
                     id="email"
-                    type="email"
+                    type="text"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="ejemplo@correo.com"
+                    placeholder="Email, Documento o Teléfono"
                     className="w-full bg-slate-800/40 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-bold text-sm sm:text-base"
-                    autoComplete="email"
+                    autoComplete="username"
                   />
                 </div>
               </div>

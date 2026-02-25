@@ -16,7 +16,7 @@ interface AIChatProps {
 const AIChat: React.FC<AIChatProps> = ({ context }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '¡Bienvenido al Centro de Inteligencia **OrbitM7 IQ**! 🚀\n\nEstoy conectado al núcleo operativo de OrbitM7. Puedo ayudarte a:\n- **Optimizar rutas** de despacho.\n- **Auditar documentos** pendientes.\n- **Analizar disponibilidad** de tu flota.\n\n¿Por dónde empezamos hoy?' }
+    { role: 'assistant', content: '¡Bienvenido al Centro de Inteligencia **OrbitM7 IQ V1.8**! 🚀\n\nEstoy conectado al núcleo operativo de OrbitM7. Puedo ayudarte a:\n- **Optimizar rutas** de despacho.\n- **Auditar documentos** pendientes.\n- **Analizar disponibilidad** de tu flota.\n\n¿Por dónde empezamos hoy?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -66,13 +66,13 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
   }, []);
 
   const trigger = (
-    <div className={headerPortal ? "" : "fixed bottom-8 right-8 z-[99999]"}>
+    <div className="fixed bottom-8 right-8 z-[2147483647]">
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`relative rounded-full flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-95 group overflow-visible ${
           isOpen 
             ? 'bg-slate-950 w-12 h-12 shadow-2xl border border-white/10' 
-            : 'bg-slate-950 w-16 h-16 border-2 border-emerald-500/20 shadow-[0_20px_50px_rgba(16,185,129,0.3)]'
+            : 'bg-slate-950 w-14 h-14 border-2 border-emerald-500/20 shadow-[0_15px_40px_rgba(16,185,129,0.4)]'
         }`}
       >
         {isOpen ? (
@@ -199,7 +199,7 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
 
   return (
     <>
-      {headerPortal ? ReactDOM.createPortal(trigger, headerPortal) : ReactDOM.createPortal(trigger, document.body)}
+      {ReactDOM.createPortal(trigger, document.body)}
       {ReactDOM.createPortal(window, document.body)}
     </>
   );
