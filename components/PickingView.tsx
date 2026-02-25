@@ -72,15 +72,17 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
         return allUsers.filter(u => u.id !== user.id);
     }, [allUsers, user.id]);
 
-    const handleItemToggle = (sku: string) => {
+    const handleItemToggle = (uiId: string) => {
         setConfirmedItems(prev => 
-            prev.includes(sku) ? prev.filter(s => s !== sku) : [...prev, sku]
+            prev.includes(uiId) ? prev.filter(id => id !== uiId) : [...prev, uiId]
         );
     };
 
     const isAllConfirmed = useMemo(() => {
         if (!activeInvoice || !activeInvoice.items) return false;
-        return activeInvoice.items.every((item: any) => confirmedItems.includes(item.sku));
+        return activeInvoice.items.every((item: any) => 
+            confirmedItems.includes(item._uiId)
+        );
     }, [activeInvoice, confirmedItems]);
 
     async function handleStartActivity(inv: any) {
@@ -97,8 +99,14 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
                 createdBy: user.name
             });
             if (res.success) {
-                setActiveInvoice({ ...inv, pickingId: res.pickingId });
+                // Inyectar IDs estables DE VERDAD partiendo de la posición original
+                const itemsWithIds = (inv.items || []).map((it: any, i: number) => ({
+                    ...it,
+                    _uiId: `ui-${inv.id || inv.invoiceNumber}-${i}-${it.sku}`
+                }));
+                setActiveInvoice({ ...inv, items: itemsWithIds, pickingId: res.pickingId });
                 setConfirmedItems([]);
+                setItemSearch('');
             }
         } catch (e: any) {
             toast.error(e.message || "Error al iniciar");
@@ -139,7 +147,10 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
                             <Icons.ChevronRight className="w-4 h-4 rotate-180" />
                         </button>
                         <div>
-                            <p className="text-[8px] font-black text-slate-400 theme-text-secondary uppercase tracking-widest">Alistando Factura</p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-[8px] font-black text-slate-400 theme-text-secondary uppercase tracking-widest">Alistando Factura</p>
+                                <span className="text-[7px] bg-emerald-50 text-emerald-600 px-1.5 rounded font-black border border-emerald-100 uppercase tracking-tighter">v2.5 FINAL</span>
+                            </div>
                             <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter leading-none">
                                 {activeInvoice.invoiceNumber || activeInvoice.id}
                             </h3>
@@ -161,33 +172,39 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
                     </div>
                 </div>
 
-                {/* Lista de Artículos */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                {/* Lista de Artículos - ULTRA COMPACTA */}
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5 custom-scrollbar">
                     {activeInvoice.items?.filter((item: any) => {
                         if (!itemSearch) return true;
                         const lowerSearch = itemSearch.toLowerCase();
                         return (item.sku || '').toLowerCase().includes(lowerSearch) || 
                                (item.articleName || '').toLowerCase().includes(lowerSearch);
-                    }).map((item: any, idx: number) => (
-                        <div key={idx} className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-4 ${confirmedItems.includes(item.sku) ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 shadow-sm'}`}>
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] shrink-0 ${confirmedItems.includes(item.sku) ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                    {idx + 1}
+                    }).map((item: any) => {
+                        const isConfirmed = confirmedItems.includes(item._uiId);
+                        
+                        return (
+                            <div key={item._uiId} className={`px-3 py-1.5 rounded-xl border transition-all flex items-center justify-between gap-3 ${isConfirmed ? 'bg-emerald-50 border-emerald-200 shadow-sm shadow-emerald-100/50' : 'bg-white border-slate-100 shadow-sm'}`}>
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-[9px] shrink-0 ${isConfirmed ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                        {activeInvoice.items.indexOf(item) + 1}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="font-black text-slate-900 uppercase text-[10px] leading-tight tracking-tight">SKU: {item.sku}</h4>
+                                            <span className="text-[8px] font-black text-emerald-700 bg-emerald-100/50 px-1.5 py-0.5 rounded border border-emerald-200/50 uppercase">Cant: {item.qty || item.expectedQty || 0} {item.unit}</span>
+                                        </div>
+                                        <p className="text-[7.5px] font-bold text-slate-400 uppercase tracking-widest truncate leading-tight mt-0.5">{item.articleName || 'Descripción no disponible'}</p>
+                                    </div>
                                 </div>
-                                <div className="truncate flex flex-col">
-                                    <h4 className="font-black text-slate-900 uppercase text-[11px] truncate leading-tight">SKU: {item.sku}</h4>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{item.articleName || 'Descripción no disponible'}</p>
-                                    <p className="text-[8px] font-black text-emerald-600 uppercase mt-0.5">Cantidad: {item.expectedQty} {item.unit}</p>
-                                </div>
+                                <button 
+                                    onClick={() => handleItemToggle(item._uiId)}
+                                    className={`px-4 py-1.5 rounded-lg font-black text-[7.5px] uppercase tracking-widest transition-all shrink-0 ${isConfirmed ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-slate-900 text-white hover:bg-emerald-500 shadow-md'}`}
+                                >
+                                    {isConfirmed ? 'LISTO' : 'CONFIRMAR'}
+                                </button>
                             </div>
-                            <button 
-                                onClick={() => handleItemToggle(item.sku)}
-                                className={`px-5 py-2 rounded-lg font-black text-[8px] uppercase tracking-widest transition-all shrink-0 ${confirmedItems.includes(item.sku) ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-slate-900 text-white hover:bg-emerald-500'}`}
-                            >
-                                {confirmedItems.includes(item.sku) ? 'LISTO' : 'CONFIRMAR'}
-                            </button>
-                        </div>
-                    ))}
+                        );
+                    })}
                     
                     {activeInvoice.items?.length === 0 && (
                         <div className="py-20 text-center opacity-20 filter grayscale">

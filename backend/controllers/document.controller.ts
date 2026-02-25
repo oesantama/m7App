@@ -534,8 +534,8 @@ export const getInvoices = async (req: Request, res: Response) => {
           'unCode', document_items.un_code,
           'clientRef', document_items.client_ref
         )) as "items",
-        4.6097 as lat,
-        -74.0817 as lng
+        6.2518 as lat,
+        -75.5636 as lng
       FROM document_items
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
       LEFT JOIN articles ON document_items.article_id = articles.id

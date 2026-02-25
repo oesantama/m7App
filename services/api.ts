@@ -248,8 +248,8 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }).then(r => r.json()),
-  getLatestVehicleLocations: () => fetch(`${API_URL}/locations/latest`).then(r => r.json()),
-  getVehicleLocationHistory: (vehicleId: string, limit = 50) => fetch(`${API_URL}/locations/history/${vehicleId}?limit=${limit}`).then(r => r.json()),
+  getLatestVehicleLocations: () => fetchJson(`${API_URL}/locations/latest`),
+  getVehicleLocationHistory: (vehicleId: string, limit = 50) => fetchJson(`${API_URL}/locations/history/${vehicleId}?limit=${limit}`),
 
   // Gestión de Asignaciones (Vínculos Operativos)
   getAssignments: () => fetchJson(`${API_URL}/assignments`),
