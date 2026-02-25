@@ -53,7 +53,9 @@ const httpsGet = (url: string): Promise<any[]> => {
 
 const callNominatim = async (query: string): Promise<[number, number] | null> => {
     await waitForRateLimit();
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=co`;
+    // Restringir búsqueda al Valle de Aburrá (Medellín y alrededores) mediante viewbox y bounded=1
+    // Viewbox approx: MinLon -75.83, MaxLat 6.45, MaxLon -75.35, MinLat 5.95
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=co&viewbox=-75.83,6.45,-75.35,5.95&bounded=1`;
     try {
         const results = await httpsGet(url);
         if (results && results.length > 0) {

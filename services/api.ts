@@ -57,6 +57,35 @@ export const api = {
     }
     return res.json();
   },
+  async confirmDelivery(data: {
+    invoiceId: string; dispatchId?: string; driverId: string; vehicleId?: string;
+    deliveryType: 'FULL' | 'PARTIAL' | 'RETURN';
+    deliveredItems: any[]; notes?: string; returnReason?: string; password: string;
+  }) {
+    const res = await fetch(`${API_URL}/dispatch/confirm-delivery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al confirmar entrega');
+    }
+    return res.json();
+  },
+  async getDeliveryHistory(params: Record<string, string> = {}) {
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_URL}/dispatch/delivery-history${qs ? '?' + qs : ''}`);
+    if (!res.ok) throw new Error('Error al obtener historial de entregas');
+    return res.json();
+  },
+  async getReturnHistory(params: Record<string, string> = {}) {
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_URL}/dispatch/return-history${qs ? '?' + qs : ''}`);
+    if (!res.ok) throw new Error('Error al obtener historial de devoluciones');
+    return res.json();
+  },
+
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO

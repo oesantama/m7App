@@ -102,7 +102,69 @@ FROM vehicle_locations vl
 LEFT JOIN vehicles v ON vl.vehicle_id = v.id
 ORDER BY vehicle_id, updated_at DESC;
 
--- Saneamiento inicial de datos huérfanos
+-- 10. Sistema de Despacho y Firmas
+CREATE TABLE IF NOT EXISTS dispatch_assignments (
+    id SERIAL PRIMARY KEY,
+    invoice_id TEXT NOT NULL,
+    driver_id TEXT NOT NULL,
+    helper_ids JSONB DEFAULT '[]',
+    scanned_items JSONB DEFAULT '[]',
+    is_accompanied BOOLEAN DEFAULT FALSE,
+    helper_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'PENDING_SIGNATURES',
+    created_by TEXT,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS dispatch_signatures_pending (
+    id SERIAL PRIMARY KEY,
+    dispatch_id INTEGER REFERENCES dispatch_assignments(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    role_type TEXT,
+    signed BOOLEAN DEFAULT FALSE,
+    signed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 11. Sistema de Entrega y Devoluciones
+CREATE TABLE IF NOT EXISTS delivery_confirmations (
+    id SERIAL PRIMARY KEY,
+    dispatch_id TEXT,
+    invoice_id TEXT NOT NULL,
+    driver_id TEXT NOT NULL,
+    vehicle_id TEXT,
+    delivery_type TEXT NOT NULL,
+    delivered_items JSONB DEFAULT '[]',
+    notes TEXT,
+    delivered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS delivery_returns (
+    id SERIAL PRIMARY KEY,
+    confirmation_id INTEGER REFERENCES delivery_confirmations(id) ON DELETE SET NULL,
+    invoice_id TEXT NOT NULL,
+    driver_id TEXT NOT NULL,
+    vehicle_id TEXT,
+    return_reason TEXT,
+    notes TEXT,
+    status TEXT DEFAULT 'PENDING',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS delivery_return_items (
+    id SERIAL PRIMARY KEY,
+    return_id INTEGER NOT NULL REFERENCES delivery_returns(id) ON DELETE CASCADE,
+    sku TEXT,
+    article_name TEXT,
+    quantity_returned INTEGER NOT NULL DEFAULT 0,
+    quantity_delivered INTEGER NOT NULL DEFAULT 0,
+    unit TEXT,
+    notes TEXT
+);
+
+-- Saneamiento final
 UPDATE document_items SET item_status = 'PENDIENTE' WHERE item_status IS NULL;
 UPDATE document_items SET invoice = 'S/I' WHERE invoice IS NULL OR invoice = '';
 

@@ -1,0 +1,25 @@
+{
+  "name": "Milla 7 - Sistema de Logística",
+  "short_name": "M7 Logística",
+  "description": "Sistema Inteligente de Gestión y Optimización de Rutas - Milla 7",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/m7_favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/m7_favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "categories": ["business", "productivity"]
+}

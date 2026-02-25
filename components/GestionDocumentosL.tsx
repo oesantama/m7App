@@ -328,7 +328,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
         const iFactura = findIdx(['remision/transferencia', 'factura', 'remision', 'documento', 'invoice']);
         const iCiudad = findIdx(['destino', 'ciudad', 'city']);
-        const iDir = findIdx(['direcciÃ³n 1', 'f_direcciÃ³n', 'direcciÃ³n', 'direccion', 'address', 'dir 1']);
+        const iDir = findIdx(['dirección 1', 'dirección', 'dirección1', 'direccion 1', 'direccion', 'direccion1', 'dir 1', 'dir1', 'address', 'f_dirección', 'f_direccion', 'direcciÃ³n 1', 'direcciÃ³n']);
         const iPed = findIdx(['nÂº ped', 'pedido', 'order']);
         const iPeso = findIdx(['peso', 'weight', 'kgs', 'kilogramos']);
         

@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import apiRoutes from './routes/index.js';
+import { initDeliveryTables } from './controllers/dispatch.controller.js';
+
 
 dotenv.config();
 
@@ -63,6 +65,12 @@ app.listen(PORT, () => {
 
   // Inicialización de WhatsApp 
   console.log('[ORBIT-SYSTEM] Evolution API Integration Active');
+
+  // Inicialización automática de tablas de entrega/devoluciones
+  console.log('[M7-SYSTEM] Iniciando creación de tablas de entrega...');
+  initDeliveryTables()
+    .then(() => console.log('[M7-SYSTEM] initDeliveryTables completado exitosamente.'))
+    .catch(e => console.error('[M7-SYSTEM] Error CRÍTICO en initDeliveryTables:', e));
 
   // RESTAURACIÓN AUTOMÁTICA M7 (MIGRACIONES)
   import('./services/migration.service.js').then(m => {

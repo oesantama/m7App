@@ -9,10 +9,10 @@ services:
       - PORT=8080
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER:-m7_admin}
-      - DB_PASS=${POSTGRES_PASSWORD:-m7_master_password}
-      - DB_NAME=${POSTGRES_DB:-m7_logistica}
-      # Add other env vars here or let Coolify inject them via .env
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASS=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - NODE_ENV=production
     depends_on:
       - postgres
     networks:
@@ -35,17 +35,22 @@ services:
     container_name: m7-evolution
     restart: always
     environment:
-      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-B3B896F8-9862-4467-9C17-A038848C1726}
-      - SERVER_URL=${EVOLUTION_API_URL:-http://localhost:8081}
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - SERVER_URL=${EVOLUTION_API_URL}
       - DOCKER_ENV=true
       - LOG_LEVEL=error
       - DEL_INSTANCE=false
       - STORE_MESSAGES=true
       - STORE_MESSAGE_UP=true
-      - DATABASE_ENABLED=false # Using local store for simplicity unless postgres needed
+      - DATABASE_ENABLED=true
+      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
     volumes:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
+    depends_on:
+      - postgres
     networks:
       - m7-network
 
@@ -54,9 +59,9 @@ services:
     image: postgres:15-alpine
     restart: always
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-m7_admin}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-m7_master_password}
-      - POSTGRES_DB=${POSTGRES_DB:-m7_logistica}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - m7_logistica_data:/var/lib/postgresql/data
     networks:

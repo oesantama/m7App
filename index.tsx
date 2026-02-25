@@ -1,6 +1,10 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { registerSW } from 'virtual:pwa-register';
+
+// Registrar Service Worker para PWA (Multi-plataforma Offline)
+registerSW({ immediate: true });
+
 // Fix: Import 'App' from './App' to match the App.tsx file exactly.
 // The casing conflict is addressed by using uppercase and neutralizing the lowercase app.tsx.
 // @ts-ignore

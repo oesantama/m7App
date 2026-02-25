@@ -66,37 +66,41 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
   }, []);
 
   const trigger = (
-    <button 
-      onClick={() => setIsOpen(!isOpen)}
-      className={`fixed bottom-8 right-8 z-[99999] rounded-full flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-95 group overflow-visible shadow-[0_20px_50px_rgba(16,185,129,0.3)] ${
-        isOpen 
-          ? 'bg-slate-950 w-16 h-16' 
-          : 'bg-slate-950 w-20 h-20 border-2 border-emerald-500/20'
-      }`}
-    >
-      {isOpen ? (
-        <Icons.X className="text-white w-6 h-6" />
-      ) : (
-        <div className="relative w-full h-full flex items-center justify-center">
-          {/* Anillos de pulso premium */}
-          <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping scale-125"></div>
-          
-          <div className="flex flex-col items-center justify-center relative z-10">
-            <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/40 group-hover:rotate-12 transition-transform">
-               <Icons.Brain className="text-slate-950 w-6 h-6" />
+    <div className={headerPortal ? "" : "fixed bottom-8 right-8 z-[99999]"}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`relative rounded-full flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-95 group overflow-visible ${
+          isOpen 
+            ? 'bg-slate-950 w-12 h-12 shadow-2xl border border-white/10' 
+            : 'bg-slate-950 w-16 h-16 border-2 border-emerald-500/20 shadow-[0_20px_50px_rgba(16,185,129,0.3)]'
+        }`}
+      >
+        {isOpen ? (
+          <Icons.X className="text-white w-6 h-6" />
+        ) : (
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* Anillos de pulso premium */}
+            <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping scale-125"></div>
+            
+            <div className="flex flex-col items-center justify-center relative z-10">
+              <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/40 group-hover:rotate-12 transition-transform">
+                 <Icons.Brain className="text-slate-950 w-5 h-5" />
+              </div>
+              <span className="text-[7px] font-black text-emerald-400 uppercase tracking-[0.2em] mt-1 opacity-80 group-hover:opacity-100 transition-opacity">IQ</span>
             </div>
-            <span className="text-[7px] font-black text-emerald-400 uppercase tracking-[0.3em] mt-1.5 opacity-80 group-hover:opacity-100 transition-opacity">OrbitM7 IQ</span>
+            
+            {/* Indicador de actividad IA sutil */}
+            <div className="absolute top-5 right-5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-slate-950 shadow-sm shadow-emerald-500/50"></div>
           </div>
-          
-          {/* Indicador de actividad IA sutil */}
-          <div className="absolute top-4 right-4 w-2 h-2 bg-emerald-500 rounded-full border-2 border-slate-950 shadow-sm shadow-emerald-500/50"></div>
-        </div>
-      )}
-    </button>
+        )}
+      </button>
+    </div>
   );
 
   const window = isOpen ? (
-    <div className="fixed bottom-32 right-10 z-[2147483647] w-[380px] md:w-[420px] max-h-[calc(100vh-160px)] h-[650px] bg-slate-900/95 backdrop-blur-3xl border border-white/10 rounded-[3.5rem] shadow-[0_48px_150px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 zoom-in-95 duration-500 pointer-events-auto">
+    <div className={`fixed z-[2147483647] w-[380px] md:w-[420px] max-h-[calc(100vh-100px)] h-[600px] bg-slate-900/95 backdrop-blur-3xl border border-white/10 rounded-[3.5rem] shadow-[0_48px_150px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 zoom-in-95 duration-500 pointer-events-auto ${
+      headerPortal ? "top-20 right-10" : "bottom-28 right-8"
+    }`}>
       {/* Header Compacto - Refinado */}
       <div className="p-5 bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 flex justify-between items-center shrink-0 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>

@@ -836,29 +836,59 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   };
 
   const actualMassAssign = async () => {
+    if (isSaving) return;
     setIsSaving(true);
     let successCount = 0;
+    let failCount = 0;
 
-    for (const route of suggestedRoutes) {
+    // Clonar para evitar problemas de mutación durante el loop
+    const routesToProcess = [...suggestedRoutes];
+
+    for (const route of routesToProcess) {
       try {
         const link = assignments.find(a => a.vehicleId === route.vehicle.id && a.isActive);
+        // Generar ID más robusto
+        const uniqueId = `rt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        
         const res = await api.saveRoute({
-          id: `rt-${Date.now()}-${Math.random()}`,
+          id: uniqueId,
           vehicleId: route.vehicle.id,
           driverId: link?.driverId || 'S/A',
           clientId: selectedClient,
-          invoiceIds: route.assignedInvoices.map(i => i.id),
-          createdBy: user.name
+          invoiceIds: route.assignedInvoices.map(i => i.id || i.invoiceNumber),
+          createdBy: user.name || 'SISTEMA'
         });
-        if (res.success) successCount++;
+
+        if (res.success) {
+          successCount++;
+        } else {
+          console.error(`Error en ruta ${route.vehicle.plate}:`, res.error);
+          failCount++;
+        }
+        
+        // Pequeño delay opcional para no saturar si hay muchos
+        if (routesToProcess.length > 5) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
       } catch (e) {
-        console.error(e);
+        console.error(`Error fatal en ruta ${route.vehicle.plate}:`, e);
+        failCount++;
       }
     }
 
     setIsSaving(false);
-    toast.success(`${successCount} Despachos Confirmados Exitosamente`);
-    setSuggestedRoutes([]);
+    if (successCount > 0) {
+      toast.success(`${successCount} Despachos Confirmados Exitosamente`);
+      if (failCount > 0) {
+        toast.warning(`${failCount} rutas no pudieron ser confirmadas.`);
+      }
+      setSuggestedRoutes([]);
+      if (onRefresh) onRefresh();
+    } else if (failCount > 0) {
+      toast.error("Error al procesar el despacho masivo. No se confirmó ninguna ruta.");
+    }
+    
+    setDispatchConfirmation({ isOpen: false, route: null, isMass: false });
   };
 
   const handleExportPlanilla = (route: SuggestedRoute) => {
@@ -1063,16 +1093,39 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           </div>
           <div className="space-y-1 text-center md:text-left">
             <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">OrbitM7 Intelligence</h2>
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-              <span className="px-2 py-0.5 bg-emerald-500 text-slate-950 rounded-md text-[8px] font-black uppercase tracking-widest">Optimización 90%</span>
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+              <span className="px-2 py-0.5 bg-emerald-500 text-slate-950 rounded-md text-[8px] font-black uppercase tracking-widest shadow-sm">Optimización 90%</span>
               <select
                 value={selectedClient}
                 onChange={(e) => { setSelectedClient(e.target.value); setSuggestedRoutes([]); }}
-                className="bg-slate-50 border border-slate-200 px-3 py-0.5 rounded-md text-[9px] font-black uppercase outline-none focus:border-emerald-500"
+                className="bg-slate-50 border border-slate-200 px-3 py-0.5 rounded-md text-[9px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm"
               >
                 <option value="GLOBAL">FLOTA GLOBAL ORBIT</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+
+              {/* KPI BADGES INTEGRADOS (V2) */}
+              <div className="flex items-center gap-1.5 ml-2 border-l border-slate-200 pl-4 h-6">
+                <div className="flex flex-col items-center">
+                  <p className="text-[12px] font-black text-slate-900 leading-none">{validInvoices.length}</p>
+                  <p className="text-[6px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">Aptas</p>
+                </div>
+                <div className="w-px h-4 bg-slate-100 mx-1"></div>
+                <div className="flex flex-col items-center">
+                  <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.onBase}</p>
+                  <p className="text-[6px] font-black text-blue-500 uppercase tracking-widest mt-0.5">Base</p>
+                </div>
+                <div className="w-px h-4 bg-slate-100 mx-1"></div>
+                <div className="flex flex-col items-center">
+                  <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.assigned}</p>
+                  <p className="text-[6px] font-black text-indigo-500 uppercase tracking-widest mt-0.5">Asig</p>
+                </div>
+                <div className="w-px h-4 bg-slate-100 mx-1"></div>
+                <div className="flex flex-col items-center">
+                  <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.inRoute}</p>
+                  <p className="text-[6px] font-black text-amber-500 uppercase tracking-widest mt-0.5">Ruta</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1102,6 +1155,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             className="w-full md:w-auto px-4 py-3 bg-amber-50 text-amber-600 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap"
           >
             REAJUSTE
+          </button>
+
+          <button
+            onClick={handleMassAssign}
+            disabled={isSaving || suggestedRoutes.length === 0}
+            className="w-full md:w-auto bg-emerald-500 text-slate-950 px-6 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-xl hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 disabled:opacity-20 active:scale-95 whitespace-nowrap"
+          >
+            <Icons.CheckCircle className="w-4 h-4" />
+            {isSaving ? '...' : 'CONFIRMAR TODO'}
           </button>
 
           <button
@@ -1191,27 +1253,24 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           ) : (
 
             <div className="flex flex-col gap-4">
-              {/* Banner IA y Controles Masivos */}
-              <div className="bg-emerald-500 p-4 rounded-[2.5rem] shadow-lg flex flex-col md:flex-row items-center gap-4 animate-in zoom-in duration-500 justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-950 rounded-2xl flex items-center justify-center shrink-0 shadow-xl">
-                    <Icons.Brain className="text-emerald-500 w-6 h-6" />
+              {/* Información de Optimización IA (Compacta) */}
+              <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-2xl flex items-center justify-between px-6">
+                <div className="flex items-center gap-3">
+                  <Icons.Brain className="text-emerald-500 w-5 h-5 animate-pulse" />
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                    Plan óptimo generado con {Math.round(suggestedRoutes.reduce((acc, r) => acc + (r.utilization || 0), 0) / (suggestedRoutes.length || 1))}% de eficiencia promedio
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="text-center">
+                    <p className="text-[10px] font-black text-slate-900 leading-none">{suggestedRoutes.length}</p>
+                    <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mt-1">Rutas</p>
                   </div>
-                  <div>
-                    <h4 className="text-slate-950 font-black text-[10px] uppercase tracking-[0.2em] mb-1">OrbitM7 Intelligence</h4>
-                    <p className="text-slate-900 text-xs font-bold leading-tight">
-                      Opt. Promedio: {Math.round(suggestedRoutes.reduce((acc, r) => acc + r.utilization, 0) / suggestedRoutes.length)}% | Rutas: {suggestedRoutes.length}
-                    </p>
+                  <div className="text-center">
+                    <p className="text-[10px] font-black text-slate-900 leading-none">{suggestedRoutes.reduce((acc, r) => acc + (r.assignedInvoices?.length || 0), 0)}</p>
+                    <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mt-1">Facts</p>
                   </div>
                 </div>
-
-                <button
-                  onClick={handleMassAssign}
-                  disabled={isSaving}
-                  className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isSaving ? '...' : 'CONFIRMAR TODO'}
-                </button>
               </div>
 
               {/* Lista de Rutas Filtrada */}
@@ -1361,43 +1420,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           )}
         </div>
 
-        <div className="hidden lg:flex w-72 bg-white p-6 rounded-[2.5rem] shadow-xl border border-slate-100 flex-col gap-6 shrink-0 overflow-hidden">
-          <div className="space-y-4">
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b pb-2">Planificación</h3>
-            <div className="grid grid-cols-1 gap-3">
-              <div className="bg-slate-900 border-l-4 border-emerald-500 p-6 rounded-[2rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-all"></div>
-                <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-1">Pendientes Totales</p>
-                <p className="text-4xl font-black text-white">{validInvoices.length}</p>
-                <p className="text-[7px] font-bold text-slate-400 mt-2 uppercase tracking-widest">APTAS DESPACHO</p>
-              </div>
-              <div className="bg-white p-5 rounded-[1.5rem] border-2 border-slate-100 shadow-lg">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Flota Operativa</h3>
-              <div className="flex justify-between items-center">
-                <div className="text-center">
-                  <p className="text-3xl font-black text-slate-900">{fleetGeneralMetrics.onBase}</p>
-                  <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mt-1">En Base</p>
-                </div>
-                <div className="h-8 w-px bg-slate-100"></div>
-                <div className="text-center">
-                  <div className="flex gap-6">
-                      <div className="text-center">
-                        <p className="text-2xl font-black text-slate-900">{fleetGeneralMetrics.assigned}</p>
-                        <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-wider mt-1">Asignados</p>
-                      </div>
-                      <div className="w-px bg-slate-100 h-8 self-center"></div>
-                      <div className="text-center">
-                        <p className="text-2xl font-black text-slate-900">{fleetGeneralMetrics.inRoute}</p>
-                        <p className="text-[8px] font-bold text-amber-500 uppercase tracking-wider mt-1">En Ruta</p>
-                      </div>
-                  </div>
-                </div>
-              </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
       </div>
       {/* Modal de Auditoría para Movimientos Manuales */}
       {auditModal?.isOpen && (
@@ -1698,7 +1720,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
               <div className="space-y-4">
                 {(() => {
-                  const docMap = new Map<string, { label: string, desc: string, invoices: Invoice[], volume: number }>();
+                  const docMap = new Map<string, { label: string, desc: string, planType: string, invoices: Invoice[], volume: number }>();
 
                   validInvoices.forEach(inv => {
                     if (!inv.docLId) return; // Filtrado estricto: Solo Documentos L
@@ -1711,7 +1733,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     const desc = doc?.inventory_observation || "Carga Masiva Orbit";
 
                     if (!docMap.has(groupKey)) {
-                      docMap.set(groupKey, { label, desc, invoices: [], volume: 0 });
+                      docMap.set(groupKey, { 
+                        label, 
+                        desc, 
+                        planType: doc?.planType || 'Normal',
+                        invoices: [], 
+                        volume: 0 
+                      });
                     }
                     const entry = docMap.get(groupKey)!;
                     entry.invoices.push(inv);
@@ -1727,7 +1755,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     );
                   }
 
-                  return Array.from(docMap.entries()).map(([key, { label, desc, invoices, volume }], index) => {
+                  return Array.from(docMap.entries()).map(([key, { label, desc, planType, invoices, volume }], index) => {
                     const isSelected = readjustmentModal.selectedDocIds.has(key);
                     const isExpanded = expandedDocLId === key;
 
@@ -1754,7 +1782,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                             <div>
                               <div className="flex items-center gap-2">
                                 <p className="font-black text-sm text-slate-900 uppercase tracking-tight">{label}</p>
-                                <span className="bg-amber-100 text-amber-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Activo</span>
+                                <div className="flex gap-1.5">
+                                  <span className="bg-amber-100 text-amber-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Activo</span>
+                                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${planType.includes('(R)') ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                    {planType}
+                                  </span>
+                                </div>
                               </div>
                               <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">{desc}</p>
                               <div className="flex items-center gap-3 mt-2">

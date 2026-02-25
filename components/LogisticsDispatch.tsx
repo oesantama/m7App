@@ -70,6 +70,28 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
     const [signatureInputModal, setSignatureInputModal] = useState<{ isOpen: boolean, invoice: any, onConfirm: (pass: string) => void } | null>(null);
 
+    // ENTREGA AL CLIENTE
+    const [deliveryModal, setDeliveryModal] = useState<{
+        isOpen: boolean;
+        invoice: any;
+        route: any;
+    } | null>(null);
+    const [deliveryType, setDeliveryType] = useState<'FULL' | 'PARTIAL' | 'RETURN'>('FULL');
+    const [deliveryItems, setDeliveryItems] = useState<any[]>([]);
+    const [deliveryNotes, setDeliveryNotes] = useState('');
+    const [deliveryReturnReason, setDeliveryReturnReason] = useState('');
+    const [deliveryPassword, setDeliveryPassword] = useState('');
+    const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+
+    // TAB HISTORIAL
+    const [historyTab, setHistoryTab] = useState<'ENTREGAS' | 'DEVOLUCIONES'>('ENTREGAS');
+    const [historyData, setHistoryData] = useState<any[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [historyFilters, setHistoryFilters] = useState({
+        invoiceId: '', driverId: '', vehicleId: '', dateFrom: '', dateTo: '', deliveryType: '', status: ''
+    });
+
     // 1. Inicialización del Mapa
     useEffect(() => {
         if (!mapRef.current) {
@@ -817,9 +839,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             return;
         }
         const currentCount = scannedItems[item.sku] || 0;
-        const expected = Number(item.expectedQty);
+        const expected = Number(item.qty || item.expectedQty || 0);
         if (currentCount >= expected) {
-            toast.warning(`Cantidad máxima alcanzada para ${item.articleName || item.sku}`);
+            toast.warning(`Cantidad máxima alcanzada para ${item.articleName || item.sku} (${currentCount}/${expected})`);
             return;
         }
         setScannedItems({
@@ -836,7 +858,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             toast.error("Debe escanear al menos un artículo.");
             return;
         }
-        const totalExpected = (assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.expectedQty), 0);
+        const totalExpected = (assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.qty || b.expectedQty || 0), 0);
         if (totalScanned < totalExpected) {
              setConfirmModal({
                 isOpen: true,
@@ -921,53 +943,121 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
     };
 
+    // ─── CONFIRMACIÓN ENTREGA AL CLIENTE ─────────────────────────────────────
+    const handleConfirmDelivery = async () => {
+        if (!deliveryModal?.invoice) return;
+        if (!deliveryPassword) { toast.error('Ingresa la contraseña del conductor'); return; }
+
+        const inv = deliveryModal.invoice;
+        const route = deliveryModal.route;
+
+        // Buscar driverId vinculado a la ruta
+        const routeLink = assignments.find(a => a.vehicleId === route?.vehicle_id && a.isActive);
+        const driverForRoute = drivers.find(d => d.id === routeLink?.driverId);
+        const driverId = driverForRoute?.id || user.id;
+
+        setIsConfirmingDelivery(true);
+        try {
+            const res = await api.confirmDelivery({
+                invoiceId: inv.id || inv.invoiceNumber,
+                dispatchId: inv.dispatchId || undefined,
+                driverId,
+                vehicleId: route?.vehicle_id || undefined,
+                deliveryType,
+                deliveredItems: deliveryItems,
+                notes: deliveryNotes || undefined,
+                returnReason: deliveryReturnReason || undefined,
+                password: deliveryPassword,
+            });
+
+            if (res.success) {
+                const msg = deliveryType === 'FULL'
+                    ? '✅ Entrega completa registrada'
+                    : deliveryType === 'PARTIAL'
+                    ? '⚠️ Entrega parcial – devolución creada'
+                    : '🔄 Devolución total registrada';
+                toast.success(msg);
+                setDeliveryModal(null);
+                onRefresh(); // Refresca el estado de las facturas
+            }
+        } catch (e: any) {
+            toast.error(e.message || 'Error al confirmar entrega');
+        } finally {
+            setIsConfirmingDelivery(false);
+        }
+    };
+
+    // ─── CARGA HISTORIAL ──────────────────────────────────────────────────────
+    const loadHistory = async () => {
+        setHistoryLoading(true);
+        try {
+            const filters: Record<string, string> = {};
+            if (historyFilters.invoiceId)    filters.invoiceId    = historyFilters.invoiceId;
+            if (historyFilters.driverId)     filters.driverId     = historyFilters.driverId;
+            if (historyFilters.vehicleId)    filters.vehicleId    = historyFilters.vehicleId;
+            if (historyFilters.dateFrom)     filters.dateFrom     = historyFilters.dateFrom;
+            if (historyFilters.dateTo)       filters.dateTo       = historyFilters.dateTo;
+            if (historyTab === 'ENTREGAS' && historyFilters.deliveryType)
+                filters.deliveryType = historyFilters.deliveryType;
+            if (historyTab === 'DEVOLUCIONES' && historyFilters.status)
+                filters.status = historyFilters.status;
+
+            const res = historyTab === 'ENTREGAS'
+                ? await api.getDeliveryHistory(filters)
+                : await api.getReturnHistory(filters);
+
+            setHistoryData(res.data || []);
+        } catch (e: any) {
+            toast.error(e.message || 'Error al cargar historial');
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+
     return (
+        <>
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Cabecera de Control */}
             {/* Cabecera de Control Compacta */}
-            <div className="bg-white rounded-[2rem] p-4 shadow-md border border-slate-100 flex flex-col xl:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg border border-emerald-500">
-                        <Icons.Radar className="w-5 h-5 text-emerald-500 animate-pulse" />
+            <div className="bg-white rounded-[1.5rem] p-3 shadow-md border border-slate-100 flex flex-nowrap items-center justify-between gap-4 overflow-x-auto custom-scrollbar">
+                <div className="flex items-center gap-3 shrink-0">
+                    <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center shadow-md border border-emerald-500">
+                        <Icons.Radar className="w-4 h-4 text-emerald-500 animate-pulse" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">Centro de Mando</h2>
-                        <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rastreo GPS (v1.2-PRIVACY)</p>
+                        <h2 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-none">Centro de Mando</h2>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className="w-1 h-1 rounded-full bg-emerald-500 animate-ping"></div>
+                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">GPS v1.2</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 md:gap-4 justify-center">
-                    <div className="flex bg-slate-50 p-1 rounded-xl items-center gap-1 border border-slate-100">
-                         <div className="text-center px-3 py-1 bg-white rounded-lg shadow-sm border border-slate-100">
-                            <p className="text-[6px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-0.5">Visibles</p>
-                            <p className="text-sm font-black text-slate-900 leading-none">{filteredRoutes.length}</p>
+                <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex bg-slate-50 p-1 rounded-lg items-center gap-1 border border-slate-100 h-9">
+                         <div className="text-center px-2 py-0.5 bg-white rounded flex flex-col justify-center">
+                            <p className="text-[5px] font-black text-emerald-500 uppercase leading-none">Visi</p>
+                            <p className="text-[10px] font-black text-slate-900 leading-none">{filteredRoutes.length}</p>
                         </div>
-                        <div className="text-center px-3 py-1">
-                            <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">GPS Ok</p>
-                            <p className="text-sm font-black text-slate-700 leading-none">{filteredLocations.length}</p>
+                        <div className="text-center px-2 py-0.5 flex flex-col justify-center">
+                            <p className="text-[5px] font-black text-slate-400 uppercase leading-none">Ok</p>
+                            <p className="text-[10px] font-black text-slate-700 leading-none">{filteredLocations.length}</p>
                         </div>
-                        <div className="text-center px-3 py-1">
-                            <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest leading-none mb-0.5">Sin Señal</p>
-                            <p className="text-sm font-black text-slate-700 leading-none">{Math.max(0, filteredRoutes.length - filteredLocations.length)}</p>
+                        <div className="text-center px-2 py-0.5 flex flex-col justify-center">
+                            <p className="text-[5px] font-black text-rose-500 uppercase leading-none">Off</p>
+                            <p className="text-[10px] font-black text-slate-700 leading-none">{Math.max(0, filteredRoutes.length - filteredLocations.length)}</p>
                         </div>
                     </div>
 
-                    <div className="hidden xl:flex bg-slate-50 p-1 rounded-xl items-center gap-3 border border-slate-100 px-3 h-full">
-                        <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest">Ref:</p>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                            <p className="text-[7px] font-black text-slate-600 uppercase">HUB</p>
+                    <div className="hidden sm:flex bg-slate-50 p-1 rounded-lg items-center gap-2 border border-slate-100 px-2 h-9">
+                        <div className="flex items-center gap-1">
+                            <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
+                            <p className="text-[6px] font-black text-slate-600 uppercase">Hub</p>
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
                              <div className="w-1.5 h-1.5 bg-slate-900 rounded-sm rotate-45"></div>
-                            <p className="text-[7px] font-black text-slate-600 uppercase">En Ruta</p>
-                        </div>
-                         <div className="flex items-center gap-1.5">
-                            <div className="w-3 h-px bg-emerald-500 border-t border-dashed border-emerald-600"></div>
-                            <p className="text-[7px] font-black text-slate-600 uppercase">Trayecto</p>
+                            <p className="text-[6px] font-black text-slate-600 uppercase">Ruta</p>
                         </div>
                     </div>
 
@@ -975,22 +1065,29 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <button
                             onClick={fetchLocations}
                             disabled={isValidating}
-                            className={`px-4 py-2 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all flex items-center gap-2 ${isValidating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`px-3 py-1.5 bg-slate-900 text-white rounded-lg font-black text-[8px] uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-1.5 ${isValidating ? 'opacity-50' : ''}`}
                         >
                             {isValidating ? <Icons.RotateCcw className="w-3 h-3 animate-spin" /> : <Icons.MapPin className="w-3 h-3" />}
-                            {isValidating ? '...' : 'GPS'}
+                            GPS
+                        </button>
+                        <button
+                            onClick={() => { setHistoryData([]); setShowHistoryModal(true); }}
+                            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-black text-[8px] uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-1.5"
+                        >
+                            <Icons.History className="w-3 h-3" />
+                            Historial
                         </button>
                         <button
                             onClick={onRefresh}
-                            className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-emerald-500 transition-all shadow-sm"
+                            className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-emerald-500 transition-all"
                         >
-                            <Icons.RefreshCw className="w-4 h-4" />
+                            <Icons.RefreshCw className="w-3 h-3" />
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[calc(100vh-280px)]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[calc(100vh-210px)]">
                 <div className="lg:col-span-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 pb-10">
                     {activeRoutes.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center p-10 bg-white/40 backdrop-blur-xl rounded-[3rem] border border-white/20 shadow-xl">
@@ -1089,8 +1186,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 </div>
 
                 {/* Mapa del Centro de Mando */}
-                <div className="lg:col-span-2 bg-slate-200 rounded-[3rem] shadow-xl border-8 border-white overflow-hidden relative group">
-                    <div id="logistics-dispatch-map" className="w-full h-full"></div>
+                <div className="lg:col-span-2 bg-slate-200 rounded-[3rem] shadow-xl border-8 border-white overflow-hidden relative group h-full">
+                    <div id="logistics-dispatch-map" className="w-full min-h-[500px] h-full"></div>
 
 
 
@@ -1146,7 +1243,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 text-center">
                                         <p className="text-[6px] font-black text-slate-400 uppercase">ENTREGADAS</p>
                                         <p className="text-sm font-black text-emerald-600 leading-none">
-                                            {routeInvoices.filter(inv => inv.status === 'EST-11' || inv.status === 'COMPLETED' || inv.status === 'Entregado').length}
+                                            {routeInvoices.filter(inv => ['EST-12','EST-13','COMPLETED','Entregado'].includes(inv.status)).length}
                                             <span className="text-[8px] text-slate-300">/{routeInvoices.length}</span>
                                         </p>
                                     </div>
@@ -1224,14 +1321,49 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         <Icons.Eye className="w-3 h-3" />
                                                         Art.
                                                     </button>
-                                                    {inv.status !== 'EST-11' && inv.status !== 'Entregado' && !inv.dispatchId && (
+                                                    {/* DESPACHAR - solo para facturas pendientes/sin despachar */}
+                                                    {!['EST-11','EST-12','EST-13','COMPLETED','Entregado'].includes(inv.status) && !inv.dispatchId && (
                                                         <button 
                                                             onClick={() => setAssigningInvoice(inv)}
-                                                            className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[8px] font-black uppercase hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-1 border border-emerald-200"
+                                                            className="px-2.5 py-1.5 bg-slate-900 text-emerald-400 rounded-lg text-[8px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1 border border-slate-700"
                                                         >
                                                             <Icons.Scan className="w-3 h-3" />
-                                                            Entregar
+                                                            Despachar
                                                         </button>
+                                                    )}
+                                                    {/* ENTREGAR CLIENTE - solo para facturas en ruta (EST-11) */}
+                                                    {inv.status === 'EST-11' && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                const route = selectedActiveRoute;
+                                                                const items = (inv.items || []).map((it: any) => ({
+                                                                    sku: it.sku,
+                                                                    articleName: it.articleName || it.article_name || it.sku,
+                                                                    unit: it.unit || 'UND',
+                                                                    quantityDelivered: Number(it.qty || it.expectedQty || 0),
+                                                                    quantityReturned: 0,
+                                                                    notes: ''
+                                                                }));
+                                                                setDeliveryItems(items);
+                                                                setDeliveryType('FULL');
+                                                                setDeliveryNotes('');
+                                                                setDeliveryReturnReason('');
+                                                                setDeliveryPassword('');
+                                                                setDeliveryModal({ isOpen: true, invoice: inv, route });
+                                                            }}
+                                                            className="px-2.5 py-1.5 bg-emerald-500 text-white rounded-lg text-[8px] font-black uppercase hover:bg-emerald-600 transition-all flex items-center gap-1 shadow-md shadow-emerald-200"
+                                                        >
+                                                            <Icons.CheckCircle className="w-3 h-3" />
+                                                            Entregar Cliente
+                                                        </button>
+                                                    )}
+                                                    {/* Badge estado entregado/devuelto */}
+                                                    {['EST-12','EST-13'].includes(inv.status) && (
+                                                        <span className={`px-2 py-1 rounded-lg text-[7px] font-black uppercase ${
+                                                            inv.status === 'EST-12' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                                        }`}>
+                                                            {inv.status === 'EST-12' ? '✅ Entregado' : '⚠️ Parcial'}
+                                                        </span>
                                                     )}
                                                     {hasPendingSignature && (
                                                         <button 
@@ -1683,7 +1815,289 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 </div>
             )}
         </div>
+
+        {/* ═══════════════════════════════════════════════════════════
+             MODAL: ENTREGAR CLIENTE
+        ═══════════════════════════════════════════════════════════ */}
+
+        {deliveryModal?.isOpen && (
+            <div className="fixed inset-0 z-[900] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
+                    {/* HEADER */}
+                    <div className="p-5 bg-gradient-to-r from-slate-900 to-emerald-950 rounded-t-[2rem]">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-black text-white uppercase tracking-wider">Entregar al Cliente</h3>
+                                <p className="text-[9px] text-emerald-400 font-bold uppercase mt-0.5">
+                                    Factura #{deliveryModal.invoice?.invoiceNumber || deliveryModal.invoice?.id}
+                                </p>
+                            </div>
+                            <button onClick={() => setDeliveryModal(null)} className="w-7 h-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-all">
+                                <Icons.X className="w-3.5 h-3.5 text-white" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* BODY */}
+                    <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
+                        {/* TIPO DE ENTREGA */}
+                        <div>
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Tipo de Entrega</p>
+                            <div className="grid grid-cols-3 gap-2">
+                                {([
+                                    { value: 'FULL', label: '✅ Completa', color: 'emerald' },
+                                    { value: 'PARTIAL', label: '⚠️ Parcial', color: 'amber' },
+                                    { value: 'RETURN', label: '🔄 Devolver', color: 'rose' },
+                                ] as { value: 'FULL'|'PARTIAL'|'RETURN', label: string, color: string }[]).map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setDeliveryType(opt.value)}
+                                        className={`py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border-2 ${
+                                            deliveryType === opt.value
+                                                ? opt.value === 'FULL' ? 'bg-emerald-500 text-white border-emerald-500'
+                                                : opt.value === 'PARTIAL' ? 'bg-amber-500 text-white border-amber-500'
+                                                : 'bg-rose-500 text-white border-rose-500'
+                                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* ITEMS */}
+                        {deliveryItems.length > 0 && (
+                            <div>
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                                    Artículos {deliveryType !== 'FULL' && <span className="text-rose-500">– Ajusta cantidades devueltas</span>}
+                                </p>
+                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                    {deliveryItems.map((item, i) => (
+                                        <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-black text-slate-900 truncate">{item.articleName || item.sku}</p>
+                                                <p className="text-[8px] text-slate-400 font-bold uppercase">{item.unit} • Cant: {item.quantityDelivered}</p>
+                                            </div>
+                                            {deliveryType !== 'FULL' && (
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <p className="text-[8px] text-slate-400 uppercase font-bold">Dev:</p>
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={item.quantityDelivered}
+                                                        value={item.quantityReturned}
+                                                        onChange={e => {
+                                                            const updated = [...deliveryItems];
+                                                            updated[i] = { ...updated[i], quantityReturned: Number(e.target.value) };
+                                                            setDeliveryItems(updated);
+                                                        }}
+                                                        className="w-14 text-center border border-rose-200 rounded-lg text-[10px] font-black text-rose-600 py-1 outline-none focus:border-rose-500"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* RAZÓN DEVOLUCIÓN */}
+                        {deliveryType !== 'FULL' && (
+                            <div>
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Motivo de Devolución</p>
+                                <input
+                                    type="text"
+                                    value={deliveryReturnReason}
+                                    onChange={e => setDeliveryReturnReason(e.target.value)}
+                                    placeholder="Ej: Cliente ausente, rechazo de mercancía..."
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-rose-500 transition-all"
+                                />
+                            </div>
+                        )}
+
+                        {/* NOTAS */}
+                        <div>
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Notas (opcional)</p>
+                            <textarea
+                                rows={2}
+                                value={deliveryNotes}
+                                onChange={e => setDeliveryNotes(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-emerald-500 transition-all resize-none"
+                            />
+                        </div>
+
+                        {/* CONTRASEÑA CONDUCTOR */}
+                        <div>
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Contraseña del Conductor</p>
+                            <input
+                                type="password"
+                                value={deliveryPassword}
+                                onChange={e => setDeliveryPassword(e.target.value)}
+                                placeholder="Ingresa tu contraseña para confirmar"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-emerald-500 transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    {/* FOOTER */}
+                    <div className="p-5 border-t border-slate-100 flex gap-3">
+                        <button onClick={() => setDeliveryModal(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all">
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleConfirmDelivery}
+                            disabled={isConfirmingDelivery}
+                            className={`flex-1 py-3 text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                                deliveryType === 'FULL' ? 'bg-emerald-600 hover:bg-emerald-700'
+                                : deliveryType === 'PARTIAL' ? 'bg-amber-500 hover:bg-amber-600'
+                                : 'bg-rose-600 hover:bg-rose-700'
+                            } disabled:opacity-50 disabled:cursor-wait`}
+                        >
+                            {isConfirmingDelivery && <Icons.Loader className="w-3 h-3 animate-spin" />}
+                            {deliveryType === 'FULL' ? '✅ Confirmar Entrega' : deliveryType === 'PARTIAL' ? '⚠️ Guardar Parcial' : '🔄 Registrar Devolución'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+             MODAL: HISTORIAL ENTREGAS / DEVOLUCIONES
+        ═══════════════════════════════════════════════════════════ */}
+        {showHistoryModal && (
+            <div className="fixed inset-0 z-[900] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
+                    {/* HEADER */}
+                    <div className="p-5 bg-gradient-to-r from-slate-900 to-slate-800 rounded-t-[2rem] flex items-center justify-between">
+                        <div>
+                            <h3 className="text-sm font-black text-white uppercase tracking-wider">Historial de Operaciones</h3>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Entregas y devoluciones registradas</p>
+                        </div>
+                        <button onClick={() => setShowHistoryModal(false)} className="w-7 h-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-all">
+                            <Icons.X className="w-3.5 h-3.5 text-white" />
+                        </button>
+                    </div>
+
+                    {/* TABS */}
+                    <div className="flex border-b border-slate-100">
+                        {(['ENTREGAS', 'DEVOLUCIONES'] as const).map(tab => (
+                            <button
+                                key={tab}
+                                onClick={() => { setHistoryTab(tab); setHistoryData([]); }}
+                                className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
+                                    historyTab === tab ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-700'
+                                }`}
+                            >
+                                {tab === 'ENTREGAS' ? '🚚 Entregas' : '🔄 Devoluciones'}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* FILTROS */}
+                    <div className="p-4 bg-slate-50 border-b border-slate-100">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                            <input type="text" placeholder="Factura" value={historyFilters.invoiceId}
+                                onChange={e => setHistoryFilters(p => ({...p, invoiceId: e.target.value}))}
+                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black uppercase outline-none focus:border-emerald-400 bg-white" />
+                            <select value={historyFilters.driverId}
+                                onChange={e => setHistoryFilters(p => ({...p, driverId: e.target.value}))}
+                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black uppercase outline-none focus:border-emerald-400 bg-white">
+                                <option value="">Conductor</option>
+                                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                            <select value={historyFilters.vehicleId}
+                                onChange={e => setHistoryFilters(p => ({...p, vehicleId: e.target.value}))}
+                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black uppercase outline-none focus:border-emerald-400 bg-white">
+                                <option value="">Placa</option>
+                                {vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}</option>)}
+                            </select>
+                            <input type="date" value={historyFilters.dateFrom}
+                                onChange={e => setHistoryFilters(p => ({...p, dateFrom: e.target.value}))}
+                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black outline-none focus:border-emerald-400 bg-white" />
+                            <input type="date" value={historyFilters.dateTo}
+                                onChange={e => setHistoryFilters(p => ({...p, dateTo: e.target.value}))}
+                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black outline-none focus:border-emerald-400 bg-white" />
+                            <button onClick={loadHistory} disabled={historyLoading}
+                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-emerald-700 transition-all flex items-center justify-center gap-1 disabled:opacity-50">
+                                {historyLoading ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.Search className="w-3 h-3" />}
+                                Buscar
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* TABLA */}
+                    <div className="flex-1 overflow-auto p-4 custom-scrollbar">
+                        {historyLoading ? (
+                            <div className="flex items-center justify-center h-32">
+                                <Icons.Loader className="w-6 h-6 animate-spin text-emerald-500" />
+                                <span className="ml-2 text-slate-400 text-xs font-bold uppercase">Cargando...</span>
+                            </div>
+                        ) : historyData.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-32 text-slate-300">
+                                <Icons.FileText className="w-8 h-8 mb-2" />
+                                <p className="text-xs font-black uppercase">Sin registros. Usa los filtros y presiona Buscar.</p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-slate-100">
+                                        {historyTab === 'ENTREGAS'
+                                            ? ['ID', 'Factura', 'Conductor', 'Placa', 'Tipo', 'Fecha', 'Dev.'].map(h => (
+                                                <th key={h} className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-widest pr-4">{h}</th>
+                                            ))
+                                            : ['ID', 'Factura', 'Conductor', 'Placa', 'Motivo', 'Estado', 'Fecha'].map(h => (
+                                                <th key={h} className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-widest pr-4">{h}</th>
+                                            ))
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {historyData.map((row: any) => (
+                                        <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all">
+                                            {historyTab === 'ENTREGAS' ? <>
+                                                <td className="py-2 pr-4 text-[9px] font-black text-slate-500">#{row.id}</td>
+                                                <td className="py-2 pr-4 text-[9px] font-black text-slate-900">{row.invoiceId}</td>
+                                                <td className="py-2 pr-4 text-[9px] text-slate-600 uppercase">{row.driverName || row.driverId}</td>
+                                                <td className="py-2 pr-4 text-[9px] font-black text-emerald-600">{row.vehiclePlate || '-'}</td>
+                                                <td className="py-2 pr-4">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${
+                                                        row.deliveryType === 'FULL' ? 'bg-emerald-100 text-emerald-700'
+                                                        : row.deliveryType === 'PARTIAL' ? 'bg-amber-100 text-amber-700'
+                                                        : 'bg-rose-100 text-rose-700'
+                                                    }`}>
+                                                        {row.deliveryType === 'FULL' ? 'Completa' : row.deliveryType === 'PARTIAL' ? 'Parcial' : 'Devolución'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2 pr-4 text-[9px] text-slate-400">{new Date(row.deliveredAt).toLocaleDateString('es-CO')}</td>
+                                                <td className="py-2 pr-4 text-[9px] font-black">{row.returnId ? <span className="text-rose-500">#{row.returnId}</span> : <span className="text-slate-300">—</span>}</td>
+                                            </> : <>
+                                                <td className="py-2 pr-4 text-[9px] font-black text-slate-500">#{row.id}</td>
+                                                <td className="py-2 pr-4 text-[9px] font-black text-slate-900">{row.invoiceId}</td>
+                                                <td className="py-2 pr-4 text-[9px] text-slate-600 uppercase">{row.driverName || row.driverId}</td>
+                                                <td className="py-2 pr-4 text-[9px] font-black text-emerald-600">{row.vehiclePlate || '-'}</td>
+                                                <td className="py-2 pr-4 text-[9px] text-slate-600 max-w-[120px] truncate">{row.returnReason || '—'}</td>
+                                                <td className="py-2 pr-4">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${
+                                                        row.status === 'PROCESSED' ? 'bg-emerald-100 text-emerald-700'
+                                                        : row.status === 'CANCELLED' ? 'bg-slate-100 text-slate-500'
+                                                        : 'bg-amber-100 text-amber-700'
+                                                    }`}>{row.status}</span>
+                                                </td>
+                                                <td className="py-2 pr-4 text-[9px] text-slate-400">{new Date(row.createdAt).toLocaleDateString('es-CO')}</td>
+                                            </>}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 
 export default LogisticsDispatch;
+

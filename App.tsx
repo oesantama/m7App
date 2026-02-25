@@ -1066,20 +1066,18 @@ const App: React.FC = () => {
         {renderContent()}
       </Layout>
 
-      {/* CHATBOT POSICIÓN ABSOLUTA AL FRENTE */}
-      <div className="fixed bottom-6 right-6 z-[9999]">
-        <AIChat
-          context={{
-            user: user.name,
-            activeTab,
-            documentsCount: documents.length,
-            invoicesCount: invoices.length,
-            availableVehicles: vehicles.filter(v => v.status === 'Disponible').length,
-            activeDrivers: drivers.filter(d => d.status === 'Activo').length,
-            recentAssignments: assignments.slice(-5)
-          }}
-        />
-      </div>
+      {/* CHATBOT POSICIÓN ABSOLUTA AL FRENTE - ALINEADO CON HEADER 'RUTAS' */}
+      <AIChat
+        context={{
+          user: user.name,
+          activeTab,
+          documentsCount: documents.length,
+          invoicesCount: invoices.length,
+          availableVehicles: vehicles.filter(v => v.status === 'Disponible').length,
+          activeDrivers: drivers.filter(d => d.status === 'Activo').length,
+          recentAssignments: assignments.slice(-5)
+        }}
+      />
       {showTimeoutWarning && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in zoom-in duration-300">
           <div className="bg-white max-w-md w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6">
