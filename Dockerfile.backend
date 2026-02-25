@@ -53,9 +53,6 @@ COPY --from=builder /app/dist_backend ./dist_backend
 
 EXPOSE 8080
 
-# Copiar archivo de restauración de BD si existe
-COPY backend/full_restore.sql ./dist_backend/full_restore.sql
-
 # Ejecutamos el servidor compilado (Javascript plano)
 # Ajustar ruta si tsc genera diferente estructura, pero por defecto debería ser así:
 CMD ["node", "dist_backend/server.js"]
