@@ -266,8 +266,8 @@ const Layout: React.FC<LayoutProps> = ({
               <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{activeTab.replace('-', ' ')}</h2>
             </div>
           </div>
-          <div id="orbit-header-chat-target" className="flex items-center gap-4 transition-all">
-            {/* Aquí se inyectará el disparador de Orbit IQ vía Portal */}
+          <div className="flex items-center gap-4 transition-all">
+            {/* Espacio reservado para acciones rápidas si fuese necesario */}
           </div>
         </header>
         <section className="flex-1 overflow-y-auto p-0 bg-slate-50/50 custom-scrollbar">{children}</section>

@@ -370,10 +370,10 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                             setShowPaymentModal(true); 
                           }
                         }} 
-                        className={`p-4 rounded-2xl transition-all ${(doc as any).paymentsCount > 0 ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
-                        title={(doc as any).paymentsCount > 0 ? `Pagos: ${(doc as any).paymentsCount} Cargados` : 'Cargar Pagos L'}
+                        className={`p-4 rounded-2xl transition-all ${(doc as any).paymentsCount > 0 ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30 shadow-lg' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
+                        title={(doc as any).paymentsCount > 0 ? `Pagos: ${(doc as any).paymentsCount} Cargados (Clic para ver)` : 'Cargar Pagos L'}
                       >
-                        <Icons.Excel className="w-4 h-4" />
+                        {(doc as any).paymentsCount > 0 ? <Icons.Check className="w-4 h-4" /> : <Icons.Excel className="w-4 h-4" />}
                       </button>
                       {isAuthorizedToDelete && (
                         <button 
@@ -405,12 +405,21 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => { setActiveDetailTab('payments'); setPaymentTarget(selectedDoc); setShowPaymentModal(true); }}
-                  className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2 font-black text-[9px] uppercase"
+                <button
+                  onClick={handleDetailExport}
+                  className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white hover:scale-105 active:scale-95 transition-all shadow-md flex items-center gap-2 font-black text-[9px] uppercase border border-slate-200"
+                  title="Exportar Detalle Actual a Excel"
                 >
-                  <Icons.Excel className="w-4 h-4" /> Cargar Pagos L
+                  <Icons.Excel className="w-4 h-4" /> Exportar Excel
                 </button>
+                {(!((selectedDoc as any).paymentsCount > 0)) && (
+                  <button 
+                    onClick={() => { setActiveDetailTab('payments'); setPaymentTarget(selectedDoc); setShowPaymentModal(true); }}
+                    className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2 font-black text-[9px] uppercase"
+                  >
+                    <Icons.Excel className="w-4 h-4" /> Cargar Pagos L
+                  </button>
+                )}
                 <button onClick={() => setSelectedDoc(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-3xl font-thin">×</button>
               </div>
             </div>
@@ -503,13 +512,6 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg">
                       Reg: {sortedDetailItems.length}
                     </div>
-                    <button
-                      onClick={handleDetailExport}
-                      className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white px-4 py-3 rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl"
-                      title="Exportar a Excel"
-                    >
-                      <Icons.Excel className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
 

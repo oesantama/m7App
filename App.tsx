@@ -289,11 +289,11 @@ const App: React.FC = () => {
         api.getTiposNotificacion().then(normalize).catch(() => [])
       ]);
 
-      // Actualizamos estado global
-      setAssignments(assignmentsData as any[]);
-      setInvoices(invoicesData as any[]);
+      // Actualizamos estado global (Blindaje contra objetos de error)
+      setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
+      setInvoices(Array.isArray(invoicesData) ? invoicesData : []);
       // Usamos acceso directo al store para evitar ReferenceError en closures
-      useAppStore.getState().setRoutes(routesData as any[]);
+      useAppStore.getState().setRoutes(Array.isArray(routesData) ? routesData : []);
 
       const groupedMasters: any = {};
       if (Array.isArray(genericMasters)) {
@@ -384,12 +384,14 @@ const App: React.FC = () => {
       const mappedInvoices = Array.isArray(invoicesData) ? invoicesData.map((i: any) => ({
         ...i,
         externalDocId: i.external_doc_id || i.externalDocId,
+        docLId: i.doc_l_id || i.docLId,
         clientId: i.clientId || i.client_id,
         statusId: i.status_id,
         volumeM3: Number(i.volume_m3 || i.volumeM3 || 0),
         invoiceValue: Number(i.invoice_value || i.invoiceValue || 0),
+        customerName: i.customer_name || i.customerName || (i.customer_id === 'CUST-A68' ? 'AJOVER S.A.S' : i.customer_id),
         planType: (i.codplan === 'AJI01' || i.planType === 'AJI01') ? 'Plan Normal' : (i.codplan === 'AJV20' || i.planType === 'AJV20') ? 'Plan R' : (i.planType || 'Plan Normal'),
-        status: i.status || 'Pendiente',
+        status: i.status || (i.status_id === 'EST-11' ? 'En Ruta' : i.status_id === 'EST-01' ? 'Pendiente' : 'Pendiente'),
         items: (i.items || []).map((it: any) => ({
           ...it,
           articleId: it.article_id,
@@ -399,22 +401,28 @@ const App: React.FC = () => {
         }))
       })) : [];
       setInvoices(mappedInvoices);
-      setInvoices(mappedInvoices);
 
       // Actualizar Rutas Activas
-      setActiveRoutes(Array.isArray(routesData) ? routesData : []);
+      setRoutes(Array.isArray(routesData) ? routesData.map((r: any) => ({
+        ...r,
+        invoiceIds: Array.isArray(r.invoice_ids) ? r.invoice_ids : [],
+        vehicleId: r.vehicle_id,
+        driverId: r.driver_id
+      })) : []);
 
       // Fetch operational data too
       api.getDocuments(targetClientId).then(docs => {
         if (Array.isArray(docs)) {
           setDocuments(docs.map(d => ({
             ...d,
+            id: d.id,
             externalDocId: d.external_doc_id || d.externalDocId,
             vehicleData: d.vehicle_plate || d.vehicleData,
             // Mapeo Robusto M7
             planType: (d.plan_type || d.planType) ? (d.plan_type || d.planType) :
               (d.codplan === 'AJI01') ? 'Plan Normal' :
               (d.codplan === 'AJV20') ? 'Plan R' : 'Plan Normal',
+            status: d.status || (d.status_id === 'EST-01' ? 'En Conteo' : d.status_id === 'EST-02' ? 'Inventariado' : d.status),
             createdAt: d.created_at || d.createdAt,
             items: (d.items || []).map((it: any) => ({
               ...it,
@@ -920,7 +928,8 @@ const App: React.FC = () => {
             user={user!}
             clients={allMasterData.masterClientes || []}
             onAssign={async (vId, dId, cId) => {
-              const newAssign = { id: `as-${Date.now()}`, vehicleId: vId, driverId: dId, clientId: cId, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+              const newAssign = { vehicleId: vId, driverId: dId, clientId: cId, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+              // @ts-ignore
               addAssignment(newAssign); // Actualización optimista
               try {
                 await api.saveAssignment(newAssign);
@@ -972,6 +981,7 @@ const App: React.FC = () => {
             invoices={invoices}
             activeRoutes={routes}
             onRefresh={() => refreshAppData()}
+            clients={allMasterData.masterClientes || []}
           />
         );
       case 'chatbot':

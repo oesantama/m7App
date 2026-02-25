@@ -2,6 +2,15 @@
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+const fetchJson = async (url: string, options?: RequestInit) => {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
+  }
+  return res.json();
+};
+
 export const api = {
   // Autenticación
   login: async (email: string, pass: string) => {
@@ -10,10 +19,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass })
     });
-    // No lanzar error en 401, retornar el JSON con success: false
-    if (res.status === 401) {
-      return res.json(); // { success: false, error: '...' }
-    }
+    if (res.status === 401) return res.json();
     if (!res.ok) throw new Error('Error de conexión con el servidor');
     return res.json();
   },
@@ -54,207 +60,187 @@ export const api = {
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO
-  getUsers: () => fetch(`${API_URL}/users?_t=${Date.now()}`).then(r => r.json()),
-  saveUser: (data: any) => fetch(`${API_URL}/users`, {
+  getUsers: () => fetchJson(`${API_URL}/users?_t=${Date.now()}`),
+  saveUser: (data: any) => fetchJson(`${API_URL}/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
   saveMaster: async (category: string, data: any) => {
-    const res = await fetch(`${API_URL}/masters/${category}`, {
+    return fetchJson(`${API_URL}/masters/${category}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || `Error al guardar en ${category}`);
-    }
-    return res.json();
   },
 
-  getGenericMasters: () => fetch(`${API_URL}/masters?_t=${Date.now()}`).then(r => r.json()),
+  getGenericMasters: () => fetchJson(`${API_URL}/masters?_t=${Date.now()}`),
 
+  deleteUser: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/users/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
+  deleteMaster: (category: string, id: string, deletedBy?: string) => fetchJson(`${API_URL}/masters/${category}/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
-  deleteUser: (id: string, deletedBy?: string) => fetch(`${API_URL}/users/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  deleteMaster: (category: string, id: string, deletedBy?: string) => fetch(`${API_URL}/masters/${category}/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-
-  getClients: () => fetch(`${API_URL}/clients?_t=${Date.now()}`).then(r => r.json()),
-  saveClient: (data: any) => fetch(`${API_URL}/clients`, {
+  getClients: () => fetchJson(`${API_URL}/clients?_t=${Date.now()}`),
+  saveClient: (data: any) => fetchJson(`${API_URL}/clients`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteClient: (id: string, deletedBy?: string) => fetch(`${API_URL}/clients/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  getRoles: () => fetch(`${API_URL}/roles?_t=${Date.now()}`).then(r => r.json()),
-  saveRole: (data: any) => fetch(`${API_URL}/roles`, {
+  }),
+  deleteClient: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/clients/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
+  getRoles: () => fetchJson(`${API_URL}/roles?_t=${Date.now()}`),
+  saveRole: (data: any) => fetchJson(`${API_URL}/roles`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
   // Categorías (Nueva Tabla)
-  getCategories: () => fetch(`${API_URL}/categories?_t=${Date.now()}`).then(r => r.json()),
-  saveCategory: (data: any) => fetch(`${API_URL}/categories`, {
+  getCategories: () => fetchJson(`${API_URL}/categories?_t=${Date.now()}`),
+  saveCategory: (data: any) => fetchJson(`${API_URL}/categories`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteCategory: (id: string, deletedBy?: string) => fetch(`${API_URL}/categories/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteCategory: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/categories/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
   // Estados
-  getEstados: () => fetch(`${API_URL}/estados?_t=${Date.now()}`).then(r => r.json()),
-  saveEstado: (data: any) => fetch(`${API_URL}/estados`, {
+  getEstados: () => fetchJson(`${API_URL}/estados?_t=${Date.now()}`),
+  saveEstado: (data: any) => fetchJson(`${API_URL}/estados`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteEstado: (id: string, deletedBy?: string) => fetch(`${API_URL}/estados/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteEstado: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/estados/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
   // Marcas
-  getMarcas: () => fetch(`${API_URL}/marcas?_t=${Date.now()}`).then(r => r.json()),
-  saveMarca: (data: any) => fetch(`${API_URL}/marcas`, {
+  getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
+  saveMarca: (data: any) => fetchJson(`${API_URL}/marcas`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteMarca: (id: string, deletedBy?: string) => fetch(`${API_URL}/marcas/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteMarca: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/marcas/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
   // Tipos de Documento
-  getTiposDocumento: () => fetch(`${API_URL}/tipos-documento?_t=${Date.now()}`).then(r => r.json()),
-  saveTipoDocumento: (data: any) => fetch(`${API_URL}/tipos-documento`, {
+  getTiposDocumento: () => fetchJson(`${API_URL}/tipos-documento?_t=${Date.now()}`),
+  saveTipoDocumento: (data: any) => fetchJson(`${API_URL}/tipos-documento`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteTipoDocumento: (id: string, deletedBy?: string) => fetch(`${API_URL}/tipos-documento/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteTipoDocumento: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/tipos-documento/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
   // Unidades de Medida
-  getUnidadesMedida: () => fetch(`${API_URL}/unidades-medida?_t=${Date.now()}`).then(r => r.json()),
-  saveUnidadMedida: (data: any) => fetch(`${API_URL}/unidades-medida`, {
+  getUnidadesMedida: () => fetchJson(`${API_URL}/unidades-medida?_t=${Date.now()}`),
+  saveUnidadMedida: (data: any) => fetchJson(`${API_URL}/unidades-medida`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteUnidadMedida: (id: string, deletedBy?: string) => fetch(`${API_URL}/unidades-medida/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteUnidadMedida: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/unidades-medida/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
   // Notificaciones Config
-  getNotificacionesConfig: () => fetch(`${API_URL}/notificaciones-config?_t=${Date.now()}`).then(r => r.json()),
-  saveNotificacionConfig: (data: any) => fetch(`${API_URL}/notificaciones-config`, {
+  getNotificacionesConfig: () => fetchJson(`${API_URL}/notificaciones-config?_t=${Date.now()}`),
+  saveNotificacionConfig: (data: any) => fetchJson(`${API_URL}/notificaciones-config`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteNotificacionConfig: (id: string, deletedBy?: string) => fetch(`${API_URL}/notificaciones-config/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteNotificacionConfig: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/notificaciones-config/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
   // Tipos de Vehículo
-  getTiposVehiculo: () => fetch(`${API_URL}/tipos-vehiculo?_t=${Date.now()}`).then(r => r.json()),
-  saveTipoVehiculo: (data: any) => fetch(`${API_URL}/tipos-vehiculo`, {
+  getTiposVehiculo: () => fetchJson(`${API_URL}/tipos-vehiculo?_t=${Date.now()}`),
+  saveTipoVehiculo: (data: any) => fetchJson(`${API_URL}/tipos-vehiculo`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteTipoVehiculo: (id: string, deletedBy?: string) => fetch(`${API_URL}/tipos-vehiculo/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteTipoVehiculo: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/tipos-vehiculo/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
   // Tipos de Notificación
-  getTiposNotificacion: () => fetch(`${API_URL}/tipos-notificacion?_t=${Date.now()}`).then(r => r.json()),
-  saveTipoNotificacion: (data: any) => fetch(`${API_URL}/tipos-notificacion`, {
+  getTiposNotificacion: () => fetchJson(`${API_URL}/tipos-notificacion?_t=${Date.now()}`),
+  saveTipoNotificacion: (data: any) => fetchJson(`${API_URL}/tipos-notificacion`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteTipoNotificacion: (id: string, deletedBy?: string) => fetch(`${API_URL}/tipos-notificacion/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteTipoNotificacion: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/tipos-notificacion/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
-  getModules: () => fetch(`${API_URL}/modules?_t=${Date.now()}`).then(r => r.json()),
-  saveModule: (data: any) => fetch(`${API_URL}/modules`, {
+  getModules: () => fetchJson(`${API_URL}/modules?_t=${Date.now()}`),
+  saveModule: (data: any) => fetchJson(`${API_URL}/modules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteModule: (id: string, deletedBy?: string) => fetch(`${API_URL}/modules/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  getPages: () => fetch(`${API_URL}/pages?_t=${Date.now()}`).then(r => r.json()),
-  deletePage: (id: string, deletedBy?: string) => fetch(`${API_URL}/pages/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteModule: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/modules/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
+  getPages: () => fetchJson(`${API_URL}/pages?_t=${Date.now()}`),
+  deletePage: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/pages/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
-  getPermissions: () => fetch(`${API_URL}/permissions?_t=${Date.now()}`).then(r => r.json()),
-  savePermission: (data: any) => fetch(`${API_URL}/permissions`, {
+  getPermissions: () => fetchJson(`${API_URL}/permissions?_t=${Date.now()}`),
+  savePermission: (data: any) => fetchJson(`${API_URL}/permissions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
-  getUserPermissions: (userId: string) => fetch(`${API_URL}/user-permissions/${userId}?_t=${Date.now()}`).then(r => r.json()),
-  saveUserPermission: (data: any) => fetch(`${API_URL}/user-permissions`, {
+  getUserPermissions: (userId: string) => fetchJson(`${API_URL}/user-permissions/${userId}?_t=${Date.now()}`),
+  saveUserPermission: (data: any) => fetchJson(`${API_URL}/user-permissions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteUserPermission: (id: string, deletedBy?: string) => fetch(`${API_URL}/user-permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  deleteRolePermission: (id: string, deletedBy?: string) => fetch(`${API_URL}/permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteUserPermission: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/user-permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
+  deleteRolePermission: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
   
-  getArticles: () => fetch(`${API_URL}/articles`).then(r => r.json()),
-  saveArticle: (data: any) => fetch(`${API_URL}/articles`, {
+  getArticles: () => fetchJson(`${API_URL}/articles`),
+  saveArticle: (data: any) => fetchJson(`${API_URL}/articles`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteArticle: (id: string, deletedBy?: string) => fetch(`${API_URL}/articles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-  deleteRole: (id: string, deletedBy?: string) => fetch(`${API_URL}/roles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteArticle: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/articles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
+  deleteRole: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/roles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
-  getVehicles: () => fetch(`${API_URL}/vehicles`).then(r => r.json()),
-  saveVehicle: async (data: any) => {
-    const res = await fetch(`${API_URL}/vehicles`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Error al guardar el vehículo');
-    }
-    return res.json();
-  },
-  deleteVehicle: (id: string, deletedBy?: string) => fetch(`${API_URL}/vehicles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-
-  getDrivers: () => fetch(`${API_URL}/drivers`).then(r => r.json()),
-  saveDriver: async (data: any) => {
-    const res = await fetch(`${API_URL}/drivers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Error al guardar el conductor');
-    }
-    return res.json();
-  },
-  deleteDriver: (id: string, deletedBy?: string) => fetch(`${API_URL}/drivers/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }).then(r => r.json()),
-
-  getDocuments: (clientId?: string) => fetch(`${API_URL}/documents${clientId ? `?clientId=${clientId}` : ''}`).then(r => r.json()),
-  bulkCreateDocuments: (data: any) => fetch(`${API_URL}/documents/bulk`, {
+  getVehicles: () => fetchJson(`${API_URL}/vehicles`),
+  saveVehicle: (data: any) => fetchJson(`${API_URL}/vehicles`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteDocument: (id: string, user: string) => fetch(`${API_URL}/documents/${id}?user=${encodeURIComponent(user)}`, { method: 'DELETE' }).then(r => r.json()),
-  updateDocumentStatus: (id: string, status: string, user: string) => fetch(`${API_URL}/documents/status/${id}`, {
+  }),
+  deleteVehicle: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/vehicles/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
+
+  getDrivers: () => fetchJson(`${API_URL}/drivers`),
+  saveDriver: (data: any) => fetchJson(`${API_URL}/drivers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  deleteDriver: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/drivers/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
+
+  getDocuments: (clientId?: string) => fetchJson(`${API_URL}/documents${clientId ? `?clientId=${clientId}` : ''}`),
+  bulkCreateDocuments: (data: any) => fetchJson(`${API_URL}/documents/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  deleteDocument: (id: string, user: string) => fetchJson(`${API_URL}/documents/${id}?user=${encodeURIComponent(user)}`, { method: 'DELETE' }),
+  updateDocumentStatus: (id: string, status: string, user: string) => fetchJson(`${API_URL}/documents/status/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, user })
-  }).then(r => r.json()),
-  getRoutes: () => fetch(`${API_URL}/routes`).then(r => r.json()),
-  saveRoute: (data: any) => fetch(`${API_URL}/routes`, {
+  }),
+  getRoutes: () => fetchJson(`${API_URL}/routes`),
+  saveRoute: (data: any) => fetchJson(`${API_URL}/routes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  logRouteMovement: (data: any) => fetch(`${API_URL}/routes/log`, {
+  }),
+  logRouteMovement: (data: any) => fetchJson(`${API_URL}/routes/log`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  getRoutingPatterns: () => fetch(`${API_URL}/routes/patterns`).then(r => r.json()),
+  }),
+  getRoutingPatterns: () => fetchJson(`${API_URL}/routes/patterns`),
 
   // GPS Tracking (Nueva API dedicada)
   updateVehicleLocation: (data: any) => fetch(`${API_URL}/locations/update`, {
@@ -266,30 +252,30 @@ export const api = {
   getVehicleLocationHistory: (vehicleId: string, limit = 50) => fetch(`${API_URL}/locations/history/${vehicleId}?limit=${limit}`).then(r => r.json()),
 
   // Gestión de Asignaciones (Vínculos Operativos)
-  getAssignments: () => fetch(`${API_URL}/assignments`).then(r => r.json()),
+  getAssignments: () => fetchJson(`${API_URL}/assignments`),
 
-  saveAssignment: (data: any) => fetch(`${API_URL}/assignments`, {
+  saveAssignment: (data: any) => fetchJson(`${API_URL}/assignments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
-  endAssignment: (id: string, endedBy?: string) => fetch(`${API_URL}/assignments/${id}/end`, {
+  endAssignment: (id: string, endedBy?: string) => fetchJson(`${API_URL}/assignments/${id}/end`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ endedBy })
-  }).then(r => r.json()),
+  }),
 
-  syncInventory: (data: any) => fetch(`${API_URL}/documents/sync-inventory`, {
+  syncInventory: (data: any) => fetchJson(`${API_URL}/documents/sync-inventory`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
   getInvoices: (clientId?: string, ids?: string) => {
     let url = `${API_URL}/documents/invoices?`;
     if (clientId) url += `clientId=${clientId}&`;
     if (ids) url += `ids=${encodeURIComponent(ids)}`;
-    return fetch(url).then(r => r.json());
+    return fetchJson(url);
   },
 
   resendInventoryNotification: (docId: string, targetEmail: string) => fetch(`${API_URL}/documents/resend-notification`, {

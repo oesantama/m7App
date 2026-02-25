@@ -32,12 +32,14 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'tipos_notificacion': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'routes': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'picking_assignments': ['invoice_id', 'leader_id', 'helper_ids', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
-  'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at']
+  'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at'],
+  'route_invoices': ['route_id', 'invoice_id', 'created_at'],
+  'route_modifications_log': ['route_id', 'invoice_id', 'action', 'user_id', 'previous_plate', 'new_plate', 'details', 'timestamp']
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación de Esquema...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log'];
   for (const [table, columns] of Object.entries(UNIVERSAL_SCHEMA)) {
     const idType = serialTables.includes(table) ? 'SERIAL' : 'TEXT';
     await client.query(`CREATE TABLE IF NOT EXISTS ${table} (id ${idType} PRIMARY KEY)`);
@@ -57,6 +59,37 @@ const healSchema = async (client: any) => {
     }
   }
   console.log('[M7-DB] Curación de Esquema Finalizada.');
+
+  // Harmonización de SERIALs (Garantizar que tablas críticas usen auto-incremento)
+  for (const table of serialTables) {
+    try {
+      const typeCheck = await client.query(`
+        SELECT data_type FROM information_schema.columns 
+        WHERE table_name = '${table}' AND column_name = 'id'
+      `);
+      if (typeCheck.rows.length > 0 && typeCheck.rows[0].data_type === 'text') {
+        console.log(`[M7-DB-HEAL] Convirtiendo ${table}.id de TEXT a INTEGER (Harmonización SERIAL)...`);
+        
+        // 1. Crear secuencia
+        await client.query(`CREATE SEQUENCE IF NOT EXISTS ${table}_id_seq`);
+        
+        // 2. Convertir columna (Intentar preservar numéricos, si no, generar nuevos)
+        await client.query(`
+          ALTER TABLE ${table} 
+          ALTER COLUMN id TYPE INTEGER 
+          USING (CASE WHEN id ~ '^[0-9]+$' THEN id::INTEGER ELSE nextval('${table}_id_seq') END)
+        `);
+        
+        // 3. Establecer Default y Vincular Secuencia
+        await client.query(`ALTER TABLE ${table} ALTER COLUMN id SET DEFAULT nextval('${table}_id_seq')`);
+        await client.query(`SELECT setval('${table}_id_seq', COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1)`);
+        
+        console.log(`[M7-DB-HEAL] Tabla ${table} harmonizada exitosamente.`);
+      }
+    } catch (e: any) {
+      console.warn(`[M7-DB-HEAL] Advertencia en harmonización de ${table}:`, e.message);
+    }
+  }
 };
 
 export const restoreSystem = async () => {

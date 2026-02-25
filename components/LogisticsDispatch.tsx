@@ -18,6 +18,7 @@ interface LogisticsDispatchProps {
     invoices: Invoice[];
     activeRoutes: Route[];
     onRefresh: () => void;
+    clients?: any[];
 }
 
 const M7_HUB_ORIGIN = {
@@ -34,7 +35,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     assignments,
     invoices,
     activeRoutes,
-    onRefresh
+    onRefresh,
+    clients = []
 }) => {
     const [selectedActiveRoute, setSelectedActiveRoute] = useState<Route | null>(null);
     const [visualizedRoute, setVisualizedRoute] = useState<Route | null>(null);
@@ -244,142 +246,202 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
     };
 
-    // 3. Generación de Planilla en PDF
+    // 3. Generación de Planilla Profesional (Unificada & Refinada)
     const generateRoutePDF = (route: any) => {
-        setIsGeneratingPDF(true);
-        try {
-            const doc = new jsPDF();
+        const despachador = user.name || 'SISTEMA ORBIT';
+        const driverName = route.driver_name !== 'S/A' ? route.driver_name : 'Óscar Santamaría';
 
-            // Header
-            doc.setFillColor(15, 23, 42); // slate-900
-            doc.rect(0, 0, 210, 35, 'F');
-
-            doc.setTextColor(16, 185, 129); // emerald-500
-            doc.setFontSize(24);
-            doc.setFont('helvetica', 'bold');
-            doc.text('M7 INTELLIGENCE', 105, 15, { align: 'center' });
-
-            doc.setFontSize(10);
-            doc.setTextColor(148, 163, 184); // slate-400
-            doc.text('PLANILLA DE DESPACHO LOGÍSTICO', 105, 23, { align: 'center' });
-            doc.text(new Date().toLocaleDateString('es-CO', {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric'
-            }), 105, 29, { align: 'center' });
-
-            // Información del Vehículo
-            doc.setTextColor(15, 23, 42);
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            doc.text('INFORMACIÓN DEL DESPACHO', 14, 45);
-
-            const driverName = (() => {
-                if (route.driver_name && route.driver_name !== 'S/A') return route.driver_name;
-                const link = assignments.find(a => a.vehicleId === route.vehicle_id && a.isActive);
-                const drv = drivers.find(d => d.id === link?.driverId);
-                return drv?.name || 'SIN CONDUCTOR ASIGNADO';
-            })();
-
-            const vehicleInfo = [
-                ['PLACA VEHÍCULO:', route.plate || 'N/A'],
-                ['CONDUCTOR:', driverName],
-                ['TOTAL DOCUMENTOS:', (route.invoice_ids || []).length.toString()],
-                ['VOLUMEN TOTAL:', `${(route.invoice_ids || []).reduce((acc: number, id: string) => {
-                    const inv = invoices.find(i => i.id === id);
-                    return acc + (inv?.volumeM3 || 0);
-                }, 0).toFixed(2)} m³`],
-                ['ESTADO:', 'EN RUTA'],
-                ['FECHA DESPACHO:', new Date(route.created_at || Date.now()).toLocaleString('es-CO')]
-            ];
-
-            autoTable(doc, {
-                startY: 50,
-                head: [],
-                body: vehicleInfo,
-                theme: 'plain',
-                styles: {
-                    fontSize: 9,
-                    cellPadding: 2,
-                    textColor: [15, 23, 42]
-                },
-                columnStyles: {
-                    0: { fontStyle: 'bold', cellWidth: 50, textColor: [100, 116, 139] },
-                    1: { fontStyle: 'normal', cellWidth: 130 }
-                }
-            });
-
-            // Tabla de Documentos
-            let finalY = (doc as any).lastAutoTable.finalY || 90;
-
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            doc.text('DESGLOSE DE DOCUMENTOS', 14, finalY + 10);
-
-            const documentRows = (route.invoice_ids || []).map((id: string, idx: number) => {
-                const inv = invoices.find(i => i.id === id);
-                return [
-                    (idx + 1).toString(),
-                    inv?.invoiceNumber || id,
-                    inv?.customerName || 'Cliente Genérico',
-                    inv?.city || 'N/A',
-                    `${inv?.volumeM3?.toFixed(2) || '0.00'} m³`,
-                    inv?.orderNumber || 'N/A'
-                ];
-            });
-
-            autoTable(doc, {
-                startY: finalY + 15,
-                head: [['#', 'FACTURA', 'CLIENTE', 'CIUDAD', 'VOLUMEN', 'ORDEN']],
-                body: documentRows,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [15, 23, 42],
-                    textColor: [16, 185, 129],
-                    fontStyle: 'bold',
-                    fontSize: 8,
-                    halign: 'center'
-                },
-                bodyStyles: {
-                    fontSize: 8,
-                    textColor: [15, 23, 42]
-                },
-                alternateRowStyles: { fillColor: [248, 250, 252] },
-                columnStyles: {
-                    0: { cellWidth: 10, halign: 'center' },
-                    1: { cellWidth: 30 },
-                    2: { cellWidth: 60 },
-                    3: { cellWidth: 30 },
-                    4: { cellWidth: 25, halign: 'right' },
-                    5: { cellWidth: 30 }
-                }
-            });
-
-            // Footer
-            const pageCount = (doc as any).internal.getNumberOfPages();
-            for (let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.setFontSize(8);
-                doc.setTextColor(148, 163, 184);
-                doc.text(
-                    `Generado por M7 Intelligence • Página ${i} de ${pageCount}`,
-                    105,
-                    285,
-                    { align: 'center' }
-                );
-            }
-
-            // Guardar PDF
-            const fileName = `M7_Planilla_${route.plate}_${new Date().getTime()}.pdf`;
-            doc.save(fileName);
-
-            toast.success('✅ Planilla PDF generada exitosamente');
-        } catch (error) {
-            console.error('[PDF-GENERATION-ERROR]', error);
-            toast.error('Error al generar PDF');
-        } finally {
-            setIsGeneratingPDF(false);
+        // 0. Logo del Cliente Dinámico (Soporte multi-campo & Base64 robusto)
+        const currentClient = (clients || []).find(c => String(c.id) === String(selectedClient));
+        let clientLogo = currentClient?.logo_url || currentClient?.logoUrl || currentClient?.logo || currentClient?.avatar || '';
+        
+        // Si es base64 y le falta el prefijo, lo agregamos
+        if (clientLogo && !clientLogo.startsWith('http') && !clientLogo.startsWith('data:')) {
+            clientLogo = `data:image/png;base64,${clientLogo}`;
         }
+        if (!clientLogo) clientLogo = 'https://placehold.co/150x50?text=CLIENTE+LOGO';
+
+        // 1. Obtener facturas asociadas para consolidación y cálculos
+        const routeInvoices = invoices.filter(inv => {
+           const rid = route.invoice_ids || route.invoiceIds || [];
+           return rid.includes(String(inv.id)) || rid.includes(String(inv.invoiceNumber)) || rid.includes(inv.docLId);
+        });
+
+        // Cálculos de Cabecera y Resumen basados en las facturas filtradas
+        const totalItemsCount = routeInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.totalItems) || 0), 0);
+        const totalValue = routeInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.invoiceValue) || 0), 0);
+        const totalVolume = routeInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.volumeM3) || 0), 0);
+
+        const cargoMap = new Map<string, { id: string, name: string, total: number, unit?: string }>();
+        routeInvoices.forEach(inv => {
+          inv.items?.forEach((it: any) => {
+            const id = it.sku || it.articleId || it.id || 'N/A';
+            const name = it.articleName || it.name || id;
+            if (!cargoMap.has(id)) cargoMap.set(id, { id, name, total: 0, unit: it.unit });
+            cargoMap.get(id)!.total += Number(it.qty || it.expectedQty || it.quantity || 0);
+          });
+        });
+
+        // 2. Lógica de Totales Verídicos
+        const cashTotal = routeInvoices.reduce((acc, inv) => {
+          const method = String((inv as any).paymentMethod || inv.items?.[0]?.paymentMethod || 'EF').toUpperCase();
+          const isCash = method === 'EF' || method === 'CONTADO' || method === 'EFECTIVO';
+          return isCash ? acc + (Number(inv.invoiceValue) || 0) : acc;
+        }, 0);
+
+        const creditTotal = routeInvoices.reduce((acc, inv) => {
+          const method = String((inv as any).paymentMethod || inv.items?.[0]?.paymentMethod || '').toUpperCase();
+          const isCredit = method.includes('30D') || method.includes('60D') || method.includes('CREDIT') || method === 'CR';
+          return isCredit ? acc + (Number(inv.invoiceValue) || 0) : acc;
+        }, 0);
+        
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        // Construcción del HTML mediante template literal PURO (sin sintaxis React)
+        const html = `
+          <html>
+            <head>
+              <title>PLANILLA - ${route.plate}</title>
+              <style>
+                @page { size: letter landscape; margin: 0.3cm; }
+                body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #0f172a; margin: 0; padding: 10px; font-size: 8px; }
+                .compact-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
+                .logo-img { max-height: 45px; max-width: 150px; object-fit: contain; }
+                .header-info-grid { display: flex; gap: 12px; }
+                .info-col { display: flex; flex-direction: column; line-height: 1.1; }
+                .info-label { font-size: 6px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+                .info-val { font-size: 9px; font-weight: 900; }
+
+                table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+                th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 3px; font-size: 7px; font-weight: 900; text-transform: uppercase; }
+                td { border: 1px solid #cbd5e1; padding: 3px; font-weight: 700; height: 14px; }
+                .text-center { text-align: center; }
+                .text-right { text-align: right; }
+
+                .top-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 15px; }
+                .totals-box { border: 2px solid #000; border-radius: 4px; overflow: hidden; }
+                .total-row { display: flex; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
+                .total-row:last-child { border-bottom: none; background: #f8fafc; font-weight: 900; font-size: 10px; }
+                .bank-strip { background: #0f172a; color: #fff; text-align: center; padding: 3px; font-weight: 900; margin-bottom: 5px; font-size: 7px; }
+                
+                .signature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 40px; padding: 0 40px; }
+                .sig-box { border-top: 2px solid #0f172a; text-align: center; padding-top: 8px; font-weight: 900; text-transform: uppercase; font-size: 10px; }
+              </style>
+            </head>
+            <body>
+              <div class="compact-header">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <img src="${clientLogo}" class="logo-img" onerror="this.src='https://placehold.co/100x45?text=LOGO'"/>
+                  <div>
+                    <div style="font-size: 11px; font-weight: 900;">${(currentClient?.name || 'OPERACIÓN LOGÍSTICA').toUpperCase()}</div>
+                    <div style="font-size: 6px; font-weight: 700; color:#64748b">ORBITM7 LOGISTICS INTELLIGENCE</div>
+                  </div>
+                </div>
+                <div class="header-info-grid">
+                   <div class="info-col"> <span class="info-label">Operación (DOC L)</span> <span class="info-val">${routeInvoices[0]?.docLId || 'S/N'}</span> </div>
+                   <div class="info-col"> <span class="info-label">Fecha</span> <span class="info-val">${new Date().toLocaleDateString('es-CO')}</span> </div>
+                   <div class="info-col"> <span class="info-label">Vehículo</span> <span class="info-val">${route.plate || 'N/A'}</span> </div>
+                   <div class="info-col"> <span class="info-label">FACTURAS</span> <span class="info-val">${routeInvoices.length}</span> </div>
+                   <div class="info-col"> <span class="info-label">Conductor</span> <span class="info-val">${driverName}</span> </div>
+                   <div class="info-col"> <span class="info-label">Despachador</span> <span class="info-val">${despachador}</span> </div>
+                </div>
+              </div>
+
+              <div class="top-grid">
+                <table>
+                  <thead> <tr><th>BANCO</th><th>VALOR</th><th>COMPROBANTE</th><th>FECHA</th></tr> </thead>
+                  <tbody> ${Array(4).fill(0).map(() => `<tr><td></td><td></td><td></td><td></td></tr>`).join('')} </tbody>
+                </table>
+                <div class="totals-box">
+                  <div class="total-row"><span>EFECTIVO (EF):</span> <span>$ ${cashTotal.toLocaleString()}</span></div>
+                  <div class="total-row"><span>CRÉDITO (30D/60D):</span> <span>$ ${creditTotal.toLocaleString()}</span></div>
+                  <div class="total-row"><span>DIFERENCIA:</span> <span style="color:red">$ 0</span></div>
+                  <div class="total-row"><span>TOTAL RECAUDO:</span> <span>$ ${cashTotal.toLocaleString()}</span></div>
+                </div>
+              </div>
+
+              <div class="bank-strip">🏦 CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)</div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th width="35">U.NEG</th>
+                    <th width="75">FACTURA</th>
+                    <th width="75"># INTERNO</th>
+                    <th width="35">CANT</th>
+                    <th width="85">REF CLIENTE</th>
+                    <th width="75">VALOR</th>
+                    <th width="35">C.PAG</th>
+                    <th>CLIENTE / DIRECCIÓN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${routeInvoices.map(inv => {
+                    const firstItem = inv.items?.[0] || {} as any;
+                    const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
+                    return `
+                      <tr>
+                        <td class="text-center">${inv.unCode || firstItem.unCode || firstItem.un_code || '-'}</td>
+                        <td class="text-center" style="font-weight:900;">${inv.invoiceNumber}</td>
+                        <td class="text-center">${inv.orderNumber || inv.docLId || '-'}</td>
+                        <td class="text-center">${inv.totalItems || '-'}</td>
+                        <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
+                        <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
+                        <td class="text-center" style="background:#f8fafc; font-weight:900;">${method}</td>
+                        <td><div style="font-weight:900">${inv.customerName}</div><div style="font-size:7px; color:#64748b">${inv.address} - ${inv.city}</div></td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+
+              <div style="margin-top:10px;">
+                <div style="font-weight:900; font-size:8px; border-bottom:1px solid #000; margin-bottom:5px; text-transform:uppercase;">📦 CONSOLIDADO DE MERCANCÍA (RESUMEN DE CARGA) - ORDENADO POR ID</div>
+                <table style="width:100%; table-layout: fixed;">
+                  <thead>
+                    <tr>
+                      <th width="15%">ID</th><th width="25%">DESCRIPCIÓN</th><th width="10%">CANT</th>
+                      <th style="border-left: 2px solid #000;" width="15%">ID</th><th width="25%">DESCRIPCIÓN</th><th width="10%">CANT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${(() => {
+                      // Sort alphabetically as requested for IDs like D15...
+                      const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+                      const rows = [];
+                      for (let i = 0; i < items.length; i += 2) {
+                        const it1 = items[i];
+                        const it2 = items[i + 1];
+                        rows.push(`
+                          <tr>
+                            <td class="text-center">${it1.id}</td>
+                            <td style="font-size:6.5px; overflow:hidden; white-space:nowrap;">${it1.name}</td>
+                            <td class="text-center" style="font-weight:900; background:#fefce8;">${it1.total}</td>
+                            
+                            <td style="border-left: 2px solid #000;" class="text-center">${it2 ? it2.id : ''}</td>
+                            <td style="font-size:6.5px; overflow:hidden; white-space:nowrap;">${it2 ? it2.name : ''}</td>
+                            <td class="text-center" style="font-weight:900; background:#fefce8;">${it2 ? it2.total : ''}</td>
+                          </tr>
+                        `);
+                      }
+                      return rows.join('');
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="signature-section">
+                <div class="sig-box">FIRMA CONDUCTOR: ${driverName.toUpperCase()}</div>
+                <div class="sig-box">DESPACHO / AUDITORÍA: ${despachador.toUpperCase()}</div>
+              </div>
+
+              <script>window.onload = () => { setTimeout(() => { window.print(); }, 500); };</script>
+            </body>
+          </html>
+        `;
+        printWindow.document.write(html);
+        printWindow.document.close();
     };
 
 
@@ -617,7 +679,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 if (String(route.driver_document || '').trim() === userDoc) return true;
                 
                 // 2. Verificar vía asignación activa
-                const link = assignments.find(a => a.vehicleId === route.vehicle_id && a.isActive);
+                const link = assignments.find(a => a.driverId === route.driver_id && a.isActive);
                 const drv = drivers.find(d => d.id === link?.driverId);
                 return String(drv?.documentNumber || '').trim() === userDoc;
             });

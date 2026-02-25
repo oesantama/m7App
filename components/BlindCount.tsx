@@ -27,13 +27,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
 }) => {
   const [scanInput, setScanInput] = useState('');
   const [tableSearch, setTableSearch] = useState('');
+  // ESTADOS DE INVENTARIO M7
   const [counts, setCounts] = useState<{ [articleId: string]: number }>(() => {
     const initial: { [id: string]: number } = {};
     docL.items.forEach(it => {
-      if ((it.count2 || it.countedQty) > 0) initial[it.articleId] = it.count2 || it.countedQty;
+      // Priorizar countedQty del servidor (Cloud)
+      if ((it.countedQty || 0) > 0) initial[it.articleId] = it.countedQty;
     });
     return initial;
   });
+
   const [count1Data, setCount1Data] = useState<{ [articleId: string]: number }>(() => {
     const initial: { [id: string]: number } = {};
     docL.items.forEach(it => {
@@ -41,6 +44,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     });
     return initial;
   });
+
   const [itemObservations, setItemObservations] = useState<{ [articleId: string]: string }>(() => {
     const initial: { [id: string]: string } = {};
     docL.items.forEach(it => {
@@ -48,7 +52,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
     });
     return initial;
   });
-  const [inventoryObservation, setInventoryObservation] = useState(docL.inventory_observation || docL.inventoryNotes || '');
+
+  const [inventoryObservation, setInventoryObservation] = useState(docL.inventoryNotes || '');
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
   const [mismatchIds, setMismatchIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [validationAttempts, setValidationAttempts] = useState(0);
@@ -56,6 +64,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(20);
   const [currentPage, setCurrentPage] = useState(1);
   /* ESTADO UNIFICADO DE TRANSACCIÓN */
@@ -138,15 +147,36 @@ const BlindCount: React.FC<BlindCountProps> = ({
     }));
   }, [counts, count1Data, validationAttempts, mismatchIds, itemObservations, inventoryObservation, docL.id]);
 
-  // AUTO-SAVE AL SERVIDOR CADA 60 SEGUNDOS SI HAY CAMBIOS
+  // CLOUD SYNC: Auto-guardado con Debounce (Persistent Cloud Mode)
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (Object.keys(counts).length > 0) {
-        handleManualSave();
-      }
-    }, 60000);
-    return () => clearInterval(timer);
-  }, [counts]);
+    if (!isLoaded.current) return;
+    
+    // Evitar disparo si no hay datos significativos
+    if (Object.keys(counts).length === 0 && !inventoryObservation) return;
+
+    setSyncStatus('syncing');
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+    // DETERMINAR TIEMPO: 2000ms si está enfocado (más seguro), 800ms si está fuera (más rápido)
+    const syncDelay = isInputFocused ? 2000 : 800;
+
+    autoSaveTimer.current = setTimeout(() => {
+      onPartialSave(
+        groupedItems.map(it => ({
+          ...it,
+          countedQty: counts[it.articleId] || 0,
+          inventoryNote: itemObservations[it.articleId]
+        })),
+        inventoryObservation
+      );
+      setSyncStatus('synced');
+      setLastSyncTime(new Date());
+    }, syncDelay);
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [counts, itemObservations, inventoryObservation, isInputFocused]);
 
   const handleManualSave = () => {
     onPartialSave(
@@ -556,6 +586,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
           </div>
         </div>
       )}
+      {/* STATUS DE SINCRONIZACIÓN CLOUD */}
+      <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 border-t border-slate-100 shrink-0">
+        <div className={`w-2 h-2 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
+        <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">
+          {syncStatus === 'syncing' ? 'Cloud Sync: Sincronizando...' : syncStatus === 'error' ? 'Cloud Sync: Error de Conexión' : 'Cloud Sync: Protegido en la Nube'}
+          {lastSyncTime && syncStatus === 'synced' && (
+            <span className="ml-2 text-slate-300 font-bold opacity-60 italic">({lastSyncTime.toLocaleTimeString()})</span>
+          )}
+        </p>
+      </div>
 
       <div className="bg-slate-900 px-4 py-1 text-white flex flex-col lg:flex-row justify-between items-center shrink-0 border-none gap-3">
         <div className="flex items-center gap-3 w-full lg:w-auto">
@@ -592,6 +632,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
               type="text"
               value={scanInput}
               onChange={handleInputChange}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
               placeholder="ESCANEAR SKU..."
               autoFocus
               className="w-full pl-4 pr-10 py-2.5 bg-white border border-white/20 rounded-xl text-slate-900 font-black uppercase text-sm outline-none focus:border-emerald-500 transition-all placeholder:text-slate-300 shadow-sm"

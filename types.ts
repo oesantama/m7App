@@ -196,6 +196,11 @@ export interface Invoice extends AuditBase {
   notes?: string;
   externalDocId?: string;
   invoiceNumber?: string;
+  items?: DocumentLItem[];
+  unCode?: string;
+  clientRef?: string;
+  totalItems?: number;
+  paymentMethod?: string;
 }
 
 export interface Route extends AuditBase {

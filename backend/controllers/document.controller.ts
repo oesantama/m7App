@@ -779,7 +779,6 @@ export const getInvoices = async (req: Request, res: Response) => {
         document_items.address as "customerName",
         SUM(document_items.expected_qty) as "totalItems",
         SUM(document_items.volume) as "volumeM3",
-        SUM(document_items.peso) as "invoiceValue",
         document_items.document_id as "docLId",
         documents_l.client_id as "clientId", 
         documents_l.codplan as "codplan",
@@ -789,14 +788,20 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(da.id) as "dispatchId",
         MAX(da.status) as "dispatchStatus",
         MAX(pa.leader_id) as "pickerLeader",
+        MAX(document_items.un_code) as "unCode",
+        MAX(document_items.client_ref) as "clientRef",
+        MAX(COALESCE(p.vmetodo, 0)) as "invoiceValue",
         (JSONB_AGG(pa.helper_ids) -> 0) as "pickerHelpers",
         MAX(pa.started_at) as "pickingDate",
+        MAX(p.metodo_pago) as "paymentMethod",
         JSON_AGG(JSON_BUILD_OBJECT(
           'sku', document_items.article_id,
-          'expectedQty', document_items.expected_qty,
+          'qty', document_items.expected_qty,
           'receivedQty', document_items.received_qty,
           'articleName', COALESCE(articles.name, document_items.article_id),
-          'unit', document_items.unit
+          'unit', document_items.unit,
+          'unCode', document_items.un_code,
+          'clientRef', document_items.client_ref
         )) as "items",
         CASE 
           WHEN document_items.city ILIKE '%MEDELLIN%' OR document_items.city ILIKE '%MEDELLÍN%' OR document_items.city ILIKE '%ANTIOQUIA%' THEN 6.2442
@@ -823,6 +828,7 @@ export const getInvoices = async (req: Request, res: Response) => {
       FROM document_items
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
       LEFT JOIN articles ON document_items.article_id = articles.id
+      LEFT JOIN document_l_payments p ON (TRIM(UPPER(document_items.invoice)) = TRIM(UPPER(p.invoice)))
       LEFT JOIN dispatch_assignments da ON (
         da.invoice_id = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
         OR da.invoice_id = ${sqlIdGen}
@@ -835,6 +841,12 @@ export const getInvoices = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
+    
+    // FILTRO POR CLIENTE (Seguridad y Segmentación)
+    if (clientId && clientId !== 'GLOBAL') {
+      queryParams.push(clientId);
+      query += ` AND documents_l.client_id = $${queryParams.length}`;
+    }
 
     // LÓGICA DE FILTRADO REFINADA
     if (ids) {
@@ -862,11 +874,8 @@ export const getInvoices = async (req: Request, res: Response) => {
         OR document_items.item_status IN ('ALISTADO', 'ENTREGADO', 'FINALIZADO', 'ASIGNADO', 'EN RUTA', 'EN_RUTA')
       )`;
     } else {
-      // VISTA DE ALISTADO (PICKING): 
-      // 1. Debe estar en estado "En Conteo" (Auditado)
-      // 2. NO debe tener un proceso de alistado ya completado o en curso
-      query += ` AND documents_l.status = 'En Conteo'`;
-      query += ` AND (pa.id IS NULL OR pa.status = 'CANCELLED')`;
+      // Para la vista operativa general: Mostrar todo lo que no esté finalizado o entregado
+      query += ` AND (documents_l.status NOT IN ('Finalizado', 'Entregado') OR documents_l.status IS NULL)`;
       
       // Filtro adicional de seguridad para estados de ítem
       query += ` AND (

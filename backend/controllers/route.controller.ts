@@ -11,44 +11,45 @@ export const getRoutes = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
       SELECT 
-        r.id, r.vehicle_id, r.driver_id, r.client_id, r.created_by, r.status, r.created_at,
+        r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text, r.created_by::text, r.status::text, r.created_at,
         v.plate, d.name as driver_name,
         COALESCE(
           (
-            SELECT json_agg(TRIM(invoice_id)) 
+            SELECT json_agg(invoice_id) 
             FROM route_invoices 
-            WHERE TRIM(route_id) = TRIM(r.id)
+            WHERE route_id::text = r.id::text
           ),
           '[]'::json
         ) as invoice_ids
       FROM routes r
-      LEFT JOIN vehicles v ON TRIM(r.vehicle_id) = TRIM(v.id)
-      LEFT JOIN drivers d ON TRIM(r.driver_id) = TRIM(d.id)
+      LEFT JOIN vehicles v ON r.vehicle_id::text = v.id::text
+      LEFT JOIN drivers d ON r.driver_id::text = d.id::text
 
       UNION ALL
 
       SELECT 
-        da.id, 
-        COALESCE(a.vehicle_id, 'S/V') as vehicle_id, 
-        da.driver_id, 
+        da.id::text, 
+        COALESCE(a.vehicle_id::text, 'S/V') as vehicle_id, 
+        da.driver_id::text, 
         'CLI-01' as client_id, 
-        da.created_by, 
-        da.status, 
+        da.created_by::text, 
+        da.status::text, 
         da.created_at,
         v.plate, 
         d.name as driver_name,
         json_build_array(da.invoice_id) as invoice_ids
       FROM dispatch_assignments da
-      LEFT JOIN assignments a ON da.driver_id = a.driver_id AND a.is_active = true
-      LEFT JOIN vehicles v ON a.vehicle_id = v.id
-      LEFT JOIN drivers d ON da.driver_id = d.id
+      LEFT JOIN assignments a ON da.driver_id::text = a.driver_id::text AND a.is_active = true
+      LEFT JOIN vehicles v ON a.vehicle_id::text = v.id::text
+      LEFT JOIN drivers d ON da.driver_id::text = d.id::text
       WHERE da.status IN ('PENDING_SIGNATURES', 'EN_RUTA', 'En repart', 'PENDING')
       
       ORDER BY created_at DESC
     `);
     res.json(result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: "Error al obtener rutas" });
+    console.error('[M7-GET-ROUTES-ERR]', err);
+    res.status(500).json({ error: "Error al obtener rutas", details: err.message });
   }
 };
 

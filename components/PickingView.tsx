@@ -49,12 +49,15 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
     }
 
     const filteredInvoices = useMemo(() => {
-        // Solo mostrar facturas cuyos documentos maestros estén en proceso de Auditoría/Conteo o Inventariado
+        // Solo mostrar facturas cuyos documentos maestros estén en proceso de Auditoría/Conteo o Inventariado o estén Pendientes
         const pickingDocIds = (documents || [])
-            .filter(d => (d.status as any) === 'En Conteo' || (d.status as any) === 'Inventariado' || (d.status as any) === 'INVENTARIADO')
-            .map(d => d.id);
+            .filter(d => {
+                const s = String(d.status || '').toUpperCase();
+                return s === 'EN CONTEO' || s === 'INVENTARIADO' || s === 'PENDIENTE';
+            })
+            .map(d => String(d.id));
 
-        let list = invoices.filter(inv => pickingDocIds.includes(inv.docLId));
+        let list = invoices.filter(inv => pickingDocIds.includes(String(inv.docLId)));
 
         if (!searchTerm) return list;
         const lower = searchTerm.toLowerCase();

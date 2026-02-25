@@ -68,29 +68,28 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
   const trigger = (
     <button 
       onClick={() => setIsOpen(!isOpen)}
-      className={`rounded-2xl flex items-center justify-center transition-all duration-500 hover:scale-105 active:scale-90 group relative overflow-hidden pointer-events-auto ${
+      className={`fixed bottom-8 right-8 z-[99999] rounded-full flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-95 group overflow-visible shadow-[0_20px_50px_rgba(16,185,129,0.3)] ${
         isOpen 
-          ? 'bg-slate-900 w-14 h-14' 
-          : 'bg-emerald-500 px-6 h-14 shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:shadow-emerald-500/40'
-      } ${headerPortal ? 'h-10 px-4 bg-slate-900 border border-white/10' : 'fixed bottom-10 right-10 z-[2147483647] w-24 h-24 rounded-[2.5rem]'}`}
+          ? 'bg-slate-950 w-16 h-16' 
+          : 'bg-slate-950 w-20 h-20 border-2 border-emerald-500/20'
+      }`}
     >
       {isOpen ? (
         <Icons.X className="text-white w-6 h-6" />
       ) : (
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col items-center">
-            <span className="text-slate-950 font-black text-lg leading-none tracking-tighter">OrbitM7</span>
-            <span className="text-slate-950 text-[8px] font-black uppercase tracking-[0.2em] opacity-60">IQ</span>
-          </div>
-          {headerPortal && (
-            <div className="w-8 h-8 bg-slate-950 rounded-xl flex items-center justify-center">
-               <Icons.Brain className="text-emerald-400 w-5 h-5" />
+        <div className="relative w-full h-full flex items-center justify-center">
+          {/* Anillos de pulso premium */}
+          <div className="absolute inset-0 bg-emerald-500/20 rounded-full animate-ping scale-125"></div>
+          
+          <div className="flex flex-col items-center justify-center relative z-10">
+            <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/40 group-hover:rotate-12 transition-transform">
+               <Icons.Brain className="text-slate-950 w-6 h-6" />
             </div>
-          )}
-          {/* Indicador de actividad IA */}
-          <div className="flex gap-1">
-              <div className="w-1.5 h-1.5 bg-slate-950 rounded-full animate-ping"></div>
+            <span className="text-[7px] font-black text-emerald-400 uppercase tracking-[0.3em] mt-1.5 opacity-80 group-hover:opacity-100 transition-opacity">OrbitM7 IQ</span>
           </div>
+          
+          {/* Indicador de actividad IA sutil */}
+          <div className="absolute top-4 right-4 w-2 h-2 bg-emerald-500 rounded-full border-2 border-slate-950 shadow-sm shadow-emerald-500/50"></div>
         </div>
       )}
     </button>

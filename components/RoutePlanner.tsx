@@ -93,12 +93,20 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     // REGLA ORBIT: Solo planificar items en estado 'Pendiente' o 'Auditado'
     const filtered = invoices.filter(inv => {
       if (learningExemptions.includes(inv.id)) return false;
+
+      // FILTRO 1: Debe pertenecer al cliente seleccionado
+      const invClientId = inv.clientId || (inv as any).client_id;
+      const clientMatch = selectedClient === 'GLOBAL' || invClientId === selectedClient;
+      if (!clientMatch) return false;
+
+      // FILTRO 2: Estados aptos para despacho Orbit
       const s = String(inv.status || '').toUpperCase();
-      return s === 'PENDIENTE' || s === 'AUDITADO';
+      const validStatuses = ['PENDIENTE', 'AUDITADO', 'INVENTARIADO', 'EN CONTEO', 'PAGADO'];
+      return validStatuses.includes(s);
     });
 
     return filtered;
-  }, [invoices, learningExemptions]);
+  }, [invoices, learningExemptions, selectedClient]);
 
   // Facturas que NO están en ninguna ruta sugerida
   const unassignedInvoices = useMemo(() => {
@@ -854,130 +862,186 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   };
 
   const handleExportPlanilla = (route: SuggestedRoute) => {
-    const totalVolActual = route.assignedInvoices.reduce((acc, i) => acc + (i.volumeM3 || 0), 0);
-    // Generación premium de planilla HTML
+    const despachador = user.name || 'SISTEMA ORBIT';
+    const driverName = (route.vehicle as any).driverName || (route.vehicle as any).driver_name || route.driver_name || 'Óscar Santamaría';
+
+    // 0. Logo del Cliente Dinámico (Soporte multi-campo & Base64 robusto)
+    const currentClient = (clients || []).find(c => String(c.id) === String(selectedClient));
+    let clientLogo = currentClient?.logo_url || currentClient?.logoUrl || currentClient?.logo || currentClient?.avatar || '';
+    
+    // Si es base64 y le falta el prefijo, lo agregamos
+    if (clientLogo && !clientLogo.startsWith('http') && !clientLogo.startsWith('data:')) {
+        clientLogo = `data:image/png;base64,${clientLogo}`;
+    }
+    if (!clientLogo) clientLogo = 'https://placehold.co/150x50?text=CLIENTE+LOGO';
+
+    // 1. Cálculos de Cabecera y Resumen
+    const totalItemsCount = route.assignedInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.totalItems) || 0), 0);
+    
+    // 2. Consolidación de Carga
+    const cargoMap = new Map<string, { id: string, name: string, total: number, unit?: string }>();
+    route.assignedInvoices.forEach(inv => {
+      inv.items?.forEach((it: any) => {
+        const id = it.sku || it.articleId || (it as any).id || 'N/A';
+        const name = (it as any).articleName || (it as any).name || id;
+        if (!cargoMap.has(id)) cargoMap.set(id, { id, name, total: 0, unit: it.unit });
+        cargoMap.get(id)!.total += Number(it.qty || it.expectedQty || (it as any).quantity || 0);
+      });
+    });
+
+    // 3. Lógica de Totales Verídicos
+    const cashTotal = route.assignedInvoices.reduce((acc, inv) => {
+      const method = String((inv as any).paymentMethod || inv.items?.[0]?.paymentMethod || 'EF').toUpperCase();
+      const isCash = method === 'EF' || method === 'CONTADO' || method === 'EFECTIVO';
+      return isCash ? acc + (Number(inv.invoiceValue) || 0) : acc;
+    }, 0);
+
+    const creditTotal = route.assignedInvoices.reduce((acc, inv) => {
+      const method = String((inv as any).paymentMethod || inv.items?.[0]?.paymentMethod || '').toUpperCase();
+      const isCredit = method.includes('30D') || method.includes('60D') || method.includes('CREDIT') || method === 'CR';
+      return isCredit ? acc + (Number(inv.invoiceValue) || 0) : acc;
+    }, 0);
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
     const html = `
       <html>
         <head>
-          <title>PLANILLA ORBIT - ${route.vehicle.plate}</title>
+          <title>PLANILLA - ${route.vehicle.plate}</title>
           <style>
-            @page { size: letter; margin: 1cm; }
-            body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; padding: 20px; }
-            .header-table { width: 100%; margin-bottom: 25px; border-bottom: 3px solid #0f172a; padding-bottom: 15px; }
-            .logo-placeholder { font-size: 28px; font-weight: 900; color: #020617; letter-spacing: -1px; }
-            .m7-accent { color: #10b981; }
-            .doc-title { text-align: right; font-size: 14px; font-weight: 900; color: #64748b; }
-            
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; background: #f8fafc; padding: 20px; border-radius: 15px; }
-            .info-item { font-size: 11px; }
-            .info-label { font-weight: 900; color: #94a3b8; text-transform: uppercase; font-size: 8px; margin-bottom: 3px; }
-            .info-value { font-weight: 800; color: #1e293b; font-size: 13px; }
+            @page { size: letter landscape; margin: 0.3cm; }
+            body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #0f172a; margin: 0; padding: 10px; font-size: 8px; }
+            .compact-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
+            .logo-img { max-height: 45px; max-width: 150px; object-fit: contain; }
+            .header-info-grid { display: flex; gap: 12px; }
+            .info-col { display: flex; flex-direction: column; line-height: 1.1; }
+            .info-label { font-size: 6px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+            .info-val { font-size: 9px; font-weight: 900; }
 
-            table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
-            th { background-color: #0f172a; color: white; padding: 12px 8px; text-align: left; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-            td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; font-weight: 600; }
-            tr:last-child td { border-bottom: none; }
-            tr:nth-child(even) { background-color: #f1f5f9; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+            th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 3px; font-size: 7px; font-weight: 900; text-transform: uppercase; }
+            td { border: 1px solid #cbd5e1; padding: 3px; font-weight: 700; height: 14px; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
 
-            .prio-badge { background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 900; }
-            .footer-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; margin-top: 60px; padding: 0 40px; }
-            .sig-box { border-top: 2px solid #0f172a; padding-top: 10px; text-align: center; }
-            .sig-label { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #64748b; }
+            .top-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 15px; }
+            .totals-box { border: 2px solid #000; border-radius: 4px; overflow: hidden; }
+            .total-row { display: flex; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
+            .total-row:last-child { border-bottom: none; background: #f8fafc; font-weight: 900; font-size: 10px; }
+            .bank-strip { background: #0f172a; color: #fff; text-align: center; padding: 3px; font-weight: 900; margin-bottom: 5px; font-size: 7px; }
             
-            .summary-box { margin-top: 30px; text-align: right; padding-right: 20px; }
-            .summary-total { font-size: 16px; font-weight: 900; color: #0f172a; }
+            .signature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 40px; padding: 0 40px; }
+            .sig-box { border-top: 2px solid #0f172a; text-align: center; padding-top: 8px; font-weight: 900; text-transform: uppercase; font-size: 10px; }
           </style>
         </head>
         <body>
-          <table class="header-table" style="border:none;">
-            <tr style="background:none;">
-              <td style="border:none; padding:0;">
-                <div class="logo-placeholder uppercase">ORBITM7</div>
-                <div style="font-size: 9px; font-bold; color: #64748b;">SOFTWARE DE LOGÍSTICA INTELIGENTE</div>
-              </td>
-              <td class="doc-title" style="border:none; padding:0;">
-                PLANILLA DE DESPACHO<br/>
-                <span style="color: #10b981;">ID RUTA: ${route.id.split('-').slice(-1)}</span>
-              </td>
-            </tr>
-          </table>
-
-          <div class="info-grid">
-            <div class="info-item">
-                <div class="info-label">Vehículo / Placa</div>
-                <div class="info-value">${route.vehicle.plate}</div>
+          <div class="compact-header">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <img src="${clientLogo}" class="logo-img" onerror="this.src='https://placehold.co/100x45?text=LOGO'"/>
+              <div>
+                <div style="font-size: 11px; font-weight: 900;">${(currentClient?.name || 'OPERACIÓN LOGÍSTICA').toUpperCase()}</div>
+                <div style="font-size: 6px; font-weight: 700; color:#64748b">ORBITM7 LOGISTICS INTELLIGENCE</div>
+              </div>
             </div>
-            <div class="info-item">
-                <div class="info-label">Conductor Asignado</div>
-                <div class="info-value">${(route.vehicle as any).driverName || 'Óscar Santamaría'}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Fecha de Salida</div>
-                <div class="info-value">${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Capacidad Utilizada</div>
-                <div class="info-value">${totalVolActual.toFixed(2)}m³ / ${route.vehicle.capacityM3}m³ (${Math.round((totalVolActual / route.vehicle.capacityM3) * 100)}%)</div>
+            <div class="header-info-grid">
+               <div class="info-col"> <span class="info-label">Operación (DOC L)</span> <span class="info-val">${route.assignedInvoices[0]?.docLId || 'S/N'}</span> </div>
+               <div class="info-col"> <span class="info-label">Fecha</span> <span class="info-val">${new Date().toLocaleDateString('es-CO')}</span> </div>
+               <div class="info-col"> <span class="info-label">Vehículo</span> <span class="info-val">${route.vehicle.plate}</span> </div>
+               <div class="info-col"> <span class="info-label">FACTURAS</span> <span class="info-val">${route.assignedInvoices.length}</span> </div>
+               <div class="info-col"> <span class="info-label">Conductor</span> <span class="info-val">${driverName}</span> </div>
+               <div class="info-col"> <span class="info-label">Despachador</span> <span class="info-val">${despachador}</span> </div>
             </div>
           </div>
+
+          <div class="top-grid">
+            <table>
+              <thead> <tr><th>BANCO</th><th>VALOR</th><th>COMPROBANTE</th><th>FECHA</th></tr> </thead>
+              <tbody> ${Array(4).fill(0).map(() => `<tr><td></td><td></td><td></td><td></td></tr>`).join('')} </tbody>
+            </table>
+            <div class="totals-box">
+              <div class="total-row"><span>EFECTIVO (EF):</span> <span>$ ${cashTotal.toLocaleString()}</span></div>
+              <div class="total-row"><span>CRÉDITO (30D/60D):</span> <span>$ ${creditTotal.toLocaleString()}</span></div>
+              <div class="total-row"><span>DIFERENCIA:</span> <span style="color:red">$ 0</span></div>
+              <div class="total-row"><span>TOTAL RECAUDO:</span> <span>$ ${cashTotal.toLocaleString()}</span></div>
+            </div>
+          </div>
+
+          <div class="bank-strip">🏦 CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)</div>
 
           <table>
             <thead>
               <tr>
-                <th width="30">#</th>
-                <th width="100">Factura</th>
-                <th>Cliente</th>
-                <th>Destino / Ciudad</th>
-                <th width="60">Vol (m³)</th>
-                <th width="150">Observaciones</th>
+                <th width="35">U.NEG</th>
+                <th width="75">FACTURA</th>
+                <th width="75"># INTERNO</th>
+                <th width="35">CANT</th>
+                <th width="85">REF CLIENTE</th>
+                <th width="75">VALOR</th>
+                <th width="35">C.PAG</th>
+                <th>CLIENTE / DIRECCIÓN</th>
               </tr>
             </thead>
             <tbody>
-              ${route.assignedInvoices.map((inv, idx) => {
-      const isPrio = (inv as any).isPriority ? '<span class="prio-badge">★ PRIORIDAD</span>' : '';
-      return `
-                    <tr>
-                      <td>${idx + 1}</td>
-                      <td style="font-weight:900; color:#0f172a;">${inv.invoiceNumber}</td>
-                      <td>${inv.customerName}</td>
-                      <td>
-                        <div style="font-weight:800;">${inv.city}</div>
-                        <div style="font-size:8px; color:#64748b;">${inv.address}</div>
-                      </td>
-                      <td style="font-weight:900; color:#10b981;">${inv.volumeM3.toFixed(3)}</td>
-                      <td>
-                        ${isPrio}
-                        <div style="font-size:8px; margin-top:2px;">${inv.notes || ''}</div>
-                      </td>
-                    </tr>
-                  `;
-    }).join('')}
+              ${route.assignedInvoices.map(inv => {
+                const firstItem = inv.items?.[0] || {} as any;
+                const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
+                return `
+                  <tr>
+                    <td class="text-center">${inv.unCode || firstItem.unCode || firstItem.un_code || '-'}</td>
+                    <td class="text-center" style="font-weight:900;">${inv.invoiceNumber}</td>
+                    <td class="text-center">${inv.orderNumber || inv.docLId || '-'}</td>
+                    <td class="text-center">${inv.totalItems || '-'}</td>
+                    <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
+                    <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
+                    <td class="text-center" style="background:#f8fafc; font-weight:900;">${method}</td>
+                    <td><div style="font-weight:900">${inv.customerName}</div><div style="font-size:7px; color:#64748b">${inv.address} - ${inv.city}</div></td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
 
-          <div class="summary-box">
-             <div class="summary-total">TOTAL FACTURAS: ${route.assignedInvoices.length}</div>
-             <div style="font-size: 11px; font-weight: 700; color: #64748b;">CARGA TOTAL: ${totalVolActual.toFixed(2)}m³</div>
+          <div style="margin-top:10px;">
+            <div style="font-weight:900; font-size:8px; border-bottom:1px solid #000; margin-bottom:5px; text-transform:uppercase;">📦 CONSOLIDADO DE MERCANCÍA (RESUMEN DE CARGA) - ORDENADO POR ID</div>
+            <table style="width:100%; table-layout: fixed;">
+              <thead>
+                <tr>
+                  <th width="15%">ID</th><th width="25%">DESCRIPCIÓN</th><th width="10%">CANT</th>
+                  <th style="border-left: 2px solid #000;" width="15%">ID</th><th width="25%">DESCRIPCIÓN</th><th width="10%">CANT</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(() => {
+                  const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+                  const rows = [];
+                  for (let i = 0; i < items.length; i += 2) {
+                    const it1 = items[i];
+                    const it2 = items[i + 1];
+                    rows.push(`
+                      <tr>
+                        <td class="text-center">${it1.id}</td>
+                        <td style="font-size:6.5px; overflow:hidden; white-space:nowrap;">${it1.name}</td>
+                        <td class="text-center" style="font-weight:900; background:#fefce8;">${it1.total}</td>
+                        
+                        <td style="border-left: 2px solid #000;" class="text-center">${it2 ? it2.id : ''}</td>
+                        <td style="font-size:6.5px; overflow:hidden; white-space:nowrap;">${it2 ? it2.name : ''}</td>
+                        <td class="text-center" style="font-weight:900; background:#fefce8;">${it2 ? it2.total : ''}</td>
+                      </tr>
+                    `);
+                  }
+                  return rows.join('');
+                })()}
+              </tbody>
+            </table>
           </div>
 
-          <div class="footer-signatures">
-            <div class="sig-box">
-                <div class="sig-label">Firma Conductor</div>
-                <div style="font-size: 8px; margin-top: 5px;">${(route.vehicle as any).driverName || 'Óscar Santamaría'}</div>
-            </div>
-            <div class="sig-box">
-                <div class="sig-label">Revisión de Bodega / Despacho</div>
-            </div>
+          <div class="signature-section">
+            <div class="sig-box">FIRMA CONDUCTOR: ${driverName.toUpperCase()}</div>
+            <div class="sig-box">DESPACHO / AUDITORÍA: ${despachador.toUpperCase()}</div>
           </div>
 
-          <div style="margin-top: 40px; text-align: center; font-size: 8px; color: #94a3b8; font-weight: 700;">
-            DOCUMENTO GENERADO POR SISTEMA ORBIT LOGÍSTICA - ${new Date().toLocaleString()}
-          </div>
-
-          <script>window.print();</script>
+          <script>window.onload = () => { setTimeout(() => { window.print(); }, 500); };</script>
         </body>
       </html>
     `;
