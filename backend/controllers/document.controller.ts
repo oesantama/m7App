@@ -4,160 +4,6 @@ import pool from '../config/database.js';
 
 export const getDocuments = async (req: Request, res: Response) => {
   try {
-    // REPARACIÓN INTEGRAL: Asegurar tablas y columnas críticas
-    await pool.query('CREATE TABLE IF NOT EXISTS documents_l (id TEXT PRIMARY KEY, client_id TEXT, external_doc_id TEXT, status TEXT DEFAULT \'PENDIENTE\', created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);');
-    await pool.query('CREATE TABLE IF NOT EXISTS document_items (id SERIAL PRIMARY KEY, document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE, article_id TEXT, expected_qty NUMERIC DEFAULT 0);');
-
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS plan_type TEXT;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_notes TEXT;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_user TEXT;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_date TIMESTAMP WITH TIME ZONE;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS vehicle_plate TEXT;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picking_date TIMESTAMP WITH TIME ZONE;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiving_date TIMESTAMP WITH TIME ZONE;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picker_user TEXT;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS deliverer_user TEXT;');
-    await pool.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiver_user TEXT;');
-
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS received_qty NUMERIC DEFAULT 0;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS invoice TEXT;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS city TEXT;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS address TEXT;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC DEFAULT 0;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS neighborhood TEXT DEFAULT \'\';');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit_volume TEXT;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS batch TEXT DEFAULT \'S/L\';');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS un_code TEXT DEFAULT \'\';');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS client_ref TEXT DEFAULT \'\';');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS item_status TEXT DEFAULT \'Pendiente\';');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS count_1 NUMERIC DEFAULT 0;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
-    await pool.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS notes TEXT;');
-
-    await pool.query(`
-      DO $$ BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unq_doc_art_inv') THEN 
-          ALTER TABLE document_items ADD CONSTRAINT unq_doc_art_inv UNIQUE (document_id, article_id, invoice, order_number); 
-        END IF; 
-      END $$;
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS document_consolidated_items (
-        id SERIAL PRIMARY KEY,
-        document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE,
-        article_id TEXT,
-        expected_qty NUMERIC DEFAULT 0,
-        count_1 NUMERIC DEFAULT 0,
-        count_2 NUMERIC DEFAULT 0,
-        inventory_user TEXT,
-        inventory_observation TEXT,
-        picked_qty NUMERIC DEFAULT 0,
-        dispatched_qty NUMERIC DEFAULT 0,
-        UNIQUE(document_id, article_id)
-      );
-    `);
-
-    // Crear tabla de inventario real por cliente si no existe
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS inventario_clientes (
-        id SERIAL PRIMARY KEY,
-        client_id TEXT NOT NULL,
-        article_id TEXT NOT NULL,
-        batch TEXT DEFAULT 'S/L',
-        quantity NUMERIC DEFAULT 0,
-        last_user TEXT,
-        last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(client_id, article_id, batch)
-      );
-    `);
-
-    // Asegurar que exista el tipo de notificación EMAIL (Normalizado)
-    await pool.query(`
-      -- Corrección de Tipografía en Categorías
-      UPDATE master_records SET category = 'masterTipoNotificacion' WHERE category = 'masterTIpoNotificacion';
-      -- Corrección de Referencias en Páginas (parent_id apunta al módulo/categoría)
-      UPDATE master_records SET parent_id = 'masterTipoNotificacion' WHERE parent_id = 'masterTIpoNotificacion';
-      -- Corrección de Referencias en Módulos (si el ID del módulo tuviera el typo)
-      UPDATE master_records SET id = 'masterTipoNotificacion' WHERE id = 'masterTIpoNotificacion';
-    `);
-
-    await pool.query(`
-      INSERT INTO master_records (id, category, name, status_id)
-      VALUES ('TGN-EMAIL', 'masterTipoNotificacion', 'EMAIL', 'EST-01')
-      ON CONFLICT (id) DO NOTHING;
-    `);
-
-    await pool.query(`
-      INSERT INTO master_records (id, category, name, status_id)
-      VALUES ('TGN-WA', 'masterTipoNotificacion', 'WHATSAPP', 'EST-01')
-      ON CONFLICT (id) DO NOTHING;
-    `);
-
-    // Asegurar tablas de Alistado (Picking)
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS picking_assignments (
-          id TEXT PRIMARY KEY,
-          invoice_id TEXT NOT NULL,
-          leader_id TEXT NOT NULL,
-          helper_ids JSONB DEFAULT '[]',
-          status TEXT DEFAULT 'IN_PROGRESS', 
-          created_by TEXT,
-          started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          completed_at TIMESTAMP WITH TIME ZONE,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS picking_signatures (
-          id SERIAL PRIMARY KEY,
-          picking_id TEXT REFERENCES picking_assignments(id) ON DELETE CASCADE,
-          user_id TEXT NOT NULL,
-          signed BOOLEAN DEFAULT false,
-          signed_at TIMESTAMP WITH TIME ZONE,
-          UNIQUE(picking_id, user_id)
-      );
-    `);
-
-    // SANEAMIENTO: Limpiar duplicados en consolidados
-    await pool.query(`
-      DELETE FROM document_consolidated_items a USING (
-        SELECT MIN(ctid) as ctid, document_id, article_id
-        FROM document_consolidated_items 
-        GROUP BY document_id, article_id HAVING COUNT(*) > 1
-      ) b
-      WHERE a.document_id = b.document_id 
-      AND a.article_id = b.article_id 
-      AND a.ctid <> b.ctid;
-    `);
-
-    // RESTRICCIÓN CRÍTICA
-    await pool.query(`
-      DO $$ BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unq_doc_art_consolidated') THEN 
-          ALTER TABLE document_consolidated_items ADD CONSTRAINT unq_doc_art_consolidated UNIQUE (document_id, article_id); 
-        END IF; 
-      END $$;
-    `);
-
-    // NUEVA TABLA: document_l_payments (Auto-healing)
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS document_l_payments (
-        id SERIAL PRIMARY KEY,
-        document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE,
-        invoice TEXT,
-        client_ref TEXT,
-        un_code TEXT,
-        metodo_pago TEXT,
-        vmetodo TEXT,
-        processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        user_id TEXT,
-        UNIQUE(invoice)
-      );
-    `);
-
     const { clientId } = req.query;
     let query = `
       SELECT d.*, 
@@ -212,40 +58,6 @@ export const syncInventory = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    // AUTO-CORRECCIÓN: Asegurar columnas críticas
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_observation TEXT;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_notes TEXT;');
-    await client.query('ALTER TABLE articles ADD COLUMN IF NOT EXISTS uom_std TEXT DEFAULT \'und\';');
-    await client.query('ALTER TABLE articles ADD COLUMN IF NOT EXISTS factor_std NUMERIC DEFAULT 1;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_1 NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_user TEXT;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_observation TEXT;');
-    await client.query('ALTER TABLE master_records ADD COLUMN IF NOT EXISTS tipo_notificacion_id TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS count_1 NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
-
-    // RESTRICCIÓN CRÍTICA PARA UPSERT
-    await client.query(`
-      DELETE FROM document_consolidated_items a USING (
-        SELECT MIN(ctid) as ctid, document_id, article_id
-        FROM document_consolidated_items 
-        GROUP BY document_id, article_id HAVING COUNT(*) > 1
-      ) b
-      WHERE a.document_id = b.document_id 
-      AND a.article_id = b.article_id 
-      AND a.ctid <> b.ctid;
-    `);
-
-    await client.query(`
-      DO $$ 
-      BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unq_doc_art_consolidated') THEN 
-          ALTER TABLE document_consolidated_items ADD CONSTRAINT unq_doc_art_consolidated UNIQUE (document_id, article_id); 
-        END IF; 
-      END $$;
-    `);
 
     // 1. Bloqueo FOR UPDATE - Seleccionamos todo para tener los metadatos dinámicos
     const checkStatus = await client.query('SELECT * FROM documents_l WHERE id = $1 FOR UPDATE', [docId]);
@@ -529,58 +341,6 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
 
   try {
     await client.query('BEGIN');
-    // AUTO-CORRECCIÓN Esquema en Bulk (REPARACIÓN EXHAUSTIVA)
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS plan_type TEXT;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS inventory_notes TEXT;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picking_date TIMESTAMP WITH TIME ZONE;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiving_date TIMESTAMP WITH TIME ZONE;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS picker_user TEXT;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS deliverer_user TEXT;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS receiver_user TEXT;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS codplan TEXT;');
-    await client.query('ALTER TABLE documents_l ADD COLUMN IF NOT EXISTS delivery_date TIMESTAMP WITH TIME ZONE;');
-
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_user TEXT;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS inventory_observation TEXT;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS expected_qty NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_1 NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS count_2 NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS picked_qty NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_consolidated_items ADD COLUMN IF NOT EXISTS dispatched_qty NUMERIC DEFAULT 0;');
-
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS received_qty NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS order_number TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS invoice TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit_volume TEXT DEFAULT \'0\';');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS city TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS address TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS observation TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS batch TEXT DEFAULT \'S/L\';');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS un_code TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS client_ref TEXT;');
-    await client.query('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS item_status TEXT DEFAULT \'Pendiente\';');
-
-    await client.query(`
-      DO $$ 
-      BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unq_doc_art_inv') THEN 
-          ALTER TABLE document_items ADD CONSTRAINT unq_doc_art_inv UNIQUE (document_id, article_id, invoice, order_number); 
-        END IF; 
-      END $$;
-    `);
-
-    await client.query(`
-      DO $$ 
-      BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unq_doc_art_consolidated') THEN 
-          ALTER TABLE document_consolidated_items ADD CONSTRAINT unq_doc_art_consolidated UNIQUE (document_id, article_id); 
-        END IF; 
-      END $$;
-    `);
-
     for (const doc of documents) {
       const deliveryDate = sanitizeDate(doc.deliveryDate);
       const pickingDate = sanitizeDate(doc.pickingDate);
@@ -734,37 +494,10 @@ export const updateStatus = async (req: Request, res: Response) => {
 
 export const getInvoices = async (req: Request, res: Response) => {
   try {
-    // ASEGURAR TABLAS DE PICKING PARA EVITAR ERROR 500
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS picking_assignments (
-          id TEXT PRIMARY KEY,
-          invoice_id TEXT NOT NULL,
-          leader_id TEXT NOT NULL,
-          helper_ids JSONB DEFAULT '[]',
-          status TEXT DEFAULT 'IN_PROGRESS', 
-          created_by TEXT,
-          started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          completed_at TIMESTAMP WITH TIME ZONE,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+    const { clientId, ids, history, search, id, routeId } = req.query;
+    const queryParams: any[] = [];
     
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS picking_signatures (
-          id SERIAL PRIMARY KEY,
-          picking_id TEXT REFERENCES picking_assignments(id) ON DELETE CASCADE,
-          user_id TEXT NOT NULL,
-          signed BOOLEAN DEFAULT false,
-          signed_at TIMESTAMP WITH TIME ZONE,
-          UNIQUE(picking_id, user_id)
-      );
-    `);
-
-    // Obtener facturas únicas (agrupadas por invoice, city, address) que estén pendientes
-    const { clientId, ids, history } = req.query;
-    
-    // Helper para ID robusto en SQL
-    const sqlIdGen = `CONCAT(TRIM(document_items.document_id), '_', TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)))`;
+    const sqlIdGen = `CONCAT(TRIM(document_items.document_id), '_', TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number, 'NA')))`;
     
     let query = `
       SELECT 
@@ -772,17 +505,17 @@ export const getInvoices = async (req: Request, res: Response) => {
         TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)) as "invoiceNumber",
         MAX(document_items.order_number) as "orderNumber",
         STRING_AGG(DISTINCT document_items.observation, '. ') as "notes",
-        documents_l.external_doc_id as "externalDocId",
-        document_items.city,
-        document_items.neighborhood,
-        document_items.address,
-        document_items.address as "customerName",
+        MAX(documents_l.external_doc_id) as "externalDocId",
+        MAX(document_items.city) as city,
+        MAX(document_items.neighborhood) as neighborhood,
+        MAX(document_items.address) as address,
+        MAX(document_items.address) as "customerName",
         SUM(document_items.expected_qty) as "totalItems",
         SUM(document_items.volume) as "volumeM3",
         document_items.document_id as "docLId",
-        documents_l.client_id as "clientId", 
-        documents_l.codplan as "codplan",
-        documents_l.plan_type as "planType",
+        MAX(documents_l.client_id) as "clientId", 
+        MAX(documents_l.codplan) as "codplan",
+        MAX(documents_l.plan_type) as "planType",
         MAX(documents_l.vehicle_plate) as "plate",
         MAX(document_items.item_status) as "status",
         MAX(da.id) as "dispatchId",
@@ -790,9 +523,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(pa.leader_id) as "pickerLeader",
         MAX(document_items.un_code) as "unCode",
         MAX(document_items.client_ref) as "clientRef",
-        MAX(COALESCE(p.vmetodo, 0)) as "invoiceValue",
-        (JSONB_AGG(pa.helper_ids) -> 0) as "pickerHelpers",
-        MAX(pa.started_at) as "pickingDate",
+        MAX(COALESCE(p.vmetodo::numeric, 0)) as "invoiceValue",
         MAX(p.metodo_pago) as "paymentMethod",
         JSON_AGG(JSON_BUILD_OBJECT(
           'sku', document_items.article_id,
@@ -803,32 +534,12 @@ export const getInvoices = async (req: Request, res: Response) => {
           'unCode', document_items.un_code,
           'clientRef', document_items.client_ref
         )) as "items",
-        CASE 
-          WHEN document_items.city ILIKE '%MEDELLIN%' OR document_items.city ILIKE '%MEDELLÍN%' OR document_items.city ILIKE '%ANTIOQUIA%' THEN 6.2442
-          WHEN document_items.city ILIKE '%CALI%' OR document_items.city ILIKE '%VALLE%' THEN 3.4516
-          WHEN document_items.city ILIKE '%BARRANQUILLA%' OR document_items.city ILIKE '%ATLANTICO%' OR document_items.city ILIKE '%ATLÁNTICO%' THEN 10.9685
-          WHEN document_items.city ILIKE '%CARTAGENA%' OR document_items.city ILIKE '%BOLIVAR%' THEN 10.3910
-          WHEN document_items.city ILIKE '%BUCARAMANGA%' OR document_items.city ILIKE '%SANTANDER%' THEN 7.1193
-          WHEN document_items.city ILIKE '%PEREIRA%' OR document_items.city ILIKE '%RISARALDA%' THEN 4.8133
-          WHEN document_items.city ILIKE '%MANIZALES%' OR document_items.city ILIKE '%CALDAS%' THEN 5.0703
-          WHEN document_items.city ILIKE '%ARMENIA%' OR document_items.city ILIKE '%QUINDIO%' THEN 4.5339
-          ELSE 4.6097 
-        END + (random() * 0.01 - 0.005) as lat,
-        CASE 
-          WHEN document_items.city ILIKE '%MEDELLIN%' OR document_items.city ILIKE '%MEDELLÍN%' OR document_items.city ILIKE '%ANTIOQUIA%' THEN -75.5812
-          WHEN document_items.city ILIKE '%CALI%' OR document_items.city ILIKE '%VALLE%' THEN -76.5320
-          WHEN document_items.city ILIKE '%BARRANQUILLA%' OR document_items.city ILIKE '%ATLANTICO%' OR document_items.city ILIKE '%ATLÁNTICO%' THEN -74.7713
-          WHEN document_items.city ILIKE '%CARTAGENA%' OR document_items.city ILIKE '%BOLIVAR%' THEN -75.4794
-          WHEN document_items.city ILIKE '%BUCARAMANGA%' OR document_items.city ILIKE '%SANTANDER%' THEN -73.1227
-          WHEN document_items.city ILIKE '%PEREIRA%' OR document_items.city ILIKE '%RISARALDA%' THEN -75.6961
-          WHEN document_items.city ILIKE '%MANIZALES%' OR document_items.city ILIKE '%CALDAS%' THEN -75.5138
-          WHEN document_items.city ILIKE '%ARMENIA%' OR document_items.city ILIKE '%QUINDIO%' THEN -75.6811
-          ELSE -74.0817 
-        END + (random() * 0.01 - 0.005) as lng
+        4.6097 as lat,
+        -74.0817 as lng
       FROM document_items
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
       LEFT JOIN articles ON document_items.article_id = articles.id
-      LEFT JOIN document_l_payments p ON (TRIM(UPPER(document_items.invoice)) = TRIM(UPPER(p.invoice)))
+      LEFT JOIN document_l_payments p ON (TRIM(UPPER(document_items.invoice)) = TRIM(UPPER(p.invoice)) AND document_items.invoice != '')
       LEFT JOIN dispatch_assignments da ON (
         da.invoice_id = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
         OR da.invoice_id = ${sqlIdGen}
@@ -840,17 +551,13 @@ export const getInvoices = async (req: Request, res: Response) => {
       WHERE 1=1
     `;
 
-    const queryParams: any[] = [];
-    
-    // FILTRO POR CLIENTE (Seguridad y Segmentación)
     if (clientId && clientId !== 'GLOBAL') {
       queryParams.push(clientId);
       query += ` AND documents_l.client_id = $${queryParams.length}`;
     }
 
-    // LÓGICA DE FILTRADO REFINADA
     if (ids) {
-      const idList = String(ids).split(',').map(id => id.trim());
+      const idList = String(ids).split(',').map(item => item.trim());
       const orClauses = idList.map((compId) => {
          const lastUnderscore = compId.lastIndexOf('_');
          let searchTerm = compId;
@@ -862,55 +569,28 @@ export const getInvoices = async (req: Request, res: Response) => {
             REGEXP_REPLACE(COALESCE(document_items.invoice, ''), '\\s', '', 'g') = ${pIdx} 
             OR 
             REGEXP_REPLACE(COALESCE(document_items.order_number, ''), '\\s', '', 'g') = ${pIdx}
-            OR
-            REGEXP_REPLACE(COALESCE(document_items.client_ref, ''), '\\s', '', 'g') = ${pIdx}
          )`;
       });
       if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;
-    } else if (history === 'true') {
-      // HISTORIAL: Mostrar lo ya alistado o finalizado
-      query += ` AND (
-        pa.id IS NOT NULL 
-        OR document_items.item_status IN ('ALISTADO', 'ENTREGADO', 'FINALIZADO', 'ASIGNADO', 'EN RUTA', 'EN_RUTA')
-      )`;
     } else {
-      // Para la vista operativa general: Mostrar todo lo que no esté finalizado o entregado
-      query += ` AND (documents_l.status NOT IN ('Finalizado', 'Entregado') OR documents_l.status IS NULL)`;
-      
-      // Filtro adicional de seguridad para estados de ítem
       query += ` AND (
-        document_items.item_status IS NULL 
-        OR TRIM(UPPER(document_items.item_status)) NOT IN ('ELIMINADO', 'CANCELADO', 'ENTREGADO', 'FINALIZADO', 'ASIGNADO', 'EN RUTA', 'EN_RUTA', 'ALISTADO')
+        documents_l.status NOT IN ('Finalizado', 'Entregado', 'ELIMINADO') 
+        OR documents_l.status IS NULL
       )`;
     }
 
-    query += ` AND (
-        (document_items.invoice IS NOT NULL AND document_items.invoice != '')
-        OR 
-        (document_items.order_number IS NOT NULL AND document_items.order_number != '')
-        OR
-        (document_items.document_id IS NOT NULL)
-      )
-    `;
-
     query += ` GROUP BY 
-        COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number), 
-        document_items.city, 
-        document_items.neighborhood,
-        document_items.address, 
-        document_items.document_id, 
-        documents_l.client_id, 
-        documents_l.external_doc_id,
-        documents_l.codplan,
-        documents_l.plan_type,
-        documents_l.vehicle_plate
-      ORDER BY "invoiceNumber" ASC`;
+        ${sqlIdGen},
+        document_items.document_id,
+        TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
+      ORDER BY 2 ASC`;
 
     const result = await pool.query(query, queryParams);
+    console.log(`[M7-SUCCESS] getInvoices: Enviando ${result.rows.length} facturas.`);
     res.json(result.rows);
   } catch (err: any) {
-    console.error('[M7-INVOICES] Error:', err.message);
-    res.status(500).json({ error: "Error al obtener facturas" });
+    console.error('[M7-CRITICAL-ERR] getInvoices:', err.message);
+    res.status(500).json({ error: "Error al obtener facturas: " + err.message });
   }
 };
 

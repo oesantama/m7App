@@ -305,28 +305,32 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
               <title>PLANILLA - ${route.plate}</title>
               <style>
                 @page { size: letter landscape; margin: 0.3cm; }
-                body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #0f172a; margin: 0; padding: 10px; font-size: 8px; }
-                .compact-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
+                body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #0f172a; margin: 0; padding: 10px; font-size: 7.5px; }
+                .compact-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 8px; }
                 .logo-img { max-height: 45px; max-width: 150px; object-fit: contain; }
                 .header-info-grid { display: flex; gap: 12px; }
                 .info-col { display: flex; flex-direction: column; line-height: 1.1; }
                 .info-label { font-size: 6px; font-weight: 800; color: #64748b; text-transform: uppercase; }
                 .info-val { font-size: 9px; font-weight: 900; }
 
-                table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-                th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 3px; font-size: 7px; font-weight: 900; text-transform: uppercase; }
-                td { border: 1px solid #cbd5e1; padding: 3px; font-weight: 700; height: 14px; }
+                .content-flex { display: flex; gap: 10px; align-items: flex-start; }
+                .table-main { flex: 0 0 72%; }
+                .table-side { flex: 1; }
+
+                table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
+                th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 3px; font-size: 6px; font-weight: 900; text-transform: uppercase; }
+                td { border: 1px solid #cbd5e1; padding: 2px 3px; font-weight: 700; height: 13px; font-size: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .text-center { text-align: center; }
                 .text-right { text-align: right; }
 
-                .top-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 15px; }
+                .top-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 15px; margin-bottom: 5px; }
                 .totals-box { border: 2px solid #000; border-radius: 4px; overflow: hidden; }
-                .total-row { display: flex; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
-                .total-row:last-child { border-bottom: none; background: #f8fafc; font-weight: 900; font-size: 10px; }
-                .bank-strip { background: #0f172a; color: #fff; text-align: center; padding: 3px; font-weight: 900; margin-bottom: 5px; font-size: 7px; }
+                .total-row { display: flex; justify-content: space-between; padding: 3px 8px; border-bottom: 1px solid #e2e8f0; }
+                .total-row:last-child { border-bottom: none; background: #f8fafc; font-weight: 900; font-size: 9px; }
+                .bank-strip { background: #0f172a; color: #fff; text-align: center; padding: 2px; font-weight: 900; margin-bottom: 5px; font-size: 7px; }
                 
-                .signature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 40px; padding: 0 40px; }
-                .sig-box { border-top: 2px solid #0f172a; text-align: center; padding-top: 8px; font-weight: 900; text-transform: uppercase; font-size: 10px; }
+                .signature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 30px; padding: 0 40px; }
+                .sig-box { border-top: 2px solid #0f172a; text-align: center; padding-top: 8px; font-weight: 900; text-transform: uppercase; font-size: 9px; }
               </style>
             </head>
             <body>
@@ -357,78 +361,67 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                   <div class="total-row"><span>EFECTIVO (EF):</span> <span>$ ${cashTotal.toLocaleString()}</span></div>
                   <div class="total-row"><span>CRÉDITO (30D/60D):</span> <span>$ ${creditTotal.toLocaleString()}</span></div>
                   <div class="total-row"><span>DIFERENCIA:</span> <span style="color:red">$ 0</span></div>
-                  <div class="total-row"><span>TOTAL RECAUDO:</span> <span>$ ${cashTotal.toLocaleString()}</span></div>
+                  <div class="total-row"><span>TOTAL RECAUDO:</span> <span style="font-weight:900;">$ ${cashTotal.toLocaleString()}</span></div>
                 </div>
               </div>
 
               <div class="bank-strip">🏦 CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)</div>
 
-              <table>
-                <thead>
-                  <tr>
-                    <th width="35">U.NEG</th>
-                    <th width="75">FACTURA</th>
-                    <th width="75"># INTERNO</th>
-                    <th width="35">CANT</th>
-                    <th width="85">REF CLIENTE</th>
-                    <th width="75">VALOR</th>
-                    <th width="35">C.PAG</th>
-                    <th>CLIENTE / DIRECCIÓN</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${routeInvoices.map(inv => {
-                    const firstItem = inv.items?.[0] || {} as any;
-                    const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
-                    return `
+              <div class="content-flex">
+                <div class="table-main">
+                  <table>
+                    <thead>
                       <tr>
-                        <td class="text-center">${inv.unCode || firstItem.unCode || firstItem.un_code || '-'}</td>
-                        <td class="text-center" style="font-weight:900;">${inv.invoiceNumber}</td>
-                        <td class="text-center">${inv.orderNumber || inv.docLId || '-'}</td>
-                        <td class="text-center">${inv.totalItems || '-'}</td>
-                        <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
-                        <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
-                        <td class="text-center" style="background:#f8fafc; font-weight:900;">${method}</td>
-                        <td><div style="font-weight:900">${inv.customerName}</div><div style="font-size:7px; color:#64748b">${inv.address} - ${inv.city}</div></td>
+                        <th width="35">U.NEG</th>
+                        <th width="75">FACTURA</th>
+                        <th width="75"># INTERNO</th>
+                        <th width="85">REF CLIENTE</th>
+                        <th width="75">VALOR</th>
+                        <th width="35">C.PAG</th>
+                        <th>CLIENTE / DIRECCIÓN</th>
                       </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
-
-              <div style="margin-top:10px;">
-                <div style="font-weight:900; font-size:8px; border-bottom:1px solid #000; margin-bottom:5px; text-transform:uppercase;">📦 CONSOLIDADO DE MERCANCÍA (RESUMEN DE CARGA) - ORDENADO POR ID</div>
-                <table style="width:100%; table-layout: fixed;">
-                  <thead>
-                    <tr>
-                      <th width="15%">ID</th><th width="25%">DESCRIPCIÓN</th><th width="10%">CANT</th>
-                      <th style="border-left: 2px solid #000;" width="15%">ID</th><th width="25%">DESCRIPCIÓN</th><th width="10%">CANT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${(() => {
-                      // Sort alphabetically as requested for IDs like D15...
-                      const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
-                      const rows = [];
-                      for (let i = 0; i < items.length; i += 2) {
-                        const it1 = items[i];
-                        const it2 = items[i + 1];
-                        rows.push(`
+                    </thead>
+                    <tbody>
+                      ${routeInvoices.map(inv => {
+                        const firstItem = inv.items?.[0] || {} as any;
+                        const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
+                        return `
                           <tr>
-                            <td class="text-center">${it1.id}</td>
-                            <td style="font-size:6.5px; overflow:hidden; white-space:nowrap;">${it1.name}</td>
-                            <td class="text-center" style="font-weight:900; background:#fefce8;">${it1.total}</td>
-                            
-                            <td style="border-left: 2px solid #000;" class="text-center">${it2 ? it2.id : ''}</td>
-                            <td style="font-size:6.5px; overflow:hidden; white-space:nowrap;">${it2 ? it2.name : ''}</td>
-                            <td class="text-center" style="font-weight:900; background:#fefce8;">${it2 ? it2.total : ''}</td>
+                            <td class="text-center">${inv.unCode || firstItem.unCode || firstItem.un_code || '-'}</td>
+                            <td class="text-center" style="font-weight:900;">${inv.invoiceNumber}</td>
+                            <td class="text-center">${inv.orderNumber || inv.docLId || '-'}</td>
+                            <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
+                            <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
+                            <td class="text-center" style="background:#f8fafc; font-weight:900;">${method}</td>
+                            <td><div style="font-weight:900">${inv.customerName}</div><div style="font-size:6px; color:#64748b; font-weight:normal;">${inv.address}</div></td>
                           </tr>
-                        `);
-                      }
-                      return rows.join('');
-                    })()}
-                  </tbody>
-                </table>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="table-side">
+                  <div style="font-weight:900; font-size:7px; border-bottom:1.5px solid #000; margin-bottom:3px; text-transform:uppercase;">📦 CONSOLIDADO</div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th width="70%">ID</th><th width="30%">CANT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${(() => {
+                        const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+                        return items.map(it => `
+                          <tr>
+                            <td class="text-center" style="font-size:6.5px;">${it.id}</td>
+                            <td class="text-center" style="font-weight:900; background:#fefce8;">${it.total}</td>
+                          </tr>
+                        `).join('');
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div class="signature-section">

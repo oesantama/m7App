@@ -557,7 +557,7 @@ const App: React.FC = () => {
       });
 
       const [docsData, vehData, driversData] = await Promise.all([
-        api.getDocuments(userData.client_id || 'c1').catch(() => []),
+        api.getDocuments(userData.client_id || 'CLI-01').catch(() => []),
         api.getVehicles().catch(() => []),
         api.getDrivers().catch(() => [])
       ]);
