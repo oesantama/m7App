@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
 // Registrar Service Worker para PWA (Multi-plataforma Offline)

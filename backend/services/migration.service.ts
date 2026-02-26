@@ -30,7 +30,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'estados': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'notificaciones': ['name', 'description', 'notification_email', 'tipo_notificacion_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'tipos_notificacion': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
-  'routes': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+  'routes': ['name', 'description', 'vehicle_id', 'driver_id', 'client_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'picking_assignments': ['invoice_id', 'leader_id', 'helper_ids', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
   'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at'],
   'route_invoices': ['route_id', 'invoice_id', 'created_at'],
