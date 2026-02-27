@@ -11,6 +11,7 @@ interface VehicleManagerProps {
   masterData: { [key in MasterCategory]?: MasterRecord[] };
   onAdd: (v: Partial<Vehicle>) => void;
   onUpdate: (id: string, data: Partial<Vehicle>) => void;
+  onDelete: (id: string) => void;
 }
 
 const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterData, onAdd, onUpdate, onDelete }) => {
@@ -100,7 +101,40 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
           </div>
           <button onClick={handleExportExcel} className="p-3.5 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl"><Icons.Excel className="w-4 h-4" /></button>
           <div className="h-10 w-[1px] bg-slate-100 mx-2"></div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">TOTAL FLOTA: {vehicles.length}</p>
+          <button 
+            onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.xlsx, .xls';
+              input.onchange = (e: any) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                  const bstr = evt.target?.result;
+                  const wb = XLSX.read(bstr, { type: 'binary' });
+                  const wsname = wb.SheetNames[0];
+                  const ws = wb.Sheets[wsname];
+                  const data = XLSX.utils.sheet_to_json(ws);
+                  data.forEach((item: any) => {
+                    onAdd({
+                      plate: String(item.Placa || item.PLATE || '').toUpperCase(),
+                      brand: String(item.Marca || item.BRAND || 'GENERICO').toUpperCase(),
+                      owner: String(item.Propietario || item.OWNER || 'S/A').toUpperCase(),
+                      capacityM3: Number(item.Capacidad || item.CAPACITY || 0),
+                      statusId: 'EST-01'
+                    });
+                  });
+                };
+                reader.readAsBinaryString(file);
+              };
+              input.click();
+            }}
+            className="p-3.5 bg-slate-900 text-white rounded-2xl hover:bg-emerald-600 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+          >
+            <Icons.Excel className="w-4 h-4" />
+            <span className="text-[8px] font-black uppercase">Importar Masivo</span>
+          </button>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">TOTAL FLOTA: {vehicles.length}</p>
         </div>
       </div>
 

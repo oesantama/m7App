@@ -8,6 +8,11 @@ import 'leaflet/dist/leaflet.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Route, Invoice } from '../types';
+import DeliveryHistoryModal from './Logistics/DeliveryHistoryModal';
+import CustomerDeliveryModal from './Logistics/CustomerDeliveryModal';
+import DispatchControlModal from './Logistics/DispatchControlModal';
+import SignatureInputModal from './Logistics/SignatureInputModal';
+import GenericConfirmModal from './Logistics/GenericConfirmModal';
 
 interface LogisticsDispatchProps {
     user: any;
@@ -1385,658 +1390,86 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 </div>
             )}
 
-            {/* MODAL: ASIGNACIÓN DE ENTREGA (ESCANEADO) */}
-            {assigningInvoice && (
-                <div className="fixed inset-0 z-[700] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95">
-                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
-                                    <Icons.Scan className="w-6 h-6 text-white" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">Control de Despacho</h3>
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Validación de carga por escaneo</p>
-                                </div>
-                            </div>
-                            <button onClick={() => { setAssigningInvoice(null); setScannedItems({}); }} className="w-10 h-10 hover:bg-slate-200 rounded-full flex items-center justify-center transition-all">
-                                <Icons.X className="w-5 h-5 text-slate-400" />
-                            </button>
-                        </div>
-
-                        <div className="bg-amber-50 p-4 border-b border-amber-100 flex items-center justify-center gap-4">
-                             <input 
-                                id="m7-dispatch-barcode-input"
-                                type="text"
-                                autoFocus
-                                autoComplete="off"
-                                placeholder="ESCANEANDO... ESPERANDO BARCODE"
-                                className="bg-transparent text-center text-sm font-mono font-black text-slate-900 outline-none w-full max-w-md"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        const val = e.currentTarget.value.trim();
-                                        if (val) {
-                                            handleBarcodeScan(val);
-                                            e.currentTarget.value = '';
-                                        }
-                                    }
-                                }}
-                             />
-                             <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Lectora Activa</span>
-                             </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                {/* Lista de Artículos y Progreso */}
-                                <div className="space-y-4">
-                                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b pb-2 flex justify-between">
-                                        <span>Artículos a Cargar</span>
-                                        <span className="text-emerald-600">PROGRESO: {Object.values(scannedItems).reduce((a,b)=>a+b, 0)} / {(assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.qty || b.expectedQty || 0), 0)}</span>
-                                    </h4>
-                                    <div className="space-y-2">
-                                        {(assigningInvoice.items || []).map((item: any, i: number) => {
-                                            const scanned = scannedItems[item.sku] || 0;
-                                            const expected = Number(item.qty || item.expectedQty || 0);
-                                            const isDone = scanned >= expected;
-                                            
-                                            return (
-                                                <div key={i} className={`p-4 rounded-2xl border transition-all flex justify-between items-center ${isDone ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100 opacity-80'}`}>
-                                                    <div>
-                                                        <p className="text-sm font-black text-slate-900">{item.articleName || 'Artículo'}</p>
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className={`text-xl font-black ${isDone ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                                            {scanned} / {expected}
-                                                        </p>
-                                                        <p className="text-[8px] font-bold text-slate-400 uppercase">{item.unit || 'UND'}</p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Configuración de Entrega y Firmas */}
-                                <div className="space-y-6">
-                                    <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-                                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Equipo de Entrega</h4>
-                                        <div className="flex items-center justify-between p-3 bg-white rounded-2xl border border-slate-100">
-                                            <div className="flex items-center gap-3">
-                                                <Icons.Users className="w-5 h-5 text-slate-400" />
-                                                <span className="text-[10px] font-black text-slate-900 uppercase">¿Entrega Acompañada?</span>
-                                            </div>
-                                            <button 
-                                                onClick={() => setIsAccompanied(!isAccompanied)}
-                                                className={`w-12 h-6 rounded-full transition-all relative ${isAccompanied ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                                            >
-                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isAccompanied ? 'left-7' : 'left-1'}`}></div>
-                                            </button>
-                                        </div>
-
-                                        {isAccompanied && (
-                                            <div className="space-y-4 animate-in slide-in-from-top-2">
-                                                <div className="flex items-center gap-4">
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase">Cantidad Auxiliares:</p>
-                                                    <div className="flex items-center gap-2">
-                                                        {[1, 2, 3].map(n => (
-                                                            <button 
-                                                                key={n}
-                                                                onClick={() => setHelperCount(n)}
-                                                                className={`w-8 h-8 rounded-lg text-xs font-black transition-all ${helperCount === n ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}
-                                                            >
-                                                                {n}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    {Array.from({ length: helperCount }).map((_, i) => (
-                                                        <select 
-                                                            key={i}
-                                                            value={selectedHelpers[i] || ''}
-                                                            onChange={(e) => {
-                                                                const newHelpers = [...selectedHelpers];
-                                                                newHelpers[i] = e.target.value;
-                                                                setSelectedHelpers(newHelpers);
-                                                            }}
-                                                            className="w-full bg-white border border-slate-200 p-3 rounded-xl text-xs font-bold outline-none focus:border-emerald-500"
-                                                        >
-                                                            <option value="">Seleccionar Auxiliar {i+1}...</option>
-                                                            {allUsers.filter(u => u.id !== user.id).map(u => (
-                                                                <option key={u.id} value={u.id}>{u.name}</option>
-                                                            ))}
-                                                        </select>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Panel de Validación de Firmas */}
-                                    <div className="bg-slate-900 p-6 rounded-[2rem] shadow-2xl space-y-4 border border-white/5">
-                                        <h4 className="text-xs font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                                            <Icons.Shield className="w-4 h-4" />
-                                            PROTOCOLOS DE SEGURIDAD M7
-                                        </h4>
-                                        <div className="space-y-3">
-                                            {/* Firma del Despachador (USUARIO ACTUAL) */}
-                                            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg shadow-black/20">
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <div>
-                                                        <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">RESPONSABLE TIENDA</p>
-                                                        <p className="text-[11px] font-black text-white uppercase">{user.name}</p>
-                                                    </div>
-                                                    <div className="flex bg-white/10 p-1 rounded-lg">
-                                                        <button 
-                                                            onClick={() => setSignNowMap({...signNowMap, [user.id]: true})}
-                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] !== false ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20' : 'text-slate-400'}`}
-                                                        >AHORA</button>
-                                                        <button 
-                                                            onClick={() => setSignNowMap({...signNowMap, [user.id]: false})}
-                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] === false ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'text-slate-400'}`}
-                                                        >DESPUÉS</button>
-                                                    </div>
-                                                </div>
-                                                {signNowMap[user.id] !== false && (
-                                                    <div className="relative">
-                                                        <input 
-                                                            type={showPasswordMap[user.id] ? "text" : "password"}
-                                                            placeholder="SU CLAVE DE FIRMA..."
-                                                            autoComplete="new-password"
-                                                            className="w-full bg-slate-950 border border-white/5 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500/50 pr-10 shadow-inner"
-                                                            onChange={(e) => setSignatureKeys({...signatureKeys, [user.id]: e.target.value})}
-                                                        />
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => setShowPasswordMap({...showPasswordMap, [user.id]: !showPasswordMap[user.id]})}
-                                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                                        >
-                                                            {showPasswordMap[user.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Firma del Conductor Real */}
-                                            {(() => {
-                                                const route = activeRoutes.find(r => r.id === (assigningInvoice.route_id || assigningInvoice.routeId));
-                                                // Priorizar conductor vinculado a la ruta
-                                                const actualDriver = drivers.find(d => d.id === route?.driver_id || d.id === route?.driverId);
-                                                
-                                                if (!actualDriver) return null;
-
-                                                return (
-                                                    <div className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg shadow-black/20">
-                                                        <div className="flex justify-between items-center mb-2">
-                                                            <div>
-                                                                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">RESPONSABLE LOGÍSTICO</p>
-                                                                <p className="text-[11px] font-black text-white uppercase">{actualDriver.name} (CONDUCTOR)</p>
-                                                            </div>
-                                                            <div className="flex bg-white/10 p-1 rounded-lg">
-                                                                <button 
-                                                                    onClick={() => setSignNowMap({...signNowMap, [actualDriver.id]: true})}
-                                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] !== false ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20' : 'text-slate-400'}`}
-                                                                >AHORA</button>
-                                                                <button 
-                                                                    onClick={() => setSignNowMap({...signNowMap, [actualDriver.id]: false})}
-                                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] === false ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'text-slate-400'}`}
-                                                                >DESPUÉS</button>
-                                                            </div>
-                                                        </div>
-                                                        {signNowMap[actualDriver.id] !== false && (
-                                                            <div className="relative">
-                                                                <input 
-                                                                    type={showPasswordMap[actualDriver.id] ? "text" : "password"}
-                                                                    placeholder="CLAVE CONDUCTOR..."
-                                                                    autoComplete="new-password"
-                                                                    className="w-full bg-slate-950 border border-white/5 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500/50 pr-10 shadow-inner"
-                                                                    onChange={(e) => setSignatureKeys({...signatureKeys, [actualDriver.id]: e.target.value})}
-                                                                />
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={() => setShowPasswordMap({...showPasswordMap, [actualDriver.id]: !showPasswordMap[actualDriver.id]})}
-                                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                                                >
-                                                                    {showPasswordMap[actualDriver.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
-
-                                            {/* Firmas de Auxiliares */}
-                                            {isAccompanied && selectedHelpers.slice(0, helperCount).map((hid) => {
-                                                const helper = drivers.find(d => d.id === hid);
-                                                if (!helper) return null;
-                                                return (
-                                                    <div key={hid} className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                                                        <div className="flex justify-between items-center mb-2">
-                                                            <p className="text-[9px] font-black text-white uppercase">{helper.name} (AUXILIAR)</p>
-                                                            <div className="flex bg-white/10 p-1 rounded-lg">
-                                                                <button 
-                                                                    onClick={() => setSignNowMap({...signNowMap, [hid]: true})}
-                                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[hid] !== false ? 'bg-emerald-500 text-slate-900' : 'text-slate-400'}`}
-                                                                >AHORA</button>
-                                                                <button 
-                                                                    onClick={() => setSignNowMap({...signNowMap, [hid]: false})}
-                                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[hid] === false ? 'bg-rose-500 text-white' : 'text-slate-400'}`}
-                                                                >DESPUÉS</button>
-                                                            </div>
-                                                        </div>
-                                                        {signNowMap[hid] !== false && (
-                                                            <div className="relative">
-                                                                <input 
-                                                                    type={showPasswordMap[hid] ? "text" : "password"}
-                                                                    placeholder="CLAVE DE FIRMA AUXILIAR..."
-                                                                    autoComplete="new-password"
-                                                                    className="w-full bg-white/10 border border-white/20 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500 pr-10"
-                                                                    onChange={(e) => setSignatureKeys({...signatureKeys, [hid]: e.target.value})}
-                                                                />
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={() => setShowPasswordMap({...showPasswordMap, [hid]: !showPasswordMap[hid]})}
-                                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                                                                >
-                                                                    {showPasswordMap[hid] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-8 border-t border-slate-100 bg-slate-50 flex gap-4">
-                            <button 
-                                className="flex-1 py-4 bg-emerald-500 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
-                                onClick={handleConfirmDispatch}
-                                disabled={isValidating}
-                            >
-                                {isValidating ? (
-                                    <>
-                                        <Icons.RotateCcw className="w-4 h-4 animate-spin" />
-                                        PROCESANDO...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Icons.Check className="w-4 h-4" />
-                                        CONFIRMAR ENTREGA
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* MODAL CONFIRMACIÓN GENÉRICO */}
-            {confirmModal && (
-                <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md animate-in zoom-in-95">
-                        <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
-                                <Icons.Alert className="w-8 h-8" />
-                            </div>
-                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">{confirmModal.title}</h3>
-                            <p className="text-sm font-bold text-slate-500 mb-6">{confirmModal.message}</p>
-                            <div className="flex gap-3 w-full">
-                                <button
-                                    onClick={() => setConfirmModal(null)}
-                                    className="flex-1 py-3 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 rounded-xl"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setConfirmModal(null);
-                                        confirmModal.onConfirm();
-                                    }}
-                                    className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 transition-all"
-                                >
-                                    Confirmar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <GenericConfirmModal 
+                isOpen={!!confirmModal}
+                title={confirmModal?.title || ''}
+                message={confirmModal?.message || ''}
+                onClose={() => setConfirmModal(null)}
+                onConfirm={() => {
+                    const cb = confirmModal?.onConfirm;
+                    setConfirmModal(null);
+                    if (cb) cb();
+                }}
+            />
             
-            {/* MODAL INPUT FIRMA */}
-            {signatureInputModal && (
-                 <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md animate-in zoom-in-95">
-                        <div className="flex flex-col items-center">
-                            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4">
-                                <Icons.Signature className="w-8 h-8" />
-                            </div>
-                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-1">Firma Requerida</h3>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-6 tracking-widest">Ingrese su clave personal</p>
-                            
-                            <input 
-                                type="password" 
-                                autoFocus
-                                id="signature-modal-input"
-                                className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-lg font-black text-slate-900 outline-none focus:border-indigo-500 mb-6"
-                                placeholder="••••••"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        const val = e.currentTarget.value;
-                                        setSignatureInputModal(null);
-                                        signatureInputModal.onConfirm(val);
-                                    }
-                                }}
-                            />
+            <SignatureInputModal 
+                isOpen={!!signatureInputModal}
+                user={user}
+                onClose={() => setSignatureInputModal(null)}
+                onConfirm={(pass) => {
+                    const cb = signatureInputModal?.onConfirm;
+                    setSignatureInputModal(null);
+                    if (cb) cb(pass);
+                }}
+            />
 
-                            <div className="flex gap-3 w-full">
-                                <button
-                                    onClick={() => setSignatureInputModal(null)}
-                                    className="flex-1 py-3 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 rounded-xl"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const val = (document.getElementById('signature-modal-input') as HTMLInputElement).value;
-                                        setSignatureInputModal(null);
-                                        signatureInputModal.onConfirm(val);
-                                    }}
-                                    className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all"
-                                >
-                                    Firmar Ahora
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <CustomerDeliveryModal 
+                isOpen={!!deliveryModal?.isOpen}
+                onClose={() => setDeliveryModal(null)}
+                invoice={deliveryModal?.invoice}
+                deliveryType={deliveryType}
+                setDeliveryType={setDeliveryType}
+                deliveryItems={deliveryItems}
+                setDeliveryItems={setDeliveryItems}
+                deliveryReturnReason={deliveryReturnReason}
+                setDeliveryReturnReason={setDeliveryReturnReason}
+                deliveryNotes={deliveryNotes}
+                setDeliveryNotes={setDeliveryNotes}
+                deliveryPassword={deliveryPassword}
+                setDeliveryPassword={setDeliveryPassword}
+                isConfirmingDelivery={isConfirmingDelivery}
+                handleConfirmDelivery={handleConfirmDelivery}
+            />
 
-        {/* ═══════════════════════════════════════════════════════════
-             MODAL: ENTREGAR CLIENTE
-        ═══════════════════════════════════════════════════════════ */}
+            <DeliveryHistoryModal 
+                isOpen={showHistoryModal}
+                onClose={() => setShowHistoryModal(false)}
+                historyTab={historyTab}
+                setHistoryTab={setHistoryTab}
+                historyFilters={historyFilters}
+                setHistoryFilters={setHistoryFilters}
+                drivers={drivers}
+                vehicles={vehicles}
+                loadHistory={loadHistory}
+                historyLoading={historyLoading}
+                historyData={historyData}
+            />
 
-        {deliveryModal?.isOpen && (
-            <div className="fixed inset-0 z-[900] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-                <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
-                    {/* HEADER */}
-                    <div className="p-5 bg-gradient-to-r from-slate-900 to-emerald-950 rounded-t-[2rem]">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-sm font-black text-white uppercase tracking-wider">Entregar al Cliente</h3>
-                                <p className="text-[9px] text-emerald-400 font-bold uppercase mt-0.5">
-                                    Factura #{deliveryModal.invoice?.invoiceNumber || deliveryModal.invoice?.id}
-                                </p>
-                            </div>
-                            <button onClick={() => setDeliveryModal(null)} className="w-7 h-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-all">
-                                <Icons.X className="w-3.5 h-3.5 text-white" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* BODY */}
-                    <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
-                        {/* TIPO DE ENTREGA */}
-                        <div>
-                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Tipo de Entrega</p>
-                            <div className="grid grid-cols-3 gap-2">
-                                {([
-                                    { value: 'FULL', label: '✅ Completa', color: 'emerald' },
-                                    { value: 'PARTIAL', label: '⚠️ Parcial', color: 'amber' },
-                                    { value: 'RETURN', label: '🔄 Devolver', color: 'rose' },
-                                ] as { value: 'FULL'|'PARTIAL'|'RETURN', label: string, color: string }[]).map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        onClick={() => setDeliveryType(opt.value)}
-                                        className={`py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border-2 ${
-                                            deliveryType === opt.value
-                                                ? opt.value === 'FULL' ? 'bg-emerald-500 text-white border-emerald-500'
-                                                : opt.value === 'PARTIAL' ? 'bg-amber-500 text-white border-amber-500'
-                                                : 'bg-rose-500 text-white border-rose-500'
-                                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'
-                                        }`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* ITEMS */}
-                        {deliveryItems.length > 0 && (
-                            <div>
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                                    Artículos {deliveryType !== 'FULL' && <span className="text-rose-500">– Ajusta cantidades devueltas</span>}
-                                </p>
-                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                                    {deliveryItems.map((item, i) => (
-                                        <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[10px] font-black text-slate-900 truncate">{item.articleName || item.sku}</p>
-                                                <p className="text-[8px] text-slate-400 font-bold uppercase">{item.unit} • Cant: {item.quantityDelivered}</p>
-                                            </div>
-                                            {deliveryType !== 'FULL' && (
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    <p className="text-[8px] text-slate-400 uppercase font-bold">Dev:</p>
-                                                    <input
-                                                        type="number"
-                                                        min={0}
-                                                        max={item.quantityDelivered}
-                                                        value={item.quantityReturned}
-                                                        onChange={e => {
-                                                            const updated = [...deliveryItems];
-                                                            updated[i] = { ...updated[i], quantityReturned: Number(e.target.value) };
-                                                            setDeliveryItems(updated);
-                                                        }}
-                                                        className="w-14 text-center border border-rose-200 rounded-lg text-[10px] font-black text-rose-600 py-1 outline-none focus:border-rose-500"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* RAZÓN DEVOLUCIÓN */}
-                        {deliveryType !== 'FULL' && (
-                            <div>
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Motivo de Devolución</p>
-                                <input
-                                    type="text"
-                                    value={deliveryReturnReason}
-                                    onChange={e => setDeliveryReturnReason(e.target.value)}
-                                    placeholder="Ej: Cliente ausente, rechazo de mercancía..."
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-rose-500 transition-all"
-                                />
-                            </div>
-                        )}
-
-                        {/* NOTAS */}
-                        <div>
-                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Notas (opcional)</p>
-                            <textarea
-                                rows={2}
-                                value={deliveryNotes}
-                                onChange={e => setDeliveryNotes(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-emerald-500 transition-all resize-none"
-                            />
-                        </div>
-
-                        {/* CONTRASEÑA CONDUCTOR */}
-                        <div>
-                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Contraseña del Conductor</p>
-                            <input
-                                type="password"
-                                value={deliveryPassword}
-                                onChange={e => setDeliveryPassword(e.target.value)}
-                                placeholder="Ingresa tu contraseña para confirmar"
-                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-emerald-500 transition-all"
-                            />
-                        </div>
-                    </div>
-
-                    {/* FOOTER */}
-                    <div className="p-5 border-t border-slate-100 flex gap-3">
-                        <button onClick={() => setDeliveryModal(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all">
-                            Cancelar
-                        </button>
-                        <button
-                            onClick={handleConfirmDelivery}
-                            disabled={isConfirmingDelivery}
-                            className={`flex-1 py-3 text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                                deliveryType === 'FULL' ? 'bg-emerald-600 hover:bg-emerald-700'
-                                : deliveryType === 'PARTIAL' ? 'bg-amber-500 hover:bg-amber-600'
-                                : 'bg-rose-600 hover:bg-rose-700'
-                            } disabled:opacity-50 disabled:cursor-wait`}
-                        >
-                            {isConfirmingDelivery && <Icons.Loader className="w-3 h-3 animate-spin" />}
-                            {deliveryType === 'FULL' ? '✅ Confirmar Entrega' : deliveryType === 'PARTIAL' ? '⚠️ Guardar Parcial' : '🔄 Registrar Devolución'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════
-             MODAL: HISTORIAL ENTREGAS / DEVOLUCIONES
-        ═══════════════════════════════════════════════════════════ */}
-        {showHistoryModal && (
-            <div className="fixed inset-0 z-[900] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-                <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
-                    {/* HEADER */}
-                    <div className="p-5 bg-gradient-to-r from-slate-900 to-slate-800 rounded-t-[2rem] flex items-center justify-between">
-                        <div>
-                            <h3 className="text-sm font-black text-white uppercase tracking-wider">Historial de Operaciones</h3>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Entregas y devoluciones registradas</p>
-                        </div>
-                        <button onClick={() => setShowHistoryModal(false)} className="w-7 h-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-all">
-                            <Icons.X className="w-3.5 h-3.5 text-white" />
-                        </button>
-                    </div>
-
-                    {/* TABS */}
-                    <div className="flex border-b border-slate-100">
-                        {(['ENTREGAS', 'DEVOLUCIONES'] as const).map(tab => (
-                            <button
-                                key={tab}
-                                onClick={() => { setHistoryTab(tab); setHistoryData([]); }}
-                                className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
-                                    historyTab === tab ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-700'
-                                }`}
-                            >
-                                {tab === 'ENTREGAS' ? '🚚 Entregas' : '🔄 Devoluciones'}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* FILTROS */}
-                    <div className="p-4 bg-slate-50 border-b border-slate-100">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                            <input type="text" placeholder="Factura" value={historyFilters.invoiceId}
-                                onChange={e => setHistoryFilters(p => ({...p, invoiceId: e.target.value}))}
-                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black uppercase outline-none focus:border-emerald-400 bg-white" />
-                            <select value={historyFilters.driverId}
-                                onChange={e => setHistoryFilters(p => ({...p, driverId: e.target.value}))}
-                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black uppercase outline-none focus:border-emerald-400 bg-white">
-                                <option value="">Conductor</option>
-                                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                            </select>
-                            <select value={historyFilters.vehicleId}
-                                onChange={e => setHistoryFilters(p => ({...p, vehicleId: e.target.value}))}
-                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black uppercase outline-none focus:border-emerald-400 bg-white">
-                                <option value="">Placa</option>
-                                {vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}</option>)}
-                            </select>
-                            <input type="date" value={historyFilters.dateFrom}
-                                onChange={e => setHistoryFilters(p => ({...p, dateFrom: e.target.value}))}
-                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black outline-none focus:border-emerald-400 bg-white" />
-                            <input type="date" value={historyFilters.dateTo}
-                                onChange={e => setHistoryFilters(p => ({...p, dateTo: e.target.value}))}
-                                className="px-2 py-1.5 border border-slate-200 rounded-lg text-[9px] font-black outline-none focus:border-emerald-400 bg-white" />
-                            <button onClick={loadHistory} disabled={historyLoading}
-                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-emerald-700 transition-all flex items-center justify-center gap-1 disabled:opacity-50">
-                                {historyLoading ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.Search className="w-3 h-3" />}
-                                Buscar
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* TABLA */}
-                    <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-                        {historyLoading ? (
-                            <div className="flex items-center justify-center h-32">
-                                <Icons.Loader className="w-6 h-6 animate-spin text-emerald-500" />
-                                <span className="ml-2 text-slate-400 text-xs font-bold uppercase">Cargando...</span>
-                            </div>
-                        ) : historyData.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-32 text-slate-300">
-                                <Icons.FileText className="w-8 h-8 mb-2" />
-                                <p className="text-xs font-black uppercase">Sin registros. Usa los filtros y presiona Buscar.</p>
-                            </div>
-                        ) : (
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="border-b border-slate-100">
-                                        {historyTab === 'ENTREGAS'
-                                            ? ['ID', 'Factura', 'Conductor', 'Placa', 'Tipo', 'Fecha', 'Dev.'].map(h => (
-                                                <th key={h} className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-widest pr-4">{h}</th>
-                                            ))
-                                            : ['ID', 'Factura', 'Conductor', 'Placa', 'Motivo', 'Estado', 'Fecha'].map(h => (
-                                                <th key={h} className="pb-2 text-[9px] font-black text-slate-400 uppercase tracking-widest pr-4">{h}</th>
-                                            ))
-                                        }
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {historyData.map((row: any) => (
-                                        <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all">
-                                            {historyTab === 'ENTREGAS' ? <>
-                                                <td className="py-2 pr-4 text-[9px] font-black text-slate-500">#{row.id}</td>
-                                                <td className="py-2 pr-4 text-[9px] font-black text-slate-900">{row.invoiceId}</td>
-                                                <td className="py-2 pr-4 text-[9px] text-slate-600 uppercase">{row.driverName || row.driverId}</td>
-                                                <td className="py-2 pr-4 text-[9px] font-black text-emerald-600">{row.vehiclePlate || '-'}</td>
-                                                <td className="py-2 pr-4">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${
-                                                        row.deliveryType === 'FULL' ? 'bg-emerald-100 text-emerald-700'
-                                                        : row.deliveryType === 'PARTIAL' ? 'bg-amber-100 text-amber-700'
-                                                        : 'bg-rose-100 text-rose-700'
-                                                    }`}>
-                                                        {row.deliveryType === 'FULL' ? 'Completa' : row.deliveryType === 'PARTIAL' ? 'Parcial' : 'Devolución'}
-                                                    </span>
-                                                </td>
-                                                <td className="py-2 pr-4 text-[9px] text-slate-400">{new Date(row.deliveredAt).toLocaleDateString('es-CO')}</td>
-                                                <td className="py-2 pr-4 text-[9px] font-black">{row.returnId ? <span className="text-rose-500">#{row.returnId}</span> : <span className="text-slate-300">—</span>}</td>
-                                            </> : <>
-                                                <td className="py-2 pr-4 text-[9px] font-black text-slate-500">#{row.id}</td>
-                                                <td className="py-2 pr-4 text-[9px] font-black text-slate-900">{row.invoiceId}</td>
-                                                <td className="py-2 pr-4 text-[9px] text-slate-600 uppercase">{row.driverName || row.driverId}</td>
-                                                <td className="py-2 pr-4 text-[9px] font-black text-emerald-600">{row.vehiclePlate || '-'}</td>
-                                                <td className="py-2 pr-4 text-[9px] text-slate-600 max-w-[120px] truncate">{row.returnReason || '—'}</td>
-                                                <td className="py-2 pr-4">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${
-                                                        row.status === 'PROCESSED' ? 'bg-emerald-100 text-emerald-700'
-                                                        : row.status === 'CANCELLED' ? 'bg-slate-100 text-slate-500'
-                                                        : 'bg-amber-100 text-amber-700'
-                                                    }`}>{row.status}</span>
-                                                </td>
-                                                <td className="py-2 pr-4 text-[9px] text-slate-400">{new Date(row.createdAt).toLocaleDateString('es-CO')}</td>
-                                            </>}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
-                </div>
-            </div>
-        )}
+            <DispatchControlModal 
+                isOpen={!!assigningInvoice}
+                onClose={() => { setAssigningInvoice(null); setScannedItems({}); }}
+                invoice={assigningInvoice}
+                scannedItems={scannedItems}
+                handleBarcodeScan={handleBarcodeScan}
+                isAccompanied={isAccompanied}
+                setIsAccompanied={setIsAccompanied}
+                helperCount={helperCount}
+                setHelperCount={setHelperCount}
+                selectedHelpers={selectedHelpers}
+                setSelectedHelpers={setSelectedHelpers}
+                allUsers={allUsers}
+                user={user}
+                drivers={drivers}
+                activeRoutes={activeRoutes}
+                signNowMap={signNowMap}
+                setSignNowMap={setSignNowMap}
+                signatureKeys={signatureKeys}
+                setSignatureKeys={setSignatureKeys}
+                showPasswordMap={showPasswordMap}
+                setShowPasswordMap={setShowPasswordMap}
+                isValidating={isValidating}
+                handleConfirmDispatch={handleConfirmDispatch}
+            />
         </>
     );
 };
