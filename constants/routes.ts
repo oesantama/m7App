@@ -29,7 +29,6 @@ export const ROUTE_TO_MASTER_CATEGORY: Record<string, MasterCategory> = {
   'inventory/items': 'masterArticulo',
   'users': 'masterUsuarios',
   'roles': 'masterRol',
-  'admin-db': 'masterPaginas' as any, // Gestor DB
   'PAG-01': 'masterArticulo',
   'PAG-21': 'masterUsuarios',
   'PAG-02': 'masterRol',
