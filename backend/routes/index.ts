@@ -37,6 +37,7 @@ import tipoNotificacionRoutes from './tipo-notificacion.routes.js';
 import dispatchRoutes from './dispatch.routes.js';
 import pickingRoutes from './picking.routes.js';
 import geocodeRoutes from './geocode.routes.js';
+import backupRoutes from './backup.routes.js';
 
 
 
@@ -79,6 +80,7 @@ router.use('/telemetry', telemetryRoutes);
 router.use('/dispatch', dispatchRoutes);
 router.use('/picking', pickingRoutes);
 router.use('/geocode', geocodeRoutes);
+router.use('/admin/backup', backupRoutes); // DB Backup endpoint
 
 export default router;
 
