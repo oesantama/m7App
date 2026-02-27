@@ -70,16 +70,22 @@ app.listen(PORT, () => {
   // Inicialización de WhatsApp 
   console.log('[ORBIT-SYSTEM] Evolution API Integration Active');
 
-  // Inicialización automática de tablas de entrega/devoluciones
-  console.log('[M7-SYSTEM] Iniciando creación de tablas de entrega...');
+  // FLUJO DE ARRANQUE CRÍTICO M7 (SECUENCIAL PARA EVITAR DEADLOCKS)
+  console.log('[ORBIT-BOOT] Iniciando secuencia de servicios...');
+  
   initDeliveryTables()
-    .then(() => console.log('[M7-SYSTEM] initDeliveryTables completado exitosamente.'))
-    .catch(e => console.error('[M7-SYSTEM] Error CRÍTICO en initDeliveryTables:', e));
-
-  // RESTAURACIÓN AUTOMÁTICA M7 (MIGRACIONES)
-  import('./services/migration.service.js').then(m => {
-    m.restoreSystem()
-      .then(r => console.log('[ORBIT-AUTO] Sistema configurado:', r.message))
-      .catch(e => console.error('[ORBIT-AUTO] Fallo en configuración inicial:', e.message));
-  });
+    .then(() => {
+      console.log('[ORBIT-BOOT] Tablas de Despacho verificadas.');
+      // Importación dinámica y ejecución de recuperación nuclear
+      return import('./services/migration.service.js');
+    })
+    .then(async (m) => {
+      console.log('[ORBIT-BOOT] Ejecutando Restauración Nuclear...');
+      const result = await m.restoreSystem();
+      console.log('[ORBIT-BOOT] Sistema configurado:', result.message);
+    })
+    .catch(err => {
+      console.error('[ORBIT-BOOT] ERROR CRÍTICO EN ARRANQUE:', err.message);
+      if (err.stack) console.error(err.stack);
+    });
 });
