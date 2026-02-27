@@ -24,12 +24,26 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'tipos_vehiculo': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'unidades_medida': ['name', 'description', 'abbreviation', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'estados': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
-  'routes': ['name', 'description', 'vehicle_id', 'driver_id', 'client_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at']
+  'notificaciones': ['name', 'description', 'notification_email', 'tipo_notificacion_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+  'tipos_notificacion': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+  'routes': ['name', 'description', 'vehicle_id', 'driver_id', 'client_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+  'picking_assignments': ['invoice_id', 'leader_id', 'helper_ids', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
+  'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at'],
+  'route_invoices': ['route_id', 'invoice_id', 'created_at'],
+  'route_modifications_log': ['route_id', 'invoice_id', 'action', 'user_id', 'previous_plate', 'new_plate', 'details', 'timestamp'],
+  'dispatch_assignments': ['invoice_id', 'driver_id', 'helper_ids', 'scanned_items', 'is_accompanied', 'helper_count', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
+  'dispatch_signatures_pending': ['dispatch_id', 'user_id', 'role_type', 'signed', 'signed_at'],
+  'delivery_confirmations': ['dispatch_id', 'invoice_id', 'driver_id', 'vehicle_id', 'delivery_type', 'delivered_items', 'notes', 'delivered_at', 'created_at'],
+  'delivery_returns': ['confirmation_id', 'invoice_id', 'driver_id', 'vehicle_id', 'return_reason', 'notes', 'status', 'created_at'],
+  'delivery_return_items': ['return_id', 'sku', 'article_name', 'quantity_returned', 'quantity_delivered', 'unit', 'notes'],
+  'routing_patterns': ['city', 'vehicle_id', 'strength', 'last_used'],
+  'deletion_logs': ['table_name', 'record_id', 'record_data', 'deleted_by', 'deleted_at'],
+  'vehicle_locations': ['vehicle_id', 'driver_id', 'latitude', 'longitude', 'accuracy', 'speed', 'heading', 'updated_at', 'timestamp']
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'deletion_logs'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
@@ -40,7 +54,7 @@ const healSchema = async (client: any) => {
             const expectedCols = ['id', ...UNIVERSAL_SCHEMA[table]];
             const hasExtraCols = currentCols.some((c: string) => !expectedCols.includes(c));
             if (hasExtraCols) {
-                console.warn(`[M7-DB-NUCLEAR] Discrepancia detectada en ${table}. Limpiando...`);
+                console.warn(`[M7-DB-NUCLEAR] Discrepancia detectada en ${table}. Limpiando tabla para réplica exacta...`);
                 await client.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
             }
         }
@@ -82,10 +96,24 @@ const healSchema = async (client: any) => {
     try {
       const typeCheck = await client.query(`SELECT data_type FROM information_schema.columns WHERE table_name = '${table}' AND column_name = 'id'`);
       if (typeCheck.rows.length > 0 && typeCheck.rows[0].data_type === 'text') {
+        console.log(`[M7-DB-HEAL] Harmonizando SERIAL para ${table}...`);
+        
+        if (table === 'picking_assignments') {
+          await client.query('ALTER TABLE picking_signatures DROP CONSTRAINT IF EXISTS picking_signatures_picking_id_fkey');
+          await client.query('ALTER TABLE picking_signatures ALTER COLUMN picking_id TYPE INTEGER USING (picking_id::INTEGER)');
+        }
+        if (table === 'dispatch_assignments') {
+          await client.query('ALTER TABLE dispatch_signatures_pending DROP CONSTRAINT IF EXISTS dispatch_signatures_pending_dispatch_id_fkey');
+        }
+
         await client.query(`CREATE SEQUENCE IF NOT EXISTS ${table}_id_seq`);
         await client.query(`ALTER TABLE ${table} ALTER COLUMN id TYPE INTEGER USING (CASE WHEN id ~ '^[0-9]+$' THEN id::INTEGER ELSE nextval('${table}_id_seq') END)`);
         await client.query(`ALTER TABLE ${table} ALTER COLUMN id SET DEFAULT nextval('${table}_id_seq')`);
         await client.query(`SELECT setval('${table}_id_seq', COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1)`);
+
+        if (table === 'picking_assignments') {
+           await client.query('ALTER TABLE picking_signatures ADD CONSTRAINT picking_signatures_picking_id_fkey FOREIGN KEY (picking_id) REFERENCES picking_assignments(id) ON DELETE CASCADE');
+        }
       }
     } catch (e) {}
   }
@@ -98,7 +126,7 @@ export const restoreSystem = async () => {
     await healSchema(client);
     await client.query('BEGIN');
     
-    // SEMILLAS DE DATOS LOCALHOST
+    // SEMILLAS DE DATOS LOCALHOST (Resumen de paridad)
     await client.query(`
       INSERT INTO vehicles (id, plate, brand, owner, capacity_m3, client_id, status_id, model_year, color, vehicle_type) VALUES
       ('VEH-001', 'VEJ 509', 'MAR-022', NULL, 14, 'CLI-02', 'EST-01', '2024', 'gri', 'TV-01'),
@@ -153,7 +181,7 @@ export const restoreSystem = async () => {
     `, [adminHash]);
 
     await client.query('COMMIT');
-    return { success: true };
+    return { success: true, message: 'Operación de Sincronización Nuclear Exitosa.' };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
