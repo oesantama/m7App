@@ -473,14 +473,19 @@ const FleetManager: React.FC<FleetManagerProps> = ({
           </button>
 
           {canCreate && (
-            <button 
-              onClick={() => setIsImportOpen(true)}
-              title="Importación Masiva (Excel)"
-              className="p-3 bg-white text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-md group border-2 border-emerald-100 flex items-center justify-center relative"
-            >
-              <Icons.Excel className="w-5 h-5" />
-              <div className="absolute bottom-full mb-3 hidden group-hover:block bg-slate-900 text-white text-[8px] font-black uppercase py-2 px-3 rounded-xl whitespace-nowrap shadow-2xl z-50">IMPORTACIÓN MASIVA</div>
-            </button>
+            <div className="relative group">
+              <button 
+                onClick={() => setIsImportOpen(true)}
+                title="Importación Masiva Excel"
+                className="p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 hover:scale-110 active:scale-95 transition-all shadow-lg flex items-center gap-2"
+              >
+                <Icons.Upload className="w-4 h-4" />
+                <span className="text-[9px] font-black uppercase tracking-widest hidden lg:block">Importar</span>
+              </button>
+              <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 hidden group-hover:block bg-slate-900 text-white text-[8px] font-black uppercase py-2 px-3 rounded-xl whitespace-nowrap shadow-2xl z-50">
+                📥 IMPORTACIÓN MASIVA (Excel)
+              </div>
+            </div>
           )}
 
           {canCreate && (
