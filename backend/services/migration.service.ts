@@ -96,6 +96,17 @@ const healSchema = async (client: any) => {
       `);
       if (typeCheck.rows.length > 0 && typeCheck.rows[0].data_type === 'text') {
         console.log(`[M7-DB-HEAL] Convirtiendo ${table}.id de TEXT a INTEGER (Harmonización SERIAL)...`);
+        
+        // Manejo especial de dependencias (FKs)
+        if (table === 'picking_assignments') {
+          await client.query('ALTER TABLE picking_signatures DROP CONSTRAINT IF EXISTS picking_signatures_picking_id_fkey');
+          await client.query('ALTER TABLE picking_signatures ALTER COLUMN picking_id TYPE INTEGER USING (picking_id::INTEGER)');
+        }
+        if (table === 'dispatch_assignments') {
+          await client.query('ALTER TABLE dispatch_signatures_pending DROP CONSTRAINT IF EXISTS dispatch_signatures_pending_dispatch_id_fkey');
+          // No convertimos dispatch_id a integer aún porque en dispatch.controller se usa UUID/Text a veces
+        }
+
         await client.query(`CREATE SEQUENCE IF NOT EXISTS ${table}_id_seq`);
         await client.query(`
           ALTER TABLE ${table} 
@@ -104,6 +115,11 @@ const healSchema = async (client: any) => {
         `);
         await client.query(`ALTER TABLE ${table} ALTER COLUMN id SET DEFAULT nextval('${table}_id_seq')`);
         await client.query(`SELECT setval('${table}_id_seq', COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1)`);
+
+        // Restaurar dependencias
+        if (table === 'picking_assignments') {
+           await client.query('ALTER TABLE picking_signatures ADD CONSTRAINT picking_signatures_picking_id_fkey FOREIGN KEY (picking_id) REFERENCES picking_assignments(id) ON DELETE CASCADE');
+        }
       }
     } catch (e: any) {
       console.warn(`[M7-DB-HEAL] Advertencia en harmonización de ${table}:`, e.message);

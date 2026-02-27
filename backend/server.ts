@@ -41,7 +41,11 @@ app.use((req, res, next) => {
 app.use('/api/auth/login', loginLimiter); // Aplicar límite solo al login primero
 app.use('/api', apiRoutes);
 
-// Health Check Global
+// Health Check Global para Proxies (Coolify/Nginx)
+app.get('/', (req, res) => {
+  res.json({ ok: true, message: 'Orbit Kernal Operational', version: '1.0.4' });
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'UP', service: 'Orbit Logistics Backend', timestamp: new Date() });
 });
