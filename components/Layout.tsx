@@ -136,17 +136,16 @@ const Layout: React.FC<LayoutProps> = ({
     })
     .filter(group => group.items.length > 0);
 
-  /* INJECT ADMIN GROUP - REMOVED TO PREVENT DUPLICATES
   if (user.email === 'admin@millasiete.com') {
     menuGroups.push({
       id: 'admin-group',
       label: 'ADMINISTRACIÓN',
-      icon: getIcon('Shield'), // Assuming Shield icon exists, or use Lock/Settings
+      icon: getIcon('Shield'), 
       items: [
-        { id: 'admin-db-page', label: 'Gestor DB', module: 'admin-db' as any, masterCat: '' as any }
+        { id: 'admin-db-page', label: 'SQL MANAGER', module: 'admin-db' as any, masterCat: '' as any }
       ]
     });
-  } */
+  } 
 
 
 
