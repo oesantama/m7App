@@ -121,14 +121,24 @@ const Layout: React.FC<LayoutProps> = ({
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(page => {
           const masterCat = getMasterCategoryFromRoute(page.route, page.id);
-          // Si tiene categoría maestra, el tab activo debe ser 'master' para mostrar MasterModule
-          // A menos que sea una ruta operativa directa como 'despacho', 'rutas', etc.
           const isMasterPage = !!masterCat;
           
+          // Sanitizar la ruta: si tiene '/' (ej: 'inventory/items'), usar solo la parte
+          // que corresponde al case en App.tsx. Nunca dejar que el browser lo interprete como URL.
+          const sanitizeRoute = (route: string): string => {
+            if (!route) return '';
+            // Si es ruta de maestro, no interesa (se usa 'master' como tab)
+            if (isMasterPage) return 'master';
+            // Si contiene '/', tomar la primera parte significativa
+            // Ejemplo: 'inventory/items' → 'inventory'
+            const clean = route.replace(/^\/+/, '').split('/')[0];
+            return clean;
+          };
+
           return {
             id: page.id,
             label: page.name,
-            module: (isMasterPage ? 'master' : page.route) as PageModule,
+            module: sanitizeRoute(page.route) as PageModule,
             masterCat: masterCat as MasterCategory
           };
         });

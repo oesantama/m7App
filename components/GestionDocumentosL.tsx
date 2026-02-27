@@ -37,7 +37,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [activeModalTab, setActiveModalTab] = useState<'reception' | 'audit' | 'payments'>('reception');
   const [preview, setPreview] = useState<{ fileName: string; mapped: PreviewDocument[]; type: string } | null>(null);
   const [selectedPendingDoc, setSelectedPendingDoc] = useState<DocumentL | null>(null);
-  const [syncError, setSyncError] = useState<SyncError | null>(null); // BÃºsqueda y PaginaciÃ³n
+  const [syncError, setSyncError] = useState<SyncError | null>(null); // Búsqueda y Paginación
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingPage, setPendingPage] = useState(1);
   const [pendingPageSize, setPendingPageSize] = useState<number | 'all'>(6);
@@ -51,7 +51,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [allClients, setAllClients] = useState<{id: string, name: string}[]>([]);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
-  // Estados para Modal de Detalle (RecepciÃ³n/AuditorÃ­a)
+  // Estados para Modal de Detalle (Recepción/AuditorÃ­a)
   const [modalSearch, setModalSearch] = useState('');
   const [modalPage, setModalPage] = useState(1);
   const [modalPageSize, setModalPageSize] = useState<number | 'all'>(10);
@@ -80,10 +80,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   };
 
   const pendingDocs = useMemo(() => {
-    // NormalizaciÃ³n y DEDUPLICACIÃ“N (M7 Safety)
+    // Normalización y DEDUPLICACIÃ“N (M7 Safety)
     const uniqueMap = new Map();
     documents.forEach(d => {
-      // Normalizar campos para la llave Ãºnica
+      // Normalizar campos para la llave única
       const extId = d.externalDocId || (d as any).external_doc_id || '';
       const plate = d.vehicleData || (d as any).vehicle_plate || (d as any).plate || '';
       const key = `${extId}-${plate}`.toLowerCase();
@@ -137,7 +137,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             toast.error("Error al eliminar: " + (res.error || "Desconocido"));
         }
     } catch (err) {
-        toast.error("Error de conexiÃ³n al eliminar");
+        toast.error("Error de conexión al eliminar");
     }
   };
 
@@ -206,7 +206,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         if (!rawData || rawData.length < 1) return;
 
         let headerRowIndex = -1;
-        // Priorizar detecciÃ³n de cabeceras
+        // Priorizar detección de cabeceras
         const requiredTerms = ['placa', 'carga', 'articulo', 'item', 'un orig', 'un', 'cant env'];
         
         for (let i = 0; i < Math.min(rawData.length, 50); i++) {
@@ -218,7 +218,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         if (headerRowIndex === -1) {
           setSyncError({
             title: "M7 FORMAT ERROR",
-            message: "No se detectÃ³ la fila de tÃ­tulos. Verifique el formato del archivo Excel.",
+            message: "No se detectó la fila de tÃ­tulos. Verifique el formato del archivo Excel.",
             duplicates: []
           });
           return;
@@ -228,14 +228,14 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         
         // FUNCIÃ“N DE BÃšSQUEDA MEJORADA: PRIORIDAD EXACTA
         const findIdx = (terms: string[]) => {
-           // Paso 1: BÃºsqueda EXACTA
+           // Paso 1: Búsqueda EXACTA
            const exactIdx = headers.findIndex(h => {
              if (!h) return false;
              return terms.some(t => h.toLowerCase().trim() === t.toLowerCase().trim());
            });
            if (exactIdx !== -1) return exactIdx;
 
-           // Paso 2: BÃºsqueda PARCIAL (Solo si falla la exacta)
+           // Paso 2: Búsqueda PARCIAL (Solo si falla la exacta)
            return headers.findIndex(h => {
              if (!h) return false;
              return terms.some(t => h.toLowerCase().trim().includes(t.toLowerCase().trim()));
@@ -244,7 +244,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
         const iCodPlan = findIdx(type === 'Plan Normal' ? ['un orig', 'cod plan', 'codplan'] : ['un', 'cod plan', 'codplan']);
         
-        // DetecciÃ³n Exacta para ValidaciÃ³n Cruzada (Solicitud Usuario)
+        // Detección Exacta para Validación Cruzada (Solicitud Usuario)
         const iExactUnOrig = headers.findIndex(h => h.toLowerCase().trim() === 'un orig');
         const iExactUn = headers.findIndex(h => h.toLowerCase().trim() === 'un');
 
@@ -273,7 +273,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           if (iExactUnOrig === -1) {
             setSyncError({
               title: "FORMATO INCORRECTO: PLAN NORMAL",
-              message: "Usted seleccionÃ³ PLAN NORMAL y el documento NO coincide con lo requerido para el cargue.",
+              message: "Usted seleccionó PLAN NORMAL y el documento NO coincide con lo requerido para el cargue.",
               duplicates: []
             });
             return;
@@ -281,11 +281,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         }
 
         if (type === 'Plan R') {
-          // Si tiene 'UN ORIG', es un Plan Normal, debe ser bloqueado en la opciÃ³n de Plan R
+          // Si tiene 'UN ORIG', es un Plan Normal, debe ser bloqueado en la opción de Plan R
           if (iExactUnOrig !== -1) {
             setSyncError({
               title: "FORMATO CRUZADO DETECTADO",
-              message: "Usted seleccionÃ³ PLAN R y el documento NO coincide con lo requerido para el cargue (Se detectÃ³ formato PLAN NORMAL).",
+              message: "Usted seleccionó PLAN R y el documento NO coincide con lo requerido para el cargue (Se detectó formato PLAN NORMAL).",
               duplicates: []
             });
             return;
@@ -295,7 +295,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           if (iExactUn === -1) {
             setSyncError({
               title: "FORMATO INCORRECTO: PLAN R",
-              message: "Usted seleccionÃ³ PLAN R y el documento NO coincide con lo requerido para el cargue.",
+              message: "Usted seleccionó PLAN R y el documento NO coincide con lo requerido para el cargue.",
               duplicates: []
             });
             return;
@@ -304,7 +304,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
         const isPlanR = type === 'Plan R';
 
-        // LÃ³gica EspecÃ­fica por Tipo de Plan
+        // Lógica EspecÃ­fica por Tipo de Plan
         const iFechaEnvio = isPlanR 
           ? -1 // Plan R no tiene fecha demanda, se usa fecha actual
           : findIdx(['f demanda', 'f. demanda', 'fecha demanda', 'ship date']);
@@ -312,12 +312,12 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iObs = findIdx(isPlanR ? ['comentarios', 'comentario'] : ['message', 'mensaje']);
         
         // Mapeos comunes
-        const iArticulo = findIdx(['articulo', 'item', 'codigo', 'cÃ³digo', 'cod. art', 'sku']);
+        const iArticulo = findIdx(['articulo', 'item', 'codigo', 'código', 'cod. art', 'sku']);
         const iCant = findIdx(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
         
-        // LÃ³gica de Mapeo de VolÃºmenes (M7 RE-FIX)
-        // Para Plan R: "Volumen" es el nÃºmero directo (m3).
-        // Para Plan Normal: "Vol. Total" es el nÃºmero, "Volumen" es la unidad (CM3/MT3).
+        // Lógica de Mapeo de Volúmenes (M7 RE-FIX)
+        // Para Plan R: "Volumen" es el número directo (m3).
+        // Para Plan Normal: "Vol. Total" es el número, "Volumen" es la unidad (CM3/MT3).
         const iVolTotal = isPlanR 
           ? findIdx(['volumen', 'total volume', 'volumen total'])
           : findIdx(['vol. total', 'total volume', 'volumen total']);
@@ -332,7 +332,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iPed = findIdx(['nÂº ped', 'pedido', 'order']);
         const iPeso = findIdx(['peso', 'weight', 'kgs', 'kilogramos']);
         
-        // [NEW] Campos requeridos en detalle con discriminaciÃ³n por Plan (Solicitud Usuario)
+        // [NEW] Campos requeridos en detalle con discriminación por Plan (Solicitud Usuario)
         const iUnCodeDetail = isPlanR 
           ? findIdx(['un']) 
           : findIdx(['un orig']);
@@ -372,7 +372,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           if (sku) {
              const rawVol = val(iVolTotal);
              
-             // LÃ³gica de Parseo NÃºmerico (M7 FIX)
+             // Lógica de Parseo Númerico (M7 FIX)
              const parseNumberM7 = (raw: string, isPlanR: boolean, columnType: 'qty' | 'vol' | 'weight') => {
                  if (!raw || raw.trim() === '') return 0;
                  let val = raw.trim();
@@ -426,7 +426,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               invoice: val(iFactura),
               city: val(iCiudad),
               address: val(iDir),
-              driverNote: val(iObs), // ObservaciÃ³n Excel -> Nota Conductor
+              driverNote: val(iObs), // Observación Excel -> Nota Conductor
               orderNumber: val(iPed),
               peso: pesoVal,
               unCode: val(iUnCodeDetail),      // [NEW]
@@ -441,7 +441,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               count2: 0,
               pickedQty: 0, // Default 0
               dispatchedQty: 0, // Default 0
-              inventoryObservation: val(iObs) // ObservaciÃ³n Excel -> Obs Inventario
+              inventoryObservation: val(iObs) // Observación Excel -> Obs Inventario
             });
           }
         });
@@ -457,7 +457,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           });
 
           const isDuplicate = !!existingDoc;
-          // Si existe pero el Plan Type es diferente, permitimos la actualizaciÃ³n (Solo Cabecera)
+          // Si existe pero el Plan Type es diferente, permitimos la actualización (Solo Cabecera)
           const isHeaderUpdate = isDuplicate && existingDoc?.planType !== type;
 
           return {
@@ -521,7 +521,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const handleSync = () => {
     if (!preview) return;
     
-    // Restaurada lÃ³gica de BLOQUEO de duplicados a peticiÃ³n del usuario
+    // Restaurada lógica de BLOQUEO de duplicados a petición del usuario
     // Separamos nuevos de duplicados
     const newDocs = preview.mapped.filter(d => !d.isDuplicate);
     const duplicatedDocs = preview.mapped.filter(d => d.isDuplicate);
@@ -540,20 +540,20 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         if (res.success) {
             onDocumentsChange([...payloadDocs, ...documents]); // Optimistic update
             if (onRefresh) onRefresh(); // Trigger global data refresh
-            toast.success(`Procesados ${payloadDocs.length} documentos (CreaciÃ³n/ActualizaciÃ³n).`);
+            toast.success(`Procesados ${payloadDocs.length} documentos (Creación/Actualización).`);
             setPreview(null);
         } else {
            toast.error(`Error del servidor: ${res.error || 'Desconocido'}`);
         }
       }).catch((err) => {
          console.error('[M7-SYNC] Error:', err);
-         toast.error("Error al sincronizar con el servidor. Verifique su conexiÃ³n.");
+         toast.error("Error al sincronizar con el servidor. Verifique su conexión.");
       });
 
       // Si habÃ­a duplicados, avisamos pero permitimos el proceso de los nuevos
       if (duplicatedDocs.length > 0) {
         setSyncError({
-          title: "SincronizaciÃ³n Parcial",
+          title: "Sincronización Parcial",
           message: `Se cargaron ${newDocs.length} documentos nuevos. Sin embargo, ${duplicatedDocs.length} registros fueron omitidos porque YA EXISTEN en el sistema (Placa/Carga coincidieron).`,
           duplicates: duplicatedDocs.map(d => ({ placa: d.vehicleData || 'S/I', carga: d.externalDocId }))
         });
@@ -561,14 +561,14 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     } else {
       // Si todos son duplicados, bloqueamos totalmente y mostramos detalle
       setSyncError({
-        title: "Bloqueo de SincronizaciÃ³n",
-        message: "No se guardÃ³ nada. Todos los documentos del archivo ya existen en el sistema. Revise si estÃ¡ intentando cargar el mismo archivo.",
+        title: "Bloqueo de Sincronización",
+        message: "No se guardó nada. Todos los documentos del archivo ya existen en el sistema. Revise si estÃ¡ intentando cargar el mismo archivo.",
         duplicates: duplicatedDocs.map(d => ({ placa: d.vehicleData || 'S/I', carga: d.externalDocId }))
       });
     }
   };
 
-  // LÃ³gica de PaginaciÃ³n y BÃºsqueda para MODAL
+  // Lógica de Paginación y Búsqueda para MODAL
   const filteredModalItems = useMemo(() => {
     if (!selectedPendingDoc) return [];
     const items = activeModalTab === 'reception' 
@@ -748,7 +748,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                          <div className={`px-10 py-4 rounded-2xl text-[14px] font-black uppercase tracking-[0.2em] shadow-2xl ${preview.type === 'Plan R' ? 'bg-blue-600' : 'bg-emerald-600'}`}>{preview.type}</div>
                          <div>
                            <div className="flex items-center gap-3">
-                              <h4 className="font-black uppercase text-lg tracking-tighter leading-none">Pre-ValidaciÃ³n M7</h4>
+                              <h4 className="font-black uppercase text-lg tracking-tighter leading-none">Pre-Validación M7</h4>
                               
                               {/* [NEW] Selector de Cliente para Carga Masiva */}
                               {(user.clientIds && user.clientIds.length > 1) && (
@@ -821,7 +821,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                        {/* INFO DE MAPEO DE COLUMNAS COMPACTA */}
                        {detectedHeaders && (
                           <div className="px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
-                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">DiagnÃ³stico de Lectura</span>
+                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Diagnóstico de Lectura</span>
                              <div className="flex gap-3 text-[8px]">
                                 <span className="text-slate-500 font-bold">Placa: <span className="text-slate-900 font-black">{detectedHeaders.placa}</span></span>
                                 <span className="text-slate-500 font-bold">Carga: <span className="text-slate-900 font-black">{detectedHeaders.carga}</span></span>
@@ -1171,7 +1171,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         </div>
       )}
 
-      {/* Modal de ConfirmaciÃ³n de EliminaciÃ³n - M7 PREMIUM STYLE */}
+      {/* Modal de Confirmación de Eliminación - M7 PREMIUM STYLE */}
       {docToDelete && (
          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setDocToDelete(null)} />

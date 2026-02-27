@@ -1,6 +1,6 @@
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
-import react from '@vitejs/plugin-react-swc';
+import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -10,31 +10,32 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         tailwindcss(),
-        // VitePWA({...}) - Deshabilitado temporalmente para depuración de build
-        // VitePWA({
-        //   registerType: 'autoUpdate',
-        //   includeAssets: ['m7_favicon.png', 'm7_favicon.svg'],
-        //   manifest: {
-        //     name: 'Milla 7 - Sistema de Logística',
-        //     short_name: 'M7 Logística',
-        //     description: 'Sistema Inteligente de Gestión de Rutas',
-        //     theme_color: '#10b981',
-        //     background_color: '#020617',
-        //     display: 'standalone',
-        //     icons: [
-        //       {
-        //         src: 'm7_favicon.png',
-        //         sizes: '192x192',
-        //         type: 'image/png'
-        //       },
-        //       {
-        //         src: 'm7_favicon.png',
-        //         sizes: '512x512',
-        //         type: 'image/png'
-        //       }
-        //     ]
-        //   }
-        // })
+        VitePWA({
+          registerType: 'autoUpdate',
+          includeAssets: ['m7_favicon.png'],
+          workbox: {
+            globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+            cleanupOutdatedCaches: true,
+            clientsClaim: true,
+            skipWaiting: true,
+            navigateFallback: 'index.html',
+            navigateFallbackDenylist: [/^\/api/],
+          },
+          manifest: {
+            name: 'Milla 7 - Sistema de Logística',
+            short_name: 'OrbitM7',
+            description: 'Sistema Inteligente de Gestión de Rutas y Logística',
+            theme_color: '#10b981',
+            background_color: '#020617',
+            display: 'standalone',
+            orientation: 'portrait-primary',
+            icons: [
+              { src: 'm7-icon-192.png', sizes: '192x192', type: 'image/png' },
+              { src: 'm7-icon-512.png', sizes: '512x512', type: 'image/png' },
+              { src: 'm7-icon-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+            ]
+          }
+        }),
       ],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),

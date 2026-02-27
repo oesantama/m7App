@@ -1,12 +1,12 @@
 # Dockerfile para el Frontend
-FROM node:20-alpine AS build
+FROM node:20-slim AS build
 
 WORKDIR /app
 
 # Instalar dependencias
 COPY package*.json ./
 ENV NODE_OPTIONS="--max-old-space-size=8192"
-RUN npm cache clean --force && npm install
+RUN npm install --legacy-peer-deps && npm cache clean --force
 
 # Build
 COPY . .

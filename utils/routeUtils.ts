@@ -34,7 +34,13 @@ export function calculateUtilization(loadVolume: number, vehicleCapacity: number
  * Normaliza ciudad para comparación
  */
 export function normalizeCityKey(city: string): string {
-    return (city || 'SIN_CIUDAD').toUpperCase().trim();
+    if (!city || city.trim() === '') return 'SIN_CIUDAD';
+    // Eliminar diacríticos: Medellín → Medellin, Bogotá → Bogota
+    return city
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .trim();
 }
 
 /**
@@ -63,8 +69,8 @@ export function checkCapacityStatus(loadVolume: number, vehicleCapacity: number)
     const capacity = vehicleCapacity > 0 ? vehicleCapacity : 30;
     const utilization = (loadVolume / capacity) * 100;
     
-    if (utilization > 95) return 'critical';
-    if (utilization > 90) return 'warning';
+    if (utilization >= 95) return 'critical';
+    if (utilization >= 90) return 'warning';
     return 'ok';
 }
 

@@ -58,6 +58,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [signatureKeys, setSignatureKeys] = useState<Record<string, string>>({});
     const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
     const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Control colapsable
 
     const [vehicleLocations, setVehicleLocations] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -1163,214 +1164,137 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             {/* Modal de Detalle Mejorado */}
             {selectedActiveRoute && (
                 <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[90vw] max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-300">
-                        {/* HEADER COMPACTO */}
-                        <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-emerald-50 rounded-t-[2rem]">
-                            <div className="flex justify-between items-center mb-2">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[95vw] lg:max-w-7xl max-h-[95vh] flex flex-col items-stretch overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-emerald-50 shrink-0">
+                            <div className="flex justify-between items-center mb-1">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shadow-md shrink-0">
-                                        <Icons.Truck className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-none">Detalle de Despacho</h3>
-                                        <p className="text-[9px] font-bold text-slate-500 uppercase">
-                                            Ruta {selectedActiveRoute.plate} • {(() => {
-                                                if (selectedActiveRoute.driver_name && selectedActiveRoute.driver_name !== 'S/A') return selectedActiveRoute.driver_name;
-                                                const link = assignments.find(a => a.vehicleId === selectedActiveRoute.vehicle_id && a.isActive);
-                                                const drv = drivers.find(d => d.id === link?.driverId);
-                                                return drv?.name || 'CONDUCTOR EXTERNO';
-                                            })()} • 📌 {routeInvoices.length} Puntos
-                                        </p>
-                                    </div>
+                                   <div className="w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
+                                       <Icons.Truck className="w-5 h-5 text-emerald-400" />
+                                   </div>
+                                   <div>
+                                       <h3 className="text-xl font-black text-slate-900 tracking-tighter uppercase">{selectedActiveRoute.plate}</h3>
+                                       <p className="text-[10px] font-bold text-slate-500 uppercase">{selectedActiveRoute.driver_name || 'Sin Conductor'}</p>
+                                   </div>
                                 </div>
-                                <button onClick={() => setSelectedActiveRoute(null)} className="w-7 h-7 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
-                                    <Icons.X className="w-3.5 h-3.5 text-slate-400" />
+                                <button onClick={() => setSelectedActiveRoute(null)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 transition-all">
+                                    <Icons.X className="w-5 h-5 text-slate-400" />
                                 </button>
                             </div>
-                            {/* BUSCADOR + MÉTRICAS en el header */}
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="relative flex-1 min-w-[160px]">
-                                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                                    <input
+                            
+                            <div className="flex flex-wrap gap-2 items-center">
+                                <div className="flex-1 min-w-[200px] relative">
+                                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    <input 
                                         type="text"
                                         placeholder="BUSCAR FACTURA O CLIENTE..."
                                         value={invoiceSearchQuery}
                                         onChange={(e) => setInvoiceSearchQuery(e.target.value)}
-                                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest outline-none focus:border-emerald-500 transition-all"
+                                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-emerald-500 transition-all shadow-sm"
                                     />
                                 </div>
-                                {/* MÉTRICAS INLINE */}
-                                <div className="flex items-center gap-2">
-                                    <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 text-center">
-                                        <p className="text-[6px] font-black text-slate-400 uppercase">FACTURAS</p>
-                                        <p className="text-sm font-black text-slate-900 leading-none">{routeInvoices.length}</p>
+                                <div className="flex gap-2">
+                                    <div className="px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                        <p className="text-[7px] font-black text-slate-400 uppercase">Documentos</p>
+                                        <p className="text-sm font-black text-slate-900">{routeInvoices.length}</p>
                                     </div>
-                                    <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 text-center">
-                                        <p className="text-[6px] font-black text-slate-400 uppercase">ENTREGADAS</p>
-                                        <p className="text-sm font-black text-emerald-600 leading-none">
-                                            {routeInvoices.filter(inv => ['EST-12','EST-13','COMPLETED','Entregado'].includes(inv.status)).length}
-                                            <span className="text-[8px] text-slate-300">/{routeInvoices.length}</span>
+                                    <div className="px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                        <p className="text-[7px] font-black text-slate-400 uppercase">Volumen</p>
+                                        <p className="text-sm font-black text-emerald-600">
+                                            {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(2)}<span className="text-[9px] ml-0.5">m³</span>
                                         </p>
-                                    </div>
-                                    <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 text-center">
-                                        <p className="text-[6px] font-black text-slate-400 uppercase">VOL.</p>
-                                        <p className="text-sm font-black text-emerald-600 leading-none">{routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(1)}m³</p>
-                                    </div>
-                                    <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 text-center min-w-[70px]">
-                                        <div className="flex justify-between">
-                                            <p className="text-[6px] font-black text-slate-400 uppercase">CAPAC.</p>
-                                            <span className="text-[6px] font-black text-emerald-600">{Math.round((routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0) / (vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 1)) * 100)}%</span>
-                                        </div>
-                                        <div className="w-full bg-slate-100 h-1 rounded-full mt-1">
-                                            <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, (routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0) / (vehicles.find(v => v.id === selectedActiveRoute.vehicle_id)?.capacityM3 || 1)) * 100)}%` }}></div>
-                                        </div>
-                                    </div>
-                                    <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 text-center">
-                                        <p className="text-[6px] font-black text-slate-400 uppercase">ESTADO</p>
-                                        <p className="text-[9px] font-black text-emerald-600 uppercase leading-tight">{selectedActiveRoute.status === 'EN_RUTA' ? '🚚 TRANS.' : '✅ OK'}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1.5 custom-scrollbar">
-                            {/* ETIQUETA DESGLOSE - Ahora sólo decorativa y compacta */}
-                            <div className="flex items-center gap-2 px-1 py-1">
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Desglose de Documentos</p>
-                                <span className="text-[8px] font-black text-slate-300">{routeInvoices.length} FACTURAS</span>
-                                <div className="h-0.5 flex-1 bg-slate-100 rounded"></div>
-                                <p className="text-[8px] font-black text-emerald-500 uppercase">GESTIÓN DE RUTA</p>
-                            </div>
-                                
-                                {/* LISTA COMPACTA DE FACTURAS */}
-                            <div className="space-y-1 overflow-y-auto custom-scrollbar pb-4">
-                                {routeInvoices
-                                    .filter(inv => {
-                                        const query = invoiceSearchQuery.toLowerCase();
-                                        return (inv.invoiceNumber || "").toLowerCase().includes(query) || 
-                                               (inv.customerName || "").toLowerCase().includes(query) ||
-                                               (inv.id || "").toLowerCase().includes(query);
-                                    })
-                                    .map((inv: any, idx: number) => {
-                                        const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
-                                        return (
-                                            <div key={`${inv.id || idx}-${idx}`} className="px-3 py-2 bg-white border border-slate-100 rounded-2xl flex items-center justify-between gap-3 hover:border-emerald-400/40 hover:shadow-sm transition-all group">
-                                                {/* Número de orden */}
-                                                <div className="w-7 h-7 bg-slate-900 rounded-lg flex items-center justify-center text-emerald-400 font-black text-[10px] shrink-0 group-hover:scale-105 transition-all">
+                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 custom-scrollbar bg-slate-50/50">
+                            {routeInvoices
+                                .filter(inv => {
+                                    const query = invoiceSearchQuery.toLowerCase();
+                                    return (inv.invoiceNumber || "").toLowerCase().includes(query) || 
+                                           (inv.customerName || "").toLowerCase().includes(query) ||
+                                           (inv.id || "").toLowerCase().includes(query);
+                                })
+                                .map((inv: any, idx: number) => {
+                                    const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
+                                    return (
+                                        <div key={`${inv.id || idx}`} className="p-4 bg-white border border-slate-100 rounded-[1.5rem] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-emerald-400/40 transition-all group">
+                                            <div className="flex items-center gap-4 w-full sm:w-auto">
+                                                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 font-bold text-xs shrink-0 group-hover:bg-slate-900 group-hover:text-emerald-400 transition-colors">
                                                     {idx + 1}
                                                 </div>
-                                                {/* Info principal */}
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <p className="text-[11px] font-black text-slate-900">#{inv?.invoiceNumber || inv.id || 'N/A'}</p>
-                                                        {hasPendingSignature && (
-                                                            <span className="bg-amber-100 text-amber-700 text-[7px] font-black px-1.5 py-0.5 rounded-full animate-pulse uppercase">FIRMA</span>
-                                                        )}
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <h5 className="text-[14px] font-black text-slate-900">#{inv.invoiceNumber || inv.id}</h5>
+                                                        {inv.status === 'EST-12' && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-full">ENTREGADO</span>}
+                                                        {inv.status === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
+                                                        {hasPendingSignature && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black rounded-full animate-pulse">FIRMA</span>}
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[140px]">{inv?.customerName || 'S/N'}</p>
-                                                        {inv?.city && <>
-                                                            <div className="w-0.5 h-0.5 bg-slate-200 rounded-full"></div>
-                                                            <p className="text-[8px] font-bold text-slate-300 uppercase">{inv.city}</p>
-                                                        </>}
-                                                        <div className="w-0.5 h-0.5 bg-slate-200 rounded-full"></div>
-                                                        <p className="text-[8px] font-black text-emerald-500 uppercase">{Number(inv?.volumeM3 || 0).toFixed(2)}m³</p>
-                                                    </div>
-                                                </div>
-                                                {/* Botones compactos */}
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <button 
-                                                        onClick={() => setViewingItemsInvoice(inv)}
-                                                        className="px-2.5 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-[8px] font-black uppercase hover:bg-slate-200 transition-all flex items-center gap-1 border border-slate-200"
-                                                    >
-                                                        <Icons.Eye className="w-3 h-3" />
-                                                        Art.
-                                                    </button>
-                                                    {/* DESPACHAR - solo para facturas pendientes/sin despachar */}
-                                                    {!['EST-11','EST-12','EST-13','COMPLETED','Entregado'].includes(inv.status) && !inv.dispatchId && (
-                                                        <button 
-                                                            onClick={() => setAssigningInvoice(inv)}
-                                                            className="px-2.5 py-1.5 bg-slate-900 text-emerald-400 rounded-lg text-[8px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1 border border-slate-700"
-                                                        >
-                                                            <Icons.Scan className="w-3 h-3" />
-                                                            Despachar
-                                                        </button>
-                                                    )}
-                                                    {/* ENTREGAR CLIENTE - solo para facturas en ruta (EST-11) */}
-                                                    {inv.status === 'EST-11' && (
-                                                        <button 
-                                                            onClick={() => {
-                                                                const route = selectedActiveRoute;
-                                                                const items = (inv.items || []).map((it: any) => ({
-                                                                    sku: it.sku,
-                                                                    articleName: it.articleName || it.article_name || it.sku,
-                                                                    unit: it.unit || 'UND',
-                                                                    quantityDelivered: Number(it.qty || it.expectedQty || 0),
-                                                                    quantityReturned: 0,
-                                                                    notes: ''
-                                                                }));
-                                                                setDeliveryItems(items);
-                                                                setDeliveryType('FULL');
-                                                                setDeliveryNotes('');
-                                                                setDeliveryReturnReason('');
-                                                                setDeliveryPassword('');
-                                                                setDeliveryModal({ isOpen: true, invoice: inv, route });
-                                                            }}
-                                                            className="px-2.5 py-1.5 bg-emerald-500 text-white rounded-lg text-[8px] font-black uppercase hover:bg-emerald-600 transition-all flex items-center gap-1 shadow-md shadow-emerald-200"
-                                                        >
-                                                            <Icons.CheckCircle className="w-3 h-3" />
-                                                            Entregar Cliente
-                                                        </button>
-                                                    )}
-                                                    {/* Badge estado entregado/devuelto */}
-                                                    {['EST-12','EST-13'].includes(inv.status) && (
-                                                        <span className={`px-2 py-1 rounded-lg text-[7px] font-black uppercase ${
-                                                            inv.status === 'EST-12' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                                        }`}>
-                                                            {inv.status === 'EST-12' ? '✅ Entregado' : '⚠️ Parcial'}
-                                                        </span>
-                                                    )}
-                                                    {hasPendingSignature && (
-                                                        <button 
-                                                            onClick={() => handleDelayedSignature(inv)}
-                                                            className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg text-[8px] font-black uppercase hover:bg-indigo-700 transition-all flex items-center gap-1"
-                                                        >
-                                                            <Icons.Signature className="w-3 h-3" />
-                                                            Firmar
-                                                        </button>
-                                                    )}
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase leading-none">{inv.customerName || 'S/N'}</p>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                            </div>
-                                </div>
-                        <div className="p-8 bg-gradient-to-r from-slate-50 to-emerald-50 border-t border-slate-100 rounded-b-[2.5rem] flex gap-4">
+
+                                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                                <button 
+                                                    onClick={() => setViewingItemsInvoice(inv)}
+                                                    className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all border border-slate-200"
+                                                    title="Ver Artículos"
+                                                >
+                                                    <Icons.Eye className="w-4 h-4" />
+                                                </button>
+                                                
+                                                {inv.status === 'EST-11' && (
+                                                    <button 
+                                                        onClick={() => {
+                                                            const route = selectedActiveRoute;
+                                                            const items = (inv.items || []).map((it: any) => ({
+                                                                sku: it.sku,
+                                                                articleName: it.articleName || it.article_name || it.sku,
+                                                                unit: it.unit || 'UND',
+                                                                quantityDelivered: Number(it.qty || it.expectedQty || 0),
+                                                                quantityReturned: 0,
+                                                                notes: ''
+                                                            }));
+                                                            setDeliveryItems(items);
+                                                            setDeliveryType('FULL');
+                                                            setDeliveryModal({ isOpen: true, invoice: inv, route });
+                                                        }}
+                                                        className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                                                    >
+                                                        <Icons.CheckCircle className="w-4 h-4" />
+                                                        Entregar
+                                                    </button>
+                                                )}
+
+                                                {hasPendingSignature && (
+                                                    <button 
+                                                        onClick={() => handleDelayedSignature(inv)}
+                                                        className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700 transition-all flex items-center gap-2"
+                                                    >
+                                                        <Icons.Signature className="w-4 h-4" />
+                                                        Firma Pend.
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+
+                        <div className="p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row gap-4 shrink-0 rounded-b-[2rem]">
                             <button
-                                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
-                                onClick={() => {
-                                    generateRoutePDF(selectedActiveRoute);
-                                    setSelectedActiveRoute(null);
-                                }}
+                                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                onClick={() => generateRoutePDF(selectedActiveRoute)}
                                 disabled={isGeneratingPDF}
                             >
-                                {isGeneratingPDF ? (
-                                    <>
-                                        <Icons.RotateCcw className="w-4 h-4 animate-spin" />
-                                        Generando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Icons.FileText className="w-4 h-4" />
-                                        Descargar Planilla PDF
-                                    </>
-                                )}
+                                {isGeneratingPDF ? <Icons.RotateCcw className="w-5 h-5 animate-spin" /> : <Icons.FileText className="w-5 h-5" />}
+                                {isGeneratingPDF ? 'GENERANDO...' : 'DESCARGAR PLANILLA'}
                             </button>
                             <button
-                                className="flex-1 py-4 bg-white border-2 border-slate-200 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all"
+                                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
                                 onClick={() => setSelectedActiveRoute(null)}
                             >
-                                Cerrar Vista
+                                CERRAR DETALLE
                             </button>
                         </div>
                     </div>
