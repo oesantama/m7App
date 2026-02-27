@@ -38,11 +38,13 @@ export const getAllUserPermissions = async (req: Request, res: Response) => {
 
 export const getUserPermissions = async (req: Request, res: Response) => {
   const { userId } = req.params;
+  const email = req.query.email as string;
   
-  // SOLUCIÓN MEJORADA: Verificación por ID o por Rol de Super Admin
-  const isSuperAdmin = 
-    userId === 'admin' || 
-    userId === 'admin@millasiete.com';
+  // SOLUCIÓN MEJORADA: Verificación por ID    // Lógica de Super Admin: admin (legacy), USR-01 (M7 Local/Prod) o email específico
+    const uId = String(userId);
+    const isSuperAdmin = uId.toLowerCase() === 'admin' || 
+                        uId.toUpperCase() === 'USR-01' || 
+                        email?.toLowerCase() === 'admin@millasiete.com';
 
   // Si necesitamos la lista completa de páginas para el admin, lo ideal sería consultarla de la DB
   // pero mantendremos la lista hardcoded por ahora solo para el fallback de admin real.
