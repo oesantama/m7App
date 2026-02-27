@@ -838,22 +838,39 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // LOGICA DE NEGOCIO PARA DESPACHO (MOVIDA ANTES DEL RETURN)
     const handleBarcodeScan = async (barcode: string) => {
         if (!assigningInvoice) return;
-        const item = (assigningInvoice.items || []).find((it: any) => it.sku === barcode || it.barcode === barcode);
+        const barcodeClean = String(barcode).trim().toUpperCase();
+        
+        // Buscar el ítem por SKU o Barcode de forma robusta
+        const item = (assigningInvoice.items || []).find((it: any) => 
+            String(it.sku || '').trim().toUpperCase() === barcodeClean || 
+            String(it.barcode || '').trim().toUpperCase() === barcodeClean
+        );
+
         if (!item) {
             toast.error(`Artículo no encontrado: ${barcode}`);
             return;
         }
-        const currentCount = scannedItems[item.sku] || 0;
-        const expected = Number(item.qty || item.expectedQty || 0);
+
+        const sku = item.sku;
+        const currentCount = scannedItems[sku] || 0;
+        
+        // Detectar cantidad esperada con fallback robusto
+        const expected = Number(item.expectedQty ?? item.qty ?? item.quantity ?? 0);
+
         if (currentCount >= expected) {
-            toast.warning(`Cantidad máxima alcanzada para ${item.articleName || item.sku} (${currentCount}/${expected})`);
+            toast.error(`BLOQUEO: Ya se cumplió la cantidad máxima para ${item.articleName || sku} (${currentCount}/${expected})`, {
+                style: { background: '#ef4444', color: '#fff' }
+            });
             return;
         }
-        setScannedItems({
+
+        const newScanned = {
             ...scannedItems,
-            [item.sku]: currentCount + 1
-        });
-        toast.success(`Escaneado: ${item.articleName || item.sku}`);
+            [sku]: currentCount + 1
+        };
+
+        setScannedItems(newScanned);
+        toast.success(`Escaneado: ${item.articleName || sku} (${currentCount + 1}/${expected})`);
     };
 
     const handleConfirmDispatch = async () => {

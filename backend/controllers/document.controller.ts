@@ -433,17 +433,23 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
       // Insertar Consolidado (Auditoría)
       if (doc.consolidatedItems && doc.consolidatedItems.length > 0) {
         for (const item of doc.consolidatedItems) {
+          const articleId = item.articleId?.trim().toUpperCase();
+          if (!articleId) continue;
+
           await client.query(`
               INSERT INTO document_consolidated_items (document_id, article_id, expected_qty, count_1, count_2, picked_qty, dispatched_qty, inventory_observation)
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               ON CONFLICT (document_id, article_id) DO UPDATE SET
               expected_qty = EXCLUDED.expected_qty,
               count_1 = EXCLUDED.count_1,
-              count_2 = EXCLUDED.count_2
+              count_2 = EXCLUDED.count_2,
+              picked_qty = EXCLUDED.picked_qty,
+              dispatched_qty = EXCLUDED.dispatched_qty,
+              inventory_observation = EXCLUDED.inventory_observation
            `, [
             doc.id,
-            item.articleId?.trim().toUpperCase(),
-            item.expectedQty,
+            articleId,
+            item.expectedQty || 0,
             item.count1 || 0,
             item.count2 || 0,
             item.pickedQty || 0,
@@ -452,19 +458,17 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
           ]);
         }
       } else if (doc.items && doc.items.length > 0) {
-        // Fallback: Si no viene consolidado explícito, crearlo desde items (para plan normal que igual necesita auditoría)
+        // Fallback: Si no viene consolidado explícito, crearlo desde items
         for (const item of doc.items) {
-          // Chequear si ya existe para no duplicar en re-cargas parciales sin conflicto definido
-          // Mejor DELETE previo o Upsert?
-          // Dado que consolidado no tiene unique constraint complejo, asumimos carga limpia o verificar
-          // Por simplicidad en este paso, insertamos directo, pero idealmente upsert por doc_id + art_id
-          // Agregamos chequeo simple
+          const articleId = item.articleId?.trim().toUpperCase();
+          if (!articleId) continue;
+
           await client.query(`
                INSERT INTO document_consolidated_items (document_id, article_id, expected_qty, inventory_observation)
                VALUES ($1, $2, $3, $4)
                ON CONFLICT (document_id, article_id) DO UPDATE SET
                expected_qty = EXCLUDED.expected_qty
-            `, [doc.id, item.articleId, item.expectedQty, item.observation || '']);
+            `, [doc.id, articleId, item.expectedQty || 0, item.observation || '']);
         }
       }
     }

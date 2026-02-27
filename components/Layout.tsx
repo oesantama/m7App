@@ -89,7 +89,13 @@ const Layout: React.FC<LayoutProps> = ({
 
   const menuGroups = [...modulesData]
     .filter(m => (m.statusId || m.status_id) === 'EST-01')
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => {
+        const nameA = a.name.toUpperCase();
+        const nameB = b.name.toUpperCase();
+        if (nameA.includes('ADMINISTRACIÓN')) return 1;
+        if (nameB.includes('ADMINISTRACIÓN')) return -1;
+        return nameA.localeCompare(nameB);
+    })
     .map(mod => {
       const modId = String(mod.id).trim().toUpperCase();
       
