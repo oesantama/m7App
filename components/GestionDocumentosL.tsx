@@ -843,7 +843,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                  <th className="px-4 py-3">Vol. Total</th>
                                  <th className="px-4 py-3 text-center">Peso</th>
                                  <th className="px-4 py-3">Ciudad</th>
-                                 <th className="px-4 py-3">}Dirección</th>
+                                 <th className="px-4 py-3">Dirección</th>
                                  <th className="px-4 py-3 text-center">Validación</th>
                                </tr>
                              </thead>
