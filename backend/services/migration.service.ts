@@ -168,10 +168,11 @@ export const restoreSystem = async () => {
 
     await client.query(`
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id) VALUES 
-      ('PAG-01', 'USUARIOS', 'users', 'MOD-04', 'MOD-04', 'EST-01'),
+      ('PAG-01', 'ARTICULOS', 'inventory/items', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-21', 'USUARIOS', 'users', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-02', 'ROLES', 'roles', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-SQL', 'Gestor DB', 'admin-db', 'MOD-06', 'MOD-06', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route, module_id = EXCLUDED.module_id;
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route, module_id = EXCLUDED.module_id, parent_id = EXCLUDED.parent_id;
     `);
 
     const adminHash = await bcrypt.hash('admin123', 10);
