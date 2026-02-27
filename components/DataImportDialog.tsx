@@ -124,6 +124,22 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
             { name: 'HINO', description: 'Camiones y flotas de distribución.', statusId: 'EST-01' }
           ]
         };
+      case 'masterVehiculos' as any: 
+        return { 
+          fields: ['plate', 'brand', 'owner', 'capacityM3', 'modelYear', 'color', 'vehicleTypeId', 'statusId'],
+          examples: [
+            { plate: 'FGH789', brand: 'FOTON', owner: 'MILLA SIETE SAS', capacityM3: 35, modelYear: '2024', color: 'BLANCO', vehicleTypeId: 'SENCILLO', statusId: 'EST-01' },
+            { plate: 'ABC123', brand: 'CHEVROLET', owner: 'LOGISTICA EXPRESS', capacityM3: 15, modelYear: '2022', color: 'AZUL', vehicleTypeId: 'TURBO', statusId: 'EST-01' }
+          ]
+        };
+      case 'masterConductores' as any: 
+        return { 
+          fields: ['name', 'documentType', 'documentNumber', 'phone', 'licenseCategory', 'licenseExpiry', 'statusId'],
+          examples: [
+            { name: 'JUAN PEREZ', documentType: 'CC', documentNumber: '12345678', phone: '3001234567', licenseCategory: 'C2', licenseExpiry: '2028-12-31', statusId: 'EST-01' },
+            { name: 'MARIA LOPEZ', documentType: 'CC', documentNumber: '87654321', phone: '3109876543', licenseCategory: 'C3', licenseExpiry: '2027-06-15', statusId: 'EST-01' }
+          ]
+        };
       default: 
         return { 
           fields: ['name', 'description', 'statusId'],
@@ -160,29 +176,31 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
     
     setIsProcessing(true);
     try {
-        // Determinamos el campo "clave" según el maestro
-        let keyField = 'name';
-        if (activeMaster === 'masterArticulo') keyField = 'sku';
-        if (activeMaster === 'masterUsuarios') keyField = 'email';
-
-        const systemKeys = new Set(existingData.map(item => item[keyField]?.toString().trim().toLowerCase()));
+        const systemKeys = new Set(existingData.map(item => {
+            const val = (activeMaster as any) === 'masterVehiculos' ? item.plate : 
+                       (activeMaster as any) === 'masterConductores' ? item.documentNumber : 
+                       item[keyField];
+            return val?.toString().trim().toLowerCase();
+        }));
 
         data.forEach((item: any, index) => {
-            const value = item[keyField]?.toString().trim();
+            let value = item[keyField]?.toString().trim();
+            if ((activeMaster as any) === 'masterVehiculos') value = item.plate?.toString().trim();
+            if ((activeMaster as any) === 'masterConductores') value = item.documentNumber?.toString().trim();
             
             if (!value) {
-                errors.push(`Fila ${index + 1}: El campo "${keyField}" es obligatorio.`);
+                errors.push(`Fila ${index + 1}: El campo "${keyField}" o ID es obligatorio.`);
             } else {
                 const valueLower = value.toLowerCase();
                 
                 // 1. Validar duplicados DENTRO del Excel
                 if (internalSet.has(valueLower)) {
-                    errors.push(`Fila ${index + 1}: El ${keyField} "${value}" está repetido más de una vez en el archivo.`);
+                    errors.push(`Fila ${index + 1}: El identificador "${value}" está repetido más de una vez en el archivo.`);
                 }
                 
                 // 2. Validar duplicados contra el SISTEMA
                 if (systemKeys.has(valueLower)) {
-                    errors.push(`Fila ${index + 1}: El ${keyField} "${value}" ya existe en el sistema M7.`);
+                    errors.push(`Fila ${index + 1}: El identificador "${value}" ya existe en el sistema M7.`);
                 }
                 
                 internalSet.add(valueLower);

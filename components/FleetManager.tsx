@@ -5,6 +5,7 @@ import { Vehicle, Driver, User, MasterCategory, MasterRecord } from '../types';
 import { extractLicenseInfo, extractVehicleDocInfo } from '../services/geminiService';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { DataImportDialog } from './DataImportDialog';
 
 const SearchableSelect = ({ label, value, options, onChange, placeholder = "Buscar..." }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -155,101 +156,48 @@ const FleetManager: React.FC<FleetManagerProps> = ({
     XLSX.writeFile(workbook, `M7_${viewTab}_${Date.now()}.xlsx`);
   };
 
-  const handleDownloadTemplate = () => {
-    const isVehicles = viewTab === 'vehicles';
-    const data = isVehicles ? [
-      {
-        'Placa': 'FGH789',
-        'Marca': 'Foton',
-        'Propietario': 'Milla Siete SAS',
-        'Capacidad_m3': 35,
-        'Modelo': '2024',
-        'Color': 'Blanco',
-        'Tipo': 'Sencillo'
-      }
-    ] : [
-      {
-        'Nombre': 'Juan Perez',
-        'Tipo_ID': 'CC',
-        'Numero_ID': '12345678',
-        'Telefono': '3001234567',
-        'Categoria_Licencia': 'C2',
-        'Vencimiento_Licencia': '2028-12-31'
-      }
-    ];
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Plantilla');
-    XLSX.writeFile(workbook, `Plantilla_${isVehicles ? 'Vehiculos' : 'Conductores'}.xlsx`);
-  };
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        if (data.length === 0) {
-          toast.error("El archivo está vacío");
-          return;
-        }
-
-        setIsProcessingAI(true);
+  const handleImport = async (data: any[]) => {
+    try {
         const isVehicles = viewTab === 'vehicles';
+        const { api } = await import('../services/api');
         
         if (isVehicles) {
           const mapped = data.map((row: any) => ({
-            plate: row.Placa || row.placa,
-            brand: row.Marca || row.marca,
-            owner: row.Propietario || row.propietario,
-            capacityM3: row.Capacidad_m3 || row.capacidad_m3 || row.Capacidad,
-            modelYear: row.Modelo || row.modelo || row.Anio,
-            color: row.Color || row.color,
-            vehicleTypeId: row.Tipo || row.tipo,
+            plate: row.plate || row.Placa || row.placa,
+            brand: row.brand || row.Marca || row.marca,
+            owner: row.owner || row.Propietario || row.propietario,
+            capacityM3: row.capacityM3 || row.Capacidad_m3 || row.capacidad_m3 || row.Capacidad,
+            modelYear: row.modelYear || row.Modelo || row.modelo || row.Anio,
+            color: row.color || row.Color || row.color,
+            vehicleTypeId: row.vehicleTypeId || row.Tipo || row.tipo,
             statusId: 'EST-01',
             clientId: user.clientId || 'CLI-01'
           }));
-          
-          const { api } = await import('../services/api');
           const res = await api.bulkSaveVehicles(mapped);
-          if (res.success) toast.success(`Se cargaron ${mapped.length} vehículos`);
-          else throw new Error(res.error);
+          if (!res.success) throw new Error(res.error);
         } else {
           const mapped = data.map((row: any) => ({
-            name: row.Nombre || row.nombre,
-            documentType: row.Tipo_ID || row.tipo_id || 'CC',
-            documentNumber: row.Numero_ID || row.numero_id,
-            phone: row.Telefono || row.telefono,
-            licenseCategory: row.Categoria_Licencia || row.categoria_licencia,
-            licenseExpiry: row.Vencimiento_Licencia || row.vencimiento_licencia,
+            name: row.name || row.Nombre || row.nombre,
+            documentType: row.documentType || row.Tipo_ID || row.tipo_id || 'CC',
+            documentNumber: row.documentNumber || row.Numero_ID || row.numero_id,
+            phone: row.phone || row.Telefono || row.telefono,
+            licenseCategory: row.licenseCategory || row.Categoria_Licencia || row.categoria_license,
+            licenseExpiry: row.licenseExpiry || row.Vencimiento_Licencia || row.vencimiento_licencia,
             statusId: 'EST-01',
             clientId: user.clientId || 'CLI-01'
           }));
-          const { api } = await import('../services/api');
           const res = await api.bulkSaveDrivers(mapped);
-          if (res.success) toast.success(`Se cargaron ${mapped.length} conductores`);
-          else throw new Error(res.error);
+          if (!res.success) throw new Error(res.error);
         }
         
-        window.location.reload(); 
-      } catch (err: any) {
-        toast.error("Error al procesar el archivo: " + err.message);
-      } finally {
-        setIsProcessingAI(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsBinaryString(file);
+        toast.success("Importación completada");
+        window.location.reload();
+    } catch (err: any) {
+        toast.error("Error al importar: " + err.message);
+        throw err;
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -525,21 +473,14 @@ const FleetManager: React.FC<FleetManagerProps> = ({
           </button>
 
           {canCreate && (
-            <div className="flex gap-2">
-              <input type="file" ref={fileInputRef} onChange={handleBulkUpload} className="hidden" accept=".xlsx,.xls" />
-              <div className="relative group">
-                 <button onClick={() => fileInputRef.current?.click()} className="p-3 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-900 hover:text-white transition-all shadow-md group border border-slate-200" title="Carga Masiva (Excel)">
-                    <Icons.Shield className="w-4 h-4 rotate-180" />
-                 </button>
-                 <button 
-                   onClick={handleDownloadTemplate}
-                   className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-lg border-2 border-white hover:scale-110 transition-all"
-                   title="Descargar Plantilla"
-                 >
-                   <Icons.Check className="w-2.5 h-2.5" />
-                 </button>
-              </div>
-            </div>
+            <button 
+              onClick={() => setIsImportOpen(true)}
+              title="Importación Masiva (Excel)"
+              className="p-3 bg-white text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-md group border-2 border-emerald-100 flex items-center justify-center relative"
+            >
+              <Icons.Excel className="w-5 h-5" />
+              <div className="absolute bottom-full mb-3 hidden group-hover:block bg-slate-900 text-white text-[8px] font-black uppercase py-2 px-3 rounded-xl whitespace-nowrap shadow-2xl z-50">IMPORTACIÓN MASIVA</div>
+            </button>
           )}
 
           {canCreate && (
@@ -1083,6 +1024,15 @@ const FleetManager: React.FC<FleetManagerProps> = ({
             </div>
           </div>
         </div>
+      )}
+      {isImportOpen && (
+        <DataImportDialog 
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          activeMaster={viewTab === 'vehicles' ? 'masterVehiculos' : 'masterConductores' as any}
+          existingData={viewTab === 'vehicles' ? vehicles : drivers}
+          onImport={handleImport}
+        />
       )}
     </div>
   );
