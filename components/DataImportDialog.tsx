@@ -172,49 +172,72 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
 
   const validateData = async (data: any[]) => {
     const errors: string[] = [];
-    const internalSet = new Set(); // Para duplicados ocultos en el Excel
+    const internalSet = new Set();
     
     setIsProcessing(true);
     try {
+        // Obtener la clave única del ítem según el maestro activo
+        const getKeyValue = (item: any): string => {
+            if ((activeMaster as any) === 'masterVehiculos') {
+                // El Excel puede tener la columna en mayúsculas (PLATE) o camelCase (plate)
+                return (item.PLATE || item.plate || '').toString().trim();
+            }
+            if ((activeMaster as any) === 'masterConductores') {
+                return (item.DOCUMENT_NUMBER || item.documentNumber || item.DOCUMENTNUMBER || '').toString().trim();
+            }
+            return (item.sku || item.email || item.name || '').toString().trim();
+        };
+
+        // Claves existentes en el sistema (para contar cuántos se actualizarán)
         const systemKeys = new Set(existingData.map(item => {
-            const val = (activeMaster as any) === 'masterVehiculos' ? item.plate : 
-                       (activeMaster as any) === 'masterConductores' ? item.documentNumber : 
-                       item[keyField];
-            return val?.toString().trim().toLowerCase();
+            if ((activeMaster as any) === 'masterVehiculos') return item.plate?.toString().trim().toLowerCase();
+            if ((activeMaster as any) === 'masterConductores') return item.documentNumber?.toString().trim().toLowerCase();
+            return (item.sku || item.email || item.name || '')?.toString().trim().toLowerCase();
         }));
 
+        let updateCount = 0;
+
         data.forEach((item: any, index) => {
-            let value = item[keyField]?.toString().trim();
-            if ((activeMaster as any) === 'masterVehiculos') value = item.plate?.toString().trim();
-            if ((activeMaster as any) === 'masterConductores') value = item.documentNumber?.toString().trim();
+            const value = getKeyValue(item);
             
             if (!value) {
-                errors.push(`Fila ${index + 1}: El campo "${keyField}" o ID es obligatorio.`);
+                const label = (activeMaster as any) === 'masterVehiculos' ? 'PLATE' :
+                              (activeMaster as any) === 'masterConductores' ? 'DOCUMENT_NUMBER' : 'name/sku/email';
+                errors.push(`Fila ${index + 1}: El campo identificador (${label}) es obligatorio y está vacío.`);
             } else {
                 const valueLower = value.toLowerCase();
                 
-                // 1. Validar duplicados DENTRO del Excel
+                // Duplicado DENTRO del mismo Excel: esto SÍ bloquea
                 if (internalSet.has(valueLower)) {
-                    errors.push(`Fila ${index + 1}: El identificador "${value}" está repetido más de una vez en el archivo.`);
+                    errors.push(`Fila ${index + 1}: "${value}" está duplicado dentro del archivo Excel.`);
                 }
                 
-                // 2. Validar duplicados contra el SISTEMA
+                // Duplicado en el SISTEMA: se ACTUALIZARÁ vía UPSERT, NO es error
                 if (systemKeys.has(valueLower)) {
-                    errors.push(`Fila ${index + 1}: El identificador "${value}" ya existe en el sistema M7.`);
+                    updateCount++;
                 }
                 
                 internalSet.add(valueLower);
             }
         });
-    } catch (e) {
-        console.error("Error en validación avanzada:", e);
-        errors.push("Error inesperado durante la validación.");
+
+        // Mensaje informativo (no bloquea)
+        if (updateCount > 0) {
+            const newCount = data.length - updateCount;
+            errors.push(`ℹ️ ${newCount} registros nuevos a CREAR, ${updateCount} registros existentes a ACTUALIZAR.`);
+        }
+
+    } catch (e: any) {
+        console.error('[M7-IMPORT] Error en validación:', e);
+        errors.push(`Error durante la validación: ${e?.message || 'error desconocido'}`);
     } finally {
         setIsProcessing(false);
     }
     
+    // Solo bloquear si hay errores reales (no los mensajes informativos ℹ️)
+    const realErrors = errors.filter(e => !e.startsWith('ℹ️'));
     setValidationErrors(errors);
-    return errors.length === 0;
+    return realErrors.length === 0;
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
