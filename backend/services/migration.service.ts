@@ -184,24 +184,75 @@ export const restoreSystem = async () => {
 
     await client.query(`
       INSERT INTO modules (id, name, icon_class) VALUES
-      ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings'), ('MOD-04', 'SEGURIDAD & ACCESO', 'Shield'), ('MOD-06', 'ADMINISTRACIÓN', 'Database')
-      ON CONFLICT (id) DO NOTHING;
+      ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings'),
+      ('MOD-02', 'LOGÍSTICA & DISTRIBUCIÓN', 'Truck'),
+      ('MOD-03', 'INVENTARIOS', 'Package'),
+      ('MOD-04', 'SEGURIDAD & ACCESO', 'Shield'),
+      ('MOD-05', 'M7 INTELLIGENCE', 'Sparkles'),
+      ('MOD-06', 'ADMINISTRACIÓN', 'Database')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class;
     `);
 
     await client.query(`
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id) VALUES 
+      -- Maestros (MOD-01)
       ('PAG-01', 'ARTICULOS', 'inventory/items', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-03', 'CLIENTES', 'masterClientes', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-04', 'ESTADOS GLOBALES', 'masterEstados', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-05', 'FIRMAS DIGITALES', 'firmas', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-06', 'MARCAS', 'masterMarcas', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-07', 'NOTIFICACIONES', 'masterNotificaciones', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-08', 'TIPOS DE DOCUMENTO', 'masterTipoDocumento', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-09', 'TIPOS DE VEHÍCULO', 'masterTiposVehiculo', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-10', 'UNIDADES DE MEDIDA', 'masterUnidadMedida', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-11', 'APROBAR FIRMA', 'aprobar-firma', 'MOD-01', 'MOD-01', 'EST-01'),
+      
+      -- Logística (MOD-02)
+      ('PAG-12', 'ASIGNACIÓN FLOTA', 'vinculo', 'MOD-02', 'MOD-02', 'EST-01'),
+      ('PAG-13', 'DESPACHO LOGÍSTICO', 'despacho', 'MOD-02', 'MOD-02', 'EST-01'),
+      ('PAG-14', 'GESTIÓN DE FLOTAS', 'flotas', 'MOD-02', 'MOD-02', 'EST-01'),
+      ('PAG-15', 'PLANIFICADOR DE RUTAS', 'rutas', 'MOD-02', 'MOD-02', 'EST-01'),
+
+      -- Inventarios (MOD-03)
+      ('PAG-16', 'GESTIÓN DE DOCUMENTOS', 'documentos', 'MOD-03', 'MOD-03', 'EST-01'),
+      ('PAG-17', 'RECIBIDO DE MATERIAL', 'recibido', 'MOD-03', 'MOD-03', 'EST-01'),
+
+      -- Seguridad (MOD-04)
+      ('PAG-18', 'CONEXIÓN WHATSAPP', 'whatsapp-status', 'MOD-04', 'MOD-04', 'EST-01'),
+      ('PAG-19', 'MÓDULOS SISTEMA', 'modules', 'MOD-04', 'MOD-04', 'EST-01'),
+      ('PAG-20', 'PÁGINAS WEB', 'pages', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-21', 'USUARIOS', 'users', 'MOD-04', 'MOD-04', 'EST-01'),
-      ('PAG-02', 'ROLES', 'roles', 'MOD-04', 'MOD-04', 'EST-01'),
+      ('PAG-22', 'ROLES', 'roles', 'MOD-04', 'MOD-04', 'EST-01'),
+      ('PAG-28', 'ROLES DE SISTEMA', 'roles', 'MOD-04', 'MOD-04', 'EST-01'),
+      ('PAG-23', 'PERMISOS POR ROL', 'masterPermisosRol', 'MOD-04', 'MOD-04', 'EST-01'),
+      ('PAG-24', 'PERMISOS POR USUARIO', 'masterPermisosUsuario', 'MOD-04', 'MOD-04', 'EST-01'),
+
+      -- Inteligencia (MOD-05)
+      ('PAG-25', 'DASHBOARD EJECUTIVO', 'executive-dashboard', 'MOD-05', 'MOD-05', 'EST-01'),
+      ('PAG-26', 'GAMIFICACIÓN (IA)', 'gamification', 'MOD-05', 'MOD-05', 'EST-01'),
+      ('PAG-27', 'M7 CHATBOT', 'chatbot', 'MOD-05', 'MOD-05', 'EST-01'),
+
+      -- Administración (MOD-06)
       ('PAG-SQL', 'Gestor DB', 'admin-db', 'MOD-06', 'MOD-06', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route, module_id = EXCLUDED.module_id, parent_id = EXCLUDED.parent_id;
+
+      ON CONFLICT (id) DO UPDATE SET 
+        name = EXCLUDED.name, 
+        route = EXCLUDED.route, 
+        module_id = EXCLUDED.module_id, 
+        parent_id = EXCLUDED.parent_id;
     `);
 
     const adminHash = await bcrypt.hash('admin123', 10);
     await client.query(`
       INSERT INTO users (id, email, password, name, role_id, status_id, permissions)
-      VALUES ('USR-01', 'admin@millasiete.com', $1, 'SUPER ADMINISTRADOR M7', 'ROL-01', 'EST-01', '[{"module": "admin-db", "actions": ["view", "edit", "delete", "create"]}]'::jsonb)
-      ON CONFLICT (id) DO UPDATE SET password = $1, permissions = EXCLUDED.permissions;
+      VALUES 
+      ('USR-01', 'admin@millasiete.com', $1, 'SUPER ADMINISTRADOR M7', 'ROL-01', 'EST-01', '[{"module": "all", "actions": ["view", "edit", "delete", "create"]}]'::jsonb),
+      ('USR-DEMO', 'oscar@millasiete.com', $1, 'OSCAR SANTAMARIA', 'ROL-01', 'EST-01', '[{"module": "all", "actions": ["view", "edit", "delete", "create"]}]'::jsonb)
+      ON CONFLICT (id) DO UPDATE SET 
+        password = $1, 
+        permissions = EXCLUDED.permissions,
+        name = EXCLUDED.name,
+        role_id = EXCLUDED.role_id;
     `, [adminHash]);
 
     await client.query('COMMIT');

@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { getMasterCategoryFromRoute } from './constants/routes';
 import { User, PageModule, MasterCategory, MasterRecord } from './types';
 import Login from './components/Login';
 import Layout from './components/Layout';
@@ -627,6 +627,18 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     const availableVehiclesCount = vehicles.filter(v => v.status === 'Disponible' || v.status === 'Available').length;
+
+    // DETECCIÓN DINÁMICA DE MÓDULOS MAESTROS (Nuclear Sync)
+    const masterCat = getMasterCategoryFromRoute(activeTab, activePageId);
+    if (masterCat) {
+      return (
+        <MasterModule
+          activeMaster={masterCat}
+          user={user!}
+          onAudit={async () => {}}
+        />
+      );
+    }
 
     switch (activeTab) {
       case 'dashboard':
