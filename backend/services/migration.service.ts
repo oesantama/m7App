@@ -182,15 +182,28 @@ export const restoreSystem = async () => {
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
     `);
 
+    // ── LIMPIAR Y RECONSTRUIR MÓDULOS (Pizarra Limpia = Réplica Exacta) ──────
     await client.query(`
-      INSERT INTO modules (id, name, icon_class) VALUES
-      ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings'),
-      ('MOD-02', 'GESTIÓN TRANSPORTE', 'Truck'),
-      ('MOD-03', 'GESTIÓN AJOVER', 'Package'),
-      ('MOD-04', 'SEGURIDAD & ACCESO', 'Shield'),
-      ('MOD-05', 'M7 INTELLIGENCE', 'Sparkles'),
-      ('MOD-06', 'ADMINISTRACIÓN', 'Database')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class;
+      DELETE FROM pages WHERE id NOT IN (
+        'PAG-01','PAG-03','PAG-04','PAG-05','PAG-06','PAG-07','PAG-08','PAG-09','PAG-10','PAG-11',
+        'PAG-12','PAG-13','PAG-14','PAG-15','PAG-16','PAG-17',
+        'PAG-18','PAG-19','PAG-20','PAG-21','PAG-22','PAG-23','PAG-24',
+        'PAG-25','PAG-26','PAG-27','PAG-SQL'
+      )
+    `);
+    await client.query(`
+      DELETE FROM modules WHERE id NOT IN ('MOD-01','MOD-02','MOD-03','MOD-04','MOD-05','MOD-06')
+    `);
+
+    await client.query(`
+      INSERT INTO modules (id, name, icon_class, status_id) VALUES
+      ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings', 'EST-01'),
+      ('MOD-02', 'GESTIÓN TRANSPORTE', 'Truck', 'EST-01'),
+      ('MOD-03', 'GESTIÓN AJOVER', 'Package', 'EST-01'),
+      ('MOD-04', 'SEGURIDAD & ACCESO', 'Shield', 'EST-01'),
+      ('MOD-05', 'M7 INTELLIGENCE', 'Sparkles', 'EST-01'),
+      ('MOD-06', 'ADMINISTRACIÓN', 'Database', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class, status_id = EXCLUDED.status_id;
     `);
 
     await client.query(`
@@ -223,7 +236,6 @@ export const restoreSystem = async () => {
       ('PAG-20', 'PÁGINAS WEB', 'pages', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-21', 'USUARIOS', 'users', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-22', 'ROLES', 'roles', 'MOD-04', 'MOD-04', 'EST-01'),
-      ('PAG-28', 'ROLES DE SISTEMA', 'roles', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-23', 'PERMISOS POR ROL', 'masterPermisosRol', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-24', 'PERMISOS POR USUARIO', 'masterPermisosUsuario', 'MOD-04', 'MOD-04', 'EST-01'),
 
@@ -239,7 +251,8 @@ export const restoreSystem = async () => {
         name = EXCLUDED.name, 
         route = EXCLUDED.route, 
         module_id = EXCLUDED.module_id, 
-        parent_id = EXCLUDED.parent_id;
+        parent_id = EXCLUDED.parent_id,
+        status_id = EXCLUDED.status_id;
     `);
 
     const adminHash = await bcrypt.hash('admin123', 10);
