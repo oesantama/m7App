@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
+      css: {
+        postcss: './postcss.config.js',
+      },
       plugins: [
         react(),
         VitePWA({

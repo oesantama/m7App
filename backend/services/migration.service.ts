@@ -138,6 +138,37 @@ export const restoreSystem = async () => {
     // SEMILLAS DE DATOS MAESTROS (Garantizar paridad Local-Cloud)
     // -----------------------------------------------------------------
     
+    // 0. Datos desde Localhost (Vehículos, Conductores, Rutas)
+    console.log('[M7-SEED] Cargando datos maestros desde localhost...');
+    
+    // Vehículos Locales
+    await client.query(`
+      INSERT INTO vehicles (id, plate, brand, owner, capacity_m3, client_id, status_id, model_year, color, vehicle_type) VALUES
+      ('VEH-001', 'VEJ 509', 'MAR-022', NULL, 14, 'CLI-02', 'EST-01', '2024', 'gri', 'TV-01'),
+      ('VEH-002', 'SXI 118', 'MAR-022', NULL, 23, 'CLI-02', 'EST-01', '2024', 'blanco', 'TVH-001'),
+      ('VEH-003', 'JYO 631', 'MAR-022', NULL, 19, 'CLI-04', 'EST-01', '2026', 'blanco', 'TV-02'),
+      ('VEH-004', 'WDY 031', 'MAR-022', NULL, 22, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02'),
+      ('VEH-005', 'NNN 500', 'MAR-022', NULL, 19, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02')
+      ON CONFLICT (id) DO UPDATE SET plate = EXCLUDED.plate, status_id = EXCLUDED.status_id;
+    `);
+
+    // Conductores Locales
+    await client.query(`
+      INSERT INTO drivers (id, name, document_type, document_number, phone, client_id, status_id, license_category) VALUES
+      ('DRV-001', 'WILLIAM GIL', 'DOC-01', '71578229', '2343234', 'CLI-02', 'EST-01', 'C1'),
+      ('DRV-002', 'JAMES SALGADO', 'DOC-01', '94252356', '53324', 'CLI-02', 'EST-01', 'C2'),
+      ('DRV-003', 'JAIRO ALVAREZ', 'DOC-01', '1128450159', '323333333', 'CLI-04', 'EST-01', 'C2')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, status_id = EXCLUDED.status_id;
+    `);
+
+    // Rutas y Asignaciones Críticas
+    await client.query(`
+      INSERT INTO routes (id, name, vehicle_id, driver_id, client_id, status_id) VALUES
+      (1, 'RUTA SUR 01', 'VEH-001', 'DRV-001', 'CLI-02', 'EST-01'),
+      (2, 'RUTA NORTE 02', 'VEH-002', 'DRV-002', 'CLI-02', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+    `);
+    
     // 1. Estados Globales
     console.log('[M7-SEED] Registrando Estados...');
     await client.query(`
