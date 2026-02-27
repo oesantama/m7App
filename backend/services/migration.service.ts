@@ -185,8 +185,8 @@ export const restoreSystem = async () => {
     await client.query(`
       INSERT INTO modules (id, name, icon_class) VALUES
       ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings'),
-      ('MOD-02', 'LOGÍSTICA & DISTRIBUCIÓN', 'Truck'),
-      ('MOD-03', 'INVENTARIOS', 'Package'),
+      ('MOD-02', 'GESTIÓN TRANSPORTE', 'Truck'),
+      ('MOD-03', 'GESTIÓN AJOVER', 'Package'),
       ('MOD-04', 'SEGURIDAD & ACCESO', 'Shield'),
       ('MOD-05', 'M7 INTELLIGENCE', 'Sparkles'),
       ('MOD-06', 'ADMINISTRACIÓN', 'Database')
@@ -243,15 +243,17 @@ export const restoreSystem = async () => {
     `);
 
     const adminHash = await bcrypt.hash('admin123', 10);
+    // Limpiar usuarios duplicados del servidor (réplica exacta local)
+    await client.query(`DELETE FROM users WHERE id IN ('USR-DEMO', 'USR-02', 'USR-03') OR (email = 'oscar@millasiete.com' AND id != 'USR-01')`);
     await client.query(`
       INSERT INTO users (id, email, password, name, role_id, status_id, permissions)
       VALUES 
-      ('USR-01', 'admin@millasiete.com', $1, 'SUPER ADMINISTRADOR M7', 'ROL-01', 'EST-01', '[{"module": "all", "actions": ["view", "edit", "delete", "create"]}]'::jsonb),
-      ('USR-DEMO', 'oscar@millasiete.com', $1, 'OSCAR SANTAMARIA', 'ROL-01', 'EST-01', '[{"module": "all", "actions": ["view", "edit", "delete", "create"]}]'::jsonb)
+      ('USR-01', 'admin@millasiete.com', $1, 'OSCAR SANTAMARIA', 'ROL-01', 'EST-01', '[{"module": "all", "actions": ["view", "edit", "delete", "create"]}]'::jsonb)
       ON CONFLICT (id) DO UPDATE SET 
         password = $1, 
         permissions = EXCLUDED.permissions,
         name = EXCLUDED.name,
+        email = EXCLUDED.email,
         role_id = EXCLUDED.role_id;
     `, [adminHash]);
 
