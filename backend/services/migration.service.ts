@@ -61,22 +61,40 @@ const healSchema = async (client: any) => {
     } catch (e) {}
   }
 
+  // FASE 2: CURACIÓN ATÓMICA POR TABLA (BATCHING)
   for (const [table, columns] of Object.entries(UNIVERSAL_SCHEMA)) {
-    const idType = serialTables.includes(table) ? 'SERIAL' : 'TEXT';
-    await client.query(`CREATE TABLE IF NOT EXISTS ${table} (id ${idType} PRIMARY KEY)`);
-    for (const col of columns) {
-      try {
-        let type = 'TEXT';
-        if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at') type = 'TIMESTAMP WITH TIME ZONE';
-        if (col === 'permissions' || col.endsWith('_ids') || col.includes('items') || col === 'scanned_items' || col === 'helper_ids' || col === 'recent_assignments' || col === 'record_data') type = 'JSONB';
-        if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'accuracy' || col === 'speed' || col === 'heading') type = 'NUMERIC DEFAULT 0';
-        if (col === 'client_ids') type = 'TEXT[]';
-        if (col === 'permissions' || col === 'record_data') type = 'JSONB';
-        if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved') || col === 'aceptapolitica' || col === 'aprobada' || col === 'signed') type = 'BOOLEAN DEFAULT FALSE';
-        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} ${type}`);
-      } catch (colErr: any) {
-        console.error(`[M7-DB-HEAL] Error en tabla ${table} columna ${col}:`, colErr.message);
+    try {
+      const idType = serialTables.includes(table) ? 'SERIAL' : 'TEXT';
+      await client.query(`CREATE TABLE IF NOT EXISTS ${table} (id ${idType} PRIMARY KEY)`);
+
+      // Consultar columnas existentes una sola vez
+      const colCheck = await client.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = $1
+      `, [table]);
+      const existingCols = new Set(colCheck.rows.map((r: any) => r.column_name));
+
+      const alterStatements: string[] = [];
+      for (const col of columns) {
+        if (!existingCols.has(col)) {
+          let type = 'TEXT';
+          if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at') type = 'TIMESTAMP WITH TIME ZONE';
+          if (col === 'permissions' || col.endsWith('_ids') || col.includes('items') || col === 'scanned_items' || col === 'helper_ids' || col === 'recent_assignments' || col === 'record_data') type = 'JSONB';
+          if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'accuracy' || col === 'speed' || col === 'heading') type = 'NUMERIC DEFAULT 0';
+          if (col === 'client_ids') type = 'TEXT[]';
+          if (col === 'permissions' || col === 'record_data') type = 'JSONB';
+          if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved') || col === 'aceptapolitica' || col === 'aprobada' || col === 'signed') type = 'BOOLEAN DEFAULT FALSE';
+          
+          alterStatements.push(`ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+        }
       }
+
+      if (alterStatements.length > 0) {
+        console.log(`[M7-DB-HEAL] Aplicando ${alterStatements.length} cambios a ${table}...`);
+        await client.query(`ALTER TABLE ${table} ${alterStatements.join(', ')}`);
+      }
+    } catch (err: any) {
+      console.error(`[M7-DB-HEAL] Error crítico en tabla ${table}:`, err.message);
     }
   }
 
@@ -121,10 +139,14 @@ const healSchema = async (client: any) => {
 };
 
 export const restoreSystem = async () => {
+  const start = Date.now();
   console.log('[M7-SYSTEM] Checking Consistency... (Nuclear Mode)');
   const client = await pool.connect();
   try {
     await healSchema(client);
+    const healEnd = Date.now();
+    console.log(`[M7-DB-HEAL] Curación de esquema completada en ${healEnd - start}ms`);
+
     await client.query('BEGIN');
     
     // SEMILLAS DE DATOS LOCALHOST (Resumen de paridad)
@@ -183,7 +205,8 @@ export const restoreSystem = async () => {
     `, [adminHash]);
 
     await client.query('COMMIT');
-    return { success: true, message: 'Operación de Sincronización Nuclear Exitosa.' };
+    const total = Date.now() - start;
+    return { success: true, message: `Operación de Sincronización Nuclear Exitosa en ${total}ms.` };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

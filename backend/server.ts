@@ -80,9 +80,10 @@ app.listen(PORT, () => {
       return import('./services/migration.service.js');
     })
     .then(async (m) => {
+      const dbStart = Date.now();
       console.log('[ORBIT-BOOT] Ejecutando Restauración Nuclear...');
       const result = await m.restoreSystem();
-      console.log('[ORBIT-BOOT] Sistema configurado:', result.message);
+      console.log(`[ORBIT-BOOT] Sistema configurado en ${Date.now() - dbStart}ms:`, result.message);
     })
     .catch(err => {
       console.error('[ORBIT-BOOT] ERROR CRÍTICO EN ARRANQUE:', err.message);
