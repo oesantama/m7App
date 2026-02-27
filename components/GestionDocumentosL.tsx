@@ -328,7 +328,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
         const iFactura = findIdx(['remision/transferencia', 'factura', 'remision', 'documento', 'invoice']);
         const iCiudad = findIdx(['destino', 'ciudad', 'city']);
-        const iDir = findIdx(['dirección 1', 'dirección', 'dirección1', 'direccion 1', 'direccion', 'direccion1', 'dir 1', 'dir1', 'address', 'f_dirección', 'f_direccion', 'direcciÃ³n 1', 'direcciÃ³n']);
+        const iDir = findIdx(['dirección 1', 'dirección', 'dirección1', 'direccion 1', 'direccion', 'direccion1', 'dir 1', 'dir1', 'address', 'f_dirección', 'f_direccion', 'dirección 1', 'dirección']);
         const iPed = findIdx(['nÂº ped', 'pedido', 'order']);
         const iPeso = findIdx(['peso', 'weight', 'kgs', 'kilogramos']);
         
@@ -843,8 +843,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                  <th className="px-4 py-3">Vol. Total</th>
                                  <th className="px-4 py-3 text-center">Peso</th>
                                  <th className="px-4 py-3">Ciudad</th>
-                                 <th className="px-4 py-3">DirecciÃ³n</th>
-                                 <th className="px-4 py-3 text-center">ValidaciÃ³n</th>
+                                 <th className="px-4 py-3">}Dirección</th>
+                                 <th className="px-4 py-3 text-center">Validación</th>
                                </tr>
                              </thead>
                              <tbody className="divide-y divide-slate-100">
