@@ -855,7 +855,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         const currentCount = scannedItems[sku] || 0;
         
         // Detectar cantidad esperada con fallback robusto
-        const expected = Number(item.expectedQty ?? item.qty ?? item.quantity ?? 0);
+        const expected = Number(item.qty || item.expectedQty || item.quantity || 0);
 
         if (currentCount >= expected) {
             toast.error(`BLOQUEO: Ya se cumplió la cantidad máxima para ${item.articleName || sku} (${currentCount}/${expected})`, {
