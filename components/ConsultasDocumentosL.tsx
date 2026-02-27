@@ -6,6 +6,8 @@ import { api } from '../services/api';
 import { toast } from 'sonner';
 import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
+import TableControls from './shared/TableControls';
+import { formatCurrency, formatDate } from '../utils/formatting';
 
 interface ConsultasDocumentosLProps {
   documents: DocumentL[];
@@ -180,42 +182,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
   };
 
-  const TableControls = ({
-    searchValue,
-    onSearchChange,
-    pageSize,
-    onPageSizeChange,
-    placeholder = "BUSCAR..."
-  }: any) => (
-    <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50 p-4 rounded-3xl border border-slate-100 shadow-sm transition-all hover:bg-slate-50">
-      <div className="bg-white h-10 px-4 rounded-xl flex items-center gap-3 w-full md:w-80 shadow-inner border border-slate-100 transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
-        <Icons.Search className="w-3 h-3 text-slate-300" />
-        <input
-          type="text"
-          placeholder={placeholder}
-          value={searchValue}
-          onChange={(e) => {
-            onSearchChange(e.target.value);
-          }}
-          className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full text-slate-600 placeholder:text-slate-300"
-        />
-      </div>
-      <div className="flex items-center gap-4 shrink-0 overflow-x-auto custom-scrollbar pb-1 md:pb-0">
-        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Mostrar:</span>
-        <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-100 shadow-sm">
-          {[5, 10, 20, 50, 'all'].map((size) => (
-            <button
-              key={size}
-              onClick={() => onPageSizeChange(size)}
-              className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all whitespace-nowrap ${pageSize === size ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-900'}`}
-            >
-              {size === 'all' ? 'Todos' : size}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+
 
   const exportToExcel = (data: any[], fileName: string) => {
     const ws = XLSX.utils.json_to_sheet(data);
@@ -302,9 +269,9 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block";
 
   return (
-    <div className="space-y-8 animate-in fade-in">
-      <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-slate-100 space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-6 animate-in fade-in p-4 md:p-6">
+      <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1">
             <label className={labelClass}>Placa</label>
             <input type="text" placeholder="PLACA..." value={filters.plate} onChange={e => setFilters({ ...filters, plate: e.target.value })} className={inputClass} />
@@ -325,41 +292,41 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
             </select>
           </div>
         </div>
-        <div className="flex justify-end gap-4">
-          <button onClick={() => exportToExcel(filteredDocs, "M7_Historial")} className="px-10 py-4 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl flex items-center gap-3">
-            <Icons.Excel className="w-5 h-5" /> Exportar Excel
+        <div className="flex justify-end gap-3">
+          <button onClick={() => exportToExcel(filteredDocs, "M7_Historial")} className="px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md flex items-center gap-2">
+            <Icons.Excel className="w-4 h-4" /> Exportar
           </button>
-          <button onClick={clearFilters} className="px-10 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all">Limpiar Filtros</button>
+          <button onClick={clearFilters} className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md">Limpiar</button>
         </div>
       </div>
 
-      <div className="bg-white rounded-[3.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col min-h-[500px]">
+      <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden flex flex-col min-h-[400px]">
         <div className="flex-1 overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px]">
               <tr>
-                <th className="p-8">Documento / Placa</th>
-                <th className="p-8">UN Orig</th>
-                <th className="p-8">F. Envío</th>
-                <th className="p-8 text-center">Estado</th>
-                <th className="p-8 text-right">Acción</th>
+                <th className="px-6 py-5">Documento / Placa</th>
+                <th className="px-6 py-5">UN Orig</th>
+                <th className="px-6 py-5">F. Envío</th>
+                <th className="px-6 py-5 text-center">Estado</th>
+                <th className="px-6 py-5 text-right">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedDocs.map(doc => (
                 <tr key={doc.id} className="hover:bg-slate-50 transition-all">
-                  <td className="p-8">
-                    <p className="font-black text-slate-900 text-sm uppercase">{doc.externalDocId}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">PLACA: {doc.vehicleData}</p>
+                  <td className="px-6 py-5">
+                    <p className="font-black text-slate-900 text-xs uppercase">{doc.externalDocId}</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">PLACA: {doc.vehicleData}</p>
                   </td>
-                  <td className="p-8 font-black text-slate-600 text-[11px] uppercase">{doc.planType || 'Plan Normal'}</td>
-                  <td className="p-8 font-black text-slate-400 text-[10px] uppercase">{doc.deliveryDate}</td>
-                  <td className="p-8 text-center">
-                    <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase border shadow-inner ${doc.status === DocStatus.INVENTORED ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>{doc.status}</span>
+                  <td className="px-6 py-5 font-bold text-slate-600 text-[10px] uppercase">{doc.planType || 'Plan Normal'}</td>
+                  <td className="px-6 py-5 font-bold text-slate-400 text-[9px] uppercase">{doc.deliveryDate}</td>
+                  <td className="px-6 py-5 text-center">
+                    <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border shadow-inner ${doc.status === DocStatus.INVENTORED ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>{doc.status}</span>
                   </td>
-                  <td className="p-8 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => setSelectedDoc(doc)} className="p-4 bg-slate-100 text-slate-400 rounded-2xl hover:bg-slate-900 hover:text-white transition-all"><Icons.Eye /></button>
+                  <td className="px-6 py-5 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button onClick={() => setSelectedDoc(doc)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all"><Icons.Eye className="w-4 h-4" /></button>
                       <button 
                         onClick={() => { 
                           if ((doc as any).paymentsCount > 0) {
@@ -370,16 +337,15 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                             setShowPaymentModal(true); 
                           }
                         }} 
-                        className={`p-4 rounded-2xl transition-all ${(doc as any).paymentsCount > 0 ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30 shadow-lg' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
-                        title={(doc as any).paymentsCount > 0 ? `Pagos: ${(doc as any).paymentsCount} Cargados (Clic para ver)` : 'Cargar Pagos L'}
+                        className={`p-3 rounded-xl transition-all ${(doc as any).paymentsCount > 0 ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
+                        title={(doc as any).paymentsCount > 0 ? `Pagos: ${(doc as any).paymentsCount} Cargados` : 'Cargar Pagos'}
                       >
                         {(doc as any).paymentsCount > 0 ? <Icons.Check className="w-4 h-4" /> : <Icons.Excel className="w-4 h-4" />}
                       </button>
                       {isAuthorizedToDelete && (
                         <button 
                           onClick={() => handleDeleteDocument(doc.id)} 
-                          className="p-4 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all"
-                          title="Eliminar Documento"
+                          className="p-3 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
                         >
                           <Icons.Trash className="w-4 h-4" />
                         </button>
@@ -394,14 +360,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       </div>
 
       {selectedDoc && (
-        <div className="fixed inset-0 z-[400] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 md:p-10 animate-in fade-in zoom-in-95">
-          <div className="bg-white w-[90vw] h-[90vh] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col border border-white/5">
-            <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-900 shadow-xl"><Icons.Audit /></div>
+        <div className="fixed inset-0 z-[400] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white w-[95vw] h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-200">
+            <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-slate-900 shadow-lg"><Icons.Audit className="w-5 h-5" /></div>
                 <div>
-                  <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Detalle Auditoría M7: {selectedDoc.externalDocId}</h3>
-                  <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">Trazabilidad Total de Inventario</p>
+                  <h3 className="text-sm font-black uppercase tracking-tight">Detalle Auditoría: {selectedDoc.externalDocId}</h3>
+                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Milla7 Intelligence System</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -424,34 +390,34 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
               </div>
             </div>
 
-            <div className="p-10 md:p-14 overflow-y-auto space-y-10 custom-scrollbar bg-slate-50/20 flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                <div className="bg-white p-5 rounded-[1.8rem] border border-emerald-100 shadow-sm bg-emerald-50/10">
-                  <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Estado Documento</p>
-                  <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase border shadow-inner ${selectedDoc.status === DocStatus.INVENTORED ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                    {selectedDoc.status === 'En Conteo' ? 'Pendiente' : selectedDoc.status}
+            <div className="p-6 md:p-8 overflow-y-auto space-y-6 custom-scrollbar bg-slate-50/20 flex-1">
+              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+                <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Estado</p>
+                  <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase border ${selectedDoc.status === DocStatus.INVENTORED ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                    {selectedDoc.status}
                   </span>
                 </div>
-                <div className="bg-white p-5 rounded-[1.8rem] border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Cod. Plan</p>
-                  <p className="font-black text-slate-900 text-xs uppercase">{selectedDoc.codplan || 'S/I'}</p>
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Cod. Plan</p>
+                  <p className="font-bold text-slate-900 text-[11px] uppercase">{selectedDoc.codplan || 'S/I'}</p>
                 </div>
-                <div className="bg-white p-5 rounded-[1.8rem] border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-black text-slate-400 uppercase mb-1">UN ORIG (TIPO)</p>
-                  <p className="font-black text-emerald-600 text-xs uppercase">{selectedDoc.planType || 'Plan Normal'}</p>
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Tipo</p>
+                  <p className="font-bold text-emerald-600 text-[11px] uppercase">{selectedDoc.planType || 'Normal'}</p>
                 </div>
-                <div className="bg-white p-5 rounded-[1.8rem] border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Cargue (es-CO)</p>
-                  <p className="font-black text-slate-900 text-xs uppercase">{selectedDoc.createdAt ? new Date(selectedDoc.createdAt).toLocaleString('es-CO') : 'S/I'}</p>
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">F. Cargue</p>
+                  <p className="font-bold text-slate-900 text-[10px] uppercase">{formatDate(selectedDoc.createdAt, true)}</p>
                 </div>
-                <div className="bg-white p-5 rounded-[1.8rem] border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Placa</p>
-                  <p className="font-black text-slate-900 text-xs uppercase">{selectedDoc.vehicleData}</p>
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Placa</p>
+                  <p className="font-bold text-slate-900 text-[11px] uppercase">{selectedDoc.vehicleData}</p>
                 </div>
-                <div className="bg-white p-5 rounded-[1.8rem] border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Auditoría (es-CO)</p>
-                  <p className="font-black text-slate-900 text-xs uppercase">
-                    {selectedDoc.inventoryDate ? new Date(selectedDoc.inventoryDate).toLocaleString('es-CO') : 'PENDIENTE'}
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">F. Auditoría</p>
+                  <p className="font-bold text-slate-900 text-[10px] uppercase">
+                    {formatDate(selectedDoc.inventoryDate, true)}
                   </p>
                 </div>
                 <div className="bg-white p-5 rounded-[1.8rem] border border-slate-100 shadow-sm">
@@ -490,7 +456,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                 </div>
               </div>
 
-              <div className="bg-white rounded-[3rem] overflow-hidden shadow-2xl border-4 border-slate-100 flex flex-col min-h-[400px]">
+               <div className="bg-white rounded-[2rem] overflow-hidden shadow-xl border border-slate-100 flex flex-col min-h-[400px]">
                 {/* BARRA DE BÚSQUEDA Y TABS */}
                 <div className="p-4 border-b border-slate-50 flex flex-col xl:flex-row justify-between items-center gap-4">
                   <div className="flex-1 w-full max-w-2xl">
@@ -499,18 +465,16 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                       onSearchChange={(val: string) => { setDetailSearch(val); setDetailPage(1); }}
                       pageSize={detailPageSize}
                       onPageSizeChange={(size: any) => { setDetailPageSize(size); setDetailPage(1); }}
-                      placeholder="BUSCAR SKU, PEDIDO O FACTURA..."
+                      placeholder="SKU, PEDIDO O FACTURA..."
+                      compact
                     />
                   </div>
 
-                  <div className="flex items-center gap-4 shrink-0">
-                    <div className="flex bg-slate-100 p-1 rounded-lg shadow-inner">
-                      <button onClick={() => { setActiveDetailTab('reception'); setDetailPage(1); }} className={`px-5 py-2 rounded-md text-[9px] font-black uppercase transition-all ${activeDetailTab === 'reception' ? 'bg-white shadow-md text-slate-900' : 'text-slate-400'}`}>Recepción</button>
-                      <button onClick={() => { setActiveDetailTab('audit'); setDetailPage(1); }} className={`px-5 py-2 rounded-md text-[9px] font-black uppercase transition-all ${activeDetailTab === 'audit' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-400'}`}>Auditoría</button>
-                      <button onClick={() => { setActiveDetailTab('payments'); setDetailPage(1); }} className={`px-5 py-2 rounded-md text-[9px] font-black uppercase transition-all ${activeDetailTab === 'payments' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Pagos</button>
-                    </div>
-                    <div className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-lg">
-                      Reg: {sortedDetailItems.length}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200">
+                      <button onClick={() => { setActiveDetailTab('reception'); setDetailPage(1); }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'reception' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-500'}`}>Recepción</button>
+                      <button onClick={() => { setActiveDetailTab('audit'); setDetailPage(1); }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'audit' ? 'bg-white shadow-md text-amber-600' : 'text-slate-500'}`}>Auditoría</button>
+                      <button onClick={() => { setActiveDetailTab('payments'); setDetailPage(1); }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'payments' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500'}`}>Pagos</button>
                     </div>
                   </div>
                 </div>
@@ -538,26 +502,24 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold">
                         {paginatedDetailItems.map((it, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors text-[9px]">
-                            <td className="p-4 font-black uppercase text-slate-800 tracking-tight">{it.articleId}</td>
-                            <td className="p-4 uppercase text-slate-500 font-bold max-w-[80px] truncate" title={(it as any).unCode}>{(it as any).unCode || '-'}</td>
-                            <td className="p-4 uppercase text-slate-500 font-bold max-w-[80px] truncate" title={(it as any).clientRef}>{(it as any).clientRef || '-'}</td>
-                            <td className="p-4 uppercase text-slate-600 max-w-[80px] truncate" title={(it as any).city}>{(it as any).city || '-'}</td>
-                            <td className="p-4 text-center text-slate-900">{it.expectedQty}</td>
-                            <td className="p-4 text-center text-blue-600 font-black bg-blue-50/30">{it.receivedQty || it.count1 || 0}</td>
-                            <td className="p-4 text-center text-slate-500 uppercase">{it.unit || 'und'}</td>
-                            <td className="p-4 text-center text-slate-500 max-w-[80px] truncate" title={(it as any).invoice || ''}>{(it as any).invoice || '-'}</td>
-                            <td className="p-4 text-center text-emerald-600 font-black">{it.orderNumber || 'S/I'}</td>
-                            <td className="p-4 text-center text-emerald-600 font-black">
-                              {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(it.peso || 0)}
-                            </td>
-                            <td className="p-4 text-center">
+                          <tr key={idx} className="hover:bg-slate-50 transition-all text-[9px] border-b border-slate-50 last:border-0">
+                            <td className="px-4 py-2 font-black uppercase text-slate-800 tracking-tight leading-tight">{it.articleId}</td>
+                            <td className="px-4 py-2 uppercase text-slate-500 font-bold max-w-[80px] truncate" title={(it as any).unCode}>{(it as any).unCode || '-'}</td>
+                            <td className="px-4 py-2 uppercase text-slate-500 font-bold max-w-[80px] truncate" title={(it as any).clientRef}>{(it as any).clientRef || '-'}</td>
+                            <td className="px-4 py-2 uppercase text-slate-600 max-w-[80px] truncate" title={(it as any).city}>{(it as any).city || '-'}</td>
+                            <td className="px-4 py-2 text-center text-slate-900 font-bold">{it.expectedQty}</td>
+                            <td className="px-4 py-2 text-center text-blue-600 font-black bg-blue-50/20">{it.receivedQty || it.count1 || 0}</td>
+                            <td className="px-4 py-2 text-center text-slate-500 uppercase font-bold">{it.unit || 'und'}</td>
+                            <td className="px-4 py-2 text-center text-slate-500 font-bold">{(it as any).invoice || '-'}</td>
+                            <td className="px-4 py-2 text-center text-emerald-600 font-black">{it.orderNumber || 'S/I'}</td>
+                            <td className="px-4 py-2 text-center text-emerald-600 font-black">{formatCurrency(it.peso)}</td>
+                            <td className="px-4 py-2 text-center">
                               <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${it.itemStatus === 'Auditado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
-                                {it.itemStatus === 'En Conteo' ? 'Pendiente' : (it.itemStatus || (it.countedQty > 0 ? 'Auditado' : 'Pendiente'))}
+                                {it.itemStatus === 'En Conteo' ? 'Pendiente' : (it.itemStatus || 'Pendiente')}
                               </span>
                             </td>
-                            <td className="p-4 uppercase italic text-slate-400 max-w-[150px] truncate" title={'driverNote' in it ? (it as any).driverNote : (it as any).observation}>{'driverNote' in it ? (it as any).driverNote : (it as any).observation || '-'}</td>
-                            <td className="p-4 uppercase text-slate-600 max-w-[150px] truncate" title={it.inventoryNote}>{it.inventoryNote || '-'}</td>
+                            <td className="px-4 py-2 uppercase italic text-slate-400 max-w-[150px] truncate" title={'driverNote' in it ? (it as any).driverNote : (it as any).observation}>{'driverNote' in it ? (it as any).driverNote : (it as any).observation || '-'}</td>
+                            <td className="px-4 py-2 uppercase text-slate-600 max-w-[150px] truncate italic" title={it.inventoryNote}>{it.inventoryNote || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -578,14 +540,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-bold">
                         {paginatedDetailItems.map((it: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors text-[9px]">
-                            <td className="p-4 font-black uppercase text-slate-800 tracking-tight">{it.article_id || it.articleId || it.sku}</td>
-                            <td className="p-4 text-center text-slate-900">{it.expected_qty || it.expectedQty || 0}</td>
-                            <td className="p-4 text-center text-emerald-600 font-black bg-emerald-50/30">{it.count_1 || it.count1 || 0}</td>
-                            <td className="p-4 text-center text-amber-600 font-black bg-amber-50/30">{it.count_2 || it.count1 || 0}</td>
-                            <td className="p-4 text-center text-slate-500">{it.picked_qty || it.pickedQty || 0}</td>
-                            <td className="p-4 text-center text-slate-500">{it.dispatched_qty || it.dispatchedQty || 0}</td>
-                            <td className="p-4 uppercase italic text-slate-400 max-w-[200px] truncate" title={it.inventory_observation || it.inventoryObservation}>{it.inventory_observation || it.inventoryObservation || '-'}</td>
+                          <tr key={idx} className="hover:bg-slate-50 transition-all text-[9px] border-b border-slate-50 last:border-0">
+                            <td className="px-4 py-2 font-black uppercase text-slate-800 tracking-tight">{it.article_id || it.articleId || it.sku}</td>
+                            <td className="px-4 py-2 text-center text-slate-900 font-bold">{it.expected_qty || it.expectedQty || 0}</td>
+                            <td className="px-4 py-2 text-center text-emerald-600 font-black bg-emerald-50/20">{it.count_1 || it.count1 || 0}</td>
+                            <td className="px-4 py-2 text-center text-amber-600 font-black bg-amber-50/20">{it.count_2 || it.count2 || 0}</td>
+                            <td className="px-4 py-2 text-center text-slate-500 font-bold">{it.picked_qty || it.pickedQty || 0}</td>
+                            <td className="px-4 py-2 text-center text-slate-500 font-bold">{it.dispatched_qty || it.dispatchedQty || 0}</td>
+                            <td className="px-4 py-2 uppercase italic text-slate-400 max-w-[200px] truncate font-medium" title={it.inventory_observation || it.inventoryObservation}>{it.inventory_observation || it.inventoryObservation || '-'}</td>
                           </tr>
                         ))}
                         {(!selectedDoc.consolidatedItems || selectedDoc.consolidatedItems.length === 0) && (
@@ -613,7 +575,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                               {it.invoice}
                               <div className="text-[7px] text-slate-400 font-bold uppercase">{it.paymentRef || 'S/R'}</div>
                             </td>
-                            <td className="p-4 text-center text-indigo-600 font-black bg-indigo-50/30">{it.paymentValue || '0'}</td>
+                            <td className="p-4 text-center text-indigo-600 font-black bg-indigo-50/30">{formatCurrency(it.paymentValue)}</td>
                             <td className="p-4 uppercase text-slate-900 font-bold">{(it as any).paymentMethod || 'S/M'}</td>
                             <td className="p-4 text-center text-slate-400 font-mono">{(it as any).unCode || '-'}</td>
                           </tr>

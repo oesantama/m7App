@@ -7,6 +7,8 @@ import { api } from '../services/api';
 import ConsultasDocumentosL from './ConsultasDocumentosL';
 import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
+import TableControls from './shared/TableControls';
+import { formatCurrency, formatDate } from '../utils/formatting';
 
 // Extendemos DocumentL localmente para manejar el estado de duplicado en la UI
 interface PreviewDocument extends DocumentL {
@@ -593,64 +595,21 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
   const totalModalPages = modalPageSize === 'all' ? 1 : Math.ceil(filteredModalItems.length / modalPageSize);
 
-  // Componente Reutilizable de Controles de Tabla
-  const TableControls = ({ 
-    searchValue, 
-    onSearchChange, 
-    pageSize, 
-    onPageSizeChange, 
-    placeholder = "BUSCAR...",
-    showSearch = true,
-    showPageSize = true
-  }: any) => (
-    <div className={`flex flex-col md:flex-row justify-between items-center gap-4 ${showSearch ? 'bg-slate-50/50 p-4 rounded-3xl border border-slate-100 shadow-sm' : ''} transition-all hover:bg-slate-50`}>
-      {showSearch && (
-        <div className="bg-white h-10 px-4 rounded-xl flex items-center gap-3 w-full md:w-80 shadow-inner border border-slate-100 transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
-          <Icons.Search className="w-3 h-3 text-slate-300" />
-          <input 
-            type="text" 
-            placeholder={placeholder} 
-            value={searchValue} 
-            onChange={(e) => {
-              onSearchChange(e.target.value);
-            }} 
-            className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full text-slate-800 placeholder:text-slate-400" 
-          />
-        </div>
-      )}
-      {showPageSize && (
-        <div className="flex items-center gap-4 shrink-0 overflow-x-auto custom-scrollbar pb-1 md:pb-0" title="Seleccionar cantidad de registros a mostrar">
-          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Mostrar:</span>
-          <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-100 shadow-sm">
-            {[5, 10, 20, 50, 'all'].map((size) => (
-              <button
-                key={size}
-                onClick={() => onPageSizeChange(size)}
-                className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all whitespace-nowrap ${pageSize === size ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-900'}`}
-              >
-                {size === 'all' ? 'Todos' : size}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+
 
   return (
     <div className="space-y-4 animate-in fade-in h-full flex flex-col overflow-hidden">
-      <div className="bg-white px-6 py-3 rounded-[2rem] shadow-lg border border-slate-100 flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0 transition-all">
-         <div className="flex items-center gap-4 shrink-0">
-            <div className="w-10 h-10 bg-slate-900 rounded-[1rem] flex items-center justify-center text-emerald-500 shadow-md"><Icons.Package /></div>
+      <div className="bg-white px-6 py-2.5 rounded-[1.5rem] shadow-sm border border-slate-100 flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
+         <div className="flex items-center gap-3 shrink-0">
+            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-emerald-500 shadow-sm"><Icons.Package className="w-4 h-4" /></div>
             <div>
-              <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter leading-none">Cargues Operativos</h2>
-              <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-1">SISTEMA M7 GLOBAL</p>
+              <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-none">Cargues Operativos</h2>
+              <p className="text-[7px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">SISTEMA M7 GLOBAL</p>
             </div>
          </div>
-         <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner h-10 relative">
-            <button onClick={()=>setActiveTab('cargue')} className={`px-5 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all relative z-10 ${activeTab === 'cargue' ? 'text-slate-900' : 'text-slate-400'}`}>Cargue Masivo</button>
-            <button onClick={()=>setActiveTab('consultas')} className={`px-5 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all relative z-10 ${activeTab === 'consultas' ? 'text-slate-900' : 'text-slate-400'}`}>Consulta Histórica</button>
-            <div className={`absolute top-1 bottom-1 bg-white rounded-lg shadow-md transition-all duration-300 ${activeTab === 'cargue' ? 'left-1 w-[110px]' : 'left-[114px] w-[110px]'}`}></div>
+         <div className="flex bg-slate-50 p-1 rounded-xl shadow-inner border border-slate-100">
+            <button onClick={()=>setActiveTab('cargue')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'cargue' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Cargue Masivo</button>
+            <button onClick={()=>setActiveTab('consultas')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consultas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta Histórica</button>
          </div>
       </div>
 
@@ -660,22 +619,22 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             <div className="max-w-7xl mx-auto space-y-12">
               {!preview ? (
                 <div className="space-y-12 animate-in fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                     <div className="bg-slate-50 p-12 rounded-[3.5rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center hover:border-emerald-500 hover:bg-white transition-all group">
-                        <div className="w-16 h-16 bg-white text-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg border border-slate-100 group-hover:scale-110 transition-transform"><Icons.Excel /></div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase">Plan Normal (Excel)</h3>
-                        <p className="text-[9px] text-slate-400 font-black uppercase mt-2 tracking-widest">PROCESA FILAS CON "UN ORIG"</p>
-                        <label className="bg-slate-900 text-white px-10 py-4 rounded-xl font-black text-[9px] uppercase mt-8 cursor-pointer shadow-xl hover:bg-emerald-600 transition-all active:scale-95">
-                           Seleccionar .xls / .xlsx
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="bg-emerald-50/20 p-8 rounded-[2rem] border-2 border-dashed border-emerald-100 flex flex-col items-center justify-center text-center hover:border-emerald-500 hover:bg-emerald-50/40 transition-all group">
+                        <div className="w-12 h-12 bg-white text-emerald-600 rounded-xl flex items-center justify-center mb-4 shadow-sm border border-emerald-50 group-hover:scale-110 transition-transform"><Icons.Excel className="w-6 h-6" /></div>
+                        <h3 className="text-sm font-black text-slate-900 uppercase">Plan Normal</h3>
+                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Excel con columnas "UN ORIG"</p>
+                        <label className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[9px] uppercase mt-6 cursor-pointer shadow-md hover:bg-emerald-600 transition-all active:scale-95">
+                           Subir Normal
                            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e=>handleFileUpload(e, 'Plan Normal')} />
                         </label>
                      </div>
-                     <div className="bg-slate-50 p-12 rounded-[3.5rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center hover:border-blue-500 hover:bg-white transition-all group">
-                        <div className="w-16 h-16 bg-white text-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg border border-slate-100 group-hover:scale-110 transition-transform"><Icons.Excel /></div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase">Plan R (Excel/CSV)</h3>
-                        <p className="text-[9px] text-slate-400 font-black uppercase mt-2 tracking-widest">PROCESA FILAS CON "UN"</p>
-                        <label className="bg-slate-900 text-white px-10 py-4 rounded-xl font-black text-[9px] uppercase mt-8 cursor-pointer shadow-xl hover:bg-blue-600 transition-all active:scale-95">
-                           Seleccionar .csv / .xlsx
+                     <div className="bg-blue-50/20 p-8 rounded-[2rem] border-2 border-dashed border-blue-100 flex flex-col items-center justify-center text-center hover:border-blue-500 hover:bg-blue-50/40 transition-all group">
+                        <div className="w-12 h-12 bg-white text-blue-600 rounded-xl flex items-center justify-center mb-4 shadow-sm border border-blue-50 group-hover:scale-110 transition-transform"><Icons.Excel className="w-6 h-6" /></div>
+                        <h3 className="text-sm font-black text-slate-900 uppercase">Plan R</h3>
+                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Excel/CSV con columnas "UN"</p>
+                        <label className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[9px] uppercase mt-6 cursor-pointer shadow-md hover:bg-blue-600 transition-all active:scale-95">
+                           Subir Plan R
                            <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={e=>handleFileUpload(e, 'Plan R')} />
                         </label>
                      </div>
@@ -754,160 +713,76 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                   </div>
                 </div>
               ) : (
-                <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-                    <div className="bg-slate-950 px-4 py-2 text-white flex justify-between items-center shrink-0">
-                       <div className="flex items-center gap-4">
-                          <div className={`px-5 py-2 rounded-xl text-[12px] font-black uppercase tracking-[0.1em] shadow-2xl ${preview.type === 'Plan R' ? 'bg-blue-600' : 'bg-emerald-600'}`}>{preview.type}</div>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-3">
-                               <h4 className="font-black uppercase text-sm tracking-tighter leading-none">Pre-Validación M7</h4>
-                               
-                               {(user.clientIds && user.clientIds.length > 1) && (
-                                   <div className="flex items-center gap-2 bg-white/10 px-2 py-0.5 rounded-lg border border-white/20">
-                                       <span className="text-[8px] font-black text-white/50 uppercase">Destino:</span>
-                                       <select 
-                                         value={selectedClientId}
-                                         onChange={(e) => setSelectedClientId(e.target.value)}
-                                         className="bg-transparent text-white font-black text-[9px] outline-none cursor-pointer"
-                                       >
-                                           {user.clientIds.map(cid => {
-                                               const clin = allClients.find(c => c.id === cid);
-                                               return (
-                                                   <option key={cid} value={cid} className="text-slate-900">
-                                                       {clin ? clin.name.toUpperCase() : cid}
-                                                   </option>
-                                               );
-                                           })}
-                                       </select>
-                                   </div>
-                               )}
-                            </div>
-                            <div className="flex gap-4 items-center mt-0.5">
-                               <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">{preview.fileName}</p>
-                               <div className="h-3 w-[1px] bg-slate-800"></div>
-                               <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Total: {preview.mapped.reduce((acc, doc) => acc + doc.items.reduce((sum, it) => sum + (Number(it.expectedQty) || 0), 0), 0).toLocaleString()}</p>
-                            </div>
+                <div className="bg-white rounded-[1.5rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 flex flex-col max-h-[85vh]">
+                    <div className="bg-slate-900 px-4 py-2.5 text-white flex justify-between items-center shrink-0">
+                       <div className="flex items-center gap-3">
+                          <div className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight shadow-lg ${preview.type === 'Plan R' ? 'bg-blue-600' : 'bg-emerald-600'}`}>{preview.type}</div>
+                          <div>
+                            <h4 className="font-black uppercase text-xs tracking-tight leading-none">Pre-Validación M7</h4>
+                            <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{preview.fileName}</p>
                           </div>
                        </div>
                        
-                       <div className="flex items-center gap-4 flex-1 justify-center max-w-md mx-4">
-                          <div className="bg-white h-9 px-4 rounded-xl flex items-center gap-3 w-full shadow-inner border border-slate-100 transition-all focus-within:ring-2 focus-within:ring-emerald-500/20">
-                            <Icons.Search className="w-3 h-3 text-slate-400" />
-                            <input 
-                              type="text" 
-                              placeholder="BUSCAR EN PRE-VALIDACIÓN..." 
-                              value={previewSearch} 
-                              onChange={(e) => {
-                                setPreviewSearch(e.target.value);
-                                setPreviewPage(1);
-                              }} 
-                              className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full text-slate-800 placeholder:text-slate-400" 
-                            />
-                          </div>
+                       <div className="flex-1 max-w-sm mx-4">
+                          <TableControls
+                            searchValue={previewSearch}
+                            onSearchChange={(v)=>{setPreviewSearch(v); setPreviewPage(1);}}
+                            pageSize={previewPageSize}
+                            onPageSizeChange={(s)=>{setPreviewPageSize(s); setPreviewPage(1);}}
+                            placeholder="FILTRAR PRE-CARGA..."
+                            compact
+                          />
                        </div>
 
-                      <div className="flex items-center gap-3">
-                         <button onClick={() => exportToExcel(filteredPreviewItems, "M7_Prevalidacion")} className="p-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 transition-all shadow-lg" title="Exportar a Excel"><Icons.Excel className="w-4 h-4" /></button>
-                         <button onClick={()=>setPreview(null)} className="p-2 bg-white/10 text-white rounded-xl hover:bg-red-500 transition-all" title="Cerrar"><Icons.X className="w-4 h-4" /></button>
-                      </div>
-                   </div>
-                    <div className="p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
-
-
-                       {preview.mapped.some(d => d.isDuplicate) && (
-                         <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-r-xl space-y-4">
-                           <div className="flex items-start gap-4">
-                             <Icons.Alert className="text-amber-500 w-6 h-6 mt-1" />
-                             <div>
-                               <h4 className="text-sm font-black text-amber-800 uppercase tracking-wide">Conflicto de Duplicidad Detectado</h4>
-                               <p className="text-[10px] font-bold text-amber-700/80 uppercase mt-1">SISTEMA M7: Los siguientes documentos ya existen en base de datos:</p>
-                             </div>
-                           </div>
-                           <div className="bg-white/50 p-4 rounded-xl border border-amber-200/50 max-h-32 overflow-y-auto">
-                              <table className="w-full text-left text-[9px]">
-                                 <thead className="text-amber-900/50 uppercase"><tr><th>Placa Leída</th><th>Carga Leída</th></tr></thead>
-                                 <tbody className="font-black text-amber-900">
-                                   {preview.mapped.filter(d => d.isDuplicate).map((d, i) => (
-                                     <tr key={i}>
-                                       <td className="py-1">{d.vehicleData}</td>
-                                       <td className="py-1">{d.externalDocId}</td>
-                                     </tr>
-                                   ))}
-                                 </tbody>
-                              </table>
-                           </div>
-                           <p className="text-[9px] font-bold text-amber-600 italic">Verifique que no esté intentando subir un archivo ya procesado.</p>
-                         </div>
-                       )}
-
-
-
-                       <div className="bg-slate-50 rounded-[1.5rem] overflow-hidden border border-slate-200 shadow-sm">
-                         <div className="overflow-x-auto">
-                           <table className="w-full text-left text-[9px] min-w-[1400px]">
-                             <thead className="bg-slate-900 text-white font-black uppercase tracking-widest sticky top-0 z-10">
-                               <tr>
-                                 <th className="px-4 py-3">Documento / Placa</th>
-                                 <th className="px-4 py-3">Articulo</th>
-                                 <th className="px-4 py-3 text-center">Cant.</th>
-                                 <th className="px-4 py-3">Nº Ped</th>
-                                 <th className="px-4 py-3">Factura</th>
-                                 <th className="px-4 py-3">UM</th>
-                                 <th className="px-4 py-3">Vol. Total</th>
-                                 <th className="px-4 py-3 text-center">Peso</th>
-                                 <th className="px-4 py-3">Ciudad</th>
-                                 <th className="px-4 py-3">Dirección</th>
-                                 <th className="px-4 py-3 text-center">Validación</th>
-                               </tr>
-                             </thead>
-                             <tbody className="divide-y divide-slate-100">
-                               {paginatedPreviewItems.map((it: any, idx) => (
-                                 <tr key={idx} className={`hover:bg-white transition-all font-bold ${it.isDuplicate ? 'bg-red-50/50 opacity-60' : 'text-slate-600'}`}>
-                                   <td className="px-4 py-2 font-black text-slate-900 uppercase whitespace-nowrap">{it.docId} <span className="text-slate-300 mx-1">|</span> {it.docVehicle}</td>
-                                   <td className="px-4 py-2 uppercase whitespace-nowrap">{it.articleId}</td>
-                                   <td className="px-4 py-2 text-center font-black">{it.expectedQty}</td>
-                                   <td className="px-4 py-2 uppercase text-emerald-600 whitespace-nowrap">{it.orderNumber || 'S/I'}</td>
-                                   <td className="px-4 py-2 uppercase text-slate-500 whitespace-nowrap">{it.invoice || 'S/I'}</td>
-                                   <td className="px-4 py-2 text-blue-600 font-black">{it.unit || 'und'}</td>
-                                   <td className="px-4 py-2">{it.volume || '0'}</td>
-                                   <td className="px-4 py-2 text-center text-orange-600 font-black">{it.peso || '0'}</td>
-                                   <td className="px-4 py-2 uppercase max-w-[100px] truncate" title={it.city}>{it.city || '-'}</td>
-                                   <td className="px-4 py-2 uppercase max-w-[150px] truncate" title={it.address}>{it.address || '-'}</td>
-                                   <td className="px-4 py-2 text-center">
-                                     {it.isDuplicate ? (
-                                       <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest">YA EXISTE</span>
-                                     ) : it.isHeaderUpdate ? (
-                                       <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest">ACTUALIZAR PLAN</span>
-                                     ) : (
-                                       <span className="bg-emerald-500 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest">NUEVO</span>
-                                     )}
-                                   </td>
-                                 </tr>
-                               ))}
-                             </tbody>
-                           </table>
-                         </div>
+                       <div className="flex items-center gap-2">
+                          <button onClick={() => exportToExcel(filteredPreviewItems, "M7_Prevalidacion")} className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all border border-emerald-400" title="Exportar"><Icons.Excel className="w-4 h-4" /></button>
+                          <button onClick={()=>setPreview(null)} className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-red-500 hover:text-white transition-all" title="Cerrar"><Icons.X className="w-4 h-4" /></button>
                        </div>
-                      {totalPreviewPages > 1 && (
-                        <div className="flex flex-col items-center gap-4 mt-4">
-                           <div className="flex justify-center items-center gap-4">
-                              <button disabled={previewPage === 1} onClick={()=>setPreviewPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20" title="Anterior"><Icons.ChevronRight className="rotate-180" /></button>
-                              <span className="text-[10px] font-black uppercase">Pág {previewPage} de {totalPreviewPages}</span>
-                              <button disabled={previewPage >= totalPreviewPages} onClick={()=>setPreviewPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20" title="Siguiente"><Icons.ChevronRight /></button>
-                           </div>
-                           <TableControls 
-                              showSearch={false}
-                              pageSize={previewPageSize}
-                              onPageSizeChange={(size:any) => {setPreviewPageSize(size); setPreviewPage(1);}}
-                           />
-                        </div>
-                      )}
-                   </div>
-                   <div className="p-4 border-t bg-slate-50 flex gap-4 shrink-0">
-                      <button onClick={()=>setPreview(null)} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-black text-[9px] uppercase tracking-[0.2em] hover:bg-red-700 transition-all">Anular</button>
-                      <button onClick={handleSync} className="flex-[2] py-3 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-[0.3em] hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 active:scale-95">Sincronizar</button>
-                   </div>
-                 </div>
+                    </div>
+
+                    <div className="flex-1 overflow-auto bg-slate-50/20">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-100 text-slate-500 text-[8px] font-black uppercase tracking-widest sticky top-0 z-20 border-b">
+                          <tr>
+                            <th className="px-4 py-2">Documento / Placa</th>
+                            <th className="px-4 py-2">SKU</th>
+                            <th className="px-4 py-2 text-center">Cant</th>
+                            <th className="px-4 py-2 text-center">Peso</th>
+                            <th className="px-4 py-2 text-center">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {paginatedPreviewItems.map((it, idx) => (
+                            <tr key={idx} className={`hover:bg-white transition-all text-[9px] ${it.isDuplicate ? 'bg-rose-50/30 font-bold' : ''}`}>
+                              <td className="px-4 py-2">
+                                <span className="text-slate-900 font-bold">{it.docId}</span>
+                                <span className="text-slate-400 mx-2 text-[8px]">|</span>
+                                <span className="text-slate-500">{it.docVehicle}</span>
+                              </td>
+                              <td className="px-4 py-2 text-slate-600 font-bold">{it.articleId}</td>
+                              <td className="px-4 py-2 text-center text-slate-900">{it.expectedQty}</td>
+                              <td className="px-4 py-2 text-center text-emerald-600">{formatCurrency(it.peso)}</td>
+                              <td className="px-4 py-2 text-center">
+                                {it.isDuplicate ? (
+                                  <span className="px-2 py-0.5 bg-rose-500 text-white rounded text-[7px] font-black uppercase">Duplicado</span>
+                                ) : (
+                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[7px] font-black uppercase">Listo</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="p-4 border-t bg-slate-50 flex justify-between items-center shrink-0">
+                       <button onClick={()=>setPreview(null)} className="px-6 py-2 bg-white text-slate-500 border rounded-xl font-bold text-[9px] uppercase hover:bg-slate-100 transition-all">Cancelar</button>
+                       <div className="flex gap-4 items-center">
+                         <span className="text-[10px] font-black text-slate-400 uppercase">Confirmar {preview.mapped.length} documentos</span>
+                         <button onClick={handleSync} className="px-10 py-2 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95 shadow-lg">Iniciar Sincronización</button>
+                       </div>
+                    </div>
+                </div>
                )}
             </div>
           ) : (
@@ -1061,26 +936,29 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                </thead>
                                <tbody className="divide-y divide-slate-100">
                                  {paginatedModalItems.map((it:any, idx:number) => (
-                                  <tr key={idx} className="text-[10px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-                                    <td className="py-5 px-4 font-bold text-slate-900 truncate">{it.articleId}</td>
-                                    <td className="py-5 px-4 text-center font-bold text-slate-900">{it.unCode || 'S/I'}</td>
-                                    <td className="py-5 px-4 text-center font-bold text-slate-900">{it.clientRef || 'S/I'}</td>
-                                    <td className="py-5 px-4 text-center font-bold text-slate-900">{it.expectedQty}</td>
-                                    <td className="py-5 px-4 text-center font-black text-blue-600 bg-blue-50/50">{it.receivedQty || 0}</td>
-                                    <td className="py-5 px-4 text-center text-slate-500">{it.unit || 'UND'}</td>
-                                    <td className="py-5 px-4 text-right text-slate-400">{it.volume || 0}</td>
-                                    <td className="py-5 px-4 text-center font-black text-orange-600 italic border-x border-orange-50 bg-orange-50/20">{it.peso || 0}</td>
-                                    <td className="py-5 px-4 text-right font-bold text-emerald-600">{it.orderNumber || 'S/I'}</td>
-                                    <td className="py-5 px-4 text-right text-slate-600">{it.invoice || 'S/I'}</td>
-                                    <td className="py-5 px-4 text-right text-slate-500 truncate">{it.city || '-'}</td>
-                                    <td className="py-5 px-4 text-right text-slate-500 truncate">{it.address || '-'}</td>
-                                    <td className="py-5 px-4 text-right text-slate-400 italic truncate">{it.driverNote || 'SIN OBS.'}</td>
+                                  <tr key={idx} className="text-[9px] hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
+                                    <td className="py-2 px-4">
+                                      <div className="flex flex-col">
+                                        <span className="text-slate-900 font-bold uppercase">{it.articleId}</span>
+                                        <span className="text-[7px] text-slate-400 font-black">{it.orderNumber || 'S/P'}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.unCode || 'S/I'}</td>
+                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.clientRef || 'S/I'}</td>
+                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.expectedQty}</td>
+                                    <td className="py-2 px-4 text-center font-black text-blue-600 bg-blue-50/30">{it.receivedQty || 0}</td>
+                                    <td className="py-2 px-4 text-center text-slate-500 font-black">{it.unit || 'UND'}</td>
+                                    <td className="py-2 px-4 text-right text-slate-400 font-black">{it.volume || 0}</td>
+                                    <td className="py-2 px-4 text-center font-black text-orange-600 italic bg-orange-50/10">{formatCurrency(it.peso)}</td>
+                                    <td className="py-2 px-4 text-right font-black text-emerald-600">{it.invoice || 'S/I'}</td>
+                                    <td className="py-2 px-4 text-right text-slate-500 truncate max-w-[100px]" title={it.city}>{it.city || '-'}</td>
+                                    <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[150px]" title={it.driverNote}>{it.driverNote || 'SIN OBS.'}</td>
                                   </tr>
                                 ))}
                                  {paginatedModalItems.length === 0 && (
                                    <tr>
-                                     <td colSpan={13} className="py-10 text-center text-slate-500 text-[10px] italic">
-                                       No hay datos de recepción disponibles para este documento o no coinciden con la búsqueda.
+                                     <td colSpan={13} className="py-10 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest italic bg-slate-50/50">
+                                       No hay registros en esta vista
                                      </td>
                                    </tr>
                                  )}
@@ -1114,14 +992,14 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                               </thead>
                                <tbody className="divide-y divide-slate-100">
                                  {paginatedModalItems.map((it:any, idx:number) => (
-                                  <tr key={idx} className="text-[10px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-                                    <td className="py-5 px-4 font-bold text-slate-900 truncate">{it.articleId}</td>
-                                    <td className="py-5 px-4 text-center font-bold text-slate-900">{it.expectedQty}</td>
-                                    <td className="py-5 px-4 text-center font-black text-emerald-600 bg-emerald-50/50">{it.count1 || 0}</td>
-                                    <td className="py-5 px-4 text-center font-black text-amber-600 bg-amber-50/50">{it.count2 || 0}</td>
-                                    <td className="py-5 px-4 text-center text-slate-500">{it.pickedQty || 0}</td>
-                                    <td className="py-5 px-4 text-center text-slate-500">{it.dispatchedQty || 0}</td>
-                                    <td className="py-5 px-4 text-right text-slate-400 italic truncate">{it.inventoryObservation || 'SIN NOVEDAD'}</td>
+                                  <tr key={idx} className="text-[9px] hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
+                                    <td className="py-2 px-4 font-black text-slate-900 uppercase truncate">{it.articleId}</td>
+                                    <td className="py-2 px-4 text-center font-bold text-slate-900">{it.expectedQty}</td>
+                                    <td className="py-2 px-4 text-center font-black text-emerald-600 bg-emerald-50/30">{it.count1 || 0}</td>
+                                    <td className="py-2 px-4 text-center font-black text-amber-600 bg-amber-50/30">{it.count2 || 0}</td>
+                                    <td className="py-2 px-4 text-center text-slate-500">{it.pickedQty || 0}</td>
+                                    <td className="py-2 px-4 text-center text-slate-500">{it.dispatchedQty || 0}</td>
+                                    <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[200px]" title={it.inventoryObservation}>{it.inventoryObservation || 'SIN NOVEDAD'}</td>
                                   </tr>
                                 ))}
                                 {paginatedModalItems.length === 0 && (
@@ -1158,21 +1036,20 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                </thead>
                                 <tbody className="divide-y divide-slate-100">
                                   {paginatedModalItems.map((it:any, idx:number) => (
-                                   <tr key={idx} className="text-[10px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-                                     <td className="py-5 px-4 font-black text-slate-900">
-                                       {it.invoice}
-                                       <div className="text-[8px] text-slate-400 font-bold uppercase">{it.paymentRef || 'S/R'}</div>
+                                   <tr key={idx} className="text-[9px] font-bold text-slate-600 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-b-0">
+                                     <td className="py-2 px-4">
+                                       <span className="text-slate-900 font-black">{it.invoice}</span>
+                                       <div className="text-[7px] text-slate-400 font-black uppercase">{it.paymentRef || 'S/R'}</div>
                                      </td>
-                                     <td className="py-5 px-4 text-center font-black text-indigo-600 bg-indigo-50/20">{it.paymentValue || '0'}</td>
-                                     <td className="py-5 px-4 text-slate-900 font-bold uppercase">{it.paymentMethod || 'S/M'}</td>
-                                     <td className="py-5 px-4 text-center text-slate-400 font-mono">{it.unCode || '-'}</td>
+                                     <td className="py-2 px-4 text-center font-black text-indigo-600 bg-indigo-50/20">{formatCurrency(it.paymentValue)}</td>
+                                     <td className="py-2 px-4 text-slate-900 font-black uppercase">{it.paymentMethod || 'S/M'}</td>
+                                     <td className="py-2 px-4 text-center text-slate-400 font-mono text-[8px]">{it.unCode || '-'}</td>
                                    </tr>
                                  ))}
                                  {paginatedModalItems.length === 0 && (
                                    <tr>
-                                     <td colSpan={5} className="py-20 text-center flex flex-col items-center justify-center">
-                                       <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mb-4"><Icons.Excel className="w-8 h-8" /></div>
-                                       <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No se han cargado pagos para este documento</p>
+                                     <td colSpan={5} className="py-10 text-center flex flex-col items-center justify-center bg-slate-50/50">
+                                       <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">No hay pagos registrados</p>
                                      </td>
                                    </tr>
                                  )}

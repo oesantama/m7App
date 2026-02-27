@@ -23,6 +23,8 @@ import { Toaster, toast } from 'sonner';
 import { useAppStore } from './stores/useAppStore';
 import PortalLayout from './components/portal/PortalLayout';
 import ClientLogin from './components/portal/ClientLogin';
+import { useAppData } from './hooks/useAppData';
+import { normalizeData } from './utils/normalize';
 import OrderTracking from './components/portal/OrderTracking';
 
 // Import Admin Module
@@ -92,50 +94,7 @@ const App: React.FC = () => {
     logout
   } = useAppStore();
 
-  const normalize = React.useCallback((data: any) => {
-    if (!Array.isArray(data)) return [];
-    return data.map(item => {
-      // Robustez absoluta para campos Postgres
-      const getVal = (primary: string, secondary: string) => {
-        // Mayúsculas/Minúsculas - Driver Postgres Docker
-        const pUpper = primary.toUpperCase();
-        const sUpper = secondary.toUpperCase();
-        const keys = Object.keys(item);
-        const findKey = (k: string) => keys.find(key => key.toLowerCase() === k.toLowerCase());
-        
-        const key = findKey(primary) || findKey(secondary) || primary || secondary;
-        return (item[key] !== undefined && item[key] !== null) ? item[key] : undefined;
-      };
-
-      const parseDate = (val: any) => {
-        if (!val) return undefined;
-        if (typeof val === 'string') {
-          // Postgres format: space instead of T
-          if (val.includes(' ') && !val.includes('T')) return val.replace(' ', 'T');
-        }
-        return val;
-      };
-
-      return {
-        ...item,
-        statusId: getVal('statusId', 'status_id'),
-        moduleId: getVal('moduleId', 'module_id'),
-        iconClass: getVal('iconClass', 'icon_class'),
-        roleId: getVal('roleId', 'role_id'),
-        // Auditoría Normalizada
-        createdAt: parseDate(getVal('createdAt', 'created_at')),
-        updatedAt: parseDate(getVal('updatedAt', 'updated_at')),
-        createdBy: getVal('createdBy', 'created_by'),
-        updatedBy: getVal('updatedBy', 'updated_by'),
-        // Sistema
-        notificationEmail: getVal('notificationEmail', 'notification_email'),
-        tipoNotificacionId: getVal('tipoNotificacionId', 'tipo_notificacion_id'),
-        tipoNotificacionName: getVal('tipoNotificacionName', 'tipo_notificacion_name'),
-        logoUrl: getVal('logoUrl', 'logo_url'),
-        imageUrl: getVal('imageUrl', 'image_url')
-      };
-    });
-  }, []);
+  const { refreshAppData } = useAppData();
 
   // Timeout - 10 Minutos (600,000 ms)
   const TIMEOUT_MS = 10 * 60 * 1000;
@@ -258,190 +217,7 @@ const App: React.FC = () => {
     restoreSession();
   }, []);
 
-  const refreshAppData = React.useCallback(async (forcedClientId?: string) => {
-    const targetClientId = forcedClientId || user?.clientId || 'CLI-01';
-    try {
-      const [
-        modules, pages, genericMasters, categories, articles, vehicles, drivers, usersData, rolesData, permsData, userPermsData, clientsData, assignmentsData, invoicesData, routesData,
-        estados, marcas, tiposDocumento, unidadesMedida, notificacionesConfig, tiposVehiculo, tiposNotificacion
-      ] = await Promise.all([
-        api.getModules().then(normalize).catch(() => []),
-        api.getPages().then(normalize).catch(() => []),
-        api.getGenericMasters().then(normalize).catch(() => []),
-        api.getCategories().then(normalize).catch(() => []), 
-        api.getArticles().then(normalize).catch(() => []),
-        api.getVehicles().then(normalize).catch(() => []),
-        api.getDrivers().then(normalize).catch(() => []),
-        api.getUsers().then(normalize).catch(() => []),
-        api.getRoles().then(normalize).catch(() => []),
-        api.getPermissions().then(normalize).catch(() => []),
-        api.getAllUserPermissions().then(normalize).catch(() => []),
-        api.getClients().then(normalize).catch(() => []),
-        api.getAssignments().then(normalize).catch(() => []),
-        api.getInvoices(targetClientId).catch(() => []),
-        api.getRoutes().catch(() => []),
-        api.getEstados().then(normalize).catch(() => []),
-        api.getMarcas().then(normalize).catch(() => []),
-        api.getTiposDocumento().then(normalize).catch(() => []),
-        api.getUnidadesMedida().then(normalize).catch(() => []),
-        api.getNotificacionesConfig().then(normalize).catch(() => []),
-        api.getTiposVehiculo().then(normalize).catch(() => []),
-        api.getTiposNotificacion().then(normalize).catch(() => [])
-      ]);
 
-      // Actualizamos estado global (Blindaje contra objetos de error)
-      setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
-      setInvoices(Array.isArray(invoicesData) ? invoicesData : []);
-      // Usamos acceso directo al store para evitar ReferenceError en closures
-      useAppStore.getState().setRoutes(Array.isArray(routesData) ? routesData : []);
-
-      const groupedMasters: any = {};
-      if (Array.isArray(genericMasters)) {
-        genericMasters.forEach((m: any) => {
-          if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
-          groupedMasters[m.category].push(m);
-        });
-      }
-
-      const mappedArticles = normalize(Array.isArray(articles) ? articles.map((a: any) => ({
-        ...a,
-        statusId: a.status_id,
-        clientId: a.client_id,
-        factorInter: a.factor_inter,
-        factorStd: a.factor_std,
-        uomGeneralId: a.uom_general_id,
-        uomInterId: a.uom_inter_id,
-        uomStdId: a.uom_std, 
-        categoryArticuloId: a.category_articulo_id,
-        imageUrl: a.image_url 
-      })) : []);
-
-      const mappedVehicles = normalize(Array.isArray(vehicles) ? vehicles.map((v: any) => ({
-        ...v,
-        clientId: v.client_id,
-        statusId: v.status_id,
-        status: (v.status_id === 'EST-01' || v.status === 'Disponible') ? 'Disponible' : v.status,
-        capacityM3: parseFloat(v.capacity_m3 || '0'),
-        soatExpiry: v.soat_expiry,
-        technoExpiry: v.techno_expiry,
-        soatPdfUrl: v.soat_pdf,
-        technoPdfUrl: v.techno_pdf,
-        modelYear: v.model_year,
-        color: v.color,
-        vehicleTypeId: v.vehicle_type
-      })) : []);
-
-      const mappedDrivers = normalize(Array.isArray(drivers) ? drivers.map((d: any) => ({
-        ...d,
-        status: (d.status_id === 'EST-01' || d.status_id === '1' || d.status === 'Activo' || (d as any).is_active === true) ? 'Activo' : 'Inactivo',
-        documentType: d.document_type,
-        documentNumber: d.document_number,
-        licenseExpiry: d.license_expiry,
-        licensePdf: d.license_pdf,
-        licenseSideA: d.license_side_a,
-        licenseSideB: d.license_side_b,
-        licenseCategory: d.license_category
-      })) : []);
-
-      setAllMasterData({
-        ...groupedMasters,
-        masterCategorias: categories,
-        masterEstados: estados,
-        masterMarcas: marcas,
-        masterTipoDocumento: tiposDocumento,
-        masterUnidadMedida: unidadesMedida,
-        masterNotificaciones: notificacionesConfig,
-        masterTiposVehiculo: tiposVehiculo,
-        masterTipoNotificacion: tiposNotificacion,
-        masterUsuarios: usersData,
-        masterRol: rolesData,
-        masterPermisosRol: permsData,
-        masterPermisosUsuario: userPermsData,
-        masterClientes: clientsData,
-        masterArticulo: mappedArticles,
-        masterVehiculos: mappedVehicles,
-        masterConductores: mappedDrivers
-      });
-
-      // Update store with dedicated tables
-      useAppStore.setState({ pages, modules });
-
-      setVehicles(mappedVehicles);
-      setDrivers(mappedDrivers);
-
-      const mappedAssignments = Array.isArray(assignmentsData) ? assignmentsData.map((a: any) => ({
-        id: a.id,
-        vehicleId: a.vehicle_id || a.vehicleId,
-        driverId: a.driver_id || a.driverId,
-        clientId: a.client_id || a.clientId,
-        isActive: a.is_active !== undefined ? a.is_active : a.isActive,
-        statusId: 'EST-01',
-        createdAt: a.created_at || a.createdAt,
-        updatedAt: a.updated_at || a.updatedAt
-      })) : [];
-      setAssignments(mappedAssignments);
-
-      const mappedInvoices = Array.isArray(invoicesData) ? invoicesData.map((i: any) => ({
-        ...i,
-        externalDocId: i.external_doc_id || i.externalDocId,
-        docLId: i.doc_l_id || i.docLId,
-        clientId: i.clientId || i.client_id,
-        statusId: i.status_id,
-        volumeM3: Number(i.volume_m3 || i.volumeM3 || 0),
-        invoiceValue: Number(i.invoice_value || i.invoiceValue || 0),
-        customerName: i.customer_name || i.customerName || (i.customer_id === 'CUST-A68' ? 'AJOVER S.A.S' : i.customer_id),
-        planType: (i.codplan === 'AJI01' || i.planType === 'AJI01') ? 'Plan Normal' : (i.codplan === 'AJV20' || i.planType === 'AJV20') ? 'Plan R' : (i.planType || 'Plan Normal'),
-        status: i.status || (i.status_id === 'EST-11' ? 'En Ruta' : i.status_id === 'EST-01' ? 'Pendiente' : 'Pendiente'),
-        items: (i.items || []).map((it: any) => ({
-          ...it,
-          articleId: it.article_id,
-          expectedQty: Number(it.expected_qty || 0),
-          unCode: it.un_code,
-          clientRef: it.client_ref
-        }))
-      })) : [];
-      setInvoices(mappedInvoices);
-
-      // Actualizar Rutas Activas
-      setRoutes(Array.isArray(routesData) ? routesData.map((r: any) => ({
-        ...r,
-        invoiceIds: Array.isArray(r.invoice_ids) ? r.invoice_ids : [],
-        vehicleId: r.vehicle_id,
-        driverId: r.driver_id
-      })) : []);
-
-      // Fetch operational data too
-      api.getDocuments(targetClientId).then(docs => {
-        if (Array.isArray(docs)) {
-          setDocuments(docs.map(d => ({
-            ...d,
-            id: d.id,
-            externalDocId: d.external_doc_id || d.externalDocId,
-            vehicleData: d.vehicle_plate || d.vehicleData,
-            // Mapeo Robusto M7
-            planType: (d.plan_type || d.planType) ? (d.plan_type || d.planType) :
-              (d.codplan === 'AJI01') ? 'Plan Normal' :
-              (d.codplan === 'AJV20') ? 'Plan R' : 'Plan Normal',
-            status: d.status || (d.status_id === 'EST-01' ? 'En Conteo' : d.status_id === 'EST-02' ? 'Inventariado' : d.status),
-            createdAt: d.created_at || d.createdAt,
-            items: (d.items || []).map((it: any) => ({
-              ...it,
-              articleId: it.article_id,
-              expectedQty: it.expected_qty,
-              unCode: it.un_code,
-              clientRef: it.client_ref,
-              orderNumber: it.order_number,
-              peso: Number(it.peso || 0),
-              countedQty: it.count_2 || it.counted_qty
-            }))
-          })));
-        }
-      });
-
-    } catch (err) {
-      console.error('[M7-SYNC] Error:', err);
-    }
-  }, [user?.clientId, normalize, setAllMasterData, setVehicles, setDrivers, setAssignments, setInvoices, setDocuments]);
 
   // Efecto para persistir pestaña activa
   useEffect(() => {
@@ -488,8 +264,8 @@ const App: React.FC = () => {
         api.getClients().catch(() => []),
         api.getUsers().catch(() => []),
         api.getRoles().catch(() => []),
-        api.getModules().then(normalize).catch(() => []),
-        api.getPages().then(normalize).catch(() => []),
+        api.getModules().then(normalizeData).catch(() => []),
+        api.getPages().then(normalizeData).catch(() => []),
         api.getPermissions().catch(() => []),
         api.getAllUserPermissions().catch(() => []),
         api.getGenericMasters().catch(() => []),

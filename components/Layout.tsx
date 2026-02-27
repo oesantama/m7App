@@ -202,10 +202,10 @@ const Layout: React.FC<LayoutProps> = ({
         />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-30 bg-slate-900 text-white flex flex-col transition-all duration-300 shadow-2xl md:static md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-24' : 'md:w-72'} w-72`}>
-        <div className="p-6 flex items-center gap-4 border-b border-slate-800 shrink-0">
-          <div className="w-12 h-12 relative group cursor-pointer">
-            <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-xl group-hover:bg-emerald-500/30 transition-all"></div>
+      <aside className={`fixed inset-y-0 left-0 z-30 bg-slate-900 text-white flex flex-col transition-all duration-300 shadow-2xl md:static md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-20' : 'md:w-64'} w-64`}>
+        <div className="p-4 flex items-center gap-3 border-b border-white/5 shrink-0">
+          <div className="w-10 h-10 relative group cursor-pointer shrink-0">
+            <div className="absolute inset-0 bg-emerald-500/10 rounded-full blur-lg group-hover:bg-emerald-500/20 transition-all"></div>
             <img 
               src="/assets/brand/orbitm7_logo.png" 
               alt="OrbitM7" 
@@ -214,26 +214,33 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
-              <h1 className="font-black text-xl tracking-tighter">ORBITM7</h1>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">GLOBAL V1.0.4</span>
+              <h1 className="font-black text-lg tracking-tighter text-white">ORBITM7</h1>
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">GLOBAL V1.0.4</span>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar px-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar px-2 mt-4">
           {menuGroups.map((group) => (
-            <div key={group.id} className="space-y-1">
-              <button onClick={() => toggleGroup(group.id)} className={`w-full flex items-center transition-all font-bold text-sm rounded-2xl ${isCollapsed ? 'justify-center p-3.5' : 'justify-between px-4 py-3.5'} ${expandedGroup === group.id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}>
+            <div key={group.id} className="space-y-0.5">
+              <button 
+                onClick={() => toggleGroup(group.id)} 
+                className={`w-full flex items-center transition-all font-bold text-[11px] rounded-xl ${isCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5'} ${expandedGroup === group.id ? 'bg-white/5 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              >
                 <div className="flex items-center gap-3">
-                  <span className={expandedGroup === group.id ? 'text-emerald-400' : 'text-slate-500'}>{group.icon}</span>
-                  {!isCollapsed && <span className="truncate">{group.label}</span>}
+                  <span className={`${expandedGroup === group.id ? 'text-emerald-400' : 'text-slate-500'} ${isCollapsed ? 'scale-110' : ''}`}>{group.icon}</span>
+                  {!isCollapsed && <span className="truncate uppercase tracking-wide">{group.label}</span>}
                 </div>
-                {!isCollapsed && <div className={`transition-transform duration-300 ${expandedGroup === group.id ? 'rotate-90' : ''}`}><Icons.ChevronRight /></div>}
+                {!isCollapsed && <div className={`transition-transform duration-300 ${expandedGroup === group.id ? 'rotate-90' : ''}`}><Icons.ChevronRight className="w-3 h-3" /></div>}
               </button>
               {expandedGroup === group.id && !isCollapsed && (
-                <div className="ml-6 pl-4 border-l border-slate-800 space-y-1 py-1">
+                <div className="ml-5 pl-4 border-l border-white/5 space-y-0.5 py-1">
                   {group.items.map((item) => (
-                    <button key={item.id} onClick={() => selectItem(item)} className={`w-full text-left px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all ${(activePageId === item.id) ? 'text-emerald-400 bg-emerald-400/5 shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}>
+                    <button 
+                      key={item.id} 
+                      onClick={() => selectItem(item)} 
+                      className={`w-full text-left px-3 py-2 rounded-lg text-[10px] font-bold transition-all ${(activePageId === item.id) ? 'text-emerald-400 bg-emerald-400/5' : 'text-slate-500 hover:text-slate-200'}`}
+                    >
                       {item.label}
                     </button>
                   ))}
@@ -243,40 +250,45 @@ const Layout: React.FC<LayoutProps> = ({
           ))}
         </nav>
 
-        <div className="mt-auto p-4 border-t border-slate-800 space-y-3">
-          <div className={`bg-slate-800/40 rounded-3xl flex items-center p-4 gap-4 relative`}>
+        <div className="mt-auto p-3 border-t border-white/5 space-y-2">
+          <div className={`bg-white/5 rounded-2xl flex items-center p-3 gap-3 relative transition-all hover:bg-white/10`}>
             <button onClick={() => setIsProfileModalOpen(true)} className="absolute inset-0 z-10 opacity-0 cursor-pointer"></button>
-            <div className="w-10 h-10 rounded-full bg-slate-700 overflow-hidden border-2 border-emerald-500 shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-slate-800 overflow-hidden border border-emerald-500/50 shrink-0">
               <img src={user.avatar || AVATAR_GALLERY[0]} alt="User" className="w-full h-full object-cover" />
             </div>
-            {!isCollapsed && <div className="flex-1 min-w-0"><p className="text-xs font-black truncate uppercase">{user.name}</p><p className="text-[10px] text-emerald-500 font-black uppercase">{user.role}</p></div>}
-            <button onClick={onLogout} title="Cerrar Sesión" className="p-2 text-slate-500 hover:text-red-500 z-20 relative transition-colors"><Icons.LogOut /></button>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-black truncate uppercase tracking-tight text-white">{user.name}</p>
+                <p className="text-[8px] text-emerald-500 font-bold uppercase tracking-widest">{user.role}</p>
+              </div>
+            )}
+            <button onClick={onLogout} title="Cerrar Sesión" className="p-1.5 text-slate-500 hover:text-rose-500 z-20 relative transition-colors"><Icons.LogOut className="w-4 h-4" /></button>
           </div>
           {!isCollapsed && (
-             <p className="text-[8px] text-slate-500 font-bold uppercase text-center opacity-40">Milla 7 • Oscar Santamaría</p>
+             <p className="text-[7px] text-slate-600 font-bold uppercase text-center opacity-40">Milla 7 • Orbit v1.0.4</p>
           )}
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 shrink-0 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-6 shrink-0 z-20 shadow-sm">
           <div className="flex items-center gap-4">
-            <button onClick={toggleSidebar} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-500 hover:text-emerald-500"><Icons.Menu /></button>
+            <button onClick={toggleSidebar} className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-slate-400 hover:text-emerald-500 transition-all"><Icons.Menu className="w-5 h-5" /></button>
             {showBack && (
-              <button onClick={onBack} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-red-700">
+              <button onClick={onBack} className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-[11px] shadow-sm hover:bg-rose-700 uppercase tracking-widest transition-all">
                 Regresar
               </button>
             )}
             <div className="flex items-center gap-3">
-              <div className="h-8 w-1.5 bg-emerald-500 rounded-full"></div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{activeTab.replace('-', ' ')}</h2>
+              <div className="h-4 w-1 bg-emerald-500 rounded-full"></div>
+              <h2 className="text-sm font-black text-slate-800 tracking-wider uppercase">{activeTab.replace('-', ' ')}</h2>
             </div>
           </div>
-          <div className="flex items-center gap-4 transition-all">
-            {/* Espacio reservado para acciones rápidas si fuese necesario */}
+          <div className="flex items-center gap-4">
+            {/* Espacio para estatus de conexión o avisos rápidos */}
           </div>
         </header>
-        <section className="flex-1 overflow-y-auto p-0 bg-slate-50/50 custom-scrollbar">{children}</section>
+        <section className="flex-1 overflow-y-auto p-0 bg-slate-50/30 custom-scrollbar">{children}</section>
       </main>
 
       {isProfileModalOpen && (
