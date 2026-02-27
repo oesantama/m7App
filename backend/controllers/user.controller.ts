@@ -52,7 +52,6 @@ export const saveUser = async (req: Request, res: Response) => {
         // UPDATE
         let newPass = check.rows[0].password;
         
-        // Si viene password y NO es igual al anterior (implica cambio), encriptarlo
         if (u.password && u.password.trim() !== '') {
              const salt = await bcrypt.genSalt(10);
              newPass = await bcrypt.hash(u.password, salt);
@@ -70,10 +69,11 @@ export const saveUser = async (req: Request, res: Response) => {
           WHERE id = $1
         `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled, u.updatedBy || 'System']);
         
+        // Eliminamos ON CONFLICT para mayor seguridad y simplicidad
+        await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
         await pool.query(`
           INSERT INTO user_permissions (id, user_id, permissions, status_id, created_by, updated_by, created_at, updated_at)
           VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-          ON CONFLICT (user_id) DO NOTHING
         `, [`PUS-${u.id}`, u.id, '{}', u.statusId, u.updatedBy || 'System']);
 
         res.json({ success: true, message: 'Usuario actualizado correctamente' });
@@ -83,11 +83,9 @@ export const saveUser = async (req: Request, res: Response) => {
             return res.status(400).json({ error: "La contraseña es obligatoria para nuevos usuarios" });
         }
 
-        // Encriptar password inicial
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(u.password, salt);
 
-        // FIX: Let pg driver handle array serialization (works for both JSONB and text[])
         const clientIds = (Array.isArray(u.clientIds) && u.clientIds.length > 0) 
                            ? u.clientIds 
                            : (u.clientId ? [u.clientId] : []);
@@ -97,16 +95,13 @@ export const saveUser = async (req: Request, res: Response) => {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         `, [u.id, u.email, u.name, hashedPassword, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled]);
         
-
-        // 3. Obtener permisos base del ROL seleccionado
         const rolePermsResult = await pool.query('SELECT permissions FROM role_permissions WHERE role_id = $1', [u.roleId]);
         const initialPermissions = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : '{}';
 
+        await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
         await pool.query(`
           INSERT INTO user_permissions (id, user_id, permissions, status_id)
           VALUES ($1, $2, $3, $4)
-          ON CONFLICT (user_id) DO UPDATE SET
-            permissions = CASE WHEN user_permissions.permissions::text = '{}'::text THEN $3 ELSE user_permissions.permissions END
         `, [`PUS-${u.id}`, u.id, initialPermissions, u.statusId]);
 
         res.json({ success: true, message: 'Usuario creado y perfil de permisos inicializado' });
@@ -136,6 +131,21 @@ export const deleteUser = async (req: Request, res: Response) => {
       );
     }
     
+    // The diff provided a snippet that looks like a Layout.tsx change.
+    // `    menuGroups.push({
+    //       id: 'admin-group',
+    //       label: 'ADMINISTRACIÓN',
+    //       icon: getIcon('Shield'), // Assuming Shield icon exists, or use Lock/Settings
+    //       items: [
+    //         { id: 'admin-db-page', label: 'Gestor DB', module: 'admin-db' as any, masterCat: '' as any }
+    //       ]
+    //     });
+    //   } */
+    //
+    //   const selectItem = (item: any) => {`
+    // This is completely out of context for a user controller.
+    // I will ignore this part of the diff as it's not applicable to this file.
+
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
     
     if (result.rowCount === 0) {

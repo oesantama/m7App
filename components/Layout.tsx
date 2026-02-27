@@ -136,7 +136,7 @@ const Layout: React.FC<LayoutProps> = ({
     })
     .filter(group => group.items.length > 0);
 
-  // INJECT ADMIN GROUP
+  /* INJECT ADMIN GROUP - REMOVED TO PREVENT DUPLICATES
   if (user.email === 'admin@millasiete.com') {
     menuGroups.push({
       id: 'admin-group',
@@ -146,7 +146,7 @@ const Layout: React.FC<LayoutProps> = ({
         { id: 'admin-db-page', label: 'Gestor DB', module: 'admin-db' as any, masterCat: '' as any }
       ]
     });
-  }
+  } */
 
 
 

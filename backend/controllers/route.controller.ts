@@ -11,7 +11,7 @@ export const getRoutes = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
       SELECT 
-        r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text, r.created_by::text, r.status::text, r.created_at,
+        r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text, r.created_by::text, r.status_id::text, r.created_at,
         v.plate, d.name as driver_name,
         COALESCE(
           (
@@ -81,7 +81,7 @@ export const saveRoute = async (req: Request, res: Response) => {
 
     // 1. Insertar Cabecera de Ruta
     const routeRes = await client.query(`
-      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status)
+      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status_id)
       VALUES ($1, $2, $3, $4, 'EST-10')
       RETURNING id
     `, [vehicleId, finalDriverId, clientId, createdBy]);

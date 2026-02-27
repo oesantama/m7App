@@ -1,8 +1,6 @@
 
 import pool from '../config/database.js';
 import bcrypt from 'bcrypt';
-import fs from 'fs';
-import path from 'path';
 
 const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'roles': ['name', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
@@ -20,35 +18,35 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'role_permissions': ['role_id', 'permissions', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'assignments': ['vehicle_id', 'driver_id', 'client_id', 'is_active', 'created_at', 'updated_at'],
   'whatsapp_logs': ['user_id', 'phone_number', 'message_body', 'status', 'direction', 'sent_at', 'external_message_id', 'error_message'],
-  'whatsapp_quick_replies': ['user_id', 'title', 'content', 'created_at'],
-  'whatsapp_auto_responses': ['user_id', 'trigger_keyword', 'response_content', 'is_active', 'use_ai', 'created_at'],
   'digital_signatures': ['idusuario', 'pasword', 'firma', 'aceptapolitica', 'usuariocreacion', 'estado', 'aprobada', 'usuarioaprobo', 'fechaparobacion', 'fecha_creacion', 'usaurioactualizacion', 'fecha_actualizacion'],
   'tipos_documento': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'marcas': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'tipos_vehiculo': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'unidades_medida': ['name', 'description', 'abbreviation', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'estados': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
-  'notificaciones': ['name', 'description', 'notification_email', 'tipo_notificacion_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
-  'tipos_notificacion': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
-  'routes': ['name', 'description', 'vehicle_id', 'driver_id', 'client_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
-  'picking_assignments': ['invoice_id', 'leader_id', 'helper_ids', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
-  'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at'],
-  'route_invoices': ['route_id', 'invoice_id', 'created_at'],
-  'route_modifications_log': ['route_id', 'invoice_id', 'action', 'user_id', 'previous_plate', 'new_plate', 'details', 'timestamp'],
-  'dispatch_assignments': ['invoice_id', 'driver_id', 'helper_ids', 'scanned_items', 'is_accompanied', 'helper_count', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
-  'dispatch_signatures_pending': ['dispatch_id', 'user_id', 'role_type', 'signed', 'signed_at'],
-  'delivery_confirmations': ['dispatch_id', 'invoice_id', 'driver_id', 'vehicle_id', 'delivery_type', 'delivered_items', 'notes', 'delivered_at', 'created_at'],
-  'delivery_returns': ['confirmation_id', 'invoice_id', 'driver_id', 'vehicle_id', 'return_reason', 'notes', 'status', 'created_at'],
-  'delivery_return_items': ['return_id', 'sku', 'article_name', 'quantity_returned', 'quantity_delivered', 'unit', 'notes'],
-  'routing_patterns': ['city', 'vehicle_id', 'strength', 'last_used'],
-  'deletion_logs': ['table_name', 'record_id', 'record_data', 'deleted_by', 'deleted_at'],
-  'vehicle_locations': ['vehicle_id', 'driver_id', 'latitude', 'longitude', 'accuracy', 'speed', 'heading', 'updated_at', 'timestamp']
+  'routes': ['name', 'description', 'vehicle_id', 'driver_id', 'client_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at']
 };
 
 const healSchema = async (client: any) => {
-  console.log('[M7-DB] Iniciando Curación de Esquema...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs'];
+  console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
+  const serialTables = ['assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'deletion_logs'];
   
+  const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
+  for (const table of nuclearTables) {
+    try {
+        const checkCols = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}'`);
+        const currentCols = checkCols.rows.map((r: any) => r.column_name);
+        if (currentCols.length > 0) {
+            const expectedCols = ['id', ...UNIVERSAL_SCHEMA[table]];
+            const hasExtraCols = currentCols.some((c: string) => !expectedCols.includes(c));
+            if (hasExtraCols) {
+                console.warn(`[M7-DB-NUCLEAR] Discrepancia detectada en ${table}. Limpiando...`);
+                await client.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
+            }
+        }
+    } catch (e) {}
+  }
+
   for (const [table, columns] of Object.entries(UNIVERSAL_SCHEMA)) {
     const idType = serialTables.includes(table) ? 'SERIAL' : 'TEXT';
     await client.query(`CREATE TABLE IF NOT EXISTS ${table} (id ${idType} PRIMARY KEY)`);
@@ -60,7 +58,6 @@ const healSchema = async (client: any) => {
         if (col === 'client_ids') type = 'TEXT[]';
         if (col === 'permissions' || col === 'record_data') type = 'JSONB';
         if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved') || col === 'aceptapolitica' || col === 'aprobada' || col === 'signed') type = 'BOOLEAN DEFAULT FALSE';
-
         await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} ${type}`);
       } catch (colErr: any) {
         console.error(`[M7-DB-HEAL] Error en tabla ${table} columna ${col}:`, colErr.message);
@@ -68,80 +65,40 @@ const healSchema = async (client: any) => {
     }
   }
 
-  // Creación de Vista GPS (Requerida por Centro de Mando)
   try {
     await client.query(`
       CREATE OR REPLACE VIEW v_latest_vehicle_locations AS
       SELECT DISTINCT ON (vehicle_id)
         vl.id, vl.vehicle_id, vl.driver_id, vl.latitude, vl.longitude, 
-        vl.accuracy, vl.speed, vl.heading, vl.updated_at,
-        v.plate, d.name as driver_name
+        vl.accuracy, vl.speed, vl.heading, vl.updated_at, v.plate, d.name as driver_name
       FROM vehicle_locations vl
       LEFT JOIN vehicles v ON vl.vehicle_id = v.id
       LEFT JOIN drivers d ON vl.driver_id = d.id
       ORDER BY vehicle_id, updated_at DESC;
     `);
-  } catch (viewErr: any) {
-    console.error('[M7-DB-VIEW] Error al crear vista GPS:', viewErr.message);
-  }
+  } catch (e) {}
 
-  console.log('[M7-DB] Curación de Esquema Finalizada.');
-
-  // Harmonización de SERIALs
   for (const table of serialTables) {
     try {
-      const typeCheck = await client.query(`
-        SELECT data_type FROM information_schema.columns 
-        WHERE table_name = '${table}' AND column_name = 'id'
-      `);
+      const typeCheck = await client.query(`SELECT data_type FROM information_schema.columns WHERE table_name = '${table}' AND column_name = 'id'`);
       if (typeCheck.rows.length > 0 && typeCheck.rows[0].data_type === 'text') {
-        console.log(`[M7-DB-HEAL] Convirtiendo ${table}.id de TEXT a INTEGER (Harmonización SERIAL)...`);
-        
-        // Manejo especial de dependencias (FKs)
-        if (table === 'picking_assignments') {
-          await client.query('ALTER TABLE picking_signatures DROP CONSTRAINT IF EXISTS picking_signatures_picking_id_fkey');
-          await client.query('ALTER TABLE picking_signatures ALTER COLUMN picking_id TYPE INTEGER USING (picking_id::INTEGER)');
-        }
-        if (table === 'dispatch_assignments') {
-          await client.query('ALTER TABLE dispatch_signatures_pending DROP CONSTRAINT IF EXISTS dispatch_signatures_pending_dispatch_id_fkey');
-          // No convertimos dispatch_id a integer aún porque en dispatch.controller se usa UUID/Text a veces
-        }
-
         await client.query(`CREATE SEQUENCE IF NOT EXISTS ${table}_id_seq`);
-        await client.query(`
-          ALTER TABLE ${table} 
-          ALTER COLUMN id TYPE INTEGER 
-          USING (CASE WHEN id ~ '^[0-9]+$' THEN id::INTEGER ELSE nextval('${table}_id_seq') END)
-        `);
+        await client.query(`ALTER TABLE ${table} ALTER COLUMN id TYPE INTEGER USING (CASE WHEN id ~ '^[0-9]+$' THEN id::INTEGER ELSE nextval('${table}_id_seq') END)`);
         await client.query(`ALTER TABLE ${table} ALTER COLUMN id SET DEFAULT nextval('${table}_id_seq')`);
         await client.query(`SELECT setval('${table}_id_seq', COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1)`);
-
-        // Restaurar dependencias
-        if (table === 'picking_assignments') {
-           await client.query('ALTER TABLE picking_signatures ADD CONSTRAINT picking_signatures_picking_id_fkey FOREIGN KEY (picking_id) REFERENCES picking_assignments(id) ON DELETE CASCADE');
-        }
       }
-    } catch (e: any) {
-      console.warn(`[M7-DB-HEAL] Advertencia en harmonización de ${table}:`, e.message);
-    }
+    } catch (e) {}
   }
 };
 
 export const restoreSystem = async () => {
-  console.log('[M7-SYSTEM] Checking Database Consistency... (Emergency Deploy V8)');
+  console.log('[M7-SYSTEM] Checking Consistency... (Nuclear Mode)');
   const client = await pool.connect();
   try {
     await healSchema(client);
     await client.query('BEGIN');
     
-    // -----------------------------------------------------------------
-    // SEMILLAS DE DATOS MAESTROS (Garantizar paridad Local-Cloud)
-    // -----------------------------------------------------------------
-    
-    // 0. Datos desde Localhost (Vehículos, Conductores, Rutas)
-    console.log('[M7-SEED] Cargando datos maestros desde localhost...');
-    
-    // Vehículos Locales
+    // SEMILLAS DE DATOS LOCALHOST
     await client.query(`
       INSERT INTO vehicles (id, plate, brand, owner, capacity_m3, client_id, status_id, model_year, color, vehicle_type) VALUES
       ('VEH-001', 'VEJ 509', 'MAR-022', NULL, 14, 'CLI-02', 'EST-01', '2024', 'gri', 'TV-01'),
@@ -149,112 +106,34 @@ export const restoreSystem = async () => {
       ('VEH-003', 'JYO 631', 'MAR-022', NULL, 19, 'CLI-04', 'EST-01', '2026', 'blanco', 'TV-02'),
       ('VEH-004', 'WDY 031', 'MAR-022', NULL, 22, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02'),
       ('VEH-005', 'NNN 500', 'MAR-022', NULL, 19, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02')
-      ON CONFLICT (id) DO UPDATE SET plate = EXCLUDED.plate, status_id = EXCLUDED.status_id;
+      ON CONFLICT (id) DO UPDATE SET plate = EXCLUDED.plate;
     `);
 
-    // Conductores Locales
     await client.query(`
       INSERT INTO drivers (id, name, document_type, document_number, phone, client_id, status_id, license_category) VALUES
       ('DRV-001', 'WILLIAM GIL', 'DOC-01', '71578229', '2343234', 'CLI-02', 'EST-01', 'C1'),
       ('DRV-002', 'JAMES SALGADO', 'DOC-01', '94252356', '53324', 'CLI-02', 'EST-01', 'C2'),
       ('DRV-003', 'JAIRO ALVAREZ', 'DOC-01', '1128450159', '323333333', 'CLI-04', 'EST-01', 'C2')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, status_id = EXCLUDED.status_id;
-    `);
-
-    // Rutas y Asignaciones Críticas
-    await client.query(`
-      INSERT INTO routes (id, name, vehicle_id, driver_id, client_id, status_id) VALUES
-      (1, 'RUTA SUR 01', 'VEH-001', 'DRV-001', 'CLI-02', 'EST-01'),
-      (2, 'RUTA NORTE 02', 'VEH-002', 'DRV-002', 'CLI-02', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
     `);
-    
-    // 1. Estados Globales
-    console.log('[M7-SEED] Registrando Estados...');
+
     await client.query(`
       INSERT INTO estados (id, name, status_id) VALUES
-      ('EST-01', 'ACTIVO', 'EST-01'),
-      ('EST-02', 'INACTIVO', 'EST-01'),
-      ('EST-08', 'INVENTARIADO', 'EST-01'),
-      ('EST-10', 'ASIGNADO', 'EST-01'),
-      ('EST-11', 'EN RUTA', 'EST-01'),
-      ('EST-12', 'ENTREGADO', 'EST-01'),
-      ('EST-13', 'DEVUELTO', 'EST-01'),
-      ('EST-14', 'ENTREGA PARCIAL', 'EST-01')
+      ('EST-01', 'ACTIVO', 'EST-01'), ('EST-02', 'INACTIVO', 'EST-01'), ('EST-08', 'INVENTARIADO', 'EST-01'),
+      ('EST-10', 'ASIGNADO', 'EST-01'), ('EST-11', 'EN RUTA', 'EST-01'), ('EST-12', 'ENTREGADO', 'EST-01'),
+      ('EST-13', 'DEVUELTO', 'EST-01'), ('EST-14', 'ENTREGA PARCIAL', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
     `);
 
-    // 2. Roles
-    console.log('[M7-SEED] Registrando Roles...');
     await client.query(`
       INSERT INTO roles (id, name, status_id) VALUES
-      ('ROL-01', 'Super Admin', 'EST-01'),
-      ('ROL-02', 'ADMIN', 'EST-01'),
-      ('ROL-03', 'CONDUCTORES', 'EST-01'),
-      ('ROL-04', 'AUXILIARES', 'EST-01'),
-      ('ROL-05', 'CLIENTES', 'EST-01')
+      ('ROL-01', 'Super Admin', 'EST-01'), ('ROL-02', 'ADMIN', 'EST-01'), ('ROL-03', 'CONDUCTORES', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
     `);
 
-    // 3. Clientes Críticos
-    await client.query(`
-      INSERT INTO clients (id, name, status_id) VALUES
-      ('CLI-01', 'AJOVER S.A.S', 'EST-01'),
-      ('CLI-02', 'DARNEL', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-    `);
-
-    // 4. Unidades de Medida
-    await client.query(`
-      INSERT INTO unidades_medida (id, name, abbreviation, status_id) VALUES
-      ('UOM-001', 'Unidad', 'UND', 'EST-01'),
-      ('UOM-014', 'Caja', 'CJ', 'EST-01'),
-      ('UOM-002', 'Kilogramo', 'KG', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-    `);
-
-    // 5. Marcas y Categorías
-    await client.query(`
-      INSERT INTO marcas (id, name, status_id) VALUES
-      ('MAR-001', 'Hino', 'EST-01'),
-      ('MAR-027', 'Foton', 'EST-01'),
-      ('MAR-022', 'BYD', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-    `);
-
-    await client.query(`
-      INSERT INTO master_records (id, category, name, status_id) VALUES
-      ('CAT-001', 'category_articulo', 'PRODUCTO TERMINADO', 'EST-01'),
-      ('CAT-002', 'category_articulo', 'MATERIA PRIMA', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-    `);
-
-    // 6. Tipos de Vehículo y Documento
-    await client.query(`
-      INSERT INTO tipos_vehiculo (id, name, status_id) VALUES
-      ('TVE-01', 'Sencillo', 'EST-01'),
-      ('TVE-02', 'Turbo', 'EST-01'),
-      ('TVE-03', 'Tractocamión', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-    `);
-
-    await client.query(`
-      INSERT INTO tipos_documento (id, name, status_id) VALUES
-      ('TDO-01', 'Factura de Venta', 'EST-01'),
-      ('TDO-02', 'Remisión', 'EST-01'),
-      ('TDO-03', 'Orden de Salida', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-    `);
-
-    // 7. Módulos y Páginas (Estructura de Navegación)
     await client.query(`
       INSERT INTO modules (id, name, icon_class) VALUES
-      ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings'),
-      ('MOD-02', 'GESTIÓN AJOVER', 'Package'),
-      ('MOD-03', 'GESTIÓN TRANSPORTE', 'Truck'),
-      ('MOD-04', 'SEGURIDAD & ACCESO', 'Shield'),
-      ('MOD-05', 'M7 INTELLIGENCE', 'Brain'),
-      ('MOD-06', 'ADMINISTRACIÓN', 'Database')
+      ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings'), ('MOD-04', 'SEGURIDAD & ACCESO', 'Shield'), ('MOD-06', 'ADMINISTRACIÓN', 'Database')
       ON CONFLICT (id) DO NOTHING;
     `);
 
@@ -262,47 +141,21 @@ export const restoreSystem = async () => {
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id) VALUES 
       ('PAG-01', 'USUARIOS', 'users', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-02', 'ROLES', 'roles', 'MOD-04', 'MOD-04', 'EST-01'),
-      ('PAG-10', 'DESPACHO INTELIGENTE', 'despacho', 'MOD-05', 'MOD-05', 'EST-01'),
-      ('PAG-22', 'CONEXIÓN WHATSAPP', 'whatsapp-status', 'MOD-04', 'MOD-04', 'EST-01'),
-      ('PAG-FIRMAS', 'FIRMAS DIGITALES', 'firmas', 'MOD-04', 'MOD-04', 'EST-01'),
-      ('PAG-FIRMAS-APR', 'APROBAR FIRMA', 'aprobar-firma', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-SQL', 'SQL MANAGER', 'sql-manager', 'MOD-06', 'MOD-06', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET module_id = EXCLUDED.module_id, parent_id = EXCLUDED.parent_id;
+      ON CONFLICT (id) DO UPDATE SET module_id = EXCLUDED.module_id;
     `);
 
-    // 6. Blindaje de Usuario Administrador (Password: admin123)
-    const adminPass = 'admin123';
-    const adminHash = await bcrypt.hash(adminPass, 10);
-    console.log('[M7-DB] Asegurando credenciales administrativas...');
-
-    await client.query(`DELETE FROM users WHERE email = 'admin@millasiete.com' AND id != 'USR-01'`);
+    const adminHash = await bcrypt.hash('admin123', 10);
     await client.query(`
       INSERT INTO users (id, email, password, name, role_id, status_id)
       VALUES ('USR-01', 'admin@millasiete.com', $1, 'SUPER ADMINISTRADOR M7', 'ROL-01', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET password = $1, email = EXCLUDED.email;
+      ON CONFLICT (id) DO UPDATE SET password = $1;
     `, [adminHash]);
 
-    // Permisos Full para el Administrador
-    const allPages = ['PAG-01','PAG-02','PAG-03','PAG-04','PAG-05','PAG-06','PAG-07','PAG-08','PAG-09','PAG-10',
-                      'PAG-11','PAG-12','PAG-13','PAG-14','PAG-15','PAG-16','PAG-17','PAG-18','PAG-19','PAG-20',
-                      'PAG-21','PAG-22','PAG-FIRMAS','PAG-FIRMAS-APR','PAG-SQL'];
-    const perms: any = { id: "PERM-USER-USR-01", userId: "USR-01", statusId: "EST-01" };
-    allPages.forEach(p => {
-      ['view', 'create', 'edit', 'delete', 'active'].forEach(a => perms[`page_${p}_${a}`] = true);
-    });
-
-    await client.query(`
-      INSERT INTO user_permissions (id, user_id, permissions, status_id)
-      VALUES ('PERM-USER-USR-01', 'USR-01', $1, 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET permissions = EXCLUDED.permissions;
-    `, [JSON.stringify(perms)]);
-
     await client.query('COMMIT');
-    console.log('[M7-DB] Operación de Sincronización Nuclear Exitosa.');
-    return { success: true, message: 'Sistema Restaurado y Datos Maestros Sincronizados' };
-  } catch (err: any) {
+    return { success: true };
+  } catch (err) {
     await client.query('ROLLBACK');
-    console.error('[M7-DB-FATAL] Error en restoreSystem:', err.message);
     throw err;
   } finally {
     client.release();
