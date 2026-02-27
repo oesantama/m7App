@@ -51,7 +51,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [allClients, setAllClients] = useState<{id: string, name: string}[]>([]);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
-  // Estados para Modal de Detalle (Recepción/AuditorÃ­a)
+  // Estados para Modal de Detalle (Recepción/Auditoría)
   const [modalSearch, setModalSearch] = useState('');
   const [modalPage, setModalPage] = useState(1);
   const [modalPageSize, setModalPageSize] = useState<number | 'all'>(10);
@@ -75,12 +75,12 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       return date.toISOString().split('T')[0]; // Formato YYYY-MM-DD para SQL
     }
     const str = String(val).trim();
-    if (!str || str.toUpperCase() === 'S/I' || str.toUpperCase() === 'SIN INFORMACIÃ“N') return null;
+    if (!str || str.toUpperCase() === 'S/I' || str.toUpperCase() === 'SIN INFORMACIÓN') return null;
     return str;
   };
 
   const pendingDocs = useMemo(() => {
-    // Normalización y DEDUPLICACIÃ“N (M7 Safety)
+    // Normalización y DEDUPLICACIÓN (M7 Safety)
     const uniqueMap = new Map();
     documents.forEach(d => {
       // Normalizar campos para la llave única
@@ -187,7 +187,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
   const getSortIndicator = (key: string) => {
     if (!sortConfig || sortConfig.key !== key) return null;
-    return sortConfig.direction === 'asc' ? ' â†‘' : ' â†“';
+    return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
@@ -218,7 +218,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         if (headerRowIndex === -1) {
           setSyncError({
             title: "M7 FORMAT ERROR",
-            message: "No se detectó la fila de tÃ­tulos. Verifique el formato del archivo Excel.",
+            message: "No se detectó la fila de títulos. Verifique el formato del archivo Excel.",
             duplicates: []
           });
           return;
@@ -226,7 +226,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
         const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
         
-        // FUNCIÃ“N DE BÃšSQUEDA MEJORADA: PRIORIDAD EXACTA
+        // FUNCIÓN DE BÚSQUEDA MEJORADA: PRIORIDAD EXACTA
         const findIdx = (terms: string[]) => {
            // Paso 1: Búsqueda EXACTA
            const exactIdx = headers.findIndex(h => {
@@ -248,27 +248,27 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iExactUnOrig = headers.findIndex(h => h.toLowerCase().trim() === 'un orig');
         const iExactUn = headers.findIndex(h => h.toLowerCase().trim() === 'un');
 
-        const iPlaca = findIdx(['placa', 'vehÃ­culo', 'vehiculo', 'plate']);
-        // Quitamos "carga" de tÃ©rminos genÃ©ricos que pueden coincidir con "carga wms" si queremos ser estrictos, 
-        // pero con la prioridad exacta "Carga" ganarÃ¡ a "Carga WMS".
-        const iCarga = findIdx(['carga', 'nÂº carga', 'n de carga', 'documento de transporte', 'shipment', 'viaje', 'trip']);
+        const iPlaca = findIdx(['placa', 'vehículo', 'vehiculo', 'plate']);
+        // Quitamos "carga" de términos genéricos que pueden coincidir con "carga wms" si queremos ser estrictos, 
+        // pero con la prioridad exacta "Carga" ganará a "Carga WMS".
+        const iCarga = findIdx(['carga', 'nº carga', 'n de carga', 'documento de transporte', 'shipment', 'viaje', 'trip']);
         
         // Guardar nombres reales de columnas detectadas para DEBUG
         const headerPlaca = iPlaca !== -1 ? headers[iPlaca] : 'NO DETECTADA';
         const headerCarga = iCarga !== -1 ? headers[iCarga] : 'NO DETECTADA';
         setDetectedHeaders({ placa: headerPlaca, carga: headerCarga });
 
-        // VALIDACIÃ“N CRÃTICA DE COLUMNAS
+        // VALIDACIÓN CRÃTICA DE COLUMNAS
         if (iPlaca === -1 || iCarga === -1) {
              setSyncError({
                title: "ERROR DE FORMATO M7",
-               message: `No se pudieron identificar las columnas obligatorias: ${iPlaca === -1 ? 'PLACA' : ''} ${iCarga === -1 ? 'CARGA' : ''}. Por favor verifique los tÃ­tulos en la fila de cabecera.`,
+               message: `No se pudieron identificar las columnas obligatorias: ${iPlaca === -1 ? 'PLACA' : ''} ${iCarga === -1 ? 'CARGA' : ''}. Por favor verifique los títulos en la fila de cabecera.`,
                duplicates: []
              });
              return;
         }
 
-        // VALIDACIÃ“N ESTRICTA POR TIPO DE PLAN (Solicitud Usuario)
+        // VALIDACIÓN ESTRICTA POR TIPO DE PLAN (Solicitud Usuario)
         if (type === 'Plan Normal') {
           if (iExactUnOrig === -1) {
             setSyncError({
@@ -304,7 +304,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
         const isPlanR = type === 'Plan R';
 
-        // Lógica EspecÃ­fica por Tipo de Plan
+        // Lógica Específica por Tipo de Plan
         const iFechaEnvio = isPlanR 
           ? -1 // Plan R no tiene fecha demanda, se usa fecha actual
           : findIdx(['f demanda', 'f. demanda', 'fecha demanda', 'ship date']);
@@ -329,7 +329,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iFactura = findIdx(['remision/transferencia', 'factura', 'remision', 'documento', 'invoice']);
         const iCiudad = findIdx(['destino', 'ciudad', 'city']);
         const iDir = findIdx(['dirección 1', 'dirección', 'dirección1', 'direccion 1', 'direccion', 'direccion1', 'dir 1', 'dir1', 'address', 'f_dirección', 'f_direccion', 'dirección 1', 'dirección']);
-        const iPed = findIdx(['nÂº ped', 'pedido', 'order']);
+        const iPed = findIdx(['nº ped', 'pedido', 'order']);
         const iPeso = findIdx(['peso', 'weight', 'kgs', 'kilogramos']);
         
         // [NEW] Campos requeridos en detalle con discriminación por Plan (Solicitud Usuario)
@@ -339,7 +339,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
         const iClientRefDetail = isPlanR 
           ? findIdx(['cliente']) 
-          : findIdx(['envÃ­o', 'envio']);
+          : findIdx(['envío', 'envio']);
         
         const dataRows = rawData.slice(headerRowIndex + 1);
         const docsMap = new Map<string, { codplan: string, placa: string, carga: string, city: string, address: string, deliveryDate: string | null, items: any[], consolidatedItems: any[] }>();
@@ -385,7 +385,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                      return parseFloat(val) || 0;
                  }
 
-                 // REGLA M7: CANTIDADES Y VOLÃšMENES
+                 // REGLA M7: CANTIDADES Y VOLÚMENES
                  if (columnType === 'qty' || columnType === 'vol') {
                      if (!isPlanR) {
                          // Plan Normal: Coma (,) es decimal
@@ -404,7 +404,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             const pesoVal = isPlanR ? parseNumberM7(val(iPeso), true, 'weight') : 0;
             let volVal = parseNumberM7(val(iVolTotal), isPlanR, 'vol');
             
-            // CONVERSIÃ“N DE UNIDADES (M7 SMART DETECT)
+            // CONVERSIÓN DE UNIDADES (M7 SMART DETECT)
             if (!isPlanR && iVolUnit !== -1) {
                 const vUnit = val(iVolUnit).toUpperCase().trim();
                 if (vUnit === 'CM3' || vUnit === 'CMT3') {
@@ -415,7 +415,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                 volVal = volVal / 1000000;
             }
 
-            // 1. Mapeo para RECEPCIÃ“N (Detalle LogÃ­stico / Conductor)
+            // 1. Mapeo para RECEPCIÓN (Detalle Logístico / Conductor)
             group.items.push({
               articleId: sku,
               expectedQty: qty,
@@ -446,7 +446,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           }
         });
 
-        // VALIDACIÃ“N DE DUPLICADOS: Placa y Carga (Case Insensitive)
+        // VALIDACIÓN DE DUPLICADOS: Placa y Carga (Case Insensitive)
         const mapped: PreviewDocument[] = Array.from(docsMap.entries()).map(([key, data]) => {
           const existingDoc = documents.find(d => {
             const dCarga = String(d.externalDocId || (d as any).external_doc_id || '').trim().toLowerCase();
@@ -470,7 +470,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             city: data.city,
             address: data.address,
             planType: type as any,
-            inventoryNotes: `M7 Cargue: ${data.items.length} lÃ­neas`,
+            inventoryNotes: `M7 Cargue: ${data.items.length} líneas`,
             items: data.items,
             consolidatedItems: data.consolidatedItems,
             createdAt: new Date().toISOString(),
@@ -490,7 +490,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       } catch (err) {
         setSyncError({
           title: "M7 ERROR",
-          message: "Fallo crÃ­tico en lectura de Excel.",
+          message: "Fallo crítico en lectura de Excel.",
           duplicates: []
         });
       }
@@ -526,7 +526,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     const newDocs = preview.mapped.filter(d => !d.isDuplicate);
     const duplicatedDocs = preview.mapped.filter(d => d.isDuplicate);
 
-    // Preparar payload: Los que son HeaderUpdate se envÃ­an SIN items para evitar duplicar cantidades
+    // Preparar payload: Los que son HeaderUpdate se envían SIN items para evitar duplicar cantidades
     const payloadDocs = newDocs.map(d => {
       if (d.isHeaderUpdate) {
         return { ...d, items: [], consolidatedItems: [] };
@@ -550,7 +550,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
          toast.error("Error al sincronizar con el servidor. Verifique su conexión.");
       });
 
-      // Si habÃ­a duplicados, avisamos pero permitimos el proceso de los nuevos
+      // Si había duplicados, avisamos pero permitimos el proceso de los nuevos
       if (duplicatedDocs.length > 0) {
         setSyncError({
           title: "Sincronización Parcial",
@@ -562,7 +562,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       // Si todos son duplicados, bloqueamos totalmente y mostramos detalle
       setSyncError({
         title: "Bloqueo de Sincronización",
-        message: "No se guardó nada. Todos los documentos del archivo ya existen en el sistema. Revise si estÃ¡ intentando cargar el mismo archivo.",
+        message: "No se guardó nada. Todos los documentos del archivo ya existen en el sistema. Revise si está intentando cargar el mismo archivo.",
         duplicates: duplicatedDocs.map(d => ({ placa: d.vehicleData || 'S/I', carga: d.externalDocId }))
       });
     }
@@ -599,36 +599,41 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     onSearchChange, 
     pageSize, 
     onPageSizeChange, 
-    placeholder = "BUSCAR..." 
+    placeholder = "BUSCAR...",
+    showSearch = true,
+    showPageSize = true
   }: any) => (
-    <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50 p-4 rounded-3xl border border-slate-100 shadow-sm transition-all hover:bg-slate-50">
-      <div className="bg-white h-10 px-4 rounded-xl flex items-center gap-3 w-full md:w-80 shadow-inner border border-slate-100 transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
-        <Icons.Search className="w-3 h-3 text-slate-300" />
-        <input 
-          type="text" 
-          placeholder={placeholder} 
-          value={searchValue} 
-          onChange={(e) => {
-            onSearchChange(e.target.value);
-            // Reset page on search
-          }} 
-          className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full text-slate-600 placeholder:text-slate-300" 
-        />
-      </div>
-      <div className="flex items-center gap-4 shrink-0 overflow-x-auto custom-scrollbar pb-1 md:pb-0">
-        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Mostrar:</span>
-        <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-100 shadow-sm">
-          {[5, 10, 20, 50, 'all'].map((size) => (
-            <button
-              key={size}
-              onClick={() => onPageSizeChange(size)}
-              className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all whitespace-nowrap ${pageSize === size ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-900'}`}
-            >
-              {size === 'all' ? 'Todos' : size}
-            </button>
-          ))}
+    <div className={`flex flex-col md:flex-row justify-between items-center gap-4 ${showSearch ? 'bg-slate-50/50 p-4 rounded-3xl border border-slate-100 shadow-sm' : ''} transition-all hover:bg-slate-50`}>
+      {showSearch && (
+        <div className="bg-white h-10 px-4 rounded-xl flex items-center gap-3 w-full md:w-80 shadow-inner border border-slate-100 transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
+          <Icons.Search className="w-3 h-3 text-slate-300" />
+          <input 
+            type="text" 
+            placeholder={placeholder} 
+            value={searchValue} 
+            onChange={(e) => {
+              onSearchChange(e.target.value);
+            }} 
+            className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full text-slate-800 placeholder:text-slate-400" 
+          />
         </div>
-      </div>
+      )}
+      {showPageSize && (
+        <div className="flex items-center gap-4 shrink-0 overflow-x-auto custom-scrollbar pb-1 md:pb-0" title="Seleccionar cantidad de registros a mostrar">
+          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Mostrar:</span>
+          <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-100 shadow-sm">
+            {[5, 10, 20, 50, 'all'].map((size) => (
+              <button
+                key={size}
+                onClick={() => onPageSizeChange(size)}
+                className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all whitespace-nowrap ${pageSize === size ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-900'}`}
+              >
+                {size === 'all' ? 'Todos' : size}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -650,7 +655,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       </div>
 
       <div className="flex-1 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
           {activeTab === 'cargue' ? (
             <div className="max-w-7xl mx-auto space-y-12">
               {!preview ? (
@@ -678,7 +683,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
                   <div className="space-y-8">
                     <div className="flex flex-col gap-6">
-                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] shrink-0 px-2">Pendientes por AuditorÃ­a ({pendingDocs.length})</h4>
+                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] shrink-0 px-2">Pendientes por Auditoría ({pendingDocs.length})</h4>
                        <TableControls 
                          searchValue={searchTerm} 
                          onSearchChange={(val:string) => {setSearchTerm(val); setPendingPage(1);}}
@@ -732,65 +737,82 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                        ))}
                     </div>
 
-                    {totalPendingPages > 1 && (
-                      <div className="flex justify-center items-center gap-4 mt-8">
-                         <button disabled={pendingPage === 1} onClick={()=>setPendingPage(p => p-1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
-                         <span className="text-[10px] font-black uppercase">PÃ¡g {pendingPage} de {totalPendingPages}</span>
-                         <button disabled={pendingPage >= totalPendingPages} onClick={()=>setPendingPage(p => p+1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
+                     {totalPendingPages > 1 && (
+                      <div className="flex flex-col items-center gap-4 mt-8">
+                         <div className="flex justify-center items-center gap-4">
+                            <button disabled={pendingPage === 1} onClick={()=>setPendingPage(p => p-1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20" title="Anterior"><Icons.ChevronRight className="rotate-180" /></button>
+                            <span className="text-[10px] font-black uppercase">Pág {pendingPage} de {totalPendingPages}</span>
+                            <button disabled={pendingPage >= totalPendingPages} onClick={()=>setPendingPage(p => p+1)} className="p-3 bg-slate-100 rounded-xl disabled:opacity-20" title="Siguiente"><Icons.ChevronRight /></button>
+                         </div>
+                         <TableControls 
+                            showSearch={false}
+                            pageSize={pendingPageSize}
+                            onPageSizeChange={(size:any) => {setPendingPageSize(size); setPendingPage(1);}}
+                         />
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
                 <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-                    <div className="bg-slate-950 px-6 py-4 text-white flex justify-between items-center shrink-0">
-                       <div className="flex items-center gap-6">
-                         <div className={`px-10 py-4 rounded-2xl text-[14px] font-black uppercase tracking-[0.2em] shadow-2xl ${preview.type === 'Plan R' ? 'bg-blue-600' : 'bg-emerald-600'}`}>{preview.type}</div>
-                         <div>
-                           <div className="flex items-center gap-3">
-                              <h4 className="font-black uppercase text-lg tracking-tighter leading-none">Pre-Validación M7</h4>
-                              
-                              {/* [NEW] Selector de Cliente para Carga Masiva */}
-                              {(user.clientIds && user.clientIds.length > 1) && (
-                                  <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-lg border border-white/20">
-                                      <span className="text-[9px] font-black text-white/50 uppercase">Destino:</span>
-                                      <select 
-                                        value={selectedClientId}
-                                        onChange={(e) => setSelectedClientId(e.target.value)}
-                                        className="bg-transparent text-white font-black text-[10px] outline-none cursor-pointer"
-                                      >
-                                          {user.clientIds.map(cid => {
-                                              const clin = allClients.find(c => c.id === cid);
-                                              return (
-                                                  <option key={cid} value={cid} className="text-slate-900">
-                                                      {clin ? clin.name.toUpperCase() : cid}
-                                                  </option>
-                                              );
-                                          })}
-                                      </select>
-                                  </div>
-                              )}
-                           </div>
-                           <div className="flex gap-4 items-center mt-1">
-                              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{preview.fileName}</p>
-                              <div className="h-4 w-[1px] bg-slate-800"></div>
-                              <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Total Unidades: {preview.mapped.reduce((acc, doc) => acc + doc.items.reduce((sum, it) => sum + (Number(it.expectedQty) || 0), 0), 0).toLocaleString()}</p>
-                           </div>
-                         </div>
+                    <div className="bg-slate-950 px-4 py-2 text-white flex justify-between items-center shrink-0">
+                       <div className="flex items-center gap-4">
+                          <div className={`px-5 py-2 rounded-xl text-[12px] font-black uppercase tracking-[0.1em] shadow-2xl ${preview.type === 'Plan R' ? 'bg-blue-600' : 'bg-emerald-600'}`}>{preview.type}</div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-3">
+                               <h4 className="font-black uppercase text-sm tracking-tighter leading-none">Pre-Validación M7</h4>
+                               
+                               {(user.clientIds && user.clientIds.length > 1) && (
+                                   <div className="flex items-center gap-2 bg-white/10 px-2 py-0.5 rounded-lg border border-white/20">
+                                       <span className="text-[8px] font-black text-white/50 uppercase">Destino:</span>
+                                       <select 
+                                         value={selectedClientId}
+                                         onChange={(e) => setSelectedClientId(e.target.value)}
+                                         className="bg-transparent text-white font-black text-[9px] outline-none cursor-pointer"
+                                       >
+                                           {user.clientIds.map(cid => {
+                                               const clin = allClients.find(c => c.id === cid);
+                                               return (
+                                                   <option key={cid} value={cid} className="text-slate-900">
+                                                       {clin ? clin.name.toUpperCase() : cid}
+                                                   </option>
+                                               );
+                                           })}
+                                       </select>
+                                   </div>
+                               )}
+                            </div>
+                            <div className="flex gap-4 items-center mt-0.5">
+                               <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">{preview.fileName}</p>
+                               <div className="h-3 w-[1px] bg-slate-800"></div>
+                               <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Total: {preview.mapped.reduce((acc, doc) => acc + doc.items.reduce((sum, it) => sum + (Number(it.expectedQty) || 0), 0), 0).toLocaleString()}</p>
+                            </div>
+                          </div>
                        </div>
+                       
+                       <div className="flex items-center gap-4 flex-1 justify-center max-w-md mx-4">
+                          <div className="bg-white h-9 px-4 rounded-xl flex items-center gap-3 w-full shadow-inner border border-slate-100 transition-all focus-within:ring-2 focus-within:ring-emerald-500/20">
+                            <Icons.Search className="w-3 h-3 text-slate-400" />
+                            <input 
+                              type="text" 
+                              placeholder="BUSCAR EN PRE-VALIDACIÓN..." 
+                              value={previewSearch} 
+                              onChange={(e) => {
+                                setPreviewSearch(e.target.value);
+                                setPreviewPage(1);
+                              }} 
+                              className="bg-transparent border-none outline-none font-black text-[9px] uppercase w-full text-slate-800 placeholder:text-slate-400" 
+                            />
+                          </div>
+                       </div>
+
                       <div className="flex items-center gap-3">
-                         <button onClick={() => exportToExcel(filteredPreviewItems, "M7_Prevalidacion")} className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl"><Icons.Excel className="w-4 h-4" /></button>
-                         <button onClick={()=>setPreview(null)} className="w-8 h-8 rounded-full hover:bg-red-500 transition-all flex items-center justify-center text-xl font-thin">Ã—</button>
+                         <button onClick={() => exportToExcel(filteredPreviewItems, "M7_Prevalidacion")} className="p-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 transition-all shadow-lg" title="Exportar a Excel"><Icons.Excel className="w-4 h-4" /></button>
+                         <button onClick={()=>setPreview(null)} className="p-2 bg-white/10 text-white rounded-xl hover:bg-red-500 transition-all" title="Cerrar"><Icons.X className="w-4 h-4" /></button>
                       </div>
                    </div>
                     <div className="p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
-                       <TableControls 
-                         searchValue={previewSearch} 
-                         onSearchChange={(val:string) => {setPreviewSearch(val); setPreviewPage(1);}}
-                         pageSize={previewPageSize}
-                         onPageSizeChange={(size:any) => {setPreviewPageSize(size); setPreviewPage(1);}}
-                         placeholder="BUSCAR EN PRE-VALIDACIÃ“N (SKU, CARGA, PLACA)..."
-                       />
+
 
                        {preview.mapped.some(d => d.isDuplicate) && (
                          <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-r-xl space-y-4">
@@ -803,7 +825,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                            </div>
                            <div className="bg-white/50 p-4 rounded-xl border border-amber-200/50 max-h-32 overflow-y-auto">
                               <table className="w-full text-left text-[9px]">
-                                 <thead className="text-amber-900/50 uppercase"><tr><th>Placa LeÃ­da</th><th>Carga LeÃ­da</th></tr></thead>
+                                 <thead className="text-amber-900/50 uppercase"><tr><th>Placa Leída</th><th>Carga Leída</th></tr></thead>
                                  <tbody className="font-black text-amber-900">
                                    {preview.mapped.filter(d => d.isDuplicate).map((d, i) => (
                                      <tr key={i}>
@@ -814,20 +836,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                  </tbody>
                               </table>
                            </div>
-                           <p className="text-[9px] font-bold text-amber-600 italic">Verifique que no estÃ© intentando subir un archivo ya procesado.</p>
+                           <p className="text-[9px] font-bold text-amber-600 italic">Verifique que no esté intentando subir un archivo ya procesado.</p>
                          </div>
                        )}
 
-                       {/* INFO DE MAPEO DE COLUMNAS COMPACTA */}
-                       {detectedHeaders && (
-                          <div className="px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
-                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Diagnóstico de Lectura</span>
-                             <div className="flex gap-3 text-[8px]">
-                                <span className="text-slate-500 font-bold">Placa: <span className="text-slate-900 font-black">{detectedHeaders.placa}</span></span>
-                                <span className="text-slate-500 font-bold">Carga: <span className="text-slate-900 font-black">{detectedHeaders.carga}</span></span>
-                             </div>
-                          </div>
-                       )}
+
 
                        <div className="bg-slate-50 rounded-[1.5rem] overflow-hidden border border-slate-200 shadow-sm">
                          <div className="overflow-x-auto">
@@ -837,7 +850,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                  <th className="px-4 py-3">Documento / Placa</th>
                                  <th className="px-4 py-3">Articulo</th>
                                  <th className="px-4 py-3 text-center">Cant.</th>
-                                 <th className="px-4 py-3">NÂº Ped</th>
+                                 <th className="px-4 py-3">Nº Ped</th>
                                  <th className="px-4 py-3">Factura</th>
                                  <th className="px-4 py-3">UM</th>
                                  <th className="px-4 py-3">Vol. Total</th>
@@ -876,10 +889,17 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                          </div>
                        </div>
                       {totalPreviewPages > 1 && (
-                        <div className="flex justify-center items-center gap-4 mt-4">
-                           <button disabled={previewPage === 1} onClick={()=>setPreviewPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
-                           <span className="text-[10px] font-black uppercase">PÃ¡g {previewPage} de {totalPreviewPages}</span>
-                           <button disabled={previewPage >= totalPreviewPages} onClick={()=>setPreviewPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
+                        <div className="flex flex-col items-center gap-4 mt-4">
+                           <div className="flex justify-center items-center gap-4">
+                              <button disabled={previewPage === 1} onClick={()=>setPreviewPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20" title="Anterior"><Icons.ChevronRight className="rotate-180" /></button>
+                              <span className="text-[10px] font-black uppercase">Pág {previewPage} de {totalPreviewPages}</span>
+                              <button disabled={previewPage >= totalPreviewPages} onClick={()=>setPreviewPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20" title="Siguiente"><Icons.ChevronRight /></button>
+                           </div>
+                           <TableControls 
+                              showSearch={false}
+                              pageSize={previewPageSize}
+                              onPageSizeChange={(size:any) => {setPreviewPageSize(size); setPreviewPage(1);}}
+                           />
                         </div>
                       )}
                    </div>
@@ -923,13 +943,13 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                        <p className="text-[9px] md:text-[10px] font-black text-red-100 uppercase tracking-widest mt-1 md:mt-2 bg-red-800/30 px-3 py-1 rounded-full inline-block">CONFLICTO OPERATIVO CRÃTICO</p>
                      </div>
                   </div>
-                  <button onClick={() => setSyncError(null)} className="text-3xl md:text-4xl font-thin hover:opacity-70 transition-all">Ã—</button>
+                  <button onClick={() => setSyncError(null)} className="p-2 hover:bg-white/20 rounded-xl transition-all" title="Cerrar"><Icons.X className="w-6 h-6 md:w-8 md:h-8" /></button>
                </div>
                <div className="p-8 md:p-20 space-y-8 md:space-y-12 bg-slate-50/20 flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center justify-center text-center">
                   <div className="max-w-4xl space-y-6 md:space-y-10">
                     <p className="text-slate-900 font-black text-2xl md:text-5xl leading-tight uppercase tracking-tight">{syncError.message}</p>
                     <div className="h-1.5 md:h-2 w-24 md:w-40 bg-red-600 mx-auto rounded-full"></div>
-                    <p className="text-slate-400 font-bold text-sm md:text-xl uppercase tracking-[0.2em] md:tracking-[0.3em]">SISTEMA DE SEGURIDAD M7 GESTIÃ“N LOGÃSTICA</p>
+                    <p className="text-slate-400 font-bold text-sm md:text-xl uppercase tracking-[0.2em] md:tracking-[0.3em]">SISTEMA DE SEGURIDAD M7 GESTIÓN LOGÃSTICA</p>
                   </div>
                   
                   {syncError.duplicates.length > 0 && (
@@ -969,7 +989,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                  </div>
                  <div className="flex items-center gap-4">
                     <button onClick={() => exportToExcel(selectedPendingDoc.items, `M7_Detalles_${selectedPendingDoc.externalDocId}`)} className="px-5 py-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl flex items-center gap-2 font-black text-[9px] uppercase"><Icons.Excel className="w-4 h-4" /> Exportar</button>
-                     <button onClick={()=>setSelectedPendingDoc(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-3xl font-thin">×</button>
+                     <button onClick={()=>setSelectedPendingDoc(null)} className="p-2 hover:bg-red-600 rounded-xl transition-all" title="Cerrar"><Icons.X className="w-6 h-6" /></button>
                  </div>
               </div>
               
@@ -1069,9 +1089,9 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                           </div>
                           {totalModalPages > 1 && (
                             <div className="flex justify-center items-center gap-4 mt-4 p-4 border-t bg-slate-50">
-                               <button disabled={modalPage === 1} onClick={()=>setModalPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
+                               <button disabled={modalPage === 1} onClick={()=>setModalPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20" title="Anterior"><Icons.ChevronRight className="rotate-180" /></button>
                                <span className="text-[10px] font-black uppercase">Pág {modalPage} de {totalModalPages}</span>
-                               <button disabled={modalPage >= totalModalPages} onClick={()=>setModalPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
+                               <button disabled={modalPage >= totalModalPages} onClick={()=>setModalPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20" title="Siguiente"><Icons.ChevronRight /></button>
                             </div>
                           )}
                        </div>
@@ -1117,7 +1137,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                          {totalModalPages > 1 && (
                            <div className="flex justify-center items-center gap-4 mt-4 p-4 border-t bg-slate-50">
                               <button disabled={modalPage === 1} onClick={()=>setModalPage(p=>p-1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180" /></button>
-                              <span className="text-[10px] font-black uppercase">PÃ¡g {modalPage} de {totalModalPages}</span>
+                              <span className="text-[10px] font-black uppercase">Pág {modalPage} de {totalModalPages}</span>
                               <button disabled={modalPage >= totalModalPages} onClick={()=>setModalPage(p=>p+1)} className="p-3 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight /></button>
                            </div>
                          )}
