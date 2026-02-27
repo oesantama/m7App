@@ -169,15 +169,15 @@ export const restoreSystem = async () => {
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id) VALUES 
       ('PAG-01', 'USUARIOS', 'users', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-02', 'ROLES', 'roles', 'MOD-04', 'MOD-04', 'EST-01'),
-      ('PAG-SQL', 'SQL MANAGER', 'sql-manager', 'MOD-06', 'MOD-06', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET module_id = EXCLUDED.module_id;
+      ('PAG-SQL', 'Gestor DB', 'admin-db', 'MOD-06', 'MOD-06', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route, module_id = EXCLUDED.module_id;
     `);
 
     const adminHash = await bcrypt.hash('admin123', 10);
     await client.query(`
-      INSERT INTO users (id, email, password, name, role_id, status_id)
-      VALUES ('USR-01', 'admin@millasiete.com', $1, 'SUPER ADMINISTRADOR M7', 'ROL-01', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET password = $1;
+      INSERT INTO users (id, email, password, name, role_id, status_id, permissions)
+      VALUES ('USR-01', 'admin@millasiete.com', $1, 'SUPER ADMINISTRADOR M7', 'ROL-01', 'EST-01', '[{"module": "admin-db", "actions": ["view", "edit", "delete", "create"]}]'::jsonb)
+      ON CONFLICT (id) DO UPDATE SET password = $1, permissions = EXCLUDED.permissions;
     `, [adminHash]);
 
     await client.query('COMMIT');

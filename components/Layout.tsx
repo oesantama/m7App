@@ -136,16 +136,7 @@ const Layout: React.FC<LayoutProps> = ({
     })
     .filter(group => group.items.length > 0);
 
-  if (user.email === 'admin@millasiete.com') {
-    menuGroups.push({
-      id: 'admin-group',
-      label: 'ADMINISTRACIÓN',
-      icon: getIcon('Shield'), 
-      items: [
-        { id: 'admin-db-page', label: 'SQL MANAGER', module: 'admin-db' as any, masterCat: '' as any }
-      ]
-    });
-  } 
+  /* Módulo de Administración ahora manejado dinámicamente vía DB */
 
 
 
