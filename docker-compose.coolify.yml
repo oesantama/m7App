@@ -14,7 +14,8 @@ services:
       - DB_NAME=${POSTGRES_DB}
       - NODE_ENV=production
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - m7-network
 
@@ -25,7 +26,8 @@ services:
       dockerfile: Dockerfile.frontend
     restart: always
     depends_on:
-      - m7app-backend
+      m7app-backend:
+        condition: service_started
     networks:
       - m7-network
 
@@ -64,6 +66,12 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - m7_logistica_data:/var/lib/postgresql/data
+      - ./database/seed:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - m7-network
 
