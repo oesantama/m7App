@@ -163,6 +163,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </div>
                   <input
                     id="email"
+                    name="email"
                     type="text"
                     required
                     value={email}
@@ -193,6 +194,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </div>
                   <input
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}

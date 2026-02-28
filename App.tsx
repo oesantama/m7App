@@ -792,6 +792,8 @@ const App: React.FC = () => {
     return (
       <>
         <Toaster position="top-right" richColors theme="dark" />
+        <PWABanner />
+
         <PortalLayout>
           {portalRoute === 'login' && <ClientLogin onLogin={(token, user) => {
             // Handle client login state if we want persistence, for now just show success and maybe redirect to dashboard
@@ -824,6 +826,8 @@ const App: React.FC = () => {
           style: { borderRadius: '1.5rem', padding: '1.25rem' }
         }}
       />
+      <PWABanner />
+
       <Layout
         user={user!}
         activeTab={activeTab}

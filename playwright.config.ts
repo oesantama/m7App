@@ -5,17 +5,27 @@ export default defineConfig({
   timeout: 60000,
   fullyParallel: false,
   workers: 1,
-  reporter: 'list',
+  reporter: [['list'], ['html']],
   use: {
-    baseURL: 'http://127.0.0.1:3000',
-    trace: 'on',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
+    trace: 'on-first-retry',
+    video: 'on-first-retry',
     viewport: { width: 1280, height: 720 },
   },
 
   projects: [
     {
-      name: 'chromium',
+      name: 'desktop-chrome',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'tablet-safari',
+      use: { ...devices['iPad (gen 7) landscape'] },
     },
   ],
 });
+

@@ -3,7 +3,16 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const fetchJson = async (url: string, options?: RequestInit) => {
-  const res = await fetch(url, options);
+  const sessionStr = localStorage.getItem('m7_user_session');
+  const sessionObj = sessionStr ? JSON.parse(sessionStr) : null;
+  const token = sessionObj?.token || localStorage.getItem('token');
+  
+  const headers = new Headers(options?.headers);
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
@@ -90,6 +99,17 @@ export const api = {
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO
   getUsers: () => fetchJson(`${API_URL}/users?_t=${Date.now()}`),
+  getClients: () => fetchJson(`${API_URL}/clients`),
+  getRoles: () => fetchJson(`${API_URL}/roles`),
+  getModules: () => fetchJson(`${API_URL}/modules`),
+  getPages: () => fetchJson(`${API_URL}/pages`),
+  getPermissions: () => fetchJson(`${API_URL}/permissions`),
+  getAllUserPermissions: () => fetchJson(`${API_URL}/user-permissions`),
+  getGenericMasters: () => fetchJson(`${API_URL}/masters`),
+  getArticles: () => fetchJson(`${API_URL}/articles`),
+  getVehicles: () => fetchJson(`${API_URL}/vehicles`),
+  getDrivers: () => fetchJson(`${API_URL}/drivers`),
+  getDocuments: (clientId: string) => fetchJson(`${API_URL}/documents?clientId=${clientId}`),
   saveUser: (data: any) => fetchJson(`${API_URL}/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

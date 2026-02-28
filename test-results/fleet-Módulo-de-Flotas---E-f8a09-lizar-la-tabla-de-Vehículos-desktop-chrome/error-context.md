@@ -1,0 +1,82 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - region "Notifications alt+T"
+    - generic [ref=e3]:
+      - complementary [ref=e4]:
+        - generic [ref=e5]:
+          - img "OrbitM7" [ref=e8] [cursor=pointer]
+          - generic [ref=e9]:
+            - heading "ORBITM7" [level=1] [ref=e10]
+            - generic [ref=e11]: GLOBAL V1.0.4
+        - navigation [ref=e12]:
+          - button "Centro de Formación" [ref=e13]:
+            - img [ref=e15]
+            - generic [ref=e18]: Centro de Formación
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - button [ref=e21] [cursor=pointer]
+            - img "User" [ref=e23]
+            - generic [ref=e24]:
+              - paragraph [ref=e25]: OSCAR SANTAMARIA
+              - paragraph
+            - button "Cerrar Sesión" [ref=e26]:
+              - img [ref=e27]
+          - paragraph [ref=e30]: Milla 7 • Orbit v1.0.4
+      - main [ref=e31]:
+        - generic [ref=e33]:
+          - button [ref=e34]:
+            - img [ref=e35]
+          - heading "dashboard" [level=2] [ref=e38]
+        - generic [ref=e40]:
+          - heading "PROCESADOR ORBITM7" [level=2] [ref=e41]
+          - generic [ref=e45]: ASISTENTE OFFLINE
+          - generic [ref=e47]:
+            - img [ref=e49]
+            - img [ref=e52]
+            - generic [ref=e54]:
+              - generic [ref=e55]: Centro de Mando Inteligente OrbitM7
+              - heading "Listo para procesar tu logística" [level=3] [ref=e56]
+              - paragraph [ref=e57]: Tu panel está limpio. Sube un archivo de preventa para que OrbitM7 IQ pueda generar tus rutas optimizadas ahora.
+              - generic [ref=e58]:
+                - button "Abrir Gestor de Documentos" [ref=e59]
+                - button "Informe Narrativo" [ref=e60]
+          - generic [ref=e61]:
+            - generic [ref=e62]:
+              - generic [ref=e63]:
+                - paragraph [ref=e64]: CUMPLIMIENTO
+                - img [ref=e65]
+              - heading "98%" [level=4] [ref=e67]
+              - paragraph [ref=e68]: +14% vs semana previa
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - paragraph [ref=e71]: FLOTA DISPONIBLE
+                - img [ref=e72]
+              - heading "0" [level=4] [ref=e77]
+              - paragraph [ref=e78]: Flota totalmente ocupada
+            - generic [ref=e79]:
+              - generic [ref=e80]:
+                - paragraph [ref=e81]: IA PROYECCIÓN
+                - img [ref=e82]
+              - heading "Plan de Vuelo OrbitM7 IQ" [level=4] [ref=e86]
+              - paragraph [ref=e87]: "Ahorro estimado despacho: 12 min"
+          - generic [ref=e88]:
+            - generic [ref=e89]:
+              - generic [ref=e90]: "01"
+              - heading "CARGAR" [level=3] [ref=e91]
+              - paragraph [ref=e92]: Sube tus archivos Excel o JSON
+            - generic [ref=e93]:
+              - generic [ref=e94]: "02"
+              - heading "VALIDAR" [level=3] [ref=e95]
+              - paragraph [ref=e96]: Gestiona y corrige en tiempo real
+            - generic [ref=e97]:
+              - generic [ref=e98]: "03"
+              - heading "DESCARGAR" [level=3] [ref=e99]
+              - paragraph [ref=e100]: Exporta tus resultados limpios
+  - button "IQ" [ref=e102]:
+    - generic [ref=e105]:
+      - img [ref=e107]
+      - generic [ref=e109]: IQ
+```
