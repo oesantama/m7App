@@ -186,6 +186,14 @@ const App: React.FC = () => {
         try {
           const parsedUser = JSON.parse(savedUser);
           if (parsedUser && parsedUser.id) {
+            // FIX: Expulsar sesiones antiguas que no tengan el nuevo token JWT
+            if (!parsedUser.token) {
+              console.warn('[SESSION-RESTORE] Sesión antigua sin token detectada. Forzando re-login.');
+              localStorage.removeItem('m7_user_session');
+              setIsRestoring(false);
+              return;
+            }
+
             // SOLUCIÓN REAL: Forzar refresco de permisos para Admin en cada restauración
             if (parsedUser.roleId === 'ROL-01' || parsedUser.id === 'USR-01') {
               const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
