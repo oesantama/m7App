@@ -1,27 +1,12 @@
-
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
-
 import bcrypt from 'bcrypt';
+import { signAccessToken } from '../utils/jwt.util.js';
 
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   
   try {
-    // BYPASS DE EMERGENCIA (Hallazgo: Desbloqueo rápido si la DB falla)
-    const emergencyPass = process.env.EMERGENCY_ADMIN_PASS || 'm7_admin_emergency_2026';
-    if (email.toLowerCase() === 'admin@millasiete.com' && password === emergencyPass) {
-        console.warn(`[M7-AUTH] !!! ACCESO DE EMERGENCIA UTILIZADO PARA: ${email} !!!`);
-        // Simular usuario admin completo
-        return res.json({ 
-            success: true, 
-            user: { 
-                id: 'USR-01', email: 'admin@millasiete.com', name: 'ADMINISTRADOR DE EMERGENCIA', 
-                role_id: 'ROL-01', roleId: 'ROL-01', permissions: [] 
-            } 
-        });
-    }
-
     const identifier = email?.trim().toLowerCase();
     
     const result = await pool.query(
@@ -34,17 +19,13 @@ export const login = async (req: Request, res: Response) => {
     const user = result.rows[0];
     
     if (!user) {
-        console.log(`[M7-AUTH-FAIL] Usuario no encontrado: "${identifier}"`);
         return res.status(401).json({ success: false, error: 'Usuario no registrado o identificador incorrecto' });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-        console.log(`[M7-AUTH-FAIL] Contraseña incorrectA para: "${identifier}"`);
         return res.status(401).json({ success: false, error: 'Contraseña incorrecta' });
     }
-
-    console.log(`[M7-AUTH-SUCCESS] Acceso concedido: "${identifier}"`);
 
     // FETCH PERMISSIONS
     const permResult = await pool.query('SELECT permissions FROM user_permissions WHERE user_id = $1', [user.id]);
@@ -83,18 +64,21 @@ export const login = async (req: Request, res: Response) => {
         });
     }
 
+    // GENERAR TOKEN JWT (Seguridad Arquitectónica)
+    const userData = { 
+        id: user.id, 
+        email: user.email, 
+        name: user.name, 
+        role_id: user.role_id,
+        permissions: permissions 
+    };
+
+    const accessToken = signAccessToken(userData);
+
     res.json({ 
         success: true, 
-        user: { 
-            id: user.id, 
-            email: user.email, 
-            name: user.name, 
-            role_id: user.role_id,
-            roleId: user.role_id,
-            role: user.role_id,
-            client_ids: user.client_ids,
-            permissions: permissions 
-        } 
+        token: accessToken,
+        user: userData
     });
 
   } catch (error: any) {

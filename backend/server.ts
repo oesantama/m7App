@@ -37,9 +37,20 @@ app.use((req, res, next) => {
   next();
 });
 
+import { authenticateToken } from './middleware/auth.middleware.js';
+
 // Montaje de API Modular
-app.use('/api/auth/login', loginLimiter); // Aplicar límite solo al login primero
-app.use('/api', apiRoutes);
+app.use('/api/auth/login', loginLimiter); 
+
+// Middleware de Whitelisting y Protección Global (Seguridad Arquitectónica)
+app.use('/api', (req, res, next) => {
+  const publicPaths = ['/auth/login', '/health', '/'];
+  if (publicPaths.includes(req.path)) {
+    return next();
+  }
+  return authenticateToken(req, res, next);
+}, apiRoutes);
+
 
 // Health Check Global para Proxies (Coolify/Nginx)
 app.get('/', (req, res) => {

@@ -27,6 +27,8 @@ import ClientLogin from './components/portal/ClientLogin';
 import { useAppData } from './hooks/useAppData';
 import { normalizeData } from './utils/normalize';
 import OrderTracking from './components/portal/OrderTracking';
+import PWABanner from './components/PWABanner';
+
 
 // Import Admin Module
 const AdminDBManager = React.lazy(() => import('./pages/AdminDBManager'));

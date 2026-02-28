@@ -1,11 +1,14 @@
 import { Router, Request, Response } from 'express';
 import pool from '../config/database.js';
+import { requirePermission } from '../middleware/auth.middleware.js';
+
 
 const router = Router();
 
 // ─── ENDPOINT: BACKUP COMPLETO DE ALL TABLES ─────────────────────────────────
 // GET /api/admin/backup  → descarga un .sql con los INSERT de todas las tablas
-router.get('/backup', async (req: Request, res: Response) => {
+router.get('/backup', requirePermission('BACKUP', 'view'), async (req: Request, res: Response) => {
+
   const client = await pool.connect();
   try {
     // Tablas a exportar (en orden para respetar FK)

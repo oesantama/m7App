@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
         react(),
         tailwindcss(),
         VitePWA({
-          registerType: 'autoUpdate',
+          registerType: 'prompt',
           includeAssets: ['m7_favicon.png'],
           workbox: {
             globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
@@ -56,10 +56,11 @@ export default defineConfig(({ mode }) => {
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
-             if (id.includes('xlsx') || id.includes('jspdf') || id.includes('leaflet')) {
-                return 'vendor-heavy';
-             }
-             return 'vendor';
+            if (id.includes('xlsx')) return 'vendor-excel';
+            if (id.includes('jspdf') || id.includes('html2canvas')) return 'vendor-pdf';
+            if (id.includes('leaflet')) return 'vendor-maps';
+            if (id.includes('lucide-react') || id.includes('framer-motion')) return 'vendor-ui';
+            return 'vendor';
           }
         }
       }

@@ -50,6 +50,8 @@ RUN npm install --omit=dev
 # La estructura en dist_backend dependerá de como tsc genere la salida.
 # Si tsconfig tiene "include": ["backend/**/*"], usualmente replica la carpeta backend dentro de dist_backend
 COPY --from=builder /app/dist_backend ./dist_backend
+COPY --from=builder /app/backend/config/keys ./backend/config/keys
+
 
 EXPOSE 8080
 

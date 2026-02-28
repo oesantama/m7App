@@ -16,7 +16,7 @@ export const getCourses = async (req: Request, res: Response) => {
   const { category_id, level } = req.query;
   try {
     let query = 'SELECT * FROM training_courses WHERE status_id = \'EST-01\'';
-    const params = [];
+    const params: any[] = [];
     if (category_id) {
       params.push(category_id);
       query += ` AND category_id = $${params.length}`;
