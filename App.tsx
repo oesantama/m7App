@@ -9,22 +9,43 @@ import OrderTracking from './components/portal/OrderTracking';
 import { api } from './services/api';
 
 // ========== LAZY LOADING (CODE SPLITTING CHUNKS) ==========
-const Layout = React.lazy(() => import('./components/Layout'));
-const MasterModule = React.lazy(() => import('./components/MasterModule'));
-const WhatsAppConnect = React.lazy(() => import('./components/WhatsAppConnect'));
-const GestionDocumentosL = React.lazy(() => import('./components/GestionDocumentosL'));
-const RoutePlanner = React.lazy(() => import('./components/RoutePlanner'));
-const LogisticsDispatch = React.lazy(() => import('./components/LogisticsDispatch'));
-const RecibidoMaterial = React.lazy(() => import('./components/RecibidoMaterial'));
-const FleetManager = React.lazy(() => import('./components/FleetManager'));
-const AssignmentManager = React.lazy(() => import('./components/AssignmentManager'));
-const AIChat = React.lazy(() => import('./components/AIChat'));
-const DigitalSignature = React.lazy(() => import('./components/DigitalSignature'));
-const CentroCapacitaciones = React.lazy(() => import('./components/CentroCapacitaciones'));
-const ApprovalManager = React.lazy(() => import('./components/ApprovalManager'));
-const ChatbotWidget = React.lazy(() => import('./components/ChatbotWidget'));
-const DriverGamification = React.lazy(() => import('./components/DriverGamification'));
-const ExecutiveDashboard = React.lazy(() => import('./components/ExecutiveDashboard'));
+// Wrapper para auto-recargar la PWA si un chunk falla por cambio de nombre
+const lazyWithRetry = (componentImport: () => Promise<any>) =>
+  React.lazy(async () => {
+    const pageHasAlreadyBeenForceRefreshed = JSON.parse(
+      window.sessionStorage.getItem('m7-chunk-failed-reload') || 'false'
+    );
+    try {
+      const component = await componentImport();
+      window.sessionStorage.setItem('m7-chunk-failed-reload', 'false');
+      return component;
+    } catch (error) {
+      if (!pageHasAlreadyBeenForceRefreshed) {
+        window.sessionStorage.setItem('m7-chunk-failed-reload', 'true');
+        window.location.reload();
+        // Return a dummy promise that never resolves while reloading
+        return new Promise(() => {});
+      }
+      throw error;
+    }
+  });
+
+const Layout = lazyWithRetry(() => import('./components/Layout'));
+const MasterModule = lazyWithRetry(() => import('./components/MasterModule'));
+const WhatsAppConnect = lazyWithRetry(() => import('./components/WhatsAppConnect'));
+const GestionDocumentosL = lazyWithRetry(() => import('./components/GestionDocumentosL'));
+const RoutePlanner = lazyWithRetry(() => import('./components/RoutePlanner'));
+const LogisticsDispatch = lazyWithRetry(() => import('./components/LogisticsDispatch'));
+const RecibidoMaterial = lazyWithRetry(() => import('./components/RecibidoMaterial'));
+const FleetManager = lazyWithRetry(() => import('./components/FleetManager'));
+const AssignmentManager = lazyWithRetry(() => import('./components/AssignmentManager'));
+const AIChat = lazyWithRetry(() => import('./components/AIChat'));
+const DigitalSignature = lazyWithRetry(() => import('./components/DigitalSignature'));
+const CentroCapacitaciones = lazyWithRetry(() => import('./components/CentroCapacitaciones'));
+const ApprovalManager = lazyWithRetry(() => import('./components/ApprovalManager'));
+const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
+const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
+const ExecutiveDashboard = lazyWithRetry(() => import('./components/ExecutiveDashboard'));
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
 import { useAppStore } from './stores/useAppStore';
@@ -33,7 +54,7 @@ import { normalizeData } from './utils/normalize';
 
 
 // Import Admin Module
-const AdminDBManager = React.lazy(() => import('./pages/AdminDBManager'));
+const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
 
 const App: React.FC = () => {
   // ============ ZUSTAND STORE ============

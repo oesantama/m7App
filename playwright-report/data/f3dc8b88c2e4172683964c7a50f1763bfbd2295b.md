@@ -1,0 +1,112 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - region "Notifications alt+T"
+    - generic [ref=e3]:
+      - complementary [ref=e4]:
+        - generic [ref=e5]:
+          - img "OrbitM7" [ref=e8] [cursor=pointer]
+          - generic [ref=e9]:
+            - heading "ORBITM7" [level=1] [ref=e10]
+            - generic [ref=e11]: GLOBAL V1.0.4
+        - navigation [ref=e12]:
+          - button "Centro de Formación" [ref=e13]:
+            - img [ref=e15]
+            - generic [ref=e18]: Centro de Formación
+          - generic [ref=e19]:
+            - button "CONFIGURACIÓN MAESTROS" [ref=e20]:
+              - generic [ref=e21]:
+                - img [ref=e23]
+                - generic [ref=e26]: CONFIGURACIÓN MAESTROS
+              - img [ref=e28]
+            - generic [ref=e30]:
+              - button "APROBAR FIRMA" [ref=e31]
+              - button "ARTICULOS" [ref=e32]
+              - button "CLIENTES" [ref=e33]
+              - button "ESTADOS GLOBALES" [ref=e34]
+              - button "FIRMAS DIGITALES" [ref=e35]
+              - button "MARCAS" [ref=e36]
+              - button "NOTIFICACIONES" [ref=e37]
+              - button "TIPOS DE DOCUMENTO" [ref=e38]
+              - button "TIPOS DE VEHÍCULO" [ref=e39]
+              - button "UNIDADES DE MEDIDA" [ref=e40]
+          - button "GESTIÓN AJOVER" [ref=e42]:
+            - generic [ref=e43]:
+              - img [ref=e45]
+              - generic [ref=e48]: GESTIÓN AJOVER
+            - img [ref=e50]
+          - button "GESTIÓN TRANSPORTE" [ref=e53]:
+            - generic [ref=e54]:
+              - img [ref=e56]
+              - generic [ref=e61]: GESTIÓN TRANSPORTE
+            - img [ref=e63]
+          - button "M7 INTELLIGENCE" [ref=e66]:
+            - generic [ref=e67]:
+              - img [ref=e69]
+              - generic [ref=e71]: M7 INTELLIGENCE
+            - img [ref=e73]
+          - button "SEGURIDAD & ACCESO" [ref=e76]:
+            - generic [ref=e77]:
+              - img [ref=e79]
+              - generic [ref=e81]: SEGURIDAD & ACCESO
+            - img [ref=e83]
+          - button "ADMINISTRACIÓN" [ref=e86]:
+            - generic [ref=e87]:
+              - img [ref=e89]
+              - generic [ref=e91]: ADMINISTRACIÓN
+            - img [ref=e93]
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - button [ref=e97] [cursor=pointer]
+            - img "User" [ref=e99]
+            - generic [ref=e100]:
+              - paragraph [ref=e101]: OSCAR SANTAMARIA
+              - paragraph
+            - button "Cerrar Sesión" [ref=e102]:
+              - img [ref=e103]
+          - paragraph [ref=e106]: Milla 7 • Orbit v1.0.4
+      - main [ref=e107]:
+        - generic [ref=e109]:
+          - button [ref=e110]:
+            - img [ref=e111]
+          - button "Regresar" [ref=e112]
+          - heading "aprobar firma" [level=2] [ref=e115]
+        - generic [ref=e118]:
+          - generic [ref=e120]:
+            - img [ref=e122]
+            - generic [ref=e124]:
+              - heading "Aprobación de Firmas" [level=2] [ref=e125]
+              - paragraph [ref=e126]: Control de Seguridad M7 Intelligence
+          - generic [ref=e127]:
+            - img [ref=e128]
+            - textbox "BUSCAR FIRMA POR NOMBRE, CORREO O ID..." [ref=e131]
+          - table [ref=e133]:
+            - rowgroup [ref=e134]:
+              - row "Usuario Solicitante Estado Firma Registro Acciones" [ref=e135]:
+                - columnheader "Usuario Solicitante" [ref=e136]
+                - columnheader "Estado Firma" [ref=e137]
+                - columnheader "Registro" [ref=e138]
+                - columnheader "Acciones" [ref=e139]
+            - rowgroup [ref=e140]:
+              - row "OS OSCAR SANTAMARIA admin@millasiete.com | USR-01 Aprobada 15/2/2026 Ver Firma Auditado por USR-ADMIN" [ref=e141]:
+                - cell "OS OSCAR SANTAMARIA admin@millasiete.com | USR-01" [ref=e142]:
+                  - generic [ref=e143]:
+                    - generic [ref=e144]: OS
+                    - generic [ref=e145]:
+                      - paragraph [ref=e146]: OSCAR SANTAMARIA
+                      - paragraph [ref=e147]: admin@millasiete.com | USR-01
+                - cell "Aprobada" [ref=e148]
+                - cell "15/2/2026" [ref=e149]:
+                  - paragraph [ref=e150]: 15/2/2026
+                - cell "Ver Firma Auditado por USR-ADMIN" [ref=e151]:
+                  - button "Ver Firma" [ref=e152]
+                  - generic [ref=e153]:
+                    - img [ref=e154]
+                    - generic [ref=e156]: Auditado por USR-ADMIN
+  - button "IQ" [ref=e158]:
+    - generic [ref=e161]:
+      - img [ref=e163]
+      - generic [ref=e165]: IQ
+```

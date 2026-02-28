@@ -34,65 +34,41 @@ export const api = {
   },
 
   // --- DISPATCH AUDIT ---
-  async initDispatch(data: any) {
-    const res = await fetch(`${API_URL}/dispatch/init`, {
+  initDispatch(data: any) {
+    return fetchJson(`${API_URL}/dispatch/init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Error al iniciar despacho');
-    }
-    return res.json();
   },
-  async signDispatchPending(data: any) {
-    const res = await fetch(`${API_URL}/dispatch/sign-pending`, {
+  signDispatchPending(data: any) {
+    return fetchJson(`${API_URL}/dispatch/sign-pending`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Error al firmar pendientes');
-    }
-    return res.json();
   },
-  async getPendingSignatures(userId: string) {
-    const res = await fetch(`${API_URL}/dispatch/pending-signatures/${userId}`);
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Error al obtener firmas pendientes');
-    }
-    return res.json();
+  getPendingSignatures(userId: string) {
+    return fetchJson(`${API_URL}/dispatch/pending-signatures/${userId}`);
   },
-  async confirmDelivery(data: {
+  confirmDelivery(data: {
     invoiceId: string; dispatchId?: string; driverId: string; vehicleId?: string;
     deliveryType: 'FULL' | 'PARTIAL' | 'RETURN';
     deliveredItems: any[]; notes?: string; returnReason?: string; password: string;
   }) {
-    const res = await fetch(`${API_URL}/dispatch/confirm-delivery`, {
+    return fetchJson(`${API_URL}/dispatch/confirm-delivery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Error al confirmar entrega');
-    }
-    return res.json();
   },
-  async getDeliveryHistory(params: Record<string, string> = {}) {
+  getDeliveryHistory(params: Record<string, string> = {}) {
     const qs = new URLSearchParams(params).toString();
-    const res = await fetch(`${API_URL}/dispatch/delivery-history${qs ? '?' + qs : ''}`);
-    if (!res.ok) throw new Error('Error al obtener historial de entregas');
-    return res.json();
+    return fetchJson(`${API_URL}/dispatch/delivery-history${qs ? '?' + qs : ''}`);
   },
-  async getReturnHistory(params: Record<string, string> = {}) {
+  getReturnHistory(params: Record<string, string> = {}) {
     const qs = new URLSearchParams(params).toString();
-    const res = await fetch(`${API_URL}/dispatch/return-history${qs ? '?' + qs : ''}`);
-    if (!res.ok) throw new Error('Error al obtener historial de devoluciones');
-    return res.json();
+    return fetchJson(`${API_URL}/dispatch/return-history${qs ? '?' + qs : ''}`);
   },
 
 
@@ -343,20 +319,20 @@ export const api = {
     body: JSON.stringify({ docId, targetEmail })
   }).then(r => r.json()),
 
-  getWhatsAppStatus: (userId: string) => fetch(`${API_URL}/whatsapp/status?userId=${userId}`).then(r => r.json()),
-  connectWhatsApp: (userId: string) => fetch(`${API_URL}/whatsapp/connect`, {
+  getWhatsAppStatus: (userId: string) => fetchJson(`${API_URL}/whatsapp/status?userId=${userId}`),
+  connectWhatsApp: (userId: string) => fetchJson(`${API_URL}/whatsapp/connect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId })
-  }).then(r => r.json()),
+  }),
 
-  disconnectWhatsApp: (userId: string) => fetch(`${API_URL}/whatsapp/disconnect`, {
+  disconnectWhatsApp: (userId: string) => fetchJson(`${API_URL}/whatsapp/disconnect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId })
-  }).then(r => r.json()),
+  }),
 
-  getWhatsAppHistory: (userId: string) => fetch(`${API_URL}/whatsapp/history?userId=${userId}`).then(r => r.json()),
+  getWhatsAppHistory: (userId: string) => fetchJson(`${API_URL}/whatsapp/history?userId=${userId}`),
 
   sendWhatsAppNotification: (data: {
     phones: string[],
@@ -364,130 +340,117 @@ export const api = {
     userId: string,
     media?: string, // base64
     fileName?: string
-  }) => fetch(`${API_URL}/whatsapp/send`, {
+  }) => fetchJson(`${API_URL}/whatsapp/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
-  getWhatsAppChats: (userId: string) => fetch(`${API_URL}/whatsapp/chats?userId=${userId}`).then(r => r.json()),
-  getWhatsAppMessages: (userId: string, jid: string) => fetch(`${API_URL}/whatsapp/messages?userId=${userId}&remoteJid=${jid}`).then(r => r.json()),
-  syncWhatsAppContacts: (userId: string) => fetch(`${API_URL}/whatsapp/sync-contacts`, {
+  getWhatsAppChats: (userId: string) => fetchJson(`${API_URL}/whatsapp/chats?userId=${userId}`),
+  getWhatsAppMessages: (userId: string, jid: string) => fetchJson(`${API_URL}/whatsapp/messages?userId=${userId}&remoteJid=${jid}`),
+  syncWhatsAppContacts: (userId: string) => fetchJson(`${API_URL}/whatsapp/sync-contacts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId })
-  }).then(r => r.json()),
+  }),
 
-  getQuickReplies: (userId: string) => fetch(`${API_URL}/whatsapp/quick-replies?userId=${userId}`).then(r => r.json()),
-  saveQuickReply: (data: { userId: string, title: string, content: string }) => fetch(`${API_URL}/whatsapp/quick-replies`, {
+  getQuickReplies: (userId: string) => fetchJson(`${API_URL}/whatsapp/quick-replies?userId=${userId}`),
+  saveQuickReply: (data: { userId: string, title: string, content: string }) => fetchJson(`${API_URL}/whatsapp/quick-replies`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
-  deleteQuickReply: (id: string) => fetch(`${API_URL}/whatsapp/quick-replies/${id}`, { method: 'DELETE' }).then(r => r.json()),
+  }),
+  deleteQuickReply: (id: string) => fetchJson(`${API_URL}/whatsapp/quick-replies/${id}`, { method: 'DELETE' }),
 
   // Autenticación de Dos Factores (2FA)
-  setup2FA: (userId: string) => fetch(`${API_URL}/2fa/setup`, {
+  setup2FA: (userId: string) => fetchJson(`${API_URL}/2fa/setup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId })
-  }).then(r => r.json()),
+  }),
 
-  activate2FA: (data: { userId: string, secret: string, token: string }) => fetch(`${API_URL}/2fa/activate`, {
+  activate2FA: (data: { userId: string, secret: string, token: string }) => fetchJson(`${API_URL}/2fa/activate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
-  verify2FA: (data: { userId: string, token: string }) => fetch(`${API_URL}/2fa/verify`, {
+  verify2FA: (data: { userId: string, token: string }) => fetchJson(`${API_URL}/2fa/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
-  deactivate2FA: (userId: string) => fetch(`${API_URL}/2fa/deactivate`, {
+  deactivate2FA: (userId: string) => fetchJson(`${API_URL}/2fa/deactivate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId })
-  }).then(r => r.json()),
+  }),
 
-  aiChat: (prompt: string, context?: any) => fetch(`${API_URL}/ai/chat`, {
+  aiChat: (prompt: string, context?: any) => fetchJson(`${API_URL}/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, context })
-  }).then(r => r.json()),
+  }),
 
-  getAllUserPermissions: () => fetch(`${API_URL}/user-permissions`).then(r => r.json()),
+  getAllUserPermissions: () => fetchJson(`${API_URL}/user-permissions`),
 
   // Firma Digital
-  // Firma Digital
-  getAllSignatures: () => fetch(`${API_URL}/signatures`).then(r => r.json()),
+  getAllSignatures: () => fetchJson(`${API_URL}/signatures`),
   
   saveSignature: async (data: any) => {
-    const res = await fetch(`${API_URL}/signatures`, {
+    return await fetchJson(`${API_URL}/signatures`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
-  getSignature: (userId: string) => fetch(`${API_URL}/signatures/${userId}`).then(r => r.json()),
+  getSignature: (userId: string) => fetchJson(`${API_URL}/signatures/${userId}`),
 
-  approveSignature: (data: { userId: string, approverId: string, approverPassword: string }) => fetch(`${API_URL}/signatures/approve`, {
+  approveSignature: (data: { userId: string, approverId: string, approverPassword: string }) => fetchJson(`${API_URL}/signatures/approve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
-  savePage: (data: any) => fetch(`${API_URL}/pages`, {
+  savePage: (data: any) => fetchJson(`${API_URL}/pages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
   // --- PICKING AUDIT ---
-  async initPicking(data: any) {
-    const res = await fetch(`${API_URL}/picking/init`, {
+  initPicking(data: any) {
+    return fetchJson(`${API_URL}/picking/init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Error al iniciar alistado');
-    return res.json();
   },
-  async finishPicking(data: any) {
-    const res = await fetch(`${API_URL}/picking/finish`, {
+  finishPicking(data: any) {
+    return fetchJson(`${API_URL}/picking/finish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Error al finalizar alistado');
-    return res.json();
   },
-  async signPicking(data: any) {
-    const res = await fetch(`${API_URL}/picking/sign`, {
+  signPicking(data: any) {
+    return fetchJson(`${API_URL}/picking/sign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Error al firmar alistado');
-    }
-    return res.json();
   },
-  async getPickingStatus(invoiceId: string) {
-    const res = await fetch(`${API_URL}/picking/status/${encodeURIComponent(invoiceId)}`);
-    if (!res.ok) return null;
-    return res.json();
+  getPickingStatus(invoiceId: string) {
+    return fetchJson(`${API_URL}/picking/status/${encodeURIComponent(invoiceId)}`).catch(() => null);
   },
 
-  processDocumentLPayment: (data: { documentId: string, payments: any[], userId: string }) => fetch(`${API_URL}/documents/process-l-payment`, {
+  processDocumentLPayment: (data: { documentId: string, payments: any[], userId: string }) => fetchJson(`${API_URL}/documents/process-l-payment`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
 
   // --- CAPACITACIONES (Centro de Capacitaciones) ---
   getTrainingCategories: () => fetchJson(`${API_URL}/training/categories?_t=${Date.now()}`),
