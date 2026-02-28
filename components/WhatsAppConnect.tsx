@@ -8,7 +8,7 @@ interface WhatsAppCenterProps {
     user: any;
 }
 
-const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
+const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
     const [status, setStatus] = useState<'DISCONNECTED' | 'SCAN_QR' | 'CONNECTED' | 'ERROR'>('DISCONNECTED');
     const [qr, setQr] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -749,4 +749,4 @@ const WhatsAppCenter: React.FC<WhatsAppCenterProps> = ({ user }) => {
     );
 };
 
-export default WhatsAppCenter;
+export default WhatsAppConnect;

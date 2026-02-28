@@ -2,20 +2,45 @@
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
-const fetchJson = async (url: string, options?: RequestInit) => {
+export const fetchJson = async (url: string, options?: any) => {
+  // Búsqueda exhaustiva del token
   const sessionStr = localStorage.getItem('m7_user_session');
-  const sessionObj = sessionStr ? JSON.parse(sessionStr) : null;
-  const token = sessionObj?.token || localStorage.getItem('token');
+  let token = localStorage.getItem('token');
   
-  const headers = new Headers(options?.headers);
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`);
+  if (!token && sessionStr) {
+    try {
+      const session = JSON.parse(sessionStr);
+      token = session.token || session.accessToken;
+    } catch (e) {}
   }
 
-  const res = await fetch(url, { ...options, headers });
+  const customHeaders: any = { ...options?.headers };
+  
+  if (token) {
+    const brief = token.substring(0, 10) + '...';
+    console.log(`[ORBIT-AUTH] Inyectando Token en ${url}: ${brief}`);
+    customHeaders['Authorization'] = `Bearer ${token}`;
+  } else if (!url.includes('/auth/login')) {
+    console.warn(`[ORBIT-AUTH] ALERTA: Sin token para ${url}`);
+  }
+
+  const fetchOptions = {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...customHeaders
+    }
+  };
+
+  const res = await fetch(url, fetchOptions);
+  
+  if (res.status === 401) {
+    console.error('[ORBIT-AUTH] 401 detectado. Redirigiendo a limpieza...');
+  }
+
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
+    throw new Error(errorData.error || `Error HTTP: ${res.status}`);
   }
   return res.json();
 };
@@ -74,18 +99,8 @@ export const api = {
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO
+  // Maestros - CACHE BUSTING FORZADO
   getUsers: () => fetchJson(`${API_URL}/users?_t=${Date.now()}`),
-  getClients: () => fetchJson(`${API_URL}/clients`),
-  getRoles: () => fetchJson(`${API_URL}/roles`),
-  getModules: () => fetchJson(`${API_URL}/modules`),
-  getPages: () => fetchJson(`${API_URL}/pages`),
-  getPermissions: () => fetchJson(`${API_URL}/permissions`),
-  getAllUserPermissions: () => fetchJson(`${API_URL}/user-permissions`),
-  getGenericMasters: () => fetchJson(`${API_URL}/masters`),
-  getArticles: () => fetchJson(`${API_URL}/articles`),
-  getVehicles: () => fetchJson(`${API_URL}/vehicles`),
-  getDrivers: () => fetchJson(`${API_URL}/drivers`),
-  getDocuments: (clientId: string) => fetchJson(`${API_URL}/documents?clientId=${clientId}`),
   saveUser: (data: any) => fetchJson(`${API_URL}/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -278,11 +293,11 @@ export const api = {
   getRoutingPatterns: () => fetchJson(`${API_URL}/routes/patterns`),
 
   // GPS Tracking (Nueva API dedicada)
-  updateVehicleLocation: (data: any) => fetch(`${API_URL}/locations/update`, {
+  updateVehicleLocation: (data: any) => fetchJson(`${API_URL}/locations/update`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(r => r.json()),
+  }),
   getLatestVehicleLocations: () => fetchJson(`${API_URL}/locations/latest`),
   getVehicleLocationHistory: (vehicleId: string, limit = 50) => fetchJson(`${API_URL}/locations/history/${vehicleId}?limit=${limit}`),
 
@@ -313,11 +328,11 @@ export const api = {
     return fetchJson(url);
   },
 
-  resendInventoryNotification: (docId: string, targetEmail: string) => fetch(`${API_URL}/documents/resend-notification`, {
+  resendInventoryNotification: (docId: string, targetEmail: string) => fetchJson(`${API_URL}/documents/resend-notification`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ docId, targetEmail })
-  }).then(r => r.json()),
+  }),
 
   getWhatsAppStatus: (userId: string) => fetchJson(`${API_URL}/whatsapp/status?userId=${userId}`),
   connectWhatsApp: (userId: string) => fetchJson(`${API_URL}/whatsapp/connect`, {
@@ -475,5 +490,45 @@ export const api = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
+  }),
+
+  // --- ADMINISTRACIÓN (Gestor DB) ---
+  getAdminTables: () => fetchJson(`${API_URL}/admin/tables`, { method: 'POST' }),
+  getAdminSchema: (tableName: string) => fetchJson(`${API_URL}/admin/schema`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tableName })
+  }),
+  getAdminData: (params: { 
+    tableName: string, 
+    page?: number, 
+    limit?: number, 
+    search?: string, 
+    sortBy?: string, 
+    sortOrder?: string 
+  }) => fetchJson(`${API_URL}/admin/data`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  }),
+  executeAdminSql: (query: string) => fetchJson(`${API_URL}/admin/sql`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query })
+  }),
+  saveAdminRecord: (tableName: string, data: any) => fetchJson(`${API_URL}/admin/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tableName, data })
+  }),
+  deleteAdminRecord: (tableName: string, id: any) => fetchJson(`${API_URL}/admin/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tableName, id })
+  }),
+  bulkDeleteAdminRecords: (tableName: string, ids: any[]) => fetchJson(`${API_URL}/admin/bulk-delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tableName, ids })
   }),
 };

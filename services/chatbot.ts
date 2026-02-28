@@ -1,4 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { fetchJson } from './api';
+
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
 
@@ -166,8 +169,8 @@ export const chatbotActions = {
   async trackOrder(invoiceNumber: string): Promise<any> {
     // Integración con API existente
     try {
-      const response = await fetch(`/api/invoices/search?q=${invoiceNumber}`);
-      return await response.json();
+      const result = await fetchJson(`${API_URL}/invoices/search?q=${invoiceNumber}`);
+      return result;
     } catch (error) {
       return null;
     }
@@ -191,7 +194,7 @@ export const chatbotActions = {
     userId: string;
   }): Promise<boolean> {
     try {
-      await fetch('/api/issues/report', {
+      await fetchJson(`${API_URL}/issues/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(issueData)

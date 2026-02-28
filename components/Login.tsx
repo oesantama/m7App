@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
+import { toast } from 'sonner';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -47,6 +48,34 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
     }
   }, []);
+
+  const handleEmergencyRepair = async () => {
+    if (!window.confirm('¿Deseas realizar una limpieza profunda del sistema? Se cerrarán todas las sesiones y se actualizarán los módulos.')) return;
+    
+    setIsLoading(true);
+    try {
+      console.log('--- INICIANDO LIMPIEZA ATÓMICA ORBIT ---');
+      // 1. Limpiar Service Workers
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) await r.unregister();
+      }
+      // 2. Limpiar Caches de PWA
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        for (const k of keys) await caches.delete(k);
+      }
+      // 3. Limpiar Almacenamiento
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      toast.success('Sistema depurado. Recargando núcleo...');
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (e) {
+      setError('Falla en la autorreparación.');
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -385,6 +414,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 Arquitectura y Desarrollo por Oscar Santamaría
               </p>
             </div>
+            <button 
+              onClick={handleEmergencyRepair}
+              className="mt-4 text-[7px] text-slate-700 hover:text-emerald-500 font-black uppercase tracking-[0.2em] transition-all border border-transparent hover:border-emerald-500/20 px-4 py-2 rounded-full"
+            >
+              ¿Problemas de conexión? Reparar Núcleo
+            </button>
             <p className="text-[7px] text-slate-800 font-bold uppercase mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
               © {new Date().getFullYear()} OrbitM7 Logistics Systems
             </p>

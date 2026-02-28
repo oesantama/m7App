@@ -342,6 +342,7 @@ const App: React.FC = () => {
 
       setUser(finalUser);
       localStorage.setItem('m7_user_session', JSON.stringify(finalUser));
+      localStorage.setItem('token', authRes.token); // Redundancia para api.ts
       setIsAuthenticated(true);
 
       // Disparar hidratación de catálogos y Layout usando Lazy Load (Asíncrono real)

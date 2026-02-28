@@ -65,6 +65,7 @@ export interface User extends AuditBase {
   avatar?: string;
   password?: string;
   roleId?: string;
+  token?: string;
 }
 
 export interface Article extends AuditBase {

@@ -4,9 +4,9 @@ import pool from '../config/database.js';
 // Middleware-like check (can be used inside controllers too for double safety)
 const isAdmin = (email: string) => email === 'admin@millasiete.com';
 
-export const getTables = async (req: Request, res: Response) => {
+export const getTables = async (req: any, res: Response) => {
   try {
-    const { user } = req.body; // Assuming auth middleware populates this or passed in body
+    const user = req.user; 
     // Security Check
     if (!user || !isAdmin(user.email)) {
       return res.status(403).json({ error: "Acceso denegado. Solo admin." });
@@ -26,8 +26,9 @@ export const getTables = async (req: Request, res: Response) => {
   }
 };
 
-export const getTableData = async (req: Request, res: Response) => {
-  const { tableName, user, page = 1, limit = 50, search = '', sortBy, sortOrder = 'ASC' } = req.body;
+export const getTableData = async (req: any, res: Response) => {
+  const { tableName, page = 1, limit = 50, search = '', sortBy, sortOrder = 'ASC' } = req.body;
+  const user = req.user;
   try {
     if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
     if (!tableName) return res.status(400).json({ error: "Nombre de tabla requerido" });
@@ -89,8 +90,9 @@ export const getTableData = async (req: Request, res: Response) => {
   }
 };
 
-export const executeSql = async (req: Request, res: Response) => {
-    const { query, user } = req.body;
+export const executeSql = async (req: any, res: Response) => {
+    const { query } = req.body;
+    const user = req.user;
     try {
         if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
         if (!query) return res.status(400).json({ error: "Query requerido" });
@@ -111,8 +113,9 @@ export const executeSql = async (req: Request, res: Response) => {
     }
 }
 
-export const saveRecord = async (req: Request, res: Response) => {
-  const { tableName, data, user } = req.body;
+export const saveRecord = async (req: any, res: Response) => {
+  const { tableName, data } = req.body;
+  const user = req.user;
   try {
     if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
     
@@ -157,8 +160,9 @@ export const saveRecord = async (req: Request, res: Response) => {
 };
 
 // ... (existing deleteRecord logic)
-export const deleteRecord = async (req: Request, res: Response) => {
-  const { tableName, id, user } = req.body;
+export const deleteRecord = async (req: any, res: Response) => {
+  const { tableName, id } = req.body;
+  const user = req.user;
   try {
     if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
     if (!tableName || !id) return res.status(400).json({ error: "Datos incompletos" });
@@ -176,8 +180,9 @@ export const deleteRecord = async (req: Request, res: Response) => {
   }
 };
 
-export const bulkDeleteRecords = async (req: Request, res: Response) => {
-  const { tableName, ids, user } = req.body;
+export const bulkDeleteRecords = async (req: any, res: Response) => {
+  const { tableName, ids } = req.body;
+  const user = req.user;
   try {
     if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
     if (!tableName || !Array.isArray(ids) || ids.length === 0) {
@@ -198,8 +203,9 @@ export const bulkDeleteRecords = async (req: Request, res: Response) => {
   }
 };
 
-export const getTableSchema = async (req: Request, res: Response) => {
-    const { tableName, user } = req.body;
+export const getTableSchema = async (req: any, res: Response) => {
+    const { tableName } = req.body;
+    const user = req.user;
     try {
         if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
         if (!tableName) return res.status(400).json({ error: "Nombre de tabla requerido" });

@@ -68,21 +68,15 @@ const AdminDBManager: React.FC = () => {
       setLoading(true);
       try {
            // Fetch ALL data for export
-           const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/data`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+           const response = await api.getAdminData({ 
                 tableName: selectedTable, 
-                user,
                 page: 1,
                 limit: 1000000, // Force All
                 search: searchTerm,
                 sortBy,
                 sortOrder
-            })
-          });
-          const response = await res.json();
-          const rows = Array.isArray(response) ? response : response.data;
+           });
+           const rows = Array.isArray(response) ? response : response.data;
           
           exportToExcel(rows, `tabla_${selectedTable}`);
           toast.success('Exportación completada');
@@ -122,27 +116,23 @@ const AdminDBManager: React.FC = () => {
   }
 
   useEffect(() => {
-    loadTables();
-  }, []);
+    if (user && user.token) {
+        loadTables();
+    }
+  }, [user]);
 
   useEffect(() => {
-    if (selectedTable && mode === 'TABLE') {
+    if (selectedTable && mode === 'TABLE' && user && user.token) {
         setPage(1);
         setSortBy('');
         setSortOrder('ASC');
         loadData(1);
     }
-  }, [selectedTable]);
+  }, [selectedTable, user]);
 
   const loadTables = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/tables`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user })
-      });
-      if (!res.ok) throw new Error('Error loading tables');
-      const list = await res.json();
+      const list = await api.getAdminTables();
       setTables(list);
     } catch (e) {
       toast.error('Error cargando tablas');
@@ -151,13 +141,8 @@ const AdminDBManager: React.FC = () => {
 
   const fetchSchemaColumns = async (tableName: string) => {
     try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/schema`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tableName, user })
-        });
-        const result = await res.json();
-        if (res.ok && result.columns) {
+        const result = await api.getAdminSchema(tableName);
+        if (result.columns) {
             setTableColumns(result.columns.map((c: any) => c.column_name));
         }
     } catch (e) {
@@ -176,21 +161,14 @@ const AdminDBManager: React.FC = () => {
     const currentSortOrder = newSortOrder !== undefined ? newSortOrder : sortOrder;
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+      const response = await api.getAdminData({ 
             tableName: selectedTable, 
-            user,
             page: newPage,
             limit: currentLimit,
             search: searchTerm,
             sortBy: currentSortBy,
             sortOrder: currentSortOrder
-        })
       });
-      if (!res.ok) throw new Error('Error loading data');
-      const response = await res.json();
       
       if (Array.isArray(response)) {
           setData(response);
@@ -210,13 +188,7 @@ const AdminDBManager: React.FC = () => {
   const loadSchema = async () => {
     if (!selectedTable) return;
     try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/schema`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tableName: selectedTable, user })
-        });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error);
+        const result = await api.getAdminSchema(selectedTable);
         setSchemaInfo(result);
         setIsSchemaModalOpen(true);
     } catch (e: any) {
@@ -245,14 +217,7 @@ const AdminDBManager: React.FC = () => {
       setLoading(true);
       setSqlResult(null);
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/sql`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: customQuery, user })
-        });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Error SQL');
-        
+        const result = await api.executeAdminSql(customQuery);
         setSqlResult(result);
         toast.success('Query Ejecutado');
       } catch (e: any) {
@@ -264,14 +229,7 @@ const AdminDBManager: React.FC = () => {
 
   const handleSave = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/save`, {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ tableName: selectedTable, data: formData, user })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Error guardando');
-      
+      const result = await api.saveAdminRecord(selectedTable, formData);
       toast.success(result.action === 'UPDATE' ? 'Registro Actualizado' : 'Registro Creado');
       setIsModalOpen(false);
       loadData(page);
@@ -286,19 +244,7 @@ const AdminDBManager: React.FC = () => {
 
   const executeDelete = async (id: any) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/delete`, {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ tableName: selectedTable, id, user })
-      });
-      const result = await res.json();
-      if (!res.ok) {
-          if (result.details && result.details.includes('foreign key constraint')) {
-              throw new Error(`NO SE PUEDE ELIMINAR:\nEl registro tiene datos asociados en otras tablas (Integridad Referencial).\n\nDetalle: ${result.details}`);
-          }
-          throw new Error(result.details || result.error || 'Error eliminando');
-      }
-      
+      await api.deleteAdminRecord(selectedTable, id);
       toast.success('Registro Eliminado');
       loadData(page);
     } catch (e: any) {
@@ -317,18 +263,7 @@ const AdminDBManager: React.FC = () => {
   const executeBulkDelete = async () => {
     setLoading(true);
     try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/bulk-delete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                tableName: selectedTable, 
-                ids: Array.from(selectedIds), 
-                user 
-            })
-        });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.details || result.error || 'Error en eliminación masiva');
-        
+        const result = await api.bulkDeleteAdminRecords(selectedTable, Array.from(selectedIds));
         toast.success(`${result.count} registros eliminados exitosamente`);
         setSelectedIds(new Set());
         loadData(page);
