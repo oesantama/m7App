@@ -307,7 +307,8 @@ const App: React.FC = () => {
         documentNumber: userData.document_number || userData.documentNumber,
         permissions: mappedPermissions,
         clientId: firstClientId,
-        clientIds: userData.client_ids || [firstClientId]
+        clientIds: userData.client_ids || [firstClientId],
+        token: authRes.token // AGREGADO: Guardar el token para api.ts
       } as any;
 
       setUser(finalUser);
