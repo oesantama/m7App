@@ -2,32 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { getMasterCategoryFromRoute } from './constants/routes';
 import { User, PageModule, MasterCategory, MasterRecord } from './types';
 import Login from './components/Login';
-import Layout from './components/Layout';
-import MasterModule from './components/MasterModule';
-import WhatsAppConnect from './components/WhatsAppConnect';
-import GestionDocumentosL from './components/GestionDocumentosL';
-import RoutePlanner from './components/RoutePlanner';
-import LogisticsDispatch from './components/LogisticsDispatch';
-import RecibidoMaterial from './components/RecibidoMaterial';
-import FleetManager from './components/FleetManager';
-import AssignmentManager from './components/AssignmentManager';
-import AIChat from './components/AIChat';
-import DigitalSignature from './components/DigitalSignature';
-import CentroCapacitaciones from './components/CentroCapacitaciones';
-import ApprovalManager from './components/ApprovalManager';
-import ChatbotWidget from './components/ChatbotWidget';
-import DriverGamification from './components/DriverGamification';
-import ExecutiveDashboard from './components/ExecutiveDashboard';
+import PWABanner from './components/PWABanner';
+import PortalLayout from './components/portal/PortalLayout';
+import ClientLogin from './components/portal/ClientLogin';
+import OrderTracking from './components/portal/OrderTracking';
 import { api } from './services/api';
+
+// ========== LAZY LOADING (CODE SPLITTING CHUNKS) ==========
+const Layout = React.lazy(() => import('./components/Layout'));
+const MasterModule = React.lazy(() => import('./components/MasterModule'));
+const WhatsAppConnect = React.lazy(() => import('./components/WhatsAppConnect'));
+const GestionDocumentosL = React.lazy(() => import('./components/GestionDocumentosL'));
+const RoutePlanner = React.lazy(() => import('./components/RoutePlanner'));
+const LogisticsDispatch = React.lazy(() => import('./components/LogisticsDispatch'));
+const RecibidoMaterial = React.lazy(() => import('./components/RecibidoMaterial'));
+const FleetManager = React.lazy(() => import('./components/FleetManager'));
+const AssignmentManager = React.lazy(() => import('./components/AssignmentManager'));
+const AIChat = React.lazy(() => import('./components/AIChat'));
+const DigitalSignature = React.lazy(() => import('./components/DigitalSignature'));
+const CentroCapacitaciones = React.lazy(() => import('./components/CentroCapacitaciones'));
+const ApprovalManager = React.lazy(() => import('./components/ApprovalManager'));
+const ChatbotWidget = React.lazy(() => import('./components/ChatbotWidget'));
+const DriverGamification = React.lazy(() => import('./components/DriverGamification'));
+const ExecutiveDashboard = React.lazy(() => import('./components/ExecutiveDashboard'));
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
 import { useAppStore } from './stores/useAppStore';
-import PortalLayout from './components/portal/PortalLayout';
-import ClientLogin from './components/portal/ClientLogin';
 import { useAppData } from './hooks/useAppData';
 import { normalizeData } from './utils/normalize';
-import OrderTracking from './components/portal/OrderTracking';
-import PWABanner from './components/PWABanner';
 
 
 // Import Admin Module
@@ -262,27 +264,6 @@ const App: React.FC = () => {
       // 2. Cargar permisos del usuario
       const userPermissions = await api.getUserPermissions(userData.id).catch(() => null);
 
-      // 3. Carga de Datos Iniciales
-      const [clients, users, roles, modules, pages, permissions, userPermissionsAll, genericMasters, articData] = await Promise.all([
-        api.getClients().catch(() => []),
-        api.getUsers().catch(() => []),
-        api.getRoles().catch(() => []),
-        api.getModules().then(normalizeData).catch(() => []),
-        api.getPages().then(normalizeData).catch(() => []),
-        api.getPermissions().catch(() => []),
-        api.getAllUserPermissions().catch(() => []),
-        api.getGenericMasters().catch(() => []),
-        api.getArticles().catch(() => [])
-      ]);
-
-      const groupedMasters: any = {};
-      if (Array.isArray(genericMasters)) {
-        genericMasters.forEach((m: any) => {
-          if (!groupedMasters[m.category]) groupedMasters[m.category] = [];
-          groupedMasters[m.category].push(m);
-        });
-      }
-
       let mappedPermissions: any[] = userData.permissions || [];
       
       // LOGIC FIX: Handle both Array (Admin mock) and Object (DB flat) formats
@@ -314,43 +295,6 @@ const App: React.FC = () => {
         }
       }
 
-      setAllMasterData({
-        ...allMasterData,
-        ...groupedMasters,
-        masterClientes: Array.isArray(clients) ? clients : [],
-        masterUsuarios: Array.isArray(users) ? users : [],
-        masterRol: Array.isArray(roles) ? roles : [],
-        masterPermisosRol: Array.isArray(permissions) ? permissions : [],
-        masterPermisosUsuario: Array.isArray(userPermissionsAll) ? userPermissionsAll : [],
-        masterArticulo: Array.isArray(articData) ? articData.map((a: any) => ({
-          ...a,
-          statusId: a.status_id,
-          clientId: a.client_id,
-          factorInter: a.factor_inter,
-          factorStd: a.factor_std,
-          uomGeneralId: a.uom_general_id,
-          uomInterId: a.uom_inter_id,
-          uomStdId: a.uom_std_id,
-          categoryArticuloId: a.category_articulo_id
-        })) : []
-      });
-
-      const [docsData, vehData, driversData] = await Promise.all([
-        api.getDocuments(userData.client_id || 'CLI-01').catch(() => []),
-        api.getVehicles().catch(() => []),
-        api.getDrivers().catch(() => [])
-      ]);
-
-      setDocuments(Array.isArray(docsData) ? docsData.map((d: any) => ({
-        ...d,
-        externalDocId: d.external_doc_id,
-        vehicleData: d.vehicle_plate,
-        createdAt: d.created_at,
-        items: (d.items || []).map((it: any) => ({ ...it, articleId: it.article_id }))
-      })) : []);
-      setVehicles(Array.isArray(vehData) ? vehData : []);
-      setDrivers(Array.isArray(driversData) ? driversData : []);
-
       const firstClientId = (userData.client_ids && userData.client_ids.length > 0) 
         ? userData.client_ids[0] 
         : (userData.client_id || 'CLI-01');
@@ -366,12 +310,12 @@ const App: React.FC = () => {
         clientIds: userData.client_ids || [firstClientId]
       } as any;
 
-      // Update store with dedicated tables
-      useAppStore.setState({ pages, modules });
-
       setUser(finalUser);
       localStorage.setItem('m7_user_session', JSON.stringify(finalUser));
       setIsAuthenticated(true);
+
+      // Disparar hidratación de catálogos y Layout usando Lazy Load (Asíncrono real)
+      refreshAppData(firstClientId);
 
       toast.success(`Bienvenido, ${userData.name}`);
       return { success: true };
@@ -828,74 +772,81 @@ const App: React.FC = () => {
       />
       <PWABanner />
 
-      <Layout
-        user={user!}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        activeMasterCategory={activeMasterCategory}
-        setActiveMasterCategory={setActiveMasterCategory}
-        activePageId={activePageId}
-        setActivePageId={setActivePageId}
-        onUpdateUser={async (data) => {
-          try {
-            const updatedUser = { ...user, ...data } as User;
-            setUser(updatedUser);
-            // Persistir en Backend
-            console.log('[M7-APP] Persistiendo usuario...', updatedUser);
-            await api.saveUser(updatedUser);
-
-            // Actualizar también la lista de maestros para que se vea en Auditoría/Difusión
-            const freshUsers = await api.getUsers().catch(() => []);
-            setAllMasterData({ ...allMasterData, masterUsuarios: freshUsers });
-
-            localStorage.setItem('m7_user_session', JSON.stringify(updatedUser));
-          } catch (e) {
-            console.error('[M7-APP] Error al guardar perfil:', e);
-            toast.error("Error al guardar en servidor", { description: "Los cambios son locales temporalmente." });
-          }
-        }}
-        onLogout={() => handleLogout()}
-        onBack={handleBack}
-        showBack={activeTab !== 'dashboard'}
-        modulesData={modules}
-        pagesData={pages}
-      >
-        {renderContent()}
-      </Layout>
-
-      {/* CHATBOT POSICIÓN ABSOLUTA AL FRENTE - ALINEADO CON HEADER 'RUTAS' */}
-      <AIChat
-        key="global-ai-chat-v8"
-        context={{
-          user: user.name,
-          activeTab,
-          documentsCount: documents.length,
-          invoicesCount: invoices.length,
-          availableVehicles: vehicles.filter(v => v.status === 'Disponible').length,
-          activeDrivers: drivers.filter(d => d.status === 'Activo').length,
-          recentAssignments: assignments.slice(-5)
-        }}
-      />
-      {showTimeoutWarning && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in zoom-in duration-300">
-          <div className="bg-white max-w-md w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6">
-            <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto animate-bounce">
-              <Icons.Alert style={{ width: '40px', height: '40px' }} />
-            </div>
-            <h3 className="text-2xl font-black text-slate-900 uppercase">¿Sigues ahí?</h3>
-            <p className="text-slate-500 font-medium">Tu sesión se cerrará por inactividad en:</p>
-            <div className="text-6xl font-black text-emerald-500 tabular-nums">
-              00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
-            </div>
-            <button
-              onClick={resetInactivityTimer}
-              className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl"
-            >
-              Continuar Trabajando
-            </button>
+      <React.Suspense fallback={
+        <div className="flex items-center justify-center h-screen w-full bg-slate-950">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-emerald-500 font-bold uppercase tracking-widest text-xs animate-pulse">Cargando Módulos...</p>
           </div>
         </div>
-      )}
+      }>
+        <Layout
+          user={user!}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          activeMasterCategory={activeMasterCategory}
+          setActiveMasterCategory={setActiveMasterCategory}
+          activePageId={activePageId}
+          setActivePageId={setActivePageId}
+          onUpdateUser={async (data) => {
+            try {
+              const updatedUser = { ...user, ...data } as User;
+              setUser(updatedUser);
+              console.log('[M7-APP] Persistiendo usuario...', updatedUser);
+              await api.saveUser(updatedUser);
+
+              const freshUsers = await api.getUsers().catch(() => []);
+              setAllMasterData({ ...allMasterData, masterUsuarios: freshUsers });
+
+              localStorage.setItem('m7_user_session', JSON.stringify(updatedUser));
+            } catch (e) {
+              console.error('[M7-APP] Error al guardar perfil:', e);
+              toast.error("Error al guardar en servidor", { description: "Los cambios son locales temporalmente." });
+            }
+          }}
+          onLogout={() => handleLogout()}
+          onBack={handleBack}
+          showBack={activeTab !== 'dashboard'}
+          modulesData={modules}
+          pagesData={pages}
+        >
+          {renderContent()}
+        </Layout>
+
+        {/* CHATBOT POSICIÓN ABSOLUTA AL FRENTE - ALINEADO CON HEADER 'RUTAS' */}
+        <AIChat
+          key="global-ai-chat-v8"
+          context={{
+            user: user.name,
+            activeTab,
+            documentsCount: documents.length,
+            invoicesCount: invoices.length,
+            availableVehicles: vehicles.filter(v => v.status === 'Disponible').length,
+            activeDrivers: drivers.filter(d => d.status === 'Activo').length,
+            recentAssignments: assignments.slice(-5)
+          }}
+        />
+        {showTimeoutWarning && (
+          <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in zoom-in duration-300">
+            <div className="bg-white max-w-md w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6">
+              <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto animate-bounce">
+                <Icons.Alert style={{ width: '40px', height: '40px' }} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-900 uppercase">¿Sigues ahí?</h3>
+              <p className="text-slate-500 font-medium">Tu sesión se cerrará por inactividad en:</p>
+              <div className="text-6xl font-black text-emerald-500 tabular-nums">
+                00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+              </div>
+              <button
+                onClick={resetInactivityTimer}
+                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl"
+              >
+                Continuar Trabajando
+              </button>
+            </div>
+          </div>
+        )}
+      </React.Suspense>
     </>
   );
 };
