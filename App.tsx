@@ -13,6 +13,7 @@ import FleetManager from './components/FleetManager';
 import AssignmentManager from './components/AssignmentManager';
 import AIChat from './components/AIChat';
 import DigitalSignature from './components/DigitalSignature';
+import CentroCapacitaciones from './components/CentroCapacitaciones';
 import ApprovalManager from './components/ApprovalManager';
 import ChatbotWidget from './components/ChatbotWidget';
 import DriverGamification from './components/DriverGamification';
@@ -772,6 +773,8 @@ const App: React.FC = () => {
             clients={allMasterData.masterClientes || []}
           />
         );
+      case 'capacitaciones':
+        return <CentroCapacitaciones user={user!} />;
       case 'chatbot':
         return <AIChat context={{ user: user!.name, activeTab: 'chatbot-fullscreen' }} />;
       default:

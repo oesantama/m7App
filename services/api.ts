@@ -468,4 +468,29 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }).then(r => r.json()),
+
+  // --- CAPACITACIONES (Centro de Capacitaciones) ---
+  getTrainingCategories: () => fetchJson(`${API_URL}/training/categories?_t=${Date.now()}`),
+  getTrainingCourses: (categoryId?: string, level?: number) => {
+    let url = `${API_URL}/training/courses?_t=${Date.now()}`;
+    if (categoryId) url += `&category_id=${categoryId}`;
+    if (level) url += `&level=${level}`;
+    return fetchJson(url);
+  },
+  getCourseWithLessons: (courseId: string, userId: string) => fetchJson(`${API_URL}/training/courses/${courseId}?userId=${userId}&_t=${Date.now()}`),
+  updateTrainingProgress: (data: { user_id: string, lesson_id: string, status: string }) => fetchJson(`${API_URL}/training/progress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  saveTrainingCourse: (data: any) => fetchJson(`${API_URL}/training/courses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  saveTrainingLesson: (data: any) => fetchJson(`${API_URL}/training/lessons`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
 };
