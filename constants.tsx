@@ -16,7 +16,7 @@ export const AVATAR_GALLERY = [
 
 export const INITIAL_CLIENTS = [
   { 
-    id: 'c1', 
+    id: 'CLI-01', 
     name: 'AJOVER S.A.S', 
     logoUrl: 'https://ajover.com/wp-content/uploads/2021/03/Logo-Ajover-300x120.png',
     emailNotifications: ['logistica@ajover.com'], 
@@ -24,7 +24,7 @@ export const INITIAL_CLIENTS = [
     createdBy: 'SYSTEM', createdAt: new Date().toISOString(), updatedBy: 'SYSTEM', updatedAt: new Date().toISOString(), statusId: 'EST-01'
   },
   { 
-    id: 'c2', 
+    id: 'CLI-02', 
     name: 'MEXICHEM COLOMBIA', 
     logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Mexichem_logo.svg/1200px-Mexichem_logo.svg.png',
     emailNotifications: ['ops@mexichem.com'], 
