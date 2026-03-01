@@ -113,7 +113,16 @@ export const useAppData = () => {
           vehicles: mappedVehicles,
           drivers: mappedDrivers,
           routes: Array.isArray(routesDataRaw) ? routesDataRaw : [],
-          assignments: Array.isArray(assignmentsDataRaw) ? assignmentsDataRaw : [],
+          // [M7-FIX] Normalizar snake_case → camelCase para que AssignmentManager pueda filtrar correctamente
+          assignments: Array.isArray(assignmentsDataRaw) ? assignmentsDataRaw.map((a: any) => ({
+            ...a,
+            vehicleId: a.vehicleId || a.vehicle_id,
+            driverId: a.driverId || a.driver_id,
+            clientId: a.clientId || a.client_id,
+            isActive: a.isActive !== undefined ? a.isActive : a.is_active,
+            updatedAt: a.updatedAt || a.updated_at,
+            createdAt: a.createdAt || a.created_at
+          })) : [],
           invoices: Array.isArray(invoicesDataRaw) ? invoicesDataRaw : []
         });
       }).catch(err => console.error('[M7-DATA-HOOK] Error deferred sync:', err));
