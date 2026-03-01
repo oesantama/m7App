@@ -70,6 +70,7 @@ export const login = async (req: Request, res: Response) => {
         email: user.email, 
         name: user.name, 
         role_id: user.role_id,
+        client_ids: user.client_ids || [], // NUEVO: Incluir clientes permitidos
         permissions: permissions 
     };
 

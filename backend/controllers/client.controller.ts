@@ -4,10 +4,24 @@ import pool from '../config/database.js';
 
 export const getClients = async (req: Request, res: Response) => {
   try {
-    const result = await pool.query('SELECT * FROM clients ORDER BY name ASC');
+    const user = (req as any).user;
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    
+    let query = 'SELECT * FROM clients';
+    let params: any[] = [];
+
+    if (!isSuper) {
+      // Filtrado Real: Solo clientes permitidos para el usuario
+      const allowedIds = user?.client_ids || [];
+      query += ' WHERE id = ANY($1::text[])';
+      params.push(allowedIds);
+    }
+
+    query += ' ORDER BY name ASC';
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err: any) {
-    console.warn('[M7-CLIENTS] Database connection failed');
+    console.error('[M7-CLIENTS] Fetch failed:', err);
     res.json([]);
   }
 };
