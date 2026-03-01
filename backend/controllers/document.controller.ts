@@ -394,39 +394,63 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
         }
 
         for (const item of doc.items) {
-          await client.query(`
-            INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-            ON CONFLICT ON CONSTRAINT unq_doc_art_inv DO UPDATE SET
-            expected_qty = document_items.expected_qty + EXCLUDED.expected_qty,
-            unit = EXCLUDED.unit,
-            volume = EXCLUDED.volume,
-            unit_volume = EXCLUDED.unit_volume,
-            city = EXCLUDED.city,
-            address = EXCLUDED.address,
-            observation = EXCLUDED.observation,
-            batch = EXCLUDED.batch,
-            peso = EXCLUDED.peso,
-            un_code = EXCLUDED.un_code,
-            client_ref = EXCLUDED.client_ref
-          `, [
-            doc.id,
-            item.articleId?.trim().toUpperCase(),
-            item.expectedQty || 0,
-            item.receivedQty || 0,
-            item.orderNumber || 'S/I',
-            item.unit || 'und',
-            item.invoice || 'S/I',
-            item.volume || 0,
-            item.unitVolume || '0',
-            item.city || 'S/D',
-            item.address || 'S/D',
-            item.observation || item.driverNote || '',
-            item.batch || 'S/L',
-            item.peso || 0,
-            item.unCode || null,
-            item.clientRef || null
-          ]);
+          const artId = item.articleId?.trim().toUpperCase();
+          const invoice = item.invoice || 'S/I';
+          if (!artId) continue;
+
+          // [M7-FIX] Estrategia SELECT → UPDATE/INSERT para evitar dependencia
+          // del constraint unq_doc_art_inv que puede no existir en la BD
+          const existingItem = await client.query(
+            `SELECT id FROM document_items WHERE document_id = $1 AND article_id = $2 AND invoice = $3 LIMIT 1`,
+            [doc.id, artId, invoice]
+          );
+
+          if (existingItem.rowCount && existingItem.rowCount > 0) {
+            // Acumular cantidad si ya existe
+            await client.query(`
+              UPDATE document_items SET
+                expected_qty = expected_qty + $1,
+                unit = $2, volume = $3, unit_volume = $4,
+                city = $5, address = $6, observation = $7,
+                batch = $8, peso = $9, un_code = $10, client_ref = $11
+              WHERE document_id = $12 AND article_id = $13 AND invoice = $14
+            `, [
+              item.expectedQty || 0,
+              item.unit || 'und',
+              item.volume || 0,
+              item.unitVolume || '0',
+              item.city || 'S/D',
+              item.address || 'S/D',
+              item.observation || item.driverNote || '',
+              item.batch || 'S/L',
+              item.peso || 0,
+              item.unCode || null,
+              item.clientRef || null,
+              doc.id, artId, invoice
+            ]);
+          } else {
+            await client.query(`
+              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            `, [
+              doc.id,
+              artId,
+              item.expectedQty || 0,
+              item.receivedQty || 0,
+              item.orderNumber || 'S/I',
+              item.unit || 'und',
+              invoice,
+              item.volume || 0,
+              item.unitVolume || '0',
+              item.city || 'S/D',
+              item.address || 'S/D',
+              item.observation || item.driverNote || '',
+              item.batch || 'S/L',
+              item.peso || 0,
+              item.unCode || null,
+              item.clientRef || null
+            ]);
+          }
         }
       }
 
