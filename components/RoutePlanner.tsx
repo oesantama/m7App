@@ -45,7 +45,19 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   invoices, vehicles, drivers, assignments, documents, activeRoutes, user, clients, onAssign, onSaveRoute, onRefresh
 }) => {
   const mapRef = useRef<L.Map | null>(null);
-  const [selectedClient, setSelectedClient] = useState(user.clientId || 'c1');
+  const isSuperAdmin = user.roleId === 'ROL-01' || user.role_id === 'ROL-01' || user.email === 'admin@millasiete.com';
+  const allowedClientIds = user.clientIds || [];
+  
+  // Filtrar clientes permitidos
+  const allowedClients = useMemo(() => {
+    if (isSuperAdmin) return clients;
+    return clients.filter(c => allowedClientIds.includes(c.id));
+  }, [clients, isSuperAdmin, allowedClientIds]);
+
+  const [selectedClient, setSelectedClient] = useState(() => {
+    if (isSuperAdmin) return user.clientId || 'GLOBAL';
+    return allowedClientIds.includes(user.clientId) ? user.clientId : (allowedClientIds[0] || '');
+  });
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [viewMode, setViewMode] = useState<'intelligence' | 'map' | 'active'>('intelligence');
@@ -1108,8 +1120,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 onChange={(e) => { setSelectedClient(e.target.value); setSuggestedRoutes([]); }}
                 className="bg-slate-50 border border-slate-200 px-3 py-0.5 rounded-md text-[9px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm"
               >
-                <option value="GLOBAL">FLOTA GLOBAL ORBIT</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {isSuperAdmin && <option value="GLOBAL">FLOTA GLOBAL ORBIT</option>}
+                {allowedClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
 
               {/* KPI BADGES INTEGRADOS (V2) */}

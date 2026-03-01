@@ -49,7 +49,7 @@ export const useAppData = () => {
         isSuper ? api.getRoles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper ? api.getPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper || hasPerm('MATRIZ_PERMISOS') ? api.getAllUserPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        hasPerm('CLIENTES') ? api.getClients().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('CLIENTES') || hasPerm('RUTAS')) ? api.getClients().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('ASIGNACIONES') ? api.getAssignments().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('DOCUMENTOS_L') ? api.getInvoices(targetClientId).catch(() => []) : Promise.resolve([]),
         hasPerm('RUTAS') ? api.getRoutes().catch(() => []) : Promise.resolve([]),
