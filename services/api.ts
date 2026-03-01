@@ -30,12 +30,16 @@ export const fetchJson = async (url: string, options?: any) => {
     try {
       const res = await fetch(url, fetchOptions);
       
-      if (res.status === 401) {
-        console.warn('[ORBIT-AUTH] 401 detectado.');
-      }
-
       const isJson = res.headers.get('content-type')?.includes('application/json');
       const data = isJson ? await res.json().catch(() => ({})) : await res.text();
+
+      if (res.status === 401) {
+        console.warn('[ORBIT-AUTH] 401 detectado. Caducidad o token inválido.');
+        localStorage.removeItem('token');
+        window.dispatchEvent(new CustomEvent('orbit-auth-failed', { 
+          detail: { message: data?.error || 'Su sesión ha caducado por seguridad.' } 
+        }));
+      }
 
       if (!res.ok) {
         throw new Error(data.error || data || `Error HTTP: ${res.status}`);

@@ -181,10 +181,17 @@ const App: React.FC = () => {
   // Import dynamic components locally or use lazy? No, direct import above to keep it simple
 
   useEffect(() => {
-    // Eventos de actividad
-    window.addEventListener('mousemove', resetInactivityTimer);
-    //...
+    // Listener para fallos de JWT Global (401)
+    const handleAuthFailure = (event: any) => {
+      handleLogout(false);
+      toast.error(event.detail?.message || "Sesión Invalida", { 
+        description: "Por favor inicie sesión nuevamente.",
+        duration: 5000 
+      });
+    };
 
+    window.addEventListener('orbit-auth-failed', handleAuthFailure);
+    window.addEventListener('mousemove', resetInactivityTimer);
     window.addEventListener('keydown', resetInactivityTimer);
     window.addEventListener('click', resetInactivityTimer);
 
@@ -192,6 +199,7 @@ const App: React.FC = () => {
 
     return () => {
       if (inactivityTimer) clearTimeout(inactivityTimer);
+      window.removeEventListener('orbit-auth-failed', handleAuthFailure);
       window.removeEventListener('mousemove', resetInactivityTimer);
       window.removeEventListener('keydown', resetInactivityTimer);
       window.removeEventListener('click', resetInactivityTimer);
