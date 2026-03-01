@@ -36,26 +36,30 @@ export const useAppData = () => {
         modules: modulesRaw
       });
 
-      // 2. CARGA DIFERIDA (No bloqueante, se pinta el UI de inmediato)
+      // 2. FUNCIONES AUXILIARES DE PERMISOS
+      const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
+      const hasPerm = (mod: string) => isSuper || (user?.permissions || []).some(p => p.module === mod && p.actions.includes('view'));
+
+      // 3. CARGA DIFERIDA CON FILTRO DE PERMISOS
       Promise.all([
         api.getGenericMasters().then(normalizeData).catch(() => []),
         api.getCategories().then(normalizeData).catch(() => []), 
-        api.getArticles().then(normalizeData).catch(() => []),
-        api.getVehicles().then(normalizeData).catch(() => []),
-        api.getDrivers().then(normalizeData).catch(() => []),
-        api.getUsers().then(normalizeData).catch(() => []),
-        api.getRoles().then(normalizeData).catch(() => []),
-        api.getPermissions().then(normalizeData).catch(() => []),
-        api.getAllUserPermissions().then(normalizeData).catch(() => []),
-        api.getClients().then(normalizeData).catch(() => []),
-        api.getAssignments().then(normalizeData).catch(() => []),
-        api.getInvoices(targetClientId).catch(() => []),
-        api.getRoutes().catch(() => []),
-        api.getEstados().then(normalizeData).catch(() => []),
+        hasPerm('ARTICULOS') ? api.getArticles().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        hasPerm('VEHICULOS') ? api.getVehicles().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        hasPerm('CONDUCTORES') ? api.getDrivers().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        hasPerm('USUARIOS') ? api.getUsers().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        isSuper ? api.getRoles().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        isSuper ? api.getPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        isSuper || hasPerm('MATRIZ_PERMISOS') ? api.getAllUserPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        hasPerm('CLIENTES') ? api.getClients().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        hasPerm('ASIGNACIONES') ? api.getAssignments().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        hasPerm('DOCUMENTOS_L') ? api.getInvoices(targetClientId).catch(() => []) : Promise.resolve([]),
+        hasPerm('RUTAS') ? api.getRoutes().catch(() => []) : Promise.resolve([]),
+        api.getEstados().then(normalizeData).catch(() => []), // Maestros base (Siempre cargar)
         api.getMarcas().then(normalizeData).catch(() => []),
         api.getTiposDocumento().then(normalizeData).catch(() => []),
         api.getUnidadesMedida().then(normalizeData).catch(() => []),
-        api.getNotificacionesConfig().then(normalizeData).catch(() => []),
+        hasPerm('NOTIFICACIONES') ? api.getNotificacionesConfig().then(normalizeData).catch(() => []) : Promise.resolve([]),
         api.getTiposVehiculo().then(normalizeData).catch(() => []),
         api.getTiposNotificacion().then(normalizeData).catch(() => [])
       ]).then(([
@@ -116,18 +120,20 @@ export const useAppData = () => {
         });
       }).catch(err => console.error('[M7-DATA-HOOK] Error deferred sync:', err));
 
-      // 6. Carga de Documentos Operativos (Async independiente)
-      api.getDocuments(targetClientId).then(docs => {
-        if (Array.isArray(docs)) {
-          setDocuments(docs.map(d => ({
-            ...d,
-            externalDocId: d.external_doc_id || d.externalDocId,
-            vehicleData: d.vehicle_plate || d.vehicleData,
-            status: d.status || (d.status_id === 'EST-01' ? 'En Conteo' : 'Pendiente'),
-            items: (d.items || []).map((it: any) => ({ ...it, articleId: it.article_id }))
-          })));
-        }
-      });
+      // 4. CARGA DE DOCUMENTOS OPERATIVOS (Condicional)
+      if (hasPerm('DOCUMENTOS_L')) {
+        api.getDocuments(targetClientId).then(docs => {
+          if (Array.isArray(docs)) {
+            setDocuments(docs.map(d => ({
+              ...d,
+              externalDocId: d.external_doc_id || d.externalDocId,
+              vehicleData: d.vehicle_plate || d.vehicleData,
+              status: d.status || (d.status_id === 'EST-01' ? 'En Conteo' : 'Pendiente'),
+              items: (d.items || []).map((it: any) => ({ ...it, articleId: it.article_id }))
+            })));
+          }
+        }).catch(err => console.warn('[M7-DATA-HOOK] Error loading documents:', err));
+      }
 
     } catch (err) {
       console.error('[M7-DATA-HOOK] Error sync:', err);
