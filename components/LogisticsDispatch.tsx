@@ -1116,25 +1116,35 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 const utilizationPercent = vehicleData ? (totalVolume / vehicleData.capacityM3) * 100 : 0;
 
                                 return (
-                                    <div key={route.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 group hover:shadow-md transition-all border-l-4 border-l-slate-900 hover:border-l-emerald-500">
+                                    <div key={route.id} className="bg-slate-50 rounded-2xl border border-slate-100 shadow-sm p-4 group hover:shadow-xl hover:scale-[1.02] transition-all border-l-4 border-l-slate-900 hover:border-l-emerald-500">
                                         <div className="flex justify-between items-center mb-3">
-                                            <h4 className="text-sm font-black text-slate-900 leading-none">{route.plate}</h4>
-                                            <div className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                                                {utilizationPercent.toFixed(0)}% Cap.
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{route.plate}</span>
+                                                <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{route.driver_name || 'PENDIENTE'}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[10px] font-black text-slate-900">{utilizationPercent.toFixed(0)}%</div>
+                                                <div className="w-16 h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                                                    <div className="h-full bg-emerald-500" style={{ width: `${Math.min(utilizationPercent, 100)}%` }}></div>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex gap-2">
+                                        <div className="grid grid-cols-2 gap-2">
                                             <button 
-                                                onClick={() => setVisualizedRoute(route)}
-                                                className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${visualizedRoute?.id === route.id ? 'bg-slate-900 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+                                                onClick={() => {
+                                                    setVisualizedRoute(route);
+                                                }}
+                                                className={`flex items-center justify-center gap-2 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${visualizedRoute?.id === route.id ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                                             >
-                                                {visualizedRoute?.id === route.id ? '📍 Rastreo On' : 'Ver Mapa'}
+                                                <Icons.Truck className="w-3 h-3" />
+                                                {visualizedRoute?.id === route.id ? 'Tracker On' : 'Ver Mapa'}
                                             </button>
                                             <button 
                                                 onClick={() => setSelectedActiveRoute(route)}
-                                                className="px-2.5 py-1.5 bg-emerald-500/10 text-emerald-700 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all"
+                                                className="flex items-center justify-center gap-2 bg-slate-900 text-white rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-slate-900/20"
                                             >
+                                                <Icons.FileText className="w-3 h-3" />
                                                 Docs
                                             </button>
                                         </div>

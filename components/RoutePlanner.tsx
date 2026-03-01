@@ -1590,7 +1590,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-black text-emerald-600">{inv.volumeM3.toFixed(3)}m³</p>
+                      <p className="text-xs font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(3)}m³</p>
                       <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tight">
                         {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(inv.invoiceValue || 0)}
                       </p>
@@ -1803,7 +1803,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                                   {invoices.length} Facturas
                                 </span>
                                 <span className="text-[9px] font-black text-slate-500 bg-white border border-slate-200 px-2 py-1 rounded-lg uppercase">
-                                  {volume.toFixed(2)}m³ Total
+                                  {(Number(volume) || 0).toFixed(2)}m³ Total
                                 </span>
                               </div>
                             </div>
@@ -1827,7 +1827,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                                   <p className="font-black text-[11px] text-slate-800 uppercase leading-none">{inv.invoiceNumber}</p>
                                   <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{inv.customerName}</p>
                                 </div>
-                                <p className="text-[11px] font-black text-indigo-500">{inv.volumeM3.toFixed(2)}m³</p>
+                                <p className="text-[11px] font-black text-indigo-500">{(Number(inv.volumeM3) || 0).toFixed(2)}m³</p>
                               </div>
                             ))}
                           </div>

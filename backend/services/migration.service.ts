@@ -275,6 +275,16 @@ export const restoreSystem = async () => {
     `, [adminHash]);
 
     await client.query('COMMIT');
+
+    // FASE FINAL: SINCRONIZACIÓN NUCLEAR DE MENÚS (REUBICACIÓN LOGÍSTICA)
+    console.log('[M7-SYNC] Forzando reubicación de módulos logísticos a Gestión Ajover...');
+    await client.query(`
+      UPDATE pages 
+      SET module_id = 'MOD-03', parent_id = 'MOD-03' 
+      WHERE id IN ('PAG-13', 'PAG-15');
+    `);
+    console.log('[M7-SYNC] Módulos Logísticos Sincronizados con Éxito.');
+
     const total = Date.now() - start;
     return { success: true, message: `Operación de Sincronización Nuclear Exitosa en ${total}ms.` };
   } catch (err) {
