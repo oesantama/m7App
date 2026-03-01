@@ -940,19 +940,20 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                     <td className="py-2 px-4">
                                       <div className="flex flex-col">
                                         <span className="text-slate-900 font-bold uppercase">{it.articleId}</span>
-                                        <span className="text-[7px] text-slate-400 font-black">{it.orderNumber || 'S/P'}</span>
+                                        <span className="text-[7px] text-slate-400 font-black">{it.sku || ''}</span>
                                       </div>
                                     </td>
-                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.unCode || 'S/I'}</td>
-                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.clientRef || 'S/I'}</td>
-                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.expectedQty}</td>
+                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.unCode || '-'}</td>
+                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.clientRef || '-'}</td>
+                                    <td className="py-2 px-4 text-center text-slate-900 font-bold">{it.expectedQty || 0}</td>
                                     <td className="py-2 px-4 text-center font-black text-blue-600 bg-blue-50/30">{it.receivedQty || 0}</td>
-                                    <td className="py-2 px-4 text-center text-slate-500 font-black">{it.unit || 'UND'}</td>
+                                    <td className="py-2 px-4 text-center text-slate-500 font-black">{it.unit || 'CJ'}</td>
                                     <td className="py-2 px-4 text-right text-slate-400 font-black">{it.volume || 0}</td>
-                                    <td className="py-2 px-4 text-center font-black text-orange-600 italic bg-orange-50/10">{formatCurrency(it.peso)}</td>
-                                    <td className="py-2 px-4 text-right font-black text-emerald-600">{it.invoice || 'S/I'}</td>
+                                    <td className="py-2 px-4 text-center font-black text-orange-600 italic bg-orange-50/10 font-mono text-[8px]">{formatCurrency(it.peso)}</td>
+                                    <td className="py-2 px-4 text-right font-black text-emerald-600 font-mono">{it.orderNumber || '-'}</td>
+                                    <td className="py-2 px-4 text-right font-black text-slate-900 font-mono">{it.invoice || '-'}</td>
                                     <td className="py-2 px-4 text-right text-slate-500 truncate max-w-[100px]" title={it.city}>{it.city || '-'}</td>
-                                    <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[150px]" title={it.driverNote}>{it.driverNote || 'SIN OBS.'}</td>
+                                    <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[150px]" title={it.driverNote}>{it.driverNote || '-'}</td>
                                   </tr>
                                 ))}
                                  {paginatedModalItems.length === 0 && (
