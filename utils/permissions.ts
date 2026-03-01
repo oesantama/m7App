@@ -1,0 +1,46 @@
+
+import { User } from '../types';
+
+/**
+ * Mapa Maestro de Seguridad para Milla 7
+ * Vincula nombres de módulos descriptivos con sus IDs de página técnicos (PAG-XX)
+ */
+export const ID_MAP: Record<string, string> = {
+  'ARTICULOS': 'PAG-01',
+  'CLIENTES': 'PAG-03',
+  'VEHICULOS': 'PAG-14',
+  'CONDUCTORES': 'PAG-14', // Ambos caen en Gestión de Flotas
+  'USUARIOS': 'PAG-21',
+  'ROLES': 'PAG-22',
+  'ASIGNACIONES': 'PAG-12',
+  'DOCUMENTOS_L': 'PAG-16',
+  'RUTAS': 'PAG-15',
+  'DASHBOARD': 'PAG-25',
+  'NOTIFICACIONES': 'PAG-07',
+  'WHATSAPP': 'PAG-18',
+  'CAPACITACIONES': 'CAPACITACIONES' // Nombre directo por ahora
+};
+
+/**
+ * Valida si un usuario tiene un permiso específico.
+ * Soporta validación por nombre de módulo o por ID técnico.
+ */
+export const hasPermission = (user: User | null | any, moduleName: string, action: string = 'view'): boolean => {
+  if (!user) return false;
+
+  // Los Super Administradores tienen acceso total
+  const isSuper = user.roleId === 'ROL-01' || user.role_id === 'ROL-01' || user.email === 'admin@millasiete.com';
+  if (isSuper) return true;
+
+  const pageId = ID_MAP[moduleName];
+  const permissions = user.permissions || [];
+
+  return permissions.some((p: any) => {
+    const mod = String(p.module).toUpperCase();
+    const targetMod = String(moduleName).toUpperCase();
+    const targetPage = pageId ? String(pageId).toUpperCase() : null;
+
+    return (mod === targetMod || (targetPage && mod === targetPage)) && 
+           p.actions.includes(action);
+  });
+};

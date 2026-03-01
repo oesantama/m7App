@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import { api } from '../services/api';
 import { normalizeData } from '../utils/normalize';
+import { hasPermission } from '../utils/permissions';
 
 /**
  * Hook para gestionar la sincronización global de datos de la aplicación.
@@ -9,22 +10,17 @@ import { normalizeData } from '../utils/normalize';
  */
 export const useAppData = () => {
   const {
-    user,
-    setVehicles,
-    setDrivers,
-    setAssignments,
-    setInvoices,
-    setDocuments,
     setAllMasterData,
-    setIsLoading
+    setIsLoading,
+    setDocuments
   } = useAppStore();
 
   const refreshAppData = useCallback(async (forcedClientId?: string) => {
-    const targetClientId = forcedClientId || user?.clientId || 'CLI-01';
+    // IMPORTANTE: Obtener el usuario directamente del store para evitar cierres (closures) obsoletos
+    const currentUser = useAppStore.getState().user;
+    const targetClientId = forcedClientId || currentUser?.clientId || 'CLI-01';
     
     try {
-      // setIsLoading(true); // Opcional, dependiendo de si queremos mostrar loader global
-      
       // 1. CARGA CRÍTICA (Bloqueante para pintar el Layout/Menú)
       const [modulesRaw, pagesRaw] = await Promise.all([
         api.getModules().then(normalizeData).catch(() => []),
@@ -36,32 +32,9 @@ export const useAppData = () => {
         modules: modulesRaw
       });
 
-      // 2. FUNCIONES AUXILIARES DE PERMISOS (Mapeo de IDs M7)
-      const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
-      
-      const ID_MAP: Record<string, string> = {
-        'ARTICULOS': 'PAG-01',
-        'CLIENTES': 'PAG-03',
-        'VEHICULOS': 'PAG-14',
-        'CONDUCTORES': 'PAG-14', // Fleet Manager
-        'USUARIOS': 'PAG-21',
-        'ROLES': 'PAG-22',
-        'ASIGNACIONES': 'PAG-12',
-        'DOCUMENTOS_L': 'PAG-16',
-        'RUTAS': 'PAG-15',
-        'DASHBOARD': 'PAG-25',
-        'NOTIFICACIONES': 'PAG-07'
-      };
+      const isSuper = (currentUser as any)?.roleId === 'ROL-01' || (currentUser as any)?.role_id === 'ROL-01' || (currentUser as any)?.email === 'admin@millasiete.com';
+      const hasPerm = (mod: string) => hasPermission(currentUser, mod, 'view');
 
-      const hasPerm = (modName: string) => {
-        if (isSuper) return true;
-        const pageId = ID_MAP[modName];
-        return (user?.permissions || []).some(p => 
-          (String(p.module).toUpperCase() === String(modName).toUpperCase() || 
-           (pageId && String(p.module).toUpperCase() === String(pageId).toUpperCase())) && 
-          p.actions.includes('view')
-        );
-      };
 
       // 3. CARGA DIFERIDA CON FILTRO DE PERMISOS
       Promise.all([
@@ -71,6 +44,7 @@ export const useAppData = () => {
         hasPerm('VEHICULOS') ? api.getVehicles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('CONDUCTORES') ? api.getDrivers().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('USUARIOS') ? api.getUsers().then(normalizeData).catch(() => []) : Promise.resolve([]),
+
 
         isSuper ? api.getRoles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper ? api.getPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
@@ -164,7 +138,8 @@ export const useAppData = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, setVehicles, setDrivers, setAssignments, setInvoices, setDocuments, setAllMasterData, setIsLoading]);
+  }, [setAllMasterData, setIsLoading, setDocuments]);
+
 
   return { refreshAppData };
 };

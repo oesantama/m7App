@@ -5,6 +5,7 @@ import { getMasterCategoryFromRoute } from '../constants/routes';
 import { Toaster, toast } from 'sonner';
 import { User, PageModule, MasterCategory, MasterRecord } from '../types';
 import { api } from '../services/api';
+import { hasPermission } from '../utils/permissions';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -81,7 +82,9 @@ const Layout: React.FC<LayoutProps> = ({
     return IconComponent ? <IconComponent /> : <Icons.Alert />;
   };
 
-  const isSuperUser = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
+
+  const isSuperUser = hasPermission(user, 'USUARIOS', 'super'); // O simplemente usar hasPermission donde sea necesario
+
 
 
 
@@ -106,18 +109,8 @@ const Layout: React.FC<LayoutProps> = ({
           const isActive = (p.statusId || p.status_id) === 'EST-01';
           return isMatch && isActive;
         })
-        .filter(p => {
-          if (isSuperUser) return true;
-          const pId = p.id;
-          const userPerm = user.permissions?.find(perm => perm.module === pId); // Added optional chaining just in case
-          
-          // DEBUG PERMISSIONS
-          // console.log(`Checking Page: ${p.name} (${pId})`);
-          // console.log(`User Perms for ${pId}:`, userPerm);
-          // console.log(`Has View?`, userPerm?.actions?.includes('view'));
+        .filter(p => hasPermission(user, p.id, 'view'))
 
-          return userPerm && userPerm.actions.includes('view');
-        })
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(page => {
           const masterCat = getMasterCategoryFromRoute(page.route, page.id);
@@ -221,13 +214,16 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar px-2 mt-4">
-          <button 
-            onClick={() => setActiveTab('capacitaciones')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all font-bold text-[11px] rounded-xl mb-4 ${activeTab === 'capacitaciones' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-          >
-            <span className={activeTab === 'capacitaciones' ? 'text-slate-950' : 'text-emerald-500'}><Icons.Award className="w-5 h-5" /></span>
-            {!isCollapsed && <span className="truncate uppercase tracking-wide">Centro de Formación</span>}
-          </button>
+          {hasPermission(user, 'CAPACITACIONES', 'view') && (
+            <button 
+              onClick={() => setActiveTab('capacitaciones')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all font-bold text-[11px] rounded-xl mb-4 ${activeTab === 'capacitaciones' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            >
+              <span className={activeTab === 'capacitaciones' ? 'text-slate-950' : 'text-emerald-500'}><Icons.Award className="w-5 h-5" /></span>
+              {!isCollapsed && <span className="truncate uppercase tracking-wide">Centro de Formación</span>}
+            </button>
+          )}
+
 
           {menuGroups.map((group) => (
             <div key={group.id} className="space-y-0.5">

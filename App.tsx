@@ -51,6 +51,7 @@ import { Toaster, toast } from 'sonner';
 import { useAppStore } from './stores/useAppStore';
 import { useAppData } from './hooks/useAppData';
 import { normalizeData } from './utils/normalize';
+import { hasPermission } from './utils/permissions';
 
 
 // Import Admin Module
@@ -274,6 +275,10 @@ const App: React.FC = () => {
   // Polling global para indicador
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
+    
+    // M7 FIX: Solo pollear si el usuario tiene permiso para WhatsApp
+    if (!hasPermission(user, 'WHATSAPP', 'view')) return;
+
     const checkWa = async () => {
       try {
         const res = await api.getWhatsAppStatus(user.id);
@@ -283,7 +288,7 @@ const App: React.FC = () => {
     checkWa();
     const timer = setInterval(checkWa, 30000);
     return () => clearInterval(timer);
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, user?.permissions]);
 
   const handleLogin = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -390,19 +395,19 @@ const App: React.FC = () => {
       console.log('[M7-ROUTING] Calculando ruta de bienvenida...');
       
       const isSuperUser = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
-      const userPerms = user.permissions || [];
       
-      // 1. PRIORIDAD: DASHBOARD
-      const hasDashboard = isSuperUser || userPerms.some(p => p.module === 'DASHBOARD' && p.actions.includes('view'));
+      // 1. PRIORIDAD: DASHBOARD (Usando utilidad centralizada)
+      const hasDashboard = hasPermission(user, 'DASHBOARD', 'view');
       
       if (hasDashboard) {
         setActiveTab('dashboard');
+        setActivePageId(''); // Limpiar ID de página para evitar componentes residuales
         setNeedsWelcomeRedirect(false);
         return;
       }
 
+
       // 2. BUSCAR PRIMERA PÁGINA PERMITIDA
-      // Replicamos la lógica de Layout.tsx para encontrar la primera opción real
       const allowedModules = modules
         .filter(m => (m.statusId || m.status_id) === 'EST-01')
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -412,10 +417,7 @@ const App: React.FC = () => {
         const firstPage = pages
           .filter(p => String(p.parentId || p.parent_id || '').trim().toUpperCase() === modId)
           .filter(p => (p.statusId || p.status_id) === 'EST-01')
-          .filter(p => {
-            if (isSuperUser) return true;
-            return userPerms.some(perm => perm.module === p.id && perm.actions.includes('view'));
-          })
+          .filter(p => hasPermission(user, p.id, 'view'))
           .sort((a, b) => a.name.localeCompare(b.name))[0];
 
         if (firstPage) {
@@ -435,11 +437,19 @@ const App: React.FC = () => {
         }
       }
 
-      // 3. FALLBACK: DASHBOARD (aunque no tenga datos, es mejor que nada)
+      // 3. FALLBACK: CAPACITACIONES (Si Dashboard falló)
+      if (hasPermission(user, 'CAPACITACIONES', 'view')) {
+        setActiveTab('capacitaciones');
+        setNeedsWelcomeRedirect(false);
+        return;
+      }
+
+      // 4. ULTIMO RECURSO: DASHBOARD
       setActiveTab('dashboard');
       setNeedsWelcomeRedirect(false);
     }
   }, [isAuthenticated, needsWelcomeRedirect, pages, modules, user]);
+
 
   if (isRestoring) {
     return (
