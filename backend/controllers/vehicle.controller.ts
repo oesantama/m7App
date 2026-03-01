@@ -10,7 +10,20 @@ export const getVehicles = async (req: Request, res: Response) => {
     await pool.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS vehicle_type TEXT;');
     
     // Filtrar eliminados (Soft Delete)
-    const result = await pool.query("SELECT * FROM vehicles WHERE status_id != 'ELIMINADO' ORDER BY plate ASC");
+    const user = (req as any).user;
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    
+    let query = "SELECT * FROM vehicles WHERE status_id != 'ELIMINADO'";
+    let params: any[] = [];
+
+    if (!isSuper) {
+        const allowedIds = user?.client_ids || [];
+        query += " AND client_id = ANY($1::text[])";
+        params.push(allowedIds);
+    }
+
+    query += " ORDER BY plate ASC";
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err: any) {
     console.warn('[M7-VEHICLES] Error fetching or repairing schema:', err.message);

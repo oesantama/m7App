@@ -555,9 +555,19 @@ export const getInvoices = async (req: Request, res: Response) => {
       WHERE 1=1
     `;
 
+    const user = (req as any).user;
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+
     if (clientId && clientId !== 'GLOBAL') {
       queryParams.push(clientId);
       query += ` AND documents_l.client_id = $${queryParams.length}`;
+    }
+
+    // [SECURITY FIX] Siempre filtrar por los clientes autorizados si no es Super Admin
+    if (!isSuper) {
+      const allowedIds = user?.client_ids || [];
+      queryParams.push(allowedIds);
+      query += ` AND documents_l.client_id = ANY($${queryParams.length}::text[])`;
     }
 
     if (ids) {

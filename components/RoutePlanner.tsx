@@ -5,6 +5,7 @@ import { Invoice, Vehicle, Route, VehicleStatus, Driver, VehicleAssignment, Docu
 import { Icons, INITIAL_CLIENTS } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { useAppStore } from '../stores/useAppStore';
 
 interface RoutePlannerProps {
   invoices: Invoice[];
@@ -58,6 +59,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     if (isSuperAdmin) return user.clientId || 'GLOBAL';
     return allowedClientIds.includes(user.clientId) ? user.clientId : (allowedClientIds[0] || '');
   });
+
+  const setInvoices = useAppStore(state => state.setInvoices);
+
+  // Recargar facturas automáticamente cuando el usuario cambia de cliente
+  useEffect(() => {
+    if (!selectedClient) return;
+    api.getInvoices(selectedClient === 'GLOBAL' ? undefined : selectedClient)
+      .then((data: any[]) => {
+        if (Array.isArray(data)) setInvoices(data);
+      })
+      .catch(() => {});
+  }, [selectedClient]);
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [viewMode, setViewMode] = useState<'intelligence' | 'map' | 'active'>('intelligence');

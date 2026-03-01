@@ -9,7 +9,20 @@ export const getDrivers = async (req: Request, res: Response) => {
     await pool.query('ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_side_b TEXT;');
     await pool.query('ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_category TEXT;');
 
-    const result = await pool.query('SELECT * FROM drivers ORDER BY name ASC');
+    const user = (req as any).user;
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+
+    let query = 'SELECT * FROM drivers';
+    let params: any[] = [];
+
+    if (!isSuper) {
+        const allowedIds = user?.client_ids || [];
+        query += ' WHERE client_id = ANY($1::text[])';
+        params.push(allowedIds);
+    }
+
+    query += ' ORDER BY name ASC';
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err: any) {
     console.warn('[M7-DRIVERS] Error fetching or repairing schema:', err.message);
