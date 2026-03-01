@@ -24,6 +24,7 @@ export const ID_MAP: Record<string, string> = {
 /**
  * Valida si un usuario tiene un permiso específico.
  * Soporta validación por nombre de módulo o por ID técnico.
+ * Es extremadamente robusto contra diferentes formas de datos (Array vs Object).
  */
 export const hasPermission = (user: User | null | any, moduleName: string, action: string = 'view'): boolean => {
   if (!user) return false;
@@ -33,14 +34,28 @@ export const hasPermission = (user: User | null | any, moduleName: string, actio
   if (isSuper) return true;
 
   const pageId = ID_MAP[moduleName];
-  const permissions = user.permissions || [];
+  
+  // Normalizar permisos a un array de objetos { module, actions }
+  let userPerms: any[] = [];
+  if (Array.isArray(user.permissions)) {
+    userPerms = user.permissions;
+  } else if (user.permissions && typeof user.permissions === 'object') {
+    userPerms = Object.entries(user.permissions).map(([mod, pacts]) => ({
+      module: mod,
+      actions: Array.isArray(pacts) ? pacts : []
+    }));
+  }
 
-  return permissions.some((p: any) => {
+  const targetMod = String(moduleName).toUpperCase();
+  const targetPage = pageId ? String(pageId).toUpperCase() : null;
+
+  return userPerms.some((p: any) => {
+    if (!p || !p.module) return false;
     const mod = String(p.module).toUpperCase();
-    const targetMod = String(moduleName).toUpperCase();
-    const targetPage = pageId ? String(pageId).toUpperCase() : null;
+    const actions = Array.isArray(p.actions) ? p.actions : [];
 
     return (mod === targetMod || (targetPage && mod === targetPage)) && 
-           p.actions.includes(action);
+           actions.includes(action);
   });
 };
+

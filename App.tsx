@@ -224,13 +224,16 @@ const App: React.FC = () => {
               return;
             }
 
-            // SOLUCIÓN REAL: Forzar refresco de permisos para Admin en cada restauración
-            if (parsedUser.roleId === 'ROL-01' || parsedUser.id === 'USR-01') {
-              const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
-              if (freshPerms && Array.isArray(freshPerms)) {
-                parsedUser.permissions = freshPerms;
-              }
+            // M7 SOLUCIÓN NUCLEAR: Forzar refresco de permisos para TODOS en cada restauración
+            // Esto evita que datos obsoletos en localStorage permitan peticiones prohibidas
+            const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
+            if (freshPerms) {
+              parsedUser.permissions = Array.isArray(freshPerms) ? freshPerms : Object.entries(freshPerms).map(([mod, pacts]) => ({
+                module: mod,
+                actions: pacts
+              }));
             }
+
 
             setUser({
               ...parsedUser,
