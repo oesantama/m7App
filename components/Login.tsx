@@ -405,7 +405,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="mt-10 pt-8 border-t border-white/5 text-center group cursor-help">
             <p className="text-[9px] text-slate-600 font-black uppercase tracking-[0.3em] flex items-center justify-center gap-2 group-hover:text-emerald-500 transition-colors">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-              Estado: Operativo 100% (V1.9.2)
+              Estado: Operativo 100% (V1.9.5-NUCLEAR)
             </p>
             <div className="mt-2 space-y-1">
               <p className="text-[7px] text-slate-500 font-black uppercase tracking-widest">

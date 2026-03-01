@@ -1590,9 +1590,23 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(3)}m³</p>
+                      <p className="text-xs font-black text-emerald-600">
+                        {(() => {
+                          try {
+                            return (Number(inv.volumeM3) || 0).toFixed(3);
+                          } catch (e) {
+                            return "0.000";
+                          }
+                        })()}m³
+                      </p>
                       <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tight">
-                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(inv.invoiceValue || 0)}
+                        {(() => {
+                          try {
+                            return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(inv.invoiceValue || 0);
+                          } catch (e) {
+                            return "$0";
+                          }
+                        })()}
                       </p>
                       <button
                         onClick={() => handleAddInvoiceToRoute(inv)}
@@ -1827,7 +1841,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                                   <p className="font-black text-[11px] text-slate-800 uppercase leading-none">{inv.invoiceNumber}</p>
                                   <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{inv.customerName}</p>
                                 </div>
-                                <p className="text-[11px] font-black text-indigo-500">{(Number(inv.volumeM3) || 0).toFixed(2)}m³</p>
+                                <p className="text-[11px] font-black text-indigo-500">
+                                  {(() => {
+                                    try {
+                                      return (Number(inv.volumeM3) || 0).toFixed(2);
+                                    } catch (e) {
+                                      return "0.00";
+                                    }
+                                  })()}m³
+                                </p>
                               </div>
                             ))}
                           </div>

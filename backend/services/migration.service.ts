@@ -283,10 +283,10 @@ export const restoreSystem = async () => {
       SET module_id = 'MOD-03', parent_id = 'MOD-03' 
       WHERE id IN ('PAG-13', 'PAG-15');
     `);
-    console.log('[M7-SYNC] Módulos Logísticos Sincronizados con Éxito.');
+    console.log(`[M7-SYNC] Módulos Logísticos Sincronizados con Éxito - ${new Date().toLocaleString()}`);
 
     const total = Date.now() - start;
-    return { success: true, message: `Operación de Sincronización Nuclear Exitosa en ${total}ms.` };
+    return { success: true, message: `Operación de Sincronización Nuclear Exitosa en ${total}ms. [TS: ${new Date().toISOString()}]` };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

@@ -1123,7 +1123,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{route.driver_name || 'PENDIENTE'}</span>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-[10px] font-black text-slate-900">{utilizationPercent.toFixed(0)}%</div>
+                                                <div className="text-[10px] font-black text-slate-900">{(Number(utilizationPercent) || 0).toFixed(0)}%</div>
                                                 <div className="w-16 h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
                                                     <div className="h-full bg-emerald-500" style={{ width: `${Math.min(utilizationPercent, 100)}%` }}></div>
                                                 </div>
@@ -1210,7 +1210,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <div className="px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
                                         <p className="text-[7px] font-black text-slate-400 uppercase">Volumen</p>
                                         <p className="text-sm font-black text-emerald-600">
-                                            {routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0).toFixed(2)}<span className="text-[9px] ml-0.5">m³</span>
+                                            {(Number(routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0)) || 0).toFixed(2)}<span className="text-[9px] ml-0.5">m³</span>
                                         </p>
                                     </div>
                                 </div>
