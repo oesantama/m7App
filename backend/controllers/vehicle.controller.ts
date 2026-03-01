@@ -16,12 +16,6 @@ export const getVehicles = async (req: Request, res: Response) => {
     let query = "SELECT * FROM vehicles WHERE status_id != 'ELIMINADO'";
     let params: any[] = [];
 
-    if (!isSuper) {
-        const allowedIds = user?.client_ids || [];
-        query += " AND client_id = ANY($1::text[])";
-        params.push(allowedIds);
-    }
-
     query += " ORDER BY plate ASC";
     const result = await pool.query(query, params);
     res.json(result.rows);

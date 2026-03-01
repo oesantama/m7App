@@ -15,12 +15,6 @@ export const getDrivers = async (req: Request, res: Response) => {
     let query = 'SELECT * FROM drivers';
     let params: any[] = [];
 
-    if (!isSuper) {
-        const allowedIds = user?.client_ids || [];
-        query += ' WHERE client_id = ANY($1::text[])';
-        params.push(allowedIds);
-    }
-
     query += ' ORDER BY name ASC';
     const result = await pool.query(query, params);
     res.json(result.rows);
