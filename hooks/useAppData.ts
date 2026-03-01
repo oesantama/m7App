@@ -138,7 +138,23 @@ export const useAppData = () => {
               externalDocId: d.external_doc_id || d.externalDocId,
               vehicleData: d.vehicle_plate || d.vehicleData,
               status: d.status || (d.status_id === 'EST-01' ? 'En Conteo' : 'Pendiente'),
-              items: (d.items || []).map((it: any) => ({ ...it, articleId: it.article_id }))
+              items: (d.items || []).map((it: any) => ({ 
+                ...it, 
+                articleId: it.article_id || it.articleId,
+                expectedQty: it.expected_qty || it.expectedQty,
+                receivedQty: it.received_qty || it.receivedQty || it.count1 || it.count_1,
+                unCode: it.un_code || it.unCode,
+                clientRef: it.client_ref || it.clientRef,
+                orderNumber: it.order_number || it.orderNumber,
+                invoice: it.invoice || it.invoice_number,
+                driverNote: it.driver_note || it.driverNote || it.observation,
+                inventoryNote: it.inventory_note || it.inventoryNote,
+                count1: it.count_1 || it.count1,
+                count2: it.count_2 || it.count2,
+                pickedQty: it.picked_qty || it.pickedQty,
+                dispatchedQty: it.dispatched_qty || it.dispatchedQty,
+                itemStatus: it.status || it.itemStatus
+              }))
             })));
           }
         }).catch(err => console.warn('[M7-DATA-HOOK] Error loading documents:', err));
