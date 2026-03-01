@@ -111,7 +111,7 @@ export const saveUserPermission = async (req: Request, res: Response) => {
     await client.query('DELETE FROM user_permissions WHERE user_id = $1', [p.userId]);
 
     // 2. INSERT NEW PERMISSIONS
-    const newId = p.id || `PERM-USER-${p.userId}`;
+    const newId = p.id || `PUS-${p.userId}`;
     await client.query(`
       INSERT INTO user_permissions (id, user_id, permissions, status_id, created_by, updated_by, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)

@@ -396,8 +396,25 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
 
     const now = getColombiaNow();
     // Allow user to set ID (SKU) for new records, fallback to generator
-    const finalId = editingRecord?.id || formData.id || generateNextId(activeMaster, allMasterData[activeMaster] || []);
-    const newRecord = { ...formData, id: finalId, updatedAt: now, updatedBy: user.name };
+    const prefix = MASTER_PREFIXES[activeMaster] || 'M7';
+    const finalId = editingRecord?.id || formData.id || (activeMaster === 'masterPermisosUsuario' ? `PUS-${formData.userId || formData.user_id}` : generateNextId(activeMaster, allMasterData[activeMaster] || []));
+    
+    // Si es gestión de permisos de usuario, asegurar los campos de auditoría y el objeto permissions
+    let finalPayload = { ...formData, id: finalId, updatedAt: now, updatedBy: user.name };
+    
+    if (activeMaster === 'masterPermisosUsuario') {
+        finalPayload = {
+            ...formData,
+            id: finalId,
+            userId: formData.userId || formData.user_id,
+            permissions: { ...formData }, // Incluimos todo el formData que contiene los checkboxes
+            updatedBy: user.name,
+            updatedAt: now,
+            statusId: formData.statusId || 'EST-01'
+        };
+    }
+
+    const newRecord = finalPayload;
 
     try {
       // --- PERSISTENCIA BACKEND ---

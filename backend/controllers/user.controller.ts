@@ -69,13 +69,7 @@ export const saveUser = async (req: Request, res: Response) => {
           WHERE id = $1
         `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled, u.updatedBy || 'System']);
         
-        // Eliminamos ON CONFLICT para mayor seguridad y simplicidad
-        await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
-        await pool.query(`
-          INSERT INTO user_permissions (id, user_id, permissions, status_id, created_by, updated_by, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        `, [`PUS-${u.id}`, u.id, '{}', u.statusId, u.updatedBy || 'System']);
-
+        // M7 FIX: No sobreescribir permisos en UPDATE. La gestión de permisos es independiente.
         res.json({ success: true, message: 'Usuario actualizado correctamente' });
     } else {
         // INSERT
