@@ -28,7 +28,21 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     }
 };
 
-export const requirePermission = (module: string, action: string) => {
+const ID_MAP: Record<string, string> = {
+    'ARTICULOS': 'PAG-01',
+    'CLIENTES': 'PAG-03',
+    'VEHICULOS': 'PAG-14',
+    'CONDUCTORES': 'PAG-14',
+    'USUARIOS': 'PAG-21',
+    'ROLES': 'PAG-22',
+    'ASIGNACIONES': 'PAG-12',
+    'DOCUMENTOS_L': 'PAG-16',
+    'RUTAS': 'PAG-15',
+    'DASHBOARD': 'PAG-25',
+    'NOTIFICACIONES': 'PAG-07'
+};
+
+export const requirePermission = (moduleName: string, action: string) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
         const user = req.user;
         
@@ -41,19 +55,22 @@ export const requirePermission = (module: string, action: string) => {
             return next();
         }
 
-        // Verificar permisos específicos en el payload del token o volver a consultar DB si es necesario
-        // Por ahora, asumimos que los permisos vienen en el token para evitar latencia de DB en cada request
+        const pageId = ID_MAP[moduleName];
+
         const hasPermission = user.permissions?.some((p: any) => 
-            p.module === module && p.actions.includes(action)
+            (p.module === moduleName || (pageId && p.module === pageId)) && 
+            p.actions.includes(action)
         );
 
         if (!hasPermission) {
+            console.warn(`[AUTH-403] Usuario ${user.email} intentó acceder a ${moduleName}:${action} sin permiso. ID esperado: ${pageId}`);
             return res.status(403).json({ 
                 success: false, 
-                error: `Permiso insuficiente. Se requiere ${module}:${action}` 
+                error: `Permiso insuficiente. Se requiere ${moduleName}:${action}` 
             });
         }
 
         next();
     };
 };
+

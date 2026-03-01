@@ -36,9 +36,32 @@ export const useAppData = () => {
         modules: modulesRaw
       });
 
-      // 2. FUNCIONES AUXILIARES DE PERMISOS
+      // 2. FUNCIONES AUXILIARES DE PERMISOS (Mapeo de IDs M7)
       const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
-      const hasPerm = (mod: string) => isSuper || (user?.permissions || []).some(p => p.module === mod && p.actions.includes('view'));
+      
+      const ID_MAP: Record<string, string> = {
+        'ARTICULOS': 'PAG-01',
+        'CLIENTES': 'PAG-03',
+        'VEHICULOS': 'PAG-14',
+        'CONDUCTORES': 'PAG-14', // Fleet Manager
+        'USUARIOS': 'PAG-21',
+        'ROLES': 'PAG-22',
+        'ASIGNACIONES': 'PAG-12',
+        'DOCUMENTOS_L': 'PAG-16',
+        'RUTAS': 'PAG-15',
+        'DASHBOARD': 'PAG-25',
+        'NOTIFICACIONES': 'PAG-07'
+      };
+
+      const hasPerm = (modName: string) => {
+        if (isSuper) return true;
+        const pageId = ID_MAP[modName];
+        return (user?.permissions || []).some(p => 
+          (String(p.module).toUpperCase() === String(modName).toUpperCase() || 
+           (pageId && String(p.module).toUpperCase() === String(pageId).toUpperCase())) && 
+          p.actions.includes('view')
+        );
+      };
 
       // 3. CARGA DIFERIDA CON FILTRO DE PERMISOS
       Promise.all([
@@ -48,6 +71,7 @@ export const useAppData = () => {
         hasPerm('VEHICULOS') ? api.getVehicles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('CONDUCTORES') ? api.getDrivers().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('USUARIOS') ? api.getUsers().then(normalizeData).catch(() => []) : Promise.resolve([]),
+
         isSuper ? api.getRoles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper ? api.getPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper || hasPerm('MATRIZ_PERMISOS') ? api.getAllUserPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
