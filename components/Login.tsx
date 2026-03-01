@@ -139,7 +139,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       const demoEmail = import.meta.env.VITE_APP_DEMO_EMAIL || 'admin@millasiete.com';
-      if (email.toLowerCase() !== demoEmail.toLowerCase()) {
+      if (email.trim().toLowerCase() !== demoEmail.trim().toLowerCase()) {
           setError("ORBIT SECURITY: El correo ingresado no se encuentra en nuestra base de datos.");
           setIsLoading(false);
           return;

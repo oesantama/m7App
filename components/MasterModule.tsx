@@ -949,7 +949,10 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
               </div>
               <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Email Corporativo</label>
-                <input type="email" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value.toLowerCase() })} className={commonInputStyle} required />
+                <input type="email" value={formData.email || ''} onChange={e => {
+                    const lowEmail = e.target.value.toLowerCase().trim();
+                    setFormData({ ...formData, email: lowEmail });
+                }} className={commonInputStyle} required />
               </div>
 
               {/* Password Fields - Only for New Users or Explicit Change */}
