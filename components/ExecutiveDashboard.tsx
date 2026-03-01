@@ -187,7 +187,7 @@ const ExecutiveDashboard: React.FC = () => {
     {
       id: 'customerSat',
       name: 'Satisfacción Cliente',
-      value: dashboardData.customerSatisfaction.toFixed(1),
+      value: (Number(dashboardData.customerSatisfaction) || 0).toFixed(1),
       unit: '/5.0',
       trend: 'up',
       trendValue: 0.2,
@@ -196,7 +196,7 @@ const ExecutiveDashboard: React.FC = () => {
     {
       id: 'costPerDelivery',
       name: 'Costo por Entrega',
-      value: `$${(dashboardData.costPerDelivery / 1000).toFixed(1)}K`,
+      value: `$${((Number(dashboardData.costPerDelivery) || 0) / 1000).toFixed(1)}K`,
       trend: 'down',
       trendValue: 8.0,
       status: 'good'
@@ -270,14 +270,14 @@ const ExecutiveDashboard: React.FC = () => {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-xl font-black text-slate-800">Ingresos del Mes</h3>
-                <p className="text-sm text-slate-500">vs objetivo: ${(dashboardData.revenueTarget / 1000000).toFixed(0)}M</p>
+                <p className="text-sm text-slate-500">vs objetivo: ${((Number(dashboardData.revenueTarget) || 0) / 1000000).toFixed(0)}M</p>
               </div>
               <div className="text-right">
                 <p className="text-3xl font-black text-emerald-600">
-                  ${(dashboardData.revenueMonth / 1000000).toFixed(1)}M
+                  ${((Number(dashboardData.revenueMonth) || 0) / 1000000).toFixed(1)}M
                 </p>
                 <p className="text-sm text-slate-500">
-                  {((dashboardData.revenueMonth / dashboardData.revenueTarget) * 100).toFixed(1)}% del objetivo
+                  {(((Number(dashboardData.revenueMonth) || 0) / (Number(dashboardData.revenueTarget) || 1)) * 100).toFixed(1)}% del objetivo
                 </p>
               </div>
             </div>
@@ -357,7 +357,7 @@ const ExecutiveDashboard: React.FC = () => {
                     </div>
                     <div className="text-right">
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Confianza del Modelo</p>
-                        <div className="text-4xl font-black text-emerald-500">{(predictionData.confidence * 100).toFixed(0)}%</div>
+                        <div className="text-4xl font-black text-emerald-500">{(Number(predictionData.confidence) * 100).toFixed(0)}%</div>
                     </div>
                 </div>
 
@@ -546,7 +546,7 @@ const ProgressMetric: React.FC<{
         <span>{icon}</span>
         {label}
       </span>
-      <span className="text-sm font-black text-slate-800">{value.toFixed(1)}%</span>
+      <span className="text-sm font-black text-slate-800">{(Number(value) || 0).toFixed(1)}%</span>
     </div>
     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
       <div

@@ -135,11 +135,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   }, [unassignedInvoices, documents]);
 
   const unassignedMetrics = useMemo(() => {
-    const vol = unassignedInvoices.reduce((acc, inv) => acc + (inv.volumeM3 || 0), 0);
+    const vol = unassignedInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
     return {
       count: unassignedInvoices.length,
-      volume: parseFloat(vol.toFixed(2)),
-      additionalVehicles: Math.ceil(vol / 25) // Asumiendo capacidad promedio de 25m3
+      volume: Number(Number(vol).toFixed(2)),
+      additionalVehicles: Math.ceil(Number(vol) / 25) // Asumiendo capacidad promedio de 25m3
     };
   }, [unassignedInvoices]);
 
@@ -341,7 +341,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         let currentLoadVolume = 0;
 
         // Capacidad REGLA ORBIT: MÁXIMO 90% (TECHO DURO)
-        const nominalCapacity = vehicle.capacityM3 > 0 ? vehicle.capacityM3 : 30;
+        const vCap = Number(vehicle.capacityM3) || 0;
+        const nominalCapacity = vCap > 0 ? vCap : 30;
         const targetMaxCapacity = nominalCapacity * 0.90; // Meta y límite: 90%
         const absoluteMaxCapacity = targetMaxCapacity;      // Techo duro estricto
 
@@ -378,11 +379,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
             // Lógica de No Interferencia de Horarios Críticos
             // @ts-ignore
-            if (inv.detectedTime && earlyBirdAssigned.has(inv.detectedTime)) continue;
-
-            if (currentLoadVolume + inv.volumeM3 <= absoluteMaxCapacity) {
+            const invVol = Number(inv.volumeM3) || 0;
+            if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
               load.push(inv);
-              currentLoadVolume += inv.volumeM3;
+              currentLoadVolume += invVol;
 
               // @ts-ignore
               if (inv.detectedTime) earlyBirdAssigned.add(inv.detectedTime);
@@ -429,8 +429,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             id: `route-${Date.now()}-${vehicle.plate}`,
             vehicle,
             assignedInvoices: load,
-            totalVolume: Number(currentLoadVolume.toFixed(2)),
-            utilization: Math.round((currentLoadVolume / nominalCapacity) * 100),
+            totalVolume: Number(Number(currentLoadVolume).toFixed(2)),
+            utilization: Math.round((Number(currentLoadVolume) / nominalCapacity) * 100),
             city: dominantCity
           });
           usedVehicleIds.add(vehicle.id);
@@ -494,10 +494,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }
 
     // Recalculate using fallback capacity same as optimization loop to prevent NaN
-    const realCapacity = route.vehicle.capacityM3 > 0 ? route.vehicle.capacityM3 : 30;
-    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + curr.volumeM3, 0);
-    route.totalVolume = parseFloat(newVol.toFixed(2));
-    route.utilization = Math.round((newVol / realCapacity) * 100);
+    const realCapacity = Number(route.vehicle.capacityM3) > 0 ? Number(route.vehicle.capacityM3) : 30;
+    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + (Number(curr.volumeM3) || 0), 0);
+    route.totalVolume = Number(Number(newVol).toFixed(2));
+    route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
 
     // Registrar Auditoría en el Servidor
     api.logRouteMovement({
@@ -539,10 +539,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const route = newSuggestions[addInvoiceModal.routeIndex];
 
     route.assignedInvoices.push(invoice);
-    const realCapacity = route.vehicle.capacityM3 > 0 ? route.vehicle.capacityM3 : 30; // Fallback
-    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + curr.volumeM3, 0);
-    route.totalVolume = parseFloat(newVol.toFixed(2));
-    route.utilization = Math.round((newVol / realCapacity) * 100);
+    const realCapacity = Number(route.vehicle.capacityM3) > 0 ? Number(route.vehicle.capacityM3) : 30; // Fallback
+    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + (Number(curr.volumeM3) || 0), 0);
+    route.totalVolume = Number(Number(newVol).toFixed(2));
+    route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
 
     setSuggestedRoutes(newSuggestions);
     setAddInvoiceModal({ isOpen: false, routeIndex: null });
@@ -567,7 +567,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       setCapacityAlert({
         isOpen: true,
         type: 'error',
-        message: `BLOQUEO: La carga actual (${loadVolume.toFixed(2)}m³) excede el límite crítico del 95% para este vehículo (${newCapacity}m³). ¿Deseas ajustar automáticamente la carga al 90%?`,
+        message: `BLOQUEO: La carga actual (${(Number(loadVolume) || 0).toFixed(2)}m³) excede el límite crítico del 95% para este vehículo (${newCapacity}m³). ¿Deseas ajustar automáticamente la carga al 90%?`,
         confirmLabel: 'Ajustar al 90% y Asignar',
         onConfirm: () => {
           const targetVolume = newCapacity * 0.90;
@@ -579,8 +579,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             removedInvoices.push(removed);
           }
           route.vehicle = newVehicle;
-          route.totalVolume = parseFloat(currentVol.toFixed(2));
-          route.utilization = Math.round((currentVol / newCapacity) * 100);
+          route.totalVolume = Number(Number(currentVol).toFixed(2));
+          route.utilization = Math.round((Number(currentVol) / newCapacity) * 100);
           route.id = `route-${Date.now()}-${newVehicle.plate}`;
           setSuggestedRoutes(newSuggestions);
           setSwapVehicleModal({ isOpen: false, routeIndex: null });
@@ -599,8 +599,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         confirmLabel: 'Proceder con Cambio',
         onConfirm: () => {
           route.vehicle = newVehicle;
-          route.totalVolume = parseFloat(loadVolume.toFixed(2));
-          route.utilization = Math.round((loadVolume / newCapacity) * 100);
+          route.totalVolume = Number(Number(loadVolume).toFixed(2));
+          route.utilization = Math.round((Number(loadVolume) / newCapacity) * 100);
           route.id = `route-${Date.now()}-${newVehicle.plate}`;
           setSuggestedRoutes(newSuggestions);
           setSwapVehicleModal({ isOpen: false, routeIndex: null });
@@ -613,8 +613,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
     // Proceso normal
     route.vehicle = newVehicle;
-    route.totalVolume = parseFloat(loadVolume.toFixed(2));
-    route.utilization = Math.round((loadVolume / newCapacity) * 100);
+    route.totalVolume = Number(Number(loadVolume).toFixed(2));
+    route.utilization = Math.round((Number(loadVolume) / newCapacity) * 100);
     route.id = `route-${Date.now()}-${newVehicle.plate}`;
 
     setSuggestedRoutes(newSuggestions);
@@ -901,7 +901,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   const handleExportPlanilla = (route: SuggestedRoute) => {
     const despachador = user.name || 'SISTEMA ORBIT';
-    const driverName = (route.vehicle as any).driverName || (route.vehicle as any).driver_name || route.driver_name || 'Óscar Santamaría';
+    const driverName = (route.vehicle as any).driverName || (route.vehicle as any).driver_name || (route as any).driver_name || 'Óscar Santamaría';
 
     // 0. Logo del Cliente Dinámico (Soporte multi-campo & Base64 robusto)
     const currentClient = (clients || []).find(c => String(c.id) === String(selectedClient));
@@ -1311,13 +1311,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         </div>
                         <div className="text-right flex items-center gap-3">
                           <div className="text-right">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">CAPACIDAD</p>
                             <p className="text-xs font-black text-white">
-                              <span className={route.totalVolume > route.vehicle.capacityM3 ? 'text-red-500' : 'text-emerald-400'}>
-                                {route.totalVolume.toFixed(2)}
+                              <span className={(Number(route.totalVolume) || 0) > (Number(route.vehicle.capacityM3) || 30) ? 'text-red-500' : 'text-emerald-400'}>
+                                {(Number(route.totalVolume) || 0).toFixed(2)}
                               </span>
                               <span className="text-slate-500 mx-1">/</span>
-                              {route.vehicle.capacityM3.toFixed(2)}m³
+                              {(Number(route.vehicle.capacityM3) || 0).toFixed(2)}m³
                             </p>
                           </div>
                           <div className="w-[1px] h-6 bg-white/10"></div>
@@ -1373,7 +1372,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                                 <div className="flex gap-3">
                                   <div className="text-center">
                                     <p className="text-[7px] font-bold text-slate-400 uppercase">VOL</p>
-                                    <p className="text-[10px] font-black text-emerald-600">{Number(inv.volumeM3 || 0).toFixed(2)}m³</p>
+                                    <p className="text-[10px] font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(2)}m³</p>
                                   </div>
                                   <div className="text-center">
                                     <p className="text-[7px] font-bold text-slate-400 uppercase">VALOR</p>

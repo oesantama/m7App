@@ -668,7 +668,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <div style="font-size:10px; color:#64748b; margin-top:2px">📍 ${city}${city && address ? ' — ' : ''}${address}</div>
                         ${notes ? `<div style="font-size:9px; color:#94a3b8; margin-top:2px; font-style:italic">📝 ${notes}</div>` : ''}
                         <div style="margin-top:4px; font-size:9px; font-weight:900; color:${isDelivered ? '#10b981' : '#f59e0b'}">${statusLabel}</div>
-                        <div style="font-size:9px; color:#94a3b8">${Number(inv.volumeM3 || 0).toFixed(2)} m³</div>
+                        <div style="font-size:9px; color:#94a3b8">${(Number(inv.volumeM3) || 0).toFixed(2)} m³</div>
                     </div>
                 `);
             routeMarkersRef.current.push(marker);
@@ -1210,7 +1210,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <div className="px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
                                         <p className="text-[7px] font-black text-slate-400 uppercase">Volumen</p>
                                         <p className="text-sm font-black text-emerald-600">
-                                            {(Number(routeInvoices.reduce((acc: number, inv: any) => acc + Number(inv.volumeM3 || 0), 0)) || 0).toFixed(2)}<span className="text-[9px] ml-0.5">m³</span>
+                                            {(Number(routeInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.volumeM3) || 0), 0)) || 0).toFixed(2)}<span className="text-[9px] ml-0.5">m³</span>
                                         </p>
                                     </div>
                                 </div>

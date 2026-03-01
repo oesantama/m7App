@@ -439,17 +439,17 @@ const BlindCount: React.FC<BlindCountProps> = ({
     const opt = unitTransaction.selectedOption;
     
     // Validación de decimales
-    if (!Number.isInteger(opt.resultQty)) {
-        if(!confirm(`La operación resultará en decimales (${opt.resultQty.toFixed(2)}). ¿Continuar?`)) return;
+    if (!Number.isInteger(Number(opt.resultQty))) {
+        if(!confirm(`La operación resultará en decimales (${(Number(opt.resultQty) || 0).toFixed(2)}). ¿Continuar?`)) return;
     }
 
     setCounts(prev => ({
       ...prev,
-      [unitTransaction.articleId]: Number(opt.resultQty.toFixed(2))
+      [unitTransaction.articleId]: Number((Number(opt.resultQty) || 0).toFixed(2))
     }));
 
     const opSymbol = opt.operation === 'multiply' ? 'x' : '/';
-    const logMsg = `${unitTransaction.type === 'CONVERT' ? 'Conv' : 'Rev'}: ${unitTransaction.currentQty} ${opt.sourceUnit} ${opSymbol} ${opt.factor} = ${opt.resultQty.toFixed(2)} ${opt.targetUnit}`;
+    const logMsg = `${unitTransaction.type === 'CONVERT' ? 'Conv' : 'Rev'}: ${unitTransaction.currentQty} ${opt.sourceUnit} ${opSymbol} ${opt.factor} = ${(Number(opt.resultQty) || 0).toFixed(2)} ${opt.targetUnit}`;
 
     setItemObservations(prev => ({
       ...prev,
@@ -943,7 +943,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                             </div>
                             <div className="text-right">
                                 <p className={`text-xl font-black ${unitTransaction.type === 'CONVERT' ? 'text-blue-600' : 'text-amber-600'}`}>
-                                    {opt.resultQty.toFixed(2).replace(/\.00$/, '')}
+                                    {(Number(opt.resultQty) || 0).toFixed(2).replace(/\.00$/, '')}
                                 </p>
                                 <p className="text-[8px] font-bold text-slate-400 uppercase">Resultado</p>
                             </div>
