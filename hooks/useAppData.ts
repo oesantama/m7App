@@ -119,7 +119,8 @@ export const useAppData = () => {
       }).catch(err => console.error('[M7-DATA-HOOK] Error deferred sync:', err));
 
       // 4. CARGA DE DOCUMENTOS OPERATIVOS (Condicional)
-      if (hasPerm('DOCUMENTOS_L')) {
+      // [M7-FIX] Cargar también para usuarios con permiso RUTAS (planificadores)
+      if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS')) {
         api.getDocuments(targetClientId).then(docs => {
           if (Array.isArray(docs)) {
             setDocuments(docs.map(d => ({

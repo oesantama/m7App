@@ -6,7 +6,15 @@ import { requirePermission } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-router.get('/', requirePermission('DOCUMENTOS_L', 'view'), getDocuments);
+router.get('/', (req, res, next) => {
+  const user = (req as any).user;
+  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const hasDocsPerm = user?.permissions?.some((p: any) => p.module === 'PAG-16' && p.actions.includes('view'));
+  const hasRutasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-15' && p.actions.includes('view'));
+
+  if (isSuper || hasDocsPerm || hasRutasPerm) return next();
+  res.status(403).json({ success: false, error: 'Permiso insuficiente para ver documentos' });
+}, getDocuments);
 router.post('/bulk', requirePermission('DOCUMENTOS_L', 'create'), bulkCreateDocuments);
 router.patch('/status/:id', requirePermission('DOCUMENTOS_L', 'edit'), updateStatus);
 router.delete('/:id', requirePermission('DOCUMENTOS_L', 'delete'), deleteDocument);
