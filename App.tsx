@@ -227,11 +227,31 @@ const App: React.FC = () => {
             // M7 SOLUCIÓN NUCLEAR: Forzar refresco de permisos para TODOS en cada restauración
             // Esto evita que datos obsoletos en localStorage permitan peticiones prohibidas
             const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
+            
             if (freshPerms) {
-              parsedUser.permissions = Array.isArray(freshPerms) ? freshPerms : Object.entries(freshPerms).map(([mod, pacts]) => ({
-                module: mod,
-                actions: pacts
-              }));
+              if (Array.isArray(freshPerms)) {
+                parsedUser.permissions = freshPerms;
+              } else if (typeof freshPerms === 'object') {
+                // Transformar el objeto plano (page_PAG-01_view: true) al formato de Array para el Layout y hasPermission
+                const permMap = new Map<string, Set<string>>();
+                Object.keys(freshPerms).forEach(key => {
+                  if (freshPerms[key] === true) {
+                    const parts = key.toLowerCase().split('_');
+                    if (parts.length >= 3 && parts[0] === 'page') {
+                      const action = parts.pop();
+                      const pageId = parts.slice(1).join('_').toUpperCase();
+                      if (pageId && action) {
+                        if (!permMap.has(pageId)) permMap.set(pageId, new Set());
+                        permMap.get(pageId)?.add(action);
+                      }
+                    }
+                  }
+                });
+                parsedUser.permissions = Array.from(permMap.entries()).map(([module, actions]) => ({
+                  module,
+                  actions: Array.from(actions)
+                }));
+              }
             }
 
 

@@ -291,17 +291,41 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     
     if (!Array.isArray(list)) list = [];
     
+    const searchStr = searchTerm.toLowerCase().trim();
+    if (!searchStr) return list;
+
     return list.filter(d => {
-      const searchStr = searchTerm.toLowerCase();
-      // Enhanced Search for Articles (include SKU/ID and Barcode)
-      if (activeMaster === 'masterArticulo') {
-         return (
-           (d.name && d.name.toLowerCase().includes(searchStr)) ||
-           (d.id && d.id.toLowerCase().includes(searchStr)) ||
-           ((d as any).barcode && (d as any).barcode.toLowerCase().includes(searchStr))
-         );
+      // 1. Caso especial: Matriz de Usuarios (buscar por nombre de usuario vinculado)
+      if (activeMaster === 'masterPermisosUsuario') {
+        const userId = d.userId || d.user_id;
+        const linkedUser = (allMasterData.masterUsuarios || []).find(u => u.id === userId);
+        if (linkedUser?.name?.toLowerCase().includes(searchStr)) return true;
       }
-      return (d.name || d.email || d.id || '').toLowerCase().includes(searchStr);
+
+      // 2. Búsqueda en campos base (ID, Nombre, Email)
+      const baseMatch = (
+        (d.name && d.name.toLowerCase().includes(searchStr)) ||
+        (d.email && d.email.toLowerCase().includes(searchStr)) ||
+        (d.id && d.id.toLowerCase().includes(searchStr))
+      );
+      if (baseMatch) return true;
+
+      // 3. Caso especial: Artículos (Barcode/SKU)
+      if (activeMaster === 'masterArticulo') {
+         if ((d as any).barcode && (d as any).barcode.toLowerCase().includes(searchStr)) return true;
+      }
+
+      // 4. Búsqueda en campos de Auditoría (Quién creó/actualizó)
+      if (d.updatedBy?.toLowerCase().includes(searchStr)) return true;
+      if (d.createdBy?.toLowerCase().includes(searchStr)) return true;
+
+      // 5. Búsqueda Genérica Exhaustiva (Valores directos)
+      return Object.entries(d).some(([key, val]) => {
+        // Ignorar campos de imagen/binarios/objetos complejos
+        if (['avatar', 'logoUrl', 'imageUrl', 'permissions', 'clientIds'].includes(key)) return false;
+        return (typeof val === 'string' || typeof val === 'number') && 
+               val.toString().toLowerCase().includes(searchStr);
+      });
     });
   }, [allMasterData, modules, pages, activeMaster, searchTerm]);
 
