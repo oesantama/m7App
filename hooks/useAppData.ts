@@ -81,7 +81,7 @@ export const useAppData = () => {
 
         const mappedVehicles = normalizeData(Array.isArray(vehiclesRaw) ? vehiclesRaw.map((v: any) => ({
           ...v, clientId: v.client_id, statusId: v.status_id,
-          status: (v.status_id === 'EST-01' || v.status === 'Disponible') ? 'Disponible' : (v.status || 'Ocupado'),
+          status: (String(v.status_id).toUpperCase() === 'EST-01' || String(v.status).toUpperCase() === 'DISPONIBLE') ? 'DISPONIBLE' : String(v.status || 'OCUPADO').toUpperCase(),
           capacityM3: parseFloat(v.capacity_m3 || '0'), modelYear: v.model_year, vehicleTypeId: v.vehicle_type
         })) : []);
 

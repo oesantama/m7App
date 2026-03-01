@@ -203,7 +203,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       // Validar estado 'Disponible'
       const vStatus = String(v.status || '').toUpperCase();
-      if (vStatus !== 'DISPONIBLE') return null;
+      if (vStatus !== 'DISPONIBLE' && String(v.statusId).toUpperCase() !== 'EST-01') return null;
 
       // Validar si está en despacho o ruta activa
       // Normalización robusta para comparación de IDs
@@ -216,7 +216,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       );
 
       // Regla estricta: Si el vehículo tiene estado ocupado en la BD, no se usa
-      if (vStatus === 'EST-10' || vStatus === 'EST-11' || vStatus === 'OCUPADO' || isBusy) return null;
+      if (['EST-10', 'EST-11', 'OCUPADO'].includes(vStatus) || isBusy) return null;
 
       return {
         ...v,
@@ -266,7 +266,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       } else {
         // Solo contar "En Base" si está Disponible Y NO tiene ruta
         const vStatus = String(v.status || '').toUpperCase();
-        if (vStatus === 'DISPONIBLE') {
+        if (vStatus === 'DISPONIBLE' || String(v.statusId).toUpperCase() === 'EST-01') {
           onBase++;
         }
       }
