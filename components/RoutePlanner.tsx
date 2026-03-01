@@ -190,20 +190,28 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const activeLinks = assignments.filter(a => {
       const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
       const cId = a.clientId || (a as any).client_id;
-      // Permitir ver todos si selectedClient es GLOBAL o si coincide
       const clientMatch = selectedClient === 'GLOBAL' || cId === selectedClient;
       return active && clientMatch;
     });
 
+    console.log('[DEBUG-RP] Cliente Seleccionado:', selectedClient);
+    console.log('[DEBUG-RP] Vínculos Activos filtrados:', activeLinks.length);
+    console.log('[DEBUG-RP] Total Vehículos en Store:', vehicles.length);
+
     const fleet = activeLinks.map(link => {
       const v = vehicles.find(veh => veh.id === link.vehicleId);
+      if (!v) console.log('[DEBUG-RP] Vehículo NO encontrado en store para ID:', link.vehicleId);
       const d = drivers.find(drv => drv.id === link.driverId);
 
       if (!v || !d) return null;
 
       // Validar estado 'Disponible'
       const vStatus = String(v.status || '').toUpperCase();
-      if (vStatus !== 'DISPONIBLE' && String(v.statusId).toUpperCase() !== 'EST-01') return null;
+      const isAvailable = vStatus === 'DISPONIBLE' || String(v.statusId).toUpperCase() === 'EST-01';
+      if (!isAvailable) {
+        console.log(`[DEBUG-RP] Vehículo ${v.plate} descartado por estado:`, vStatus, v.statusId);
+        return null;
+      }
 
       // Validar si está en despacho o ruta activa
       // Normalización robusta para comparación de IDs
