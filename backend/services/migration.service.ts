@@ -41,7 +41,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'vehicle_locations': ['vehicle_id', 'driver_id', 'latitude', 'longitude', 'accuracy', 'speed', 'heading', 'updated_at', 'timestamp'],
   'training_categories': ['name', 'description', 'created_at'],
   'training_courses': ['category_id', 'title', 'description', 'cover_image', 'level', 'status_id', 'created_at'],
-  'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', 'order', 'created_at'],
+  'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', '"order"', 'created_at'],
   'user_training_progress': ['user_id', 'lesson_id', 'status', 'finished_at', 'updated_at']
 };
 
@@ -261,7 +261,10 @@ export const restoreSystem = async () => {
 
     const adminHash = await bcrypt.hash('admin123', 10);
     // Limpiar usuarios duplicados del servidor (réplica exacta local)
+    // [M7-FIX] Borrar permisos primero para respetar FK user_permissions_user_id_fkey
+    await client.query(`DELETE FROM user_permissions WHERE user_id IN ('USR-DEMO', 'USR-02', 'USR-03')`);
     await client.query(`DELETE FROM users WHERE id IN ('USR-DEMO', 'USR-02', 'USR-03') OR (email = 'oscar@millasiete.com' AND id != 'USR-01')`);
+
     await client.query(`
       INSERT INTO users (id, email, password, name, role_id, status_id, permissions)
       VALUES 
