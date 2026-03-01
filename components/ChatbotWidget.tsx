@@ -77,7 +77,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ user, onClose }) => {
     return (
       <button
         onClick={() => setIsMinimized(false)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full shadow-2xl hover:scale-110 transform transition-all duration-300 flex items-center justify-center z-50 group"
+        className="fixed top-[10px] right-6 w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full shadow-2xl hover:scale-110 transform transition-all duration-300 flex items-center justify-center z-50 group"
       >
         <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -88,7 +88,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ user, onClose }) => {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden z-50 border border-slate-200">
+    <div className="fixed top-6 right-6 w-96 h-[600px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden z-50 border border-slate-200">
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">

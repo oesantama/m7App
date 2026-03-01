@@ -35,6 +35,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   });
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [showRepairConfirm, setShowRepairConfirm] = useState(false);
 
   useEffect(() => {
     setError(null);
@@ -50,7 +51,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   }, []);
 
   const handleEmergencyRepair = async () => {
-    if (!window.confirm('¿Deseas realizar una limpieza profunda del sistema? Se cerrarán todas las sesiones y se actualizarán los módulos.')) return;
+    setShowRepairConfirm(false);
     
     setIsLoading(true);
     try {
@@ -404,7 +405,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="mt-10 pt-8 border-t border-white/5 text-center group cursor-help">
             <p className="text-[9px] text-slate-600 font-black uppercase tracking-[0.3em] flex items-center justify-center gap-2 group-hover:text-emerald-500 transition-colors">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-              Estado: Operativo 99.9%
+              Estado: Operativo 100% (V1.9.2)
             </p>
             <div className="mt-2 space-y-1">
               <p className="text-[7px] text-slate-500 font-black uppercase tracking-widest">
@@ -415,7 +416,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </p>
             </div>
             <button 
-              onClick={handleEmergencyRepair}
+              onClick={() => setShowRepairConfirm(true)}
               className="mt-4 text-[7px] text-slate-700 hover:text-emerald-500 font-black uppercase tracking-[0.2em] transition-all border border-transparent hover:border-emerald-500/20 px-4 py-2 rounded-full"
             >
               ¿Problemas de conexión? Reparar Núcleo
@@ -426,6 +427,42 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
         </div>
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN REPARAR NÚCLEO PREMIUM */}
+      {showRepairConfirm && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="bg-slate-900 border border-white/10 max-w-sm w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="w-24 h-24 bg-emerald-500/10 text-emerald-500 rounded-[2rem] flex items-center justify-center mx-auto animate-bounce shadow-[0_0_50px_rgba(16,185,129,0.2)]">
+              <div className="w-12 h-12"><Icons.Alert /></div>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Limpieza Atómica</h3>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed">
+                ¿Deseas realizar una limpieza profunda del sistema? 
+                <span className="block text-emerald-500 mt-1">Se cerrarán todas las sesiones y se actualizarán los módulos.</span>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-4">
+              <button
+                onClick={handleEmergencyRepair}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
+              >
+                Confirmar Limpieza
+              </button>
+              <button
+                onClick={() => setShowRepairConfirm(false)}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all"
+              >
+                Ahora no, volver
+              </button>
+            </div>
+            
+            <p className="text-[7px] text-slate-600 font-bold uppercase tracking-widest pt-2">OrbitM7 Security Protocol Alpha</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -224,11 +224,11 @@ export const restoreSystem = async () => {
       ('PAG-10', 'UNIDADES DE MEDIDA', 'masterUnidadMedida', 'MOD-01', 'MOD-01', 'EST-01'),
       ('PAG-11', 'APROBAR FIRMA', 'aprobar-firma', 'MOD-01', 'MOD-01', 'EST-01'),
       
-      -- Logística (MOD-02)
+      -- Logística (MOD-02 / MOD-03 RESTRUCTURE)
       ('PAG-12', 'ASIGNACIÓN FLOTA', 'vinculo', 'MOD-02', 'MOD-02', 'EST-01'),
-      ('PAG-13', 'DESPACHO LOGÍSTICO', 'despacho', 'MOD-02', 'MOD-02', 'EST-01'),
+      ('PAG-13', 'DESPACHO LOGÍSTICO', 'despacho', 'MOD-03', 'MOD-03', 'EST-01'),
       ('PAG-14', 'GESTIÓN DE FLOTAS', 'flotas', 'MOD-02', 'MOD-02', 'EST-01'),
-      ('PAG-15', 'PLANIFICADOR DE RUTAS', 'rutas', 'MOD-02', 'MOD-02', 'EST-01'),
+      ('PAG-15', 'PLANIFICADOR DE RUTAS', 'rutas', 'MOD-03', 'MOD-03', 'EST-01'),
 
       -- Inventarios (MOD-03)
       ('PAG-16', 'GESTIÓN DE DOCUMENTOS', 'documentos', 'MOD-03', 'MOD-03', 'EST-01'),

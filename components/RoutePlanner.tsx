@@ -73,8 +73,16 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     confirmLabel?: string;
   }>({ isOpen: false, type: 'warning', message: '' });
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ isOpen: boolean; id: string } | null>(null);
+
   const handleDeleteDocument = async (id: string) => {
-    if (!window.confirm('¿Está seguro de eliminar este Documento Maestro? Esta acción ocultará sus facturas de la planificación activa.')) return;
+    setShowDeleteConfirm({ isOpen: true, id });
+  };
+
+  const confirmDeleteDocument = async () => {
+    if (!showDeleteConfirm) return;
+    const { id } = showDeleteConfirm;
+    setShowDeleteConfirm(null);
     try {
       const res = await api.deleteDocument(id, user.name);
       if (res.success) {
@@ -2022,6 +2030,41 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 Descartar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL DE CONFIRMACIÓN ELIMINACIÓN PREMIUM */}
+      {showDeleteConfirm?.isOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="bg-slate-900 border border-red-500/20 max-w-sm w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="w-24 h-24 bg-red-500/10 text-red-500 rounded-[2rem] flex items-center justify-center mx-auto animate-bounce shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+              <div className="w-12 h-12 rotate-12"><Icons.Alert /></div>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Acción Crítica</h3>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed">
+                ¿Deseas eliminar este Documento Maestro?
+                <span className="block text-red-500 mt-1">Las facturas asociadas se ocultarán de la planificación.</span>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-4">
+              <button
+                onClick={confirmDeleteDocument}
+                className="w-full bg-red-500 hover:bg-red-400 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-xl shadow-red-500/20 active:scale-95"
+              >
+                Confirmar Eliminación
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
+            
+            <p className="text-[7px] text-slate-600 font-bold uppercase tracking-widest pt-2">OrbitM7 Data Integrity Protocol</p>
           </div>
         </div>
       )}

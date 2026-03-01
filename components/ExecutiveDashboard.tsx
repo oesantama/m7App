@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
+import { api } from '../services/api';
 import {
   ExecutiveDashboardData,
   KPI,
@@ -28,14 +29,11 @@ const ExecutiveDashboard: React.FC = () => {
 
   const loadPrediction = async () => {
       try {
-          const res = await fetch('/api/dashboard/prediction');
-          if (res.ok) {
-              const data = await res.json();
-              // Defensive checks for undefined data
+          const data = await api.getDemandPrediction();
+          if (data) {
               const historical = data.historical || [];
               const forecast = data.forecast || [];
               
-              // Combine historical and forecast for chart
               const chartData = [
                   ...historical.map((d: any) => ({ ...d, type: 'Real' })),
                   ...forecast.map((d: any) => ({ ...d, type: 'Proyección' }))
@@ -49,13 +47,8 @@ const ExecutiveDashboard: React.FC = () => {
 
   const loadDashboardData = async () => {
     try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`/api/dashboard/stats?period=${timeRange}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (res.ok) {
-            const data = await res.json();
+        const data = await api.getDashboardStats(timeRange);
+        if (data) {
             
             // Map API response to Frontend Interface (Backend returns subset, fill rest with mocks/defaults)
             const mappedData: ExecutiveDashboardData = {

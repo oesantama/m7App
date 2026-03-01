@@ -2,13 +2,17 @@ import { Request, Response } from 'express';
 import pool from '../config/database.js';
 
 // Middleware-like check (can be used inside controllers too for double safety)
-const isAdmin = (email: string) => email === 'admin@millasiete.com';
+// Middleware de validación robusta para Administrador
+const isUserAdmin = (user: any) => {
+  if (!user) return false;
+  return user.email === 'admin@millasiete.com' || user.roleId === 'ROL-01' || user.role_id === 'ROL-01';
+};
 
 export const getTables = async (req: any, res: Response) => {
   try {
     const user = req.user; 
     // Security Check
-    if (!user || !isAdmin(user.email)) {
+    if (!isUserAdmin(user)) {
       return res.status(403).json({ error: "Acceso denegado. Solo admin." });
     }
 
@@ -30,7 +34,7 @@ export const getTableData = async (req: any, res: Response) => {
   const { tableName, page = 1, limit = 50, search = '', sortBy, sortOrder = 'ASC' } = req.body;
   const user = req.user;
   try {
-    if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
+    if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
     if (!tableName) return res.status(400).json({ error: "Nombre de tabla requerido" });
 
     // Partial cleanup
@@ -94,7 +98,7 @@ export const executeSql = async (req: any, res: Response) => {
     const { query } = req.body;
     const user = req.user;
     try {
-        if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
+        if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
         if (!query) return res.status(400).json({ error: "Query requerido" });
 
         // DANGEROUS: Raw SQL execution.
@@ -117,7 +121,7 @@ export const saveRecord = async (req: any, res: Response) => {
   const { tableName, data } = req.body;
   const user = req.user;
   try {
-    if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
+    if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
     
     if (!/^[a-zA-Z0-9_]+$/.test(tableName)) return res.status(400).json({ error: "Tabla inválida" });
 
@@ -164,7 +168,7 @@ export const deleteRecord = async (req: any, res: Response) => {
   const { tableName, id } = req.body;
   const user = req.user;
   try {
-    if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
+    if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
     if (!tableName || !id) return res.status(400).json({ error: "Datos incompletos" });
 
     // Validate table name to prevent SQL injection
@@ -184,7 +188,7 @@ export const bulkDeleteRecords = async (req: any, res: Response) => {
   const { tableName, ids } = req.body;
   const user = req.user;
   try {
-    if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
+    if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
     if (!tableName || !Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: "Datos incompletos o inválidos" });
     }
@@ -207,7 +211,7 @@ export const getTableSchema = async (req: any, res: Response) => {
     const { tableName } = req.body;
     const user = req.user;
     try {
-        if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Acceso denegado." });
+        if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
         if (!tableName) return res.status(400).json({ error: "Nombre de tabla requerido" });
 
         if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {

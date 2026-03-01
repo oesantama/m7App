@@ -66,7 +66,7 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
   }, []);
 
   const trigger = (
-    <div className="fixed bottom-8 right-8 z-[2147483647]">
+    <div className="fixed top-[10px] right-8 z-[2147483647]">
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`relative rounded-full flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-95 group overflow-visible ${
@@ -99,7 +99,7 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
 
   const window = isOpen ? (
     <div className={`fixed z-[2147483647] w-[380px] md:w-[420px] max-h-[calc(100vh-100px)] h-[600px] bg-slate-900/95 backdrop-blur-3xl border border-white/10 rounded-[3.5rem] shadow-[0_48px_150px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 zoom-in-95 duration-500 pointer-events-auto ${
-      headerPortal ? "top-20 right-10" : "bottom-28 right-8"
+      headerPortal ? "top-[60px] right-10" : "top-[50px] right-8"
     }`}>
       {/* Header Compacto - Refinado */}
       <div className="p-5 bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 flex justify-between items-center shrink-0 relative overflow-hidden">

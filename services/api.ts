@@ -3,46 +3,55 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const fetchJson = async (url: string, options?: any) => {
-  // Búsqueda exhaustiva del token
-  const sessionStr = localStorage.getItem('m7_user_session');
-  let token = localStorage.getItem('token');
-  
-  if (!token && sessionStr) {
+  const executeFetch = async (retryCount = 0): Promise<any> => {
+    // Búsqueda exhaustiva del token
+    const sessionStr = localStorage.getItem('m7_user_session');
+    let token = localStorage.getItem('token');
+    
+    if (!token && sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        token = session.token || session.accessToken;
+      } catch (e) {}
+    }
+
+    const customHeaders: any = { ...options?.headers };
+    if (token) customHeaders['Authorization'] = `Bearer ${token}`;
+
+    const fetchOptions = {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...customHeaders
+      },
+      cache: 'no-cache' as RequestCache
+    };
+
     try {
-      const session = JSON.parse(sessionStr);
-      token = session.token || session.accessToken;
-    } catch (e) {}
-  }
+      const res = await fetch(url, fetchOptions);
+      
+      if (res.status === 401) {
+        console.warn('[ORBIT-AUTH] 401 detectado.');
+      }
 
-  const customHeaders: any = { ...options?.headers };
-  
-  if (token) {
-    const brief = token.substring(0, 10) + '...';
-    console.log(`[ORBIT-AUTH] Inyectando Token en ${url}: ${brief}`);
-    customHeaders['Authorization'] = `Bearer ${token}`;
-  } else if (!url.includes('/auth/login')) {
-    console.warn(`[ORBIT-AUTH] ALERTA: Sin token para ${url}`);
-  }
+      const isJson = res.headers.get('content-type')?.includes('application/json');
+      const data = isJson ? await res.json().catch(() => ({})) : await res.text();
 
-  const fetchOptions = {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...customHeaders
+      if (!res.ok) {
+        throw new Error(data.error || data || `Error HTTP: ${res.status}`);
+      }
+
+      return data;
+    } catch (err: any) {
+      // Reintento en caso de error de red (TypeError)
+      if (err instanceof TypeError && retryCount < 1) {
+        return executeFetch(retryCount + 1);
+      }
+      throw err;
     }
   };
 
-  const res = await fetch(url, fetchOptions);
-  
-  if (res.status === 401) {
-    console.error('[ORBIT-AUTH] 401 detectado. Redirigiendo a limpieza...');
-  }
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `Error HTTP: ${res.status}`);
-  }
-  return res.json();
+  return executeFetch();
 };
 
 export const api = {
@@ -531,4 +540,8 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tableName, ids })
   }),
+
+  // --- DASHBOARD & INTELLIGENCE ---
+  getDashboardStats: (period: string) => fetchJson(`${API_URL}/dashboard/stats?period=${period}`),
+  getDemandPrediction: () => fetchJson(`${API_URL}/dashboard/prediction`),
 };
