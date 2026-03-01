@@ -240,6 +240,9 @@ const App: React.FC = () => {
             // CARGAR DATOS MAESTROS FRESCOS CON EL CLIENTE RESTAURADO
             refreshAppData(parsedUser.clientId);
 
+            // M7 FIX: Forzar redirección inteligente tras restauración de sesión si es nueva entrada
+            useAppStore.setState({ needsWelcomeRedirect: true });
+
             // RESTAURAR CATEGORÍA ACTIVA DE MAESTROS SI EXISTE
             const savedCategory = localStorage.getItem('m7_active_master_category');
             if (savedCategory) {
@@ -355,6 +358,9 @@ const App: React.FC = () => {
 
       // Disparar hidratación de catálogos y Layout usando Lazy Load (Asíncrono real)
       refreshAppData(firstClientId);
+      
+      // M7 FIX: Activar bandera de redirección inteligente tras login exitoso
+      useAppStore.setState({ needsWelcomeRedirect: true });
 
       toast.success(`Bienvenido, ${userData.name}`);
       return { success: true };
@@ -375,6 +381,65 @@ const App: React.FC = () => {
       toast.info("Sesión finalizada");
     }
   };
+
+  // ============ REDIRECCIÓN INTELIGENTE (POST-LOGIN) ============
+  const { needsWelcomeRedirect, setNeedsWelcomeRedirect } = useAppStore();
+
+  useEffect(() => {
+    if (isAuthenticated && needsWelcomeRedirect && pages.length > 0 && modules.length > 0 && user) {
+      console.log('[M7-ROUTING] Calculando ruta de bienvenida...');
+      
+      const isSuperUser = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
+      const userPerms = user.permissions || [];
+      
+      // 1. PRIORIDAD: DASHBOARD
+      const hasDashboard = isSuperUser || userPerms.some(p => p.module === 'DASHBOARD' && p.actions.includes('view'));
+      
+      if (hasDashboard) {
+        setActiveTab('dashboard');
+        setNeedsWelcomeRedirect(false);
+        return;
+      }
+
+      // 2. BUSCAR PRIMERA PÁGINA PERMITIDA
+      // Replicamos la lógica de Layout.tsx para encontrar la primera opción real
+      const allowedModules = modules
+        .filter(m => (m.statusId || m.status_id) === 'EST-01')
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      for (const mod of allowedModules) {
+        const modId = String(mod.id).trim().toUpperCase();
+        const firstPage = pages
+          .filter(p => String(p.parentId || p.parent_id || '').trim().toUpperCase() === modId)
+          .filter(p => (p.statusId || p.status_id) === 'EST-01')
+          .filter(p => {
+            if (isSuperUser) return true;
+            return userPerms.some(perm => perm.module === p.id && perm.actions.includes('view'));
+          })
+          .sort((a, b) => a.name.localeCompare(b.name))[0];
+
+        if (firstPage) {
+          const masterCat = getMasterCategoryFromRoute(firstPage.route, firstPage.id);
+          const sanitizeRoute = (route: string): string => {
+            if (!route) return '';
+            if (!!masterCat) return 'master';
+            return route.replace(/^\/+/, '').split('/')[0];
+          };
+
+          setActiveTab(sanitizeRoute(firstPage.route));
+          if (masterCat) setActiveMasterCategory(masterCat as any);
+          setActivePageId(firstPage.id);
+          setNeedsWelcomeRedirect(false);
+          console.log(`[M7-ROUTING] Redirigido a: ${firstPage.name} (${firstPage.id})`);
+          return;
+        }
+      }
+
+      // 3. FALLBACK: DASHBOARD (aunque no tenga datos, es mejor que nada)
+      setActiveTab('dashboard');
+      setNeedsWelcomeRedirect(false);
+    }
+  }, [isAuthenticated, needsWelcomeRedirect, pages, modules, user]);
 
   if (isRestoring) {
     return (

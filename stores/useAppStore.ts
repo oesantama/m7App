@@ -30,6 +30,7 @@ interface AppState {
   waStatus: 'CONNECTED' | 'DISCONNECTED';
   showTimeoutWarning: boolean;
   timeLeft: number;
+  needsWelcomeRedirect: boolean;
   
   // ============ ACCIONES DE AUTENTICACIÓN ============
   setUser: (user: User | null) => void;
@@ -88,6 +89,7 @@ interface AppState {
   getActiveAssignments: () => any[];
   
   // ============ UTILIDADES ============
+  setNeedsWelcomeRedirect: (value: boolean) => void;
   refreshAllData: (clientId?: string) => void;
   logout: () => void;
 }
@@ -126,6 +128,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   waStatus: 'DISCONNECTED',
   showTimeoutWarning: false,
   timeLeft: 60,
+  needsWelcomeRedirect: false,
   
   // ============ IMPLEMENTACIÓN DE ACCIONES ============
   
@@ -272,7 +275,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       drivers: [],
       assignments: [],
       routes: [],
-      activeTab: 'dashboard'
+      activeTab: 'dashboard',
+      needsWelcomeRedirect: false
     });
-  }
+  },
+  setNeedsWelcomeRedirect: (value) => set({ needsWelcomeRedirect: value })
 }));
