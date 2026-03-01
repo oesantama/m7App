@@ -3,7 +3,7 @@
 
 $DB_NAME = "m7_logistica"
 $DB_USER = "m7_admin"
-$INIT_FILE = "database/seed/init.sql"
+$INIT_FILE = "database/seed/01_init.sql"
 
 Write-Host "--- Iniciando exportación de base de datos local ---" -ForegroundColor Cyan
 
