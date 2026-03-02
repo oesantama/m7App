@@ -679,6 +679,8 @@ export const getInvoices = async (req: Request, res: Response) => {
     query += ` GROUP BY 
         ${sqlIdGen},
         document_items.document_id,
+        document_items.invoice,
+        document_items.order_number,
         TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
       ORDER BY 2 ASC`;
 
@@ -967,7 +969,7 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
 export const createManualDocument = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
-    const { externalDocId, clientId, vehiclePlate, user } = req.body;
+    const { externalDocId, clientId, vehiclePlate, planType, user } = req.body;
 
     if (!externalDocId || !clientId || !vehiclePlate) {
       return res.status(400).json({ success: false, error: "Datos incompletos" });
@@ -983,7 +985,7 @@ export const createManualDocument = async (req: Request, res: Response) => {
        // Si existe y no está eliminado, lo devolvemos
        if (existing.rows[0].status !== 'ELIMINADO') {
           const docId = existing.rows[0].id;
-          const fullDoc = await client.query('SELECT *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData" FROM documents_l WHERE id = $1', [docId]);
+          const fullDoc = await client.query('SELECT *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData", plan_type as "planType" FROM documents_l WHERE id = $1', [docId]);
           return res.json({ success: true, document: fullDoc.rows[0], message: "Documento ya existía, continuando..." });
        }
     }
@@ -992,9 +994,9 @@ export const createManualDocument = async (req: Request, res: Response) => {
     const docId = `L-MAN-${Date.now()}`;
     const result = await client.query(`
       INSERT INTO documents_l (id, external_doc_id, client_id, vehicle_plate, status, plan_type, created_by, created_at)
-      VALUES ($1, $2, $3, $4, 'PENDIENTE', 'MANUAL', $5, NOW())
-      RETURNING *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData"
-    `, [docId, externalDocId, clientId, vehiclePlate, user]);
+      VALUES ($1, $2, $3, $4, 'Pendiente', $5, $6, NOW())
+      RETURNING *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData", plan_type as "planType"
+    `, [docId, externalDocId, clientId, vehiclePlate, planType || 'MANUAL', user]);
 
     res.json({ success: true, document: result.rows[0] });
 

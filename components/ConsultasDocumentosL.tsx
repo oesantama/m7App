@@ -319,7 +319,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     <p className="font-black text-slate-900 text-xs uppercase">{doc.externalDocId}</p>
                     <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">PLACA: {doc.vehicleData}</p>
                   </td>
-                  <td className="px-6 py-5 font-bold text-slate-600 text-[10px] uppercase">{doc.planType || 'Plan Normal'}</td>
+                  <td className="px-6 py-5 font-bold text-slate-600 text-[10px] uppercase">{doc.codplan || doc.planType || 'MANUAL'}</td>
                   <td className="px-6 py-5 font-bold text-slate-400 text-[9px] uppercase">{doc.deliveryDate}</td>
                   <td className="px-6 py-5 text-center">
                     <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border shadow-inner ${doc.status === DocStatus.INVENTORED ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>{doc.status}</span>

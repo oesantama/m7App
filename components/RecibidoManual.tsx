@@ -30,14 +30,15 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
   const [selectedClientId, setSelectedClientId] = useState<string>(user.clientId || '');
   const [externalDocId, setExternalDocId] = useState('');
   const [vehiclePlate, setVehiclePlate] = useState('');
+  const [planType, setPlanType] = useState<'PLAN NORMAL' | 'PLAN R'>('PLAN NORMAL');
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredDocs = useMemo(() => {
     return documents.filter(d => 
-      (!selectedClientId || d.clientId === selectedClientId) && 
-      (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING) &&
-      (d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase()) || d.vehicleData?.toLowerCase().includes(searchTerm.toLowerCase()))
+      (!selectedClientId || String(d.clientId) === String(selectedClientId)) && 
+      (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING || String(d.status).toUpperCase() === 'PENDIENTE') &&
+      (d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase()) || (d.vehicleData || '').toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [documents, selectedClientId, searchTerm]);
 
@@ -52,6 +53,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
         externalDocId,
         clientId: selectedClientId,
         vehiclePlate,
+        planType,
         user: user.name
       });
 
@@ -345,6 +347,24 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
                 placeholder="EJ: ABC-123"
                 className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 transition-all"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Tipo de Plan de Referencia</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setPlanType('PLAN NORMAL')}
+                  className={`py-3 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${planType === 'PLAN NORMAL' ? 'bg-emerald-500 border-emerald-500 text-slate-900 shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
+                >
+                  Plan Normal (Ajover)
+                </button>
+                <button
+                  onClick={() => setPlanType('PLAN R')}
+                  className={`py-3 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${planType === 'PLAN R' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
+                >
+                  Plan R (Externo)
+                </button>
+              </div>
             </div>
           </div>
 

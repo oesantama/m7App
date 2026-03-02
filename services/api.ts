@@ -286,7 +286,7 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
-  createManualDocument: (data: { externalDocId: string, clientId: string, vehiclePlate: string, user: string }) => fetchJson(`${API_URL}/documents/manual`, {
+  createManualDocument: (data: { externalDocId: string, clientId: string, vehiclePlate: string, planType?: string, user: string }) => fetchJson(`${API_URL}/documents/manual`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
