@@ -41,17 +41,17 @@ export const useAppData = () => {
         api.getGenericMasters().then(normalizeData).catch(() => []),
         api.getCategories().then(normalizeData).catch(() => []), 
         hasPerm('ARTICULOS') ? api.getArticles().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        (hasPerm('VEHICULOS') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L')) ? api.getVehicles().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        (hasPerm('CONDUCTORES') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L')) ? api.getDrivers().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('VEHICULOS') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getVehicles().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('CONDUCTORES') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getDrivers().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('USUARIOS') ? api.getUsers().then(normalizeData).catch(() => []) : Promise.resolve([]),
 
 
         isSuper ? api.getRoles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper ? api.getPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper || hasPerm('MATRIZ_PERMISOS') ? api.getAllUserPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        (hasPerm('CLIENTES') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L')) ? api.getClients().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        (hasPerm('ASIGNACIONES') || hasPerm('RUTAS') || hasPerm('DOCUMENTOS_L')) ? api.getAssignments().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        hasPerm('DOCUMENTOS_L') ? api.getInvoices(targetClientId).catch(() => []) : Promise.resolve([]),
+        (hasPerm('CLIENTES') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getClients().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('ASIGNACIONES') || hasPerm('RUTAS') || hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getAssignments().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getInvoices(targetClientId).catch(() => []) : Promise.resolve([]),
         hasPerm('RUTAS') ? api.getRoutes().catch(() => []) : Promise.resolve([]),
         api.getEstados().then(normalizeData).catch(() => []), // Maestros base (Siempre cargar)
         api.getMarcas().then(normalizeData).catch(() => []),
@@ -138,8 +138,8 @@ export const useAppData = () => {
       }).catch(err => console.error('[M7-DATA-HOOK] Error deferred sync:', err));
 
       // 4. CARGA DE DOCUMENTOS OPERATIVOS (Condicional)
-      // [M7-FIX] Cargar también para usuarios con permiso RUTAS (planificadores)
-      if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS')) {
+      // [M7-FIX] Cargar también para usuarios con permiso RUTAS (planificadores) y RECIBIDO_MATERIAL (auditores)
+      if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS') || hasPerm('RECIBIDO_MATERIAL')) {
         api.getDocuments(targetClientId).then(docs => {
           if (Array.isArray(docs)) {
             setDocuments(docs.map(d => ({

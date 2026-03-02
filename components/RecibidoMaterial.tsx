@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
@@ -7,6 +6,7 @@ import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem } from
 import BlindCount from './BlindCount';
 import PickingView from './PickingView';
 import PickingHistory from './PickingHistory';
+import { hasPermission } from '../utils/permissions';
 
 interface RecibidoMaterialProps {
   documents: DocumentL[];
@@ -279,12 +279,17 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                   <div className="mt-6 pt-6 border-t border-slate-50">
                     <button 
                       onClick={() => handleStartCount(doc)} 
-                      disabled={doc.status === DocStatus.INVENTORED}
-                      className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3 disabled:opacity-20"
+                      disabled={doc.status === DocStatus.INVENTORED || !hasPermission(user, 'RECIBIDO_MATERIAL', 'create')}
+                      className={`w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-3 ${(doc.status === DocStatus.INVENTORED || !hasPermission(user, 'RECIBIDO_MATERIAL', 'create')) ? 'opacity-20 cursor-not-allowed hidden' : 'hover:bg-emerald-600 active:scale-95'}`}
                     >
                       {doc.status === DocStatus.COUNTING ? <Icons.Audit /> : <Icons.Signature />}
                       {doc.status === DocStatus.INVENTORED ? 'INVENTARIADO' : (doc.status === DocStatus.COUNTING ? 'CONTINUAR' : 'AUDITAR')}
                     </button>
+                    {(!hasPermission(user, 'RECIBIDO_MATERIAL', 'create') && doc.status !== DocStatus.INVENTORED) && (
+                       <div className="w-full py-4 items-center justify-center text-center">
+                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><Icons.Shield className="w-3 h-3 inline mr-1" /> MODO LECTURA</span>
+                       </div>
+                    )}
                     {doc.status === DocStatus.INVENTORED && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleResendClick(doc); }}
