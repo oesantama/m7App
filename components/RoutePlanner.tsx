@@ -356,8 +356,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // @ts-ignore
         if (a.startAddressForSort !== b.startAddressForSort) return a.startAddressForSort.localeCompare(b.startAddressForSort);
 
-        // 5. Volumen (Llenado)
-        return b.volumeM3 - a.volumeM3;
+        // 5. Volumen (Llenado) - Casting explícito para evitar fallos de string
+        return (Number(b.volumeM3) || 0) - (Number(a.volumeM3) || 0);
       });
 
       const usedVehicleIds = new Set<string>();
@@ -366,8 +366,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // ALGORITMO AGRESIVO DE LLENADO (90% TARGET)
       // ============================================
 
-      // Iteramos sobre cada vehículo disponible
-      availableVehicles.forEach(vehicle => {
+      // [IA REGENERATIVA ORBIT] Ordenar vehículos por capacidad (Nominal DESC)
+      // para favorecer la consolidación en camiones grandes primero.
+      const prioritizedFleet = [...availableVehicles].sort((a, b) => (Number(b.capacityM3) || 0) - (Number(a.capacityM3) || 0));
+
+      // Iteramos sobre cada vehículo disponible prioritario
+      prioritizedFleet.forEach(vehicle => {
         if (availableInvoices.length === 0) return;
 
         const load: Invoice[] = [];
@@ -393,7 +397,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           if (targetCity) {
             // @ts-ignore
             seedInvoice = availableInvoices.find(inv => inv.cityKey === targetCity);
-            if (seedInvoice) { /* console.log(`[M7-IA] Aplicando patrón aprendido: ${vehicle.plate} -> ${targetCity}`) */ }
           }
 
           // Si no hay afinidad o no hay facturas de esa ciudad, tomamos la primera disponible
@@ -410,8 +413,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           for (let i = 0; i < primaryCandidates.length; i++) {
             const inv = primaryCandidates[i];
 
-            // Lógica de No Interferencia de Horarios Críticos
-            // @ts-ignore
+            // Lógica de No Interferencia de Horarios Críticos + CASTING DE VOLUMEN
             const invVol = Number(inv.volumeM3) || 0;
             if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
               load.push(inv);
@@ -427,21 +429,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           }
         }
 
-        // -- FASE 2: RELLENO AGRESIVO (FILL THE GAPS) --
-        // Si aún no llegamos al target, buscamos CUALQUIER factura que quepa
+        // -- FASE 2: RELLENO AGRESIVO (VORAZ / FILL THE GAPS) --
+        // Si aún no llegamos al target, buscamos CUALQUIER factura que quepa (Best Fit simple)
         if (currentLoadVolume < targetMaxCapacity && availableInvoices.length > 0) {
           // Recorremos las facturas restantes para encontrar las que "calzan" mejor
-          for (let i = 0; i < availableInvoices.length; i++) {
+          let i = 0;
+          while (i < availableInvoices.length && currentLoadVolume < targetMaxCapacity) {
             const inv = availableInvoices[i];
+            const invVol = Number(inv.volumeM3) || 0;
 
-            if (currentLoadVolume >= targetMaxCapacity) break;
-
-            // Chequeo simple de capacidad
-            if (currentLoadVolume + inv.volumeM3 <= absoluteMaxCapacity) {
+            if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
               load.push(inv);
-              currentLoadVolume += inv.volumeM3;
+              currentLoadVolume += invVol;
               availableInvoices.splice(i, 1);
-              i--; // Ajustar índice al borrar
+              // Seguir intentando en la misma posición (que ahora tiene el siguiente elemento)
+            } else {
+              i++;
             }
           }
         }
