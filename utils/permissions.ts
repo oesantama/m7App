@@ -15,6 +15,7 @@ export const ID_MAP: Record<string, string> = {
   'ASIGNACIONES': 'PAG-12',
   'DOCUMENTOS_L': 'PAG-16',
   'RECIBIDO_MATERIAL': 'PAG-17', // [M7-FIX] Mapeo crítico para visibilidad multi-usuario
+  'RECIBIDO_MANUAL': 'PAG-30',
   'RUTAS': 'PAG-15',
   'DASHBOARD': 'PAG-25',
   'NOTIFICACIONES': 'PAG-07',

@@ -928,3 +928,45 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
     client.release();
   }
 };
+
+export const createManualDocument = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { externalDocId, clientId, vehiclePlate, user } = req.body;
+
+    if (!externalDocId || !clientId || !vehiclePlate) {
+      return res.status(400).json({ success: false, error: "Datos incompletos" });
+    }
+
+    // 1. Verificar si ya existe un documento L con ese ID para ese cliente
+    const existing = await client.query(
+      'SELECT id, status FROM documents_l WHERE UPPER(external_doc_id) = UPPER($1) AND client_id = $2',
+      [externalDocId, clientId]
+    );
+
+    if (existing.rows.length > 0) {
+       // Si existe y no está eliminado, lo devolvemos
+       if (existing.rows[0].status !== 'ELIMINADO') {
+          const docId = existing.rows[0].id;
+          const fullDoc = await client.query('SELECT *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData" FROM documents_l WHERE id = $1', [docId]);
+          return res.json({ success: true, document: fullDoc.rows[0], message: "Documento ya existía, continuando..." });
+       }
+    }
+
+    // 2. Crear el documento base
+    const docId = `L-MAN-${Date.now()}`;
+    const result = await client.query(`
+      INSERT INTO documents_l (id, external_doc_id, client_id, vehicle_plate, status, plan_type, created_by, created_at)
+      VALUES ($1, $2, $3, $4, 'PENDIENTE', 'MANUAL', $5, NOW())
+      RETURNING *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData"
+    `, [docId, externalDocId, clientId, vehiclePlate, user]);
+
+    res.json({ success: true, document: result.rows[0] });
+
+  } catch (err: any) {
+    console.error('[M7-CREATE-MANUAL-ERR]', err);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+};

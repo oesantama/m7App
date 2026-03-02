@@ -240,7 +240,7 @@ export const restoreSystem = async () => {
         'PAG-01','PAG-03','PAG-04','PAG-05','PAG-06','PAG-07','PAG-08','PAG-09','PAG-10','PAG-11',
         'PAG-12','PAG-13','PAG-14','PAG-15','PAG-16','PAG-17',
         'PAG-18','PAG-19','PAG-20','PAG-21','PAG-22','PAG-23','PAG-24',
-        'PAG-25','PAG-26','PAG-27','PAG-28','PAG-29','PAG-SQL'
+        'PAG-25','PAG-26','PAG-27','PAG-28','PAG-29','PAG-30','PAG-SQL'
       )
     `);
     await client.query(`
@@ -283,6 +283,7 @@ export const restoreSystem = async () => {
       -- Inventarios (MOD-03)
       ('PAG-16', 'GESTIÓN DE DOCUMENTOS', 'documentos', 'MOD-03', 'MOD-03', 'EST-01'),
       ('PAG-17', 'RECIBIDO DE MATERIAL', 'recibido', 'MOD-03', 'MOD-03', 'EST-01'),
+      ('PAG-30', 'RECIBIDO MANUAL', 'recibido-manual', 'MOD-03', 'MOD-03', 'EST-01'),
 
       -- Seguridad (MOD-04)
       ('PAG-18', 'CONEXIÓN WHATSAPP', 'whatsapp-status', 'MOD-04', 'MOD-04', 'EST-01'),

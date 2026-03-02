@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getDocuments, syncInventory, bulkCreateDocuments, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment } from '../controllers/document.controller.js';
+import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment } from '../controllers/document.controller.js';
 
 import { requirePermission } from '../middleware/auth.middleware.js';
 
@@ -12,11 +12,13 @@ router.get('/', (req, res, next) => {
   const hasDocsPerm = user?.permissions?.some((p: any) => p.module === 'PAG-16' && p.actions.includes('view'));
   const hasRutasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-15' && p.actions.includes('view'));
   const hasRecibidoPerm = user?.permissions?.some((p: any) => p.module === 'PAG-17' && p.actions.includes('view'));
+  const hasManualPerm = user?.permissions?.some((p: any) => p.module === 'PAG-30' && p.actions.includes('view'));
 
-  if (isSuper || hasDocsPerm || hasRutasPerm || hasRecibidoPerm) return next();
+  if (isSuper || hasDocsPerm || hasRutasPerm || hasRecibidoPerm || hasManualPerm) return next();
   res.status(403).json({ success: false, error: 'Permiso insuficiente para ver documentos' });
 }, getDocuments);
 router.post('/bulk', requirePermission('DOCUMENTOS_L', 'create'), bulkCreateDocuments);
+router.post('/manual', requirePermission('PAG-30', 'create'), createManualDocument);
 router.patch('/status/:id', requirePermission('DOCUMENTOS_L', 'edit'), updateStatus);
 router.delete('/:id', requirePermission('DOCUMENTOS_L', 'delete'), deleteDocument);
 router.post('/sync-inventory', requirePermission('DOCUMENTOS_L', 'edit'), syncInventory);
@@ -27,8 +29,9 @@ router.get('/invoices', (req, res, next) => {
   const hasDocsPerm = user?.permissions?.some((p: any) => p.module === 'PAG-16' && p.actions.includes('view'));
   const hasRutasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-15' && p.actions.includes('view'));
   const hasRecibidoPerm = user?.permissions?.some((p: any) => p.module === 'PAG-17' && p.actions.includes('view'));
+  const hasManualPerm = user?.permissions?.some((p: any) => p.module === 'PAG-30' && p.actions.includes('view'));
 
-  if (isSuper || hasDocsPerm || hasRutasPerm || hasRecibidoPerm) return next();
+  if (isSuper || hasDocsPerm || hasRutasPerm || hasRecibidoPerm || hasManualPerm) return next();
   res.status(403).json({ success: false, error: 'Permiso insuficiente para ver facturas' });
 }, getInvoices);
 router.post('/process-l-payment', requirePermission('DOCUMENTOS_L', 'edit'), processDocumentLPayment);

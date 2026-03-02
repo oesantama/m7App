@@ -37,6 +37,7 @@ const GestionDocumentosL = lazyWithRetry(() => import('./components/GestionDocum
 const RoutePlanner = lazyWithRetry(() => import('./components/RoutePlanner'));
 const LogisticsDispatch = lazyWithRetry(() => import('./components/LogisticsDispatch'));
 const RecibidoMaterial = lazyWithRetry(() => import('./components/RecibidoMaterial'));
+const RecibidoManual = lazyWithRetry(() => import('./components/RecibidoManual'));
 const FleetManager = lazyWithRetry(() => import('./components/FleetManager'));
 const AssignmentManager = lazyWithRetry(() => import('./components/AssignmentManager'));
 const AIChat = lazyWithRetry(() => import('./components/AIChat'));
@@ -684,6 +685,23 @@ const App: React.FC = () => {
               const newNotif = { ...notif, id: `not-${Date.now()}` };
               await api.saveMaster('masterNotificaciones', newNotif);
               setAllMasterData({ ...allMasterData, masterNotificaciones: [...(allMasterData.masterNotificaciones || []), newNotif as MasterRecord] });
+            }}
+          />
+        );
+      case 'recibido-manual':
+        return (
+          <RecibidoManual
+            documents={documents}
+            onUpdateDocuments={setDocuments}
+            user={user!}
+            masterEstados={allMasterData.masterEstados || []}
+            masterNotificaciones={allMasterData.masterNotificaciones || []}
+            masterTipoNotificacion={allMasterData.masterTipoNotificacion || []}
+            masterArticulo={allMasterData.masterArticulo || []}
+            clients={allMasterData.masterClientes || []}
+            onAddArticleToMaster={async (article) => {
+              await api.saveArticle(article);
+              setAllMasterData({ ...allMasterData, masterArticulo: [...(allMasterData.masterArticulo || []), article as MasterRecord] });
             }}
           />
         );

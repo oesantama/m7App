@@ -14,6 +14,7 @@ interface BlindCountProps {
   onCancel: () => void;
   onAddArticleToMaster: (article: Article) => void;
   onAddNotificationToMaster: (notif: Partial<MasterRecord>) => void;
+  allowExtraItems?: boolean;
 }
 
 const BlindCount: React.FC<BlindCountProps> = ({
@@ -25,9 +26,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
   onPartialSave,
   onCancel,
   onAddArticleToMaster,
-  onAddNotificationToMaster
+  onAddNotificationToMaster,
+  allowExtraItems = false
 }) => {
   const [scanInput, setScanInput] = useState('');
+  const [extraItems, setExtraItems] = useState<DocumentLItem[]>([]);
   const [tableSearch, setTableSearch] = useState('');
   // ESTADOS DE INVENTARIO M7
   const [counts, setCounts] = useState<{ [articleId: string]: number }>(() => {
@@ -103,15 +106,18 @@ const BlindCount: React.FC<BlindCountProps> = ({
   // AGRUPACIÓN DE ITEMS POR SKU (VISTA GENERAL)
   const groupedItems = useMemo(() => {
     const groups: { [id: string]: DocumentLItem } = {};
-    docL.items.forEach(item => {
+    const allItems = [...docL.items, ...extraItems];
+    
+    allItems.forEach(item => {
       const id = item.articleId?.toUpperCase() || '';
       if (!groups[id]) {
-        groups[id] = { ...item, expectedQty: 0 };
+        groups[id] = { ...item, expectedQty: item.expectedQty || 0 };
+      } else {
+        groups[id].expectedQty += (item.expectedQty || 0);
       }
-      groups[id].expectedQty += item.expectedQty;
     });
     return Object.values(groups);
-  }, [docL.items]);
+  }, [docL.items, extraItems]);
 
   // OFFLINE CACHE: Cargar al montar si existe algo más reciente
   useEffect(() => {
@@ -198,7 +204,32 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (!input) return;
 
     const itemInDoc = groupedItems.find(it => it.articleId?.toUpperCase() === input);
+    
     if (!itemInDoc) {
+      if (allowExtraItems) {
+        // TRACTAR ARTÍCULO FUERA DE PLAN (MANUAL)
+        let articleMaster = (masterArticulo as Article[]).find(a => a.sku?.toUpperCase() === input || a.barcode === input);
+        if (!articleMaster) {
+            setLastScan({ article: null, message: `Código "${input}" no existe en maestros.`, status: 'error' });
+            setScanInput('');
+            return;
+        }
+
+        const newItem: DocumentLItem = {
+            articleId: articleMaster.sku,
+            expectedQty: 0,
+            countedQty: 1,
+            status: 'Pending',
+            unit: (articleMaster as any).uomStd || (articleMaster as any).uom_std || 'UND'
+        };
+
+        setExtraItems(prev => [...prev, newItem]);
+        setCounts(prev => ({ ...prev, [newItem.articleId]: (prev[newItem.articleId] || 0) + 1 }));
+        setLastScan({ article: articleMaster, message: `NUEVO ITEM AGREGADO: ${articleMaster.name}`, status: 'success' });
+        setScanInput('');
+        return;
+      }
+
       setLastScan({ article: null, message: `Código "${input}" fuera de plan.`, status: 'error' });
       setScanInput('');
       return;
