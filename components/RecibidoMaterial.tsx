@@ -233,6 +233,8 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
             articleId: sku,
             expectedQty: qty,
             receivedQty: 0,
+            countedQty: 0,
+            status: 'Pending',
             unit: iUnd !== -1 ? String(row[iUnd]) : 'UND',
             invoice: iFactura !== -1 ? String(row[iFactura]) : '',
             city: iCity !== -1 ? String(row[iCity]) : '',
