@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem } from '../types';
 import BlindCount from './BlindCount';
 import { hasPermission } from '../utils/permissions';
+import * as XLSX from 'xlsx';
 
 interface RecibidoManualProps {
   documents: DocumentL[];
@@ -145,6 +146,117 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
     });
   };
 
+  const handleManualExcelUpload = (e: React.ChangeEvent<HTMLInputElement>, doc: DocumentL) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const dataBuffer = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const wb = XLSX.read(dataBuffer, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false }) as any[][];
+
+        if (!rawData || rawData.length < 1) return;
+
+        let headerIdx = -1;
+        const requiredTerms = ['articulo', 'item', 'codigo', 'sku', 'cantidad', 'qty', 'cant env'];
+        for (let i = 0; i < Math.min(rawData.length, 20); i++) {
+          const row = (rawData[i] || []).map(c => String(c || '').toLowerCase().trim());
+          if (row.filter(cell => requiredTerms.some(t => cell.includes(t))).length >= 2) {
+            headerIdx = i;
+            break;
+          }
+        }
+
+        if (headerIdx === -1) {
+          toast.error("No se detectó el formato correcto en el Excel.");
+          return;
+        }
+
+        const headers = rawData[headerIdx].map(h => String(h || '').trim().toLowerCase());
+        const findCol = (terms: string[]) => headers.findIndex(h => terms.some(t => h.includes(t)));
+
+        const iArt = findCol(['articulo', 'item', 'codigo', 'sku']);
+        const iCant = findCol(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
+        const iUnd = findCol(['um', 'und', 'unid', 'unidad']);
+        const iFactura = findCol(['remision', 'factura', 'documento', 'invoice']);
+        const iCiudad = findCol(['destino', 'ciudad', 'city']);
+        const iDir = findCol(['dirección', 'direccion', 'address']);
+
+        if (iArt === -1 || iCant === -1) {
+          toast.error("Faltan columnas obligatorias (Articulo/SKU o Cantidad).");
+          return;
+        }
+
+        const items: any[] = [];
+        const consolidatedItems: any[] = [];
+
+        rawData.slice(headerIdx + 1).forEach(row => {
+          const sku = String(row[iArt] || '').trim();
+          if (!sku) return;
+
+          const qty = parseFloat(String(row[iCant] || '0').replace(/,/g, '.')) || 0;
+          
+          items.push({
+            articleId: sku,
+            expectedQty: qty,
+            receivedQty: 0,
+            unit: iUnd !== -1 ? String(row[iUnd]) : 'UND',
+            invoice: iFactura !== -1 ? String(row[iFactura]) : '',
+            city: iCiudad !== -1 ? String(row[iCiudad]) : '',
+            address: iDir !== -1 ? String(row[iDir]) : ''
+          });
+
+          consolidatedItems.push({
+            articleId: sku,
+            expectedQty: qty,
+            count1: 0,
+            count2: 0
+          });
+        });
+
+        if (items.length === 0) {
+          toast.error("No se encontraron datos válidos en el archivo.");
+          return;
+        }
+
+        const payload = {
+          documents: [{
+            ...doc,
+            items,
+            consolidatedItems,
+            planType: 'MANUAL',
+            status: doc.status,
+            updatedBy: user.name
+          }]
+        };
+
+        api.bulkCreateDocuments(payload).then(res => {
+          if (res.success) {
+            toast.success(`Referencia cargada: ${items.length} ítems configurados.`);
+            const updatedDocs = documents.map(d => 
+              d.id === doc.id ? { ...d, items, consolidatedItems } : d
+            );
+            onUpdateDocuments(updatedDocs);
+          } else {
+            toast.error("Error al sincronizar: " + res.error);
+          }
+        }).catch(err => {
+          console.error(err);
+          toast.error("Error de conexión al cargar referencia.");
+        });
+
+      } catch (err) {
+        console.error(err);
+        toast.error("Error al leer el archivo Excel.");
+      }
+      e.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   if (selectedDocForCount) {
     return (
       <div className="w-full h-full flex flex-col overflow-hidden">
@@ -245,20 +357,32 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
 
           <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
             {filteredDocs.map(doc => (
-              <button
-                key={doc.id}
-                onClick={() => setSelectedDocForCount(doc)}
-                className="w-full p-6 bg-white/5 hover:bg-white/10 border border-white/5 rounded-[2rem] text-left transition-all group flex items-center justify-between gap-4"
-              >
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black text-emerald-500 uppercase mb-1">{doc.externalDocId}</p>
-                  <p className="text-lg font-black text-white uppercase tracking-tighter truncate">{doc.vehicleData || 'S/A'}</p>
-                  <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">{new Date(doc.createdAt).toLocaleDateString()}</p>
-                </div>
-                <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 group-hover:text-emerald-500 group-hover:bg-emerald-500/10 transition-all">
-                  <Icons.ChevronRight className="w-6 h-6" />
-                </div>
-              </button>
+              <div key={doc.id} className="relative group/card">
+                <button
+                  onClick={() => setSelectedDocForCount(doc)}
+                  className="w-full p-6 bg-white/5 hover:bg-white/10 border border-white/5 rounded-[2rem] text-left transition-all flex items-center justify-between gap-4"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black text-emerald-500 uppercase mb-1">{doc.externalDocId}</p>
+                    <p className="text-lg font-black text-white uppercase tracking-tighter truncate">{doc.vehicleData || 'S/A'}</p>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">{new Date(doc.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 group-hover/card:text-emerald-500 group-hover/card:bg-emerald-500/10 transition-all shrink-0">
+                    <Icons.ChevronRight className="w-6 h-6" />
+                  </div>
+                </button>
+                
+                {/* BOTÓN FLOTANTE PARA CARGAR EXCEL EN LA MINIATURA */}
+                <label className="absolute right-20 top-1/2 -translate-y-1/2 p-3 bg-white/10 text-emerald-400 rounded-xl hover:bg-emerald-500 hover:text-white cursor-pointer transition-all opacity-0 group-hover/card:opacity-100 shadow-xl border border-white/10" title="Cargar Referencia Excel">
+                  <Icons.Excel className="w-4 h-4" />
+                  <input 
+                    type="file" 
+                    accept=".xlsx,.xls" 
+                    className="hidden" 
+                    onChange={(e) => handleManualExcelUpload(e, doc)} 
+                  />
+                </label>
+              </div>
             ))}
             {filteredDocs.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center opacity-20 py-20">
