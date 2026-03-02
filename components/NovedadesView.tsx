@@ -67,17 +67,57 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
         ).slice(0, 5);
     }, [masterArticulo, articleSearch]);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const compressImage = (base64Str: string): Promise<string> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = base64Str;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1024;
+                const MAX_HEIGHT = 1024;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+        });
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files) return;
 
-        Array.from(files).forEach(file => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPhotos(prev => [...prev, reader.result as string]);
-            };
-            reader.readAsDataURL(file);
-        });
+        const loadToast = toast.loading("Procesando imágenes...");
+        try {
+            for (const file of Array.from(files)) {
+                const base64 = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(file);
+                });
+                const compressed = await compressImage(base64);
+                setPhotos(prev => [...prev, compressed]);
+            }
+            toast.dismiss(loadToast);
+        } catch (err) {
+            toast.error("Error al procesar fotos");
+            toast.dismiss(loadToast);
+        }
     };
 
     const handleSaveNovedad = async () => {
@@ -85,18 +125,18 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
         if (quantity <= 0) return toast.error("Ingrese una cantidad válida");
         if (!observation) return toast.error("Ingrese una observación");
 
-        const existing = novedades.find(n => n.article_sku === selectedArticle.sku);
+        const existing = novedades.find(n => n.article_sku === selectedArticle.sku || n.article_id === selectedArticle.id);
         if (existing) {
-            if (!confirm(`El artículo ${selectedArticle.sku} ya tiene novedades registradas. ¿Desea ADICIONAR esta información al registro existente?`)) {
-                return;
-            }
+            const confirmMsg = `El artículo ${selectedArticle.sku} ya tiene novedades registradas. ¿Desea ADICIONAR esta información al registro existente?`;
+            if (!window.confirm(confirmMsg)) return;
         }
 
+        const saveToast = toast.loading("Guardando novedad...");
         setIsLoading(true);
         try {
             const res = await api.saveNovedad({
                 documentId: selectedDoc.id,
-                articleId: selectedArticle.id, // CORRECCIÓN: Usar .id en lugar de .sku para la DB
+                articleId: selectedArticle.id,
                 quantity,
                 observation,
                 photoUrls: photos,
@@ -104,7 +144,7 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
             });
 
             if (res.success) {
-                toast.success(res.message);
+                toast.success("Novedad guardada correctamente", { id: saveToast });
                 // Reset form
                 setSelectedArticle(null);
                 setQuantity(0);
@@ -115,8 +155,8 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                 const updated = await api.getNovedades(selectedDoc.id);
                 setNovedades(updated);
             }
-        } catch (err) {
-            toast.error("Error al guardar novedad");
+        } catch (err: any) {
+            toast.error(err.message || "Error al guardar novedad", { id: saveToast });
         } finally {
             setIsLoading(false);
         }
@@ -215,9 +255,9 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">Fotos ({photos.length})</label>
                                     <button 
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-full p-3 bg-slate-50 text-slate-600 border border-dashed border-slate-300 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                                        className="w-full p-3 bg-blue-50 text-blue-600 border border-dashed border-blue-200 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
                                     >
-                                        <Icons.Plus className="w-3 h-3" /> ADJUNTAR
+                                        <Icons.Plus className="w-3 h-3" /> <Icons.Alert className="w-3 h-3" /> CAMARA / GALERIA
                                     </button>
                                     <input 
                                         type="file" 

@@ -18,7 +18,7 @@ app.set('trust proxy', 1);
 // Middlewares de Seguridad Crítica (Hallazgos QA)
 app.use(helmet()); // Oculta X-Powered-By y agrega cabeceras de seguridad
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
 
 // Limitador de Intentos de Login (Hallazgo QA) 15 peticiones por 15 min por IP
 const loginLimiter = rateLimit({
