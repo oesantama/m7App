@@ -59,9 +59,28 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
           ...res.document,
           items: [] // Inicia vacío para manual
         };
-        onUpdateDocuments([...documents, newDoc]);
-        setSelectedDocForCount(newDoc);
-        toast.success("Recibo manual iniciado");
+        api.bulkCreateDocuments([newDoc])
+      .then(res => {
+        if (res.success) {
+          toast.success("Inventario manual iniciado.");
+          onUpdateDocuments([...documents, newDoc]);
+          setSelectedDocForCount(newDoc);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        const errorMsg = err.response?.data?.error || "Error al iniciar auditoría manual";
+        const details = err.response?.data?.details || "";
+        
+        if (err.response?.status === 409) {
+            toast.error(errorMsg, {
+                description: details,
+                duration: 5000
+            });
+        } else {
+            toast.error(errorMsg);
+        }
+      });
       } else {
         toast.error(res.error || "Error al crear documento");
       }

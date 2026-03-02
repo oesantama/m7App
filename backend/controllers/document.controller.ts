@@ -366,6 +366,29 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
     for (const doc of documents) {
+      // [M7-VALIDATION] Evitar duplicados por Placa + Documento + Cliente
+      const plate = doc.vehicleData || doc.vehicle_plate || doc.plate || 'S/A';
+      const extId = doc.externalDocId || doc.external_doc_id;
+      
+      if (plate !== 'S/A') {
+          const duplicateCheck = await client.query(`
+            SELECT id FROM documents_l 
+            WHERE client_id = $1 
+            AND external_doc_id = $2 
+            AND vehicle_plate = $3
+            AND status != 'ELIMINADO'
+            LIMIT 1
+          `, [doc.clientId, extId, plate]);
+
+          if (duplicateCheck.rowCount && duplicateCheck.rowCount > 0) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ 
+                error: "Documento duplicado", 
+                details: `Ya existe un inventario activo para la placa ${plate} con el documento ${extId}.` 
+            });
+          }
+      }
+
       const deliveryDate = sanitizeDate(doc.deliveryDate);
       const pickingDate = sanitizeDate(doc.pickingDate);
       const receivingDate = sanitizeDate(doc.receivingDate);
