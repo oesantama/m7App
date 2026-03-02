@@ -10,9 +10,15 @@ export const getNovedades = async (req: Request, res: Response) => {
     const { docId } = req.params;
     try {
         const result = await pool.query(`
-            SELECT n.*, COALESCE(a.sku, 'S/SKU') as article_sku, COALESCE(a.name, 'SIN NOMBRE') as article_name
+            SELECT n.*, 
+                   COALESCE(a.sku, n.article_id, 'S/SKU') as article_sku, 
+                   COALESCE(a.name, n.observation, 'SIN NOMBRE') as article_name
             FROM inventory_news n
-            LEFT JOIN articles a ON TRIM(CAST(n.article_id AS TEXT)) = TRIM(CAST(a.id AS TEXT))
+            LEFT JOIN articles a ON (
+                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.id AS TEXT))) OR 
+                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT))) OR
+                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.barcode AS TEXT)))
+            )
             WHERE n.document_id = $1
             ORDER BY n.created_at DESC
         `, [docId]);
@@ -67,9 +73,15 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         const placa = doc.vehicle_plate || doc.vehicleData || doc.vehicle_data || 'SIN PLACA';
 
         const newsRes = await pool.query(`
-            SELECT n.*, COALESCE(a.sku, 'S/SKU') as article_sku, COALESCE(a.name, n.observation) as article_name
+            SELECT n.*, 
+                   COALESCE(a.sku, n.article_id, 'S/SKU') as article_sku, 
+                   COALESCE(a.name, n.observation, 'SIN NOMBRE') as article_name
             FROM inventory_news n
-            LEFT JOIN articles a ON TRIM(CAST(n.article_id AS TEXT)) = TRIM(CAST(a.id AS TEXT))
+            LEFT JOIN articles a ON (
+                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.id AS TEXT))) OR 
+                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT))) OR
+                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.barcode AS TEXT)))
+            )
             WHERE n.document_id = $1
             ORDER BY n.created_at ASC
         `, [docId]);
