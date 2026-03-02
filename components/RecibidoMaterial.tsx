@@ -151,7 +151,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
     setShowResendDialog(true);
   };
 
-  const handleManualExcelUpload = (e: React.ChangeEvent<HTMLInputElement>, doc: DocumentL) => {
+  const handleManualExcelUpload = (e: React.ChangeEvent<HTMLInputElement>, doc: DocumentL, forcedType?: 'Plan Normal' | 'Plan R') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -165,101 +165,117 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
         if (!rawData || rawData.length < 1) return;
 
-        // Buscar cabecera (Lógica simplificada basada en GestionDocumentosL)
-        let headerIdx = -1;
-        const requiredTerms = ['articulo', 'item', 'codigo', 'sku', 'cantidad', 'qty', 'cant env'];
-        for (let i = 0; i < Math.min(rawData.length, 20); i++) {
+        // 1. Motor de Detección Avanzado (M7 Engine)
+        let headerRowIndex = -1;
+        const requiredTerms = ['articulo', 'item', 'codigo', 'sku', 'cantidad', 'qty', 'cant env', 'un orig', 'un'];
+        
+        for (let i = 0; i < Math.min(rawData.length, 50); i++) {
           const row = (rawData[i] || []).map(c => String(c || '').toLowerCase().trim());
-          if (row.filter(cell => requiredTerms.some(t => cell.includes(t))).length >= 2) {
-            headerIdx = i;
-            break;
+          if (row.filter(cell => requiredTerms.some(term => cell.includes(term))).length >= 2) { 
+            headerRowIndex = i; 
+            break; 
           }
         }
 
-        if (headerIdx === -1) {
-          toast.error("No se detectó el formato correcto en el Excel.");
+        if (headerRowIndex === -1) {
+          toast.error("ERROR DE FORMATO M7: No se detectó la fila de títulos.");
           return;
         }
 
-        const headers = rawData[headerIdx].map(h => String(h || '').trim().toLowerCase());
-        const findCol = (terms: string[]) => headers.findIndex(h => terms.some(t => h.includes(t)));
+        const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
+        const findIdx = (terms: string[]) => headers.findIndex(h => terms.some(t => h.toLowerCase().trim().includes(t.toLowerCase().trim())));
 
-        const iArt = findCol(['articulo', 'item', 'codigo', 'sku']);
-        const iCant = findCol(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
-        const iUnd = findCol(['um', 'und', 'unid', 'unidad']);
-        const iFactura = findCol(['remision', 'factura', 'documento', 'invoice']);
-        const iCiudad = findCol(['destino', 'ciudad', 'city']);
-        const iDir = findCol(['dirección', 'direccion', 'address']);
+        // Identificar tipo de plan automáticamente si no se forzó
+        const iExactUnOrig = headers.findIndex(h => h.toLowerCase().trim() === 'un orig');
+        const detectedType = iExactUnOrig !== -1 ? 'Plan Normal' : 'Plan R';
+        const finalType = forcedType || detectedType;
+
+        const isPlanR = finalType === 'Plan R';
+
+        // Mapeo selectivo según tipo detectado
+        const iArt = findIdx(['articulo', 'item', 'codigo', 'sku']);
+        const iCant = findIdx(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
+        const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
+        const iFactura = findIdx(['remision', 'factura', 'documento', 'invoice']);
+        const iCity = findIdx(['destino', 'ciudad', 'city']);
+        const iDir = findIdx(['dirección', 'direccion', 'address']);
+        const iVol = findIdx(isPlanR ? ['volumen'] : ['vol. total', 'total volume']);
 
         if (iArt === -1 || iCant === -1) {
-          toast.error("Faltan columnas obligatorias (Articulo/SKU o Cantidad).");
+          toast.error(`Faltan columnas críticas en ${finalType}.`);
           return;
         }
+
+        // Utilidad de parseo numérico (M7 Specs)
+        const parseNumberM7 = (raw: string, isR: boolean) => {
+          if (!raw || raw.trim() === '') return 0;
+          let val = raw.trim();
+          if (!isR) {
+              val = val.replace(/,/g, '.'); // Plan Normal: Coma es decimal
+          }
+          return parseFloat(val) || 0;
+        };
 
         const items: any[] = [];
         const consolidatedItems: any[] = [];
 
-        rawData.slice(headerIdx + 1).forEach(row => {
+        rawData.slice(headerRowIndex + 1).forEach(row => {
           const sku = String(row[iArt] || '').trim();
           if (!sku) return;
 
-          const qty = parseFloat(String(row[iCant] || '0').replace(/,/g, '.')) || 0;
+          const qty = parseNumberM7(String(row[iCant] || '0'), isPlanR);
+          let volVal = parseNumberM7(String(row[iVol] || '0'), isPlanR);
           
+          // Corrección de unidades de volumen
+          if (!isPlanR && volVal > 1000) volVal = volVal / 1000000;
+
           items.push({
             articleId: sku,
             expectedQty: qty,
             receivedQty: 0,
             unit: iUnd !== -1 ? String(row[iUnd]) : 'UND',
             invoice: iFactura !== -1 ? String(row[iFactura]) : '',
-            city: iCiudad !== -1 ? String(row[iCiudad]) : '',
-            address: iDir !== -1 ? String(row[iDir]) : ''
+            city: iCity !== -1 ? String(row[iCity]) : '',
+            address: iDir !== -1 ? String(row[iDir]) : '',
+            volume: String(volVal)
           });
 
           consolidatedItems.push({
             articleId: sku,
             expectedQty: qty,
             count1: 0,
-            count2: 0
+            count2: 0,
+            pickedQty: 0,
+            dispatchedQty: 0
           });
         });
 
         if (items.length === 0) {
-          toast.error("No se encontraron datos válidos en el archivo.");
+          toast.error("No se encontraron datos válidos.");
           return;
         }
 
-        // Sincronizar con Backend usando bulkCreateDocuments
-        // El backend hará upsert sobre el documento manual existente
-        const payload = {
+        api.bulkCreateDocuments({
           documents: [{
             ...doc,
             items,
             consolidatedItems,
-            planType: 'MANUAL', // Aseguramos que se mantenga como manual
+            planType: 'MANUAL',
             status: doc.status,
-            updatedBy: user.name
+            updatedBy: user.name,
+            inventoryNotes: `Sincro Excel ${finalType}: ${items.length} líneas`
           }]
-        };
-
-        api.bulkCreateDocuments(payload).then(res => {
+        }).then(res => {
           if (res.success) {
-            toast.success(`Referencia cargada: ${items.length} ítems configurados.`);
-            // Actualizar localmente
-            const updatedDocs = documents.map(d => 
-              d.id === doc.id ? { ...d, items, consolidatedItems } : d
-            );
-            onUpdateDocuments(updatedDocs);
+            toast.success(`¡ÉXITO! Se cargaron ${items.length} líneas como ${finalType}.`);
+            onUpdateDocuments(documents.map(d => d.id === doc.id ? { ...d, items, consolidatedItems, inventoryNotes: `Sincro Excel ${finalType}: ${items.length} líneas` } : d));
           } else {
             toast.error("Error al sincronizar: " + res.error);
           }
-        }).catch(err => {
-          console.error(err);
-          toast.error("Error de conexión al cargar referencia.");
-        });
+        }).catch(() => toast.error("Error de conexión."));
 
       } catch (err) {
-        console.error(err);
-        toast.error("Error al leer el archivo Excel.");
+        toast.error("Fallo crítico leyendo el archivo.");
       }
       e.target.value = '';
     };
@@ -416,18 +432,30 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                       {doc.status === DocStatus.INVENTORED ? 'INVENTARIADO' : (doc.status === DocStatus.COUNTING ? 'CONTINUAR' : 'AUDITAR')}
                     </button>
 
-                    {/* BOTÓN CARGA EXCEL PARA MANUALES (Visible en Pendientes e Historial) */}
+                    {/* BOTONES CARGA EXCEL PARA MANUALES (Plan Normal / Plan R) */}
                     {doc.planType === 'MANUAL' && (
-                      <label className="mt-2 w-full py-4 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-3 hover:bg-emerald-600 hover:text-white cursor-pointer active:scale-95">
-                        <Icons.Excel className="w-5 h-5" />
-                        Cargar Referencia Excel
-                        <input 
-                          type="file" 
-                          accept=".xlsx,.xls" 
-                          className="hidden" 
-                          onChange={(e) => handleManualExcelUpload(e, doc)} 
-                        />
-                      </label>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <label className="py-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-black text-[9px] uppercase tracking-tight transition-all shadow-sm flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white cursor-pointer active:scale-95 group">
+                          <Icons.Excel className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                          Plan Normal
+                          <input 
+                            type="file" 
+                            accept=".xlsx,.xls" 
+                            className="hidden" 
+                            onChange={(e) => handleManualExcelUpload(e, doc, 'Plan Normal')} 
+                          />
+                        </label>
+                        <label className="py-3 bg-blue-50 text-blue-600 border border-blue-100 rounded-2xl font-black text-[9px] uppercase tracking-tight transition-all shadow-sm flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white cursor-pointer active:scale-95 group">
+                          <Icons.Excel className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                          Plan R
+                          <input 
+                            type="file" 
+                            accept=".xlsx,.xls,.csv" 
+                            className="hidden" 
+                            onChange={(e) => handleManualExcelUpload(e, doc, 'Plan R')} 
+                          />
+                        </label>
+                      </div>
                     )}
 
                     {(!hasPermission(user, 'RECIBIDO_MATERIAL', 'create') && doc.status !== DocStatus.INVENTORED) && (
