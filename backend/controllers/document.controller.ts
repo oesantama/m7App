@@ -42,9 +42,18 @@ export const getDocuments = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
+    const user = (req as any).user;
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+
     if (clientId) {
       query += ` AND d.client_id = $1`;
       queryParams.push(clientId);
+    }
+
+    if (!isSuper) {
+       const allowedIds = user?.client_ids || [];
+       queryParams.push(allowedIds);
+       query += ` AND d.client_id = ANY($${queryParams.length}::text[])`;
     }
 
     query += ` ORDER BY d.created_at DESC`;
