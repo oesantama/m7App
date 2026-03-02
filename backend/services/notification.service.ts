@@ -19,21 +19,27 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export const sendEmail = async (to: string, subject: string, html: string) => {
+export const sendEmail = async (to: string | string[], subject: string, html: string, attachments?: any[]) => {
   if (process.env.EMAIL_ENABLED !== 'true') {
     console.log('[M7-EMAIL] Envío desactivado en .env');
     return;
   }
 
-  // 1. Intentar enviar vía Resend (API - Salta bloqueos de DigitalOcean)
+  const toList = Array.isArray(to) ? to : [to];
+
+  // 1. Intentar enviar vía Resend (API)
   if (resend) {
     try {
       const fromEmail = process.env.EMAIL_FROM || `M7 Apps <onboarding@resend.dev>`;
       const { data, error } = await resend.emails.send({
         from: fromEmail,
-        to: [to],
+        to: toList,
         subject,
         html,
+        attachments: attachments?.map(a => ({
+          filename: a.filename,
+          content: a.content.toString('base64'),
+        })),
       });
 
       if (error) throw error;
@@ -48,9 +54,13 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
   try {
     const info = await transporter.sendMail({
       from: `"Milla Siete (M7)" <${process.env.EMAIL_USER}>`,
-      to,
+      to: toList.join(', '),
       subject,
       html,
+      attachments: attachments?.map(a => ({
+        filename: a.filename,
+        content: a.content,
+      })),
     });
     console.log('[M7-EMAIL] Enviado vía SMTP: %s', info.messageId);
     return { success: true, messageId: info.messageId };

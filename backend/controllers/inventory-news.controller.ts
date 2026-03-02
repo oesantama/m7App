@@ -1,15 +1,18 @@
-
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import { sendEmail } from '../services/notification.service.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import fs from 'fs';
+import path from 'path';
 
 export const getNovedades = async (req: Request, res: Response) => {
     const { docId } = req.params;
     try {
         const result = await pool.query(`
-            SELECT n.*, a.sku as article_sku, a.name as article_name
+            SELECT n.*, COALESCE(a.sku, 'S/SKU') as article_sku, COALESCE(a.name, 'SIN NOMBRE') as article_name
             FROM inventory_news n
-            LEFT JOIN articles a ON n.article_id = a.id
+            LEFT JOIN articles a ON CAST(n.article_id AS TEXT) = CAST(a.id AS TEXT)
             WHERE n.document_id = $1
             ORDER BY n.created_at DESC
         `, [docId]);
@@ -22,7 +25,6 @@ export const getNovedades = async (req: Request, res: Response) => {
 export const saveNovedad = async (req: Request, res: Response) => {
     const { documentId, articleId, quantity, observation, photoUrls, userName } = req.body;
     try {
-        // Verificar si ya existe una novedad para este artículo en este documento
         const check = await pool.query(
             'SELECT id, quantity, observation, photo_urls FROM inventory_news WHERE document_id = $1 AND article_id = $2',
             [documentId, articleId]
@@ -62,55 +64,137 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         const doc = docRes.rows[0];
 
         const newsRes = await pool.query(`
-            SELECT n.*, a.sku as article_sku, a.name as article_name
+            SELECT n.*, COALESCE(a.sku, 'S/SKU') as article_sku, COALESCE(a.name, n.observation) as article_name
             FROM inventory_news n
-            LEFT JOIN articles a ON n.article_id = a.id
+            LEFT JOIN articles a ON CAST(n.article_id AS TEXT) = CAST(a.id AS TEXT)
             WHERE n.document_id = $1
+            ORDER BY n.created_at ASC
         `, [docId]);
         const news = newsRes.rows;
 
         if (news.length === 0) return res.status(400).json({ error: "No hay novedades para reportar" });
 
-        const newsHtml = news.map(n => `
-            <div style="margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
-                <h3 style="color: #0f172a; margin-bottom: 5px;">${n.article_sku} - ${n.article_name || 'Sin descripción'}</h3>
-                <p style="font-size: 14px; color: #64748b;"><strong>Cantidad:</strong> ${n.quantity}</p>
-                <p style="font-size: 14px; color: #64748b;"><strong>Observación:</strong> ${n.observation}</p>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                    ${(n.photo_urls || []).map((url: string) => `
-                        <img src="${url}" style="width: 200px; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd;" />
-                    `).join('')}
-                </div>
-            </div>
-        `).join('');
+        // GENERACIÓN DE PDF PROFESIONAL
+        const doc_pdf = new jsPDF() as any;
+        const pageWidth = doc_pdf.internal.pageSize.width;
 
-        const html = `
-            <!DOCTYPE html>
-            <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <div style="max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-                    <header style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">
-                        <h1 style="color: #0f172a; margin: 0;">Reporte de Novedades de Inventario</h1>
-                        <p style="color: #64748b; text-transform: uppercase; font-weight: bold; font-size: 12px;">Documento: ${doc.external_doc_id} | Placa: ${doc.vehicle_plate || 'S/A'}</p>
-                    </header>
-                    <section>
-                        ${newsHtml}
-                    </section>
-                    <footer style="margin-top: 40px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #eee; padding-top: 10px;">
-                        Generado automáticamente por OrbitM7 • ${new Date().toLocaleDateString()}
-                    </footer>
-                </div>
-            </body>
-            </html>
-        `;
-
-        const subject = `⚠️ REPORTE DE NOVEDADES: ${doc.external_doc_id || doc.externalDocId} [${doc.vehicle_data || doc.vehicleData || 'S/V'}]`;
+        // Banner Superior
+        doc_pdf.setFillColor(15, 23, 42); // Slate 900
+        doc_pdf.rect(0, 0, pageWidth, 40, 'F');
         
-        for (const email of targetEmails) {
-            await sendEmail(email, subject, html);
+        doc_pdf.setTextColor(255, 255, 255);
+        doc_pdf.setFontSize(22);
+        doc_pdf.setFont("helvetica", "bold");
+        doc_pdf.text("REPORTE DE NOVEDADES", 14, 20);
+        
+        doc_pdf.setFontSize(10);
+        doc_pdf.text(`DOCUMENTO: ${doc.external_doc_id || doc.externalDocId}`, 14, 30);
+        doc_pdf.text(`PLACA: ${doc.vehicle_data || doc.vehicleData || 'SIN PLACA'}`, 14, 35);
+        
+        doc_pdf.setFontSize(8);
+        doc_pdf.text(`GENERADO: ${new Date().toLocaleString()}`, pageWidth - 14, 35, { align: 'right' });
+
+        // Tabla de Contenido
+        const tableBody = news.map(n => [
+            n.article_sku,
+            n.article_name,
+            n.quantity.toString(),
+            n.observation,
+            n.user_name || 'N/A'
+        ]);
+
+        autoTable(doc_pdf, {
+            startY: 50,
+            head: [['SKU', 'DESCRIPCIÓN', 'CANT', 'OBSERVACIÓN', 'REGISTRÓ']],
+            body: tableBody,
+            headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            styles: { fontSize: 9, cellPadding: 4 },
+            columnStyles: {
+                0: { cellWidth: 25, fontStyle: 'bold' },
+                2: { cellWidth: 15, halign: 'center' },
+                4: { cellWidth: 25 }
+            }
+        });
+
+        // Galería de Fotos (Anexo)
+        let currentY = (doc_pdf as any).lastAutoTable.finalY + 15;
+        
+        doc_pdf.setTextColor(15, 23, 42);
+        doc_pdf.setFontSize(14);
+        doc_pdf.text("ANEXO FOTOGRÁFICO", 14, currentY);
+        currentY += 10;
+
+        const photoSize = 60;
+        const margin = 10;
+        let xPos = 14;
+
+        for (const n of news) {
+            if (n.photo_urls && n.photo_urls.length > 0) {
+                doc_pdf.setFontSize(9);
+                doc_pdf.setTextColor(100, 116, 139);
+                doc_pdf.text(`FOTOS: ${n.article_sku}`, xPos, currentY);
+                currentY += 5;
+
+                for (const url of n.photo_urls) {
+                    if (currentY + photoSize > 280) {
+                        doc_pdf.addPage();
+                        currentY = 20;
+                    }
+                    try {
+                        // Al ser base64, jspdf lo maneja directamente
+                        doc_pdf.addImage(url, 'JPEG', xPos, currentY, photoSize, photoSize);
+                        xPos += photoSize + margin;
+                        if (xPos + photoSize > pageWidth) {
+                            xPos = 14;
+                            currentY += photoSize + margin;
+                        }
+                    } catch (e) {
+                        console.warn("No se pudo añadir imagen al PDF", e);
+                    }
+                }
+                if (xPos !== 14) {
+                    xPos = 14;
+                    currentY += photoSize + margin;
+                }
+            }
         }
 
-        res.json({ success: true, message: "Reporte enviado correctamente" });
+        const pdfBuffer = Buffer.from(doc_pdf.output('arraybuffer'));
+
+        // CUERPO DEL CORREO SIMPLIFICADO
+        const subject = `⚠️ REPORTE DE NOVEDADES: ${doc.external_doc_id || doc.externalDocId} | ${doc.vehicle_data || doc.vehicleData || 'SIN PLACA'}`;
+        const html = `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+                <div style="background-color: #0f172a; padding: 24px; text-align: center; color: white;">
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.025em;">REPORTE DE NOVEDADES</h1>
+                </div>
+                <div style="padding: 32px; line-height: 1.6;">
+                    <p style="margin-top: 0;">Estimado(a),</p>
+                    <p>Se ha generado el <strong>Reporte Oficial de Novedades</strong> correspondiente a la siguiente operación:</p>
+                    <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin: 20px 0; border: 1px solid #f1f5f9;">
+                        <p style="margin: 0; font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase;">Documento</p>
+                        <p style="margin: 4px 0 12px 0; font-size: 16px; font-weight: 800; color: #0f172a;">${doc.external_doc_id || doc.externalDocId}</p>
+                        <p style="margin: 0; font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase;">Vehículo</p>
+                        <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 800; color: #0f172a;">${doc.vehicle_data || doc.vehicleData || 'SIN PLACA'}</p>
+                    </div>
+                    <p>Encontrará adjunto a este correo el documento PDF con el detalle de los artículos, cantidades, observaciones y sus respectivos anexos fotográficos.</p>
+                    <p style="margin-bottom: 0;">Si tiene alguna duda sobre esta información, por favor contacte al equipo de auditoría.</p>
+                </div>
+                <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8;">
+                    Este es un correo automático generado por el sistema OrbitM7. Por favor no responda.
+                </div>
+            </div>
+        `;
+
+        await sendEmail(targetEmails, subject, html, [
+            {
+                filename: `Reporte_Novedades_${doc.externalDocId || doc.external_doc_id}.pdf`,
+                content: pdfBuffer
+            }
+        ]);
+
+        res.json({ success: true, message: "Reporte enviado correctamente con PDF adjunto" });
     } catch (err: any) {
         console.error('[REPORT-ERROR]', err);
         res.status(500).json({ error: "Error al enviar reporte", details: err.message });
