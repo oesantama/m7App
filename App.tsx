@@ -674,6 +674,7 @@ const App: React.FC = () => {
             user={user!}
             masterEstados={allMasterData.masterEstados || []}
             masterNotificaciones={allMasterData.masterNotificaciones || []}
+            masterTipoNotificacion={allMasterData.masterTipoNotificacion || []}
             masterArticulo={allMasterData.masterArticulo || []}
             onAddArticleToMaster={async (article) => {
               await api.saveArticle(article);

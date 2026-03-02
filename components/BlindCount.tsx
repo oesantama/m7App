@@ -7,6 +7,7 @@ import { Article, DocumentL, DocumentLItem, MasterRecord, DocStatus } from '../t
 interface BlindCountProps {
   document: DocumentL;
   masterNotificaciones: MasterRecord[];
+  masterTipoNotificacion: MasterRecord[];
   masterArticulo: MasterRecord[];
   onConfirm: (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => void;
   onPartialSave: (currentItems: DocumentLItem[], generalObs: string) => void;
@@ -18,6 +19,7 @@ interface BlindCountProps {
 const BlindCount: React.FC<BlindCountProps> = ({
   document: docL,
   masterNotificaciones,
+  masterTipoNotificacion,
   masterArticulo,
   onConfirm,
   onPartialSave,
@@ -276,16 +278,36 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
   const proceedToFinalize = () => {
     setShowConfirmDialog(false);
-    // Buscar notificación específica "inventario ajover"
-    const targetNotif = masterNotificaciones.find(n =>
-      n.name?.trim().toLowerCase() === 'inventario ajover' &&
-      n.statusId === 'EST-01'
-    );
+    
+    // 1. Identificar el ID del tipo de notificación "INVENTARIO AJOVER"
+    const typeId = masterTipoNotificacion.find(t => 
+      t.name?.trim().toUpperCase() === 'INVENTARIO AJOVER'
+    )?.id;
 
-    if (!targetNotif || !targetNotif.notificationEmail) {
-      setShowEmailInput(true);
+    // 2. Buscar si hay alertas activas de ese tipo con correos válidos (Validación Mayúsculas/Minúsculas)
+    const activeNotifs = masterNotificaciones.filter(n => {
+      const isCorrectType = n.tipo_notificacion_id === typeId || n.tipoNotificacionId === typeId;
+      const isActive = n.statusId === 'EST-01' || n.status?.toUpperCase() === 'ACTIVO' || n.statusId === 'ACTIVO';
+      return isCorrectType && isActive && n.notificationEmail;
+    });
+
+    if (activeNotifs.length === 0) {
+      // Fallback: búsqueda por nombre si no se encontró por ID de tipo (por seguridad)
+      const fallbackNotif = masterNotificaciones.find(n =>
+        n.name?.trim().toUpperCase().includes('INVENTARIO') &&
+        n.notificationEmail &&
+        (n.statusId === 'EST-01' || n.status?.toUpperCase() === 'ACTIVO')
+      );
+
+      if (!fallbackNotif) {
+        setShowEmailInput(true);
+        return;
+      }
+      finalizeProcess(fallbackNotif.notificationEmail);
     } else {
-      finalizeProcess(targetNotif.notificationEmail);
+      // Si hay al menos una activa del tipo correcto, el servidor enviará a todos
+      // Le mandamos el primero como referencia pero el backend iterará por todos los del tipo
+      finalizeProcess(activeNotifs[0].notificationEmail!);
     }
   };
 

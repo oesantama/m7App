@@ -13,6 +13,7 @@ interface RecibidoMaterialProps {
   user: User;
   masterEstados: MasterRecord[];
   masterNotificaciones: MasterRecord[];
+  masterTipoNotificacion: MasterRecord[];
   masterArticulo: MasterRecord[];
   onUpdateDocuments: (docs: DocumentL[]) => void;
   onAddArticleToMaster: (article: Article) => void;
@@ -21,7 +22,10 @@ interface RecibidoMaterialProps {
 }
 
 const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
-  documents, user, masterEstados, masterNotificaciones, masterArticulo, onUpdateDocuments, onAddArticleToMaster, onAddNotificationToMaster, onUpdateNotificationEmail
+  documents, user, masterEstados, masterNotificaciones,
+  masterTipoNotificacion,
+  masterArticulo,
+  onUpdateDocuments, onAddArticleToMaster, onAddNotificationToMaster, onUpdateNotificationEmail
 }) => {
   const [selectedDocForCount, setSelectedDocForCount] = useState<DocumentL | null>(null);
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
@@ -155,6 +159,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           <BlindCount
             document={selectedDocForCount}
             masterNotificaciones={masterNotificaciones}
+            masterTipoNotificacion={masterTipoNotificacion}
             masterArticulo={masterArticulo}
             onConfirm={handleFinishCount}
             onPartialSave={handlePartialSave}

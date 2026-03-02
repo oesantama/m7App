@@ -175,17 +175,21 @@ export const syncInventory = async (req: Request, res: Response) => {
     // 4. ENVÍO DE NOTIFICACIÓN INTELIGENTE (Solo si no es parcial / Cierre Final)
     if (!isPartial) {
       try {
-        // A. Consultar ID de Tipo de Notificación desde 'inventario ajover'
+        // A. Consultar TODOS los correos activos para el tipo 'INVENTARIO AJOVER'
         const configRes = await pool.query(`
-          SELECT tipo_notificacion_id, notification_email 
-          FROM master_records 
-          WHERE name ILIKE 'inventario ajover' AND category = 'masterNotificaciones' 
-          LIMIT 1
+          SELECT mr.notification_email, mr.tipo_notificacion_id
+          FROM master_records mr
+          JOIN tipos_notificacion tn ON mr.tipo_notificacion_id = tn.id
+          WHERE tn.name ILIKE 'INVENTARIO AJOVER' 
+          AND mr.status_id = 'EST-01'
+          AND mr.category = 'masterNotificaciones'
         `);
 
-        const config = configRes.rows[0];
-        const tipoId = config?.tipo_notificacion_id || 'TGN-EMAIL';
-        const targetEmail = driverEmail || config?.notification_email;
+        const configs = configRes.rows;
+        const targetEmails: string[] = configs.map(c => c.notification_email).filter(e => e);
+        if (driverEmail && !targetEmails.includes(driverEmail)) targetEmails.push(driverEmail);
+
+        const tipoId = configs[0]?.tipo_notificacion_id || 'TGN-EMAIL';
 
         // B. Generar y Enviar Correo (Notificación Inteligente Ajover)
         const itemsWithDiscrepancies = items.filter((it: any) => {
@@ -297,20 +301,26 @@ export const syncInventory = async (req: Request, res: Response) => {
           </div>
         `;
 
-        if (targetEmail) {
+        if (targetEmails.length > 0) {
           const { sendEmail } = await import('../services/notification.service.js');
-          console.log(`[M7-NOTIF] Iniciando envío de correo a: ${targetEmail}`);
-          await sendEmail(targetEmail, subject, html);
+          console.log(`[M7-NOTIF] Iniciando envío de correos a: ${targetEmails.join(', ')}`);
+          
+          for (const targetEmail of targetEmails) {
+            try {
+              await sendEmail(targetEmail, subject, html);
+            } catch (innerErr: any) {
+              console.error(`[M7-NOTIF-ERR] Falló envío a ${targetEmail}:`, innerErr.message);
+            }
+          }
 
-          // C. Registrar log
+          // C. Registrar log de uno de los envíos (Referencial)
           const notifLogId = `NOT-${Date.now()}`;
           const notifTypeToSave = tipoId || 'TGN-EMAIL';
 
           await pool.query(`
                 INSERT INTO master_records (id, category, name, description, notification_email, tipo_notificacion_id, status_id)
                 VALUES ($1, 'masterNotificaciones', 'LOG_INVENTARIO', $2, $3, $4, 'EST-01')
-            `, [notifLogId, `RECIBO ${docL.external_doc_id || docL.externalDocId} - ${hasDiscrepancies ? 'CON NOVEDADES' : 'OK'}`, targetEmail, notifTypeToSave]);
-
+            `, [notifLogId, `RECIBO ${docL.external_doc_id || docL.externalDocId} - ${hasDiscrepancies ? 'CON NOVEDADES' : 'OK'}`, targetEmails[0], notifTypeToSave]);
         }
       } catch (notifErr: any) {
         console.error('[M7-NOTIF-ERROR]', notifErr.message);
