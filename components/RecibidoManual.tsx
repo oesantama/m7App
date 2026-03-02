@@ -131,6 +131,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
       <div className="w-full h-full flex flex-col overflow-hidden">
         <BlindCount
           document={selectedDocForCount}
+          user={user}
           masterNotificaciones={masterNotificaciones}
           masterTipoNotificacion={masterTipoNotificacion}
           masterArticulo={masterArticulo}
@@ -146,7 +147,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
   }
 
   return (
-    <div className="p-8 h-full flex flex-col bg-slate-50 overflow-hidden">
+    <div className="p-4 md:p-8 h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar">
       <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1 min-h-0">
         
         {/* PANEL IZQUIERDA: CREAR NUEVO */}

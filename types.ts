@@ -152,6 +152,7 @@ export interface DocumentL extends AuditBase {
 
 export interface DocumentLItem {
   articleId: string;
+  sku?: string;
   expectedQty: number; 
   countedQty: number;
   count1?: number; 

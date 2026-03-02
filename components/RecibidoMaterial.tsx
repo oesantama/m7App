@@ -176,6 +176,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         <div className="w-full h-full flex flex-col overflow-hidden flex-1">
           <BlindCount
             document={selectedDocForCount}
+            user={user}
             masterNotificaciones={masterNotificaciones}
             masterTipoNotificacion={masterTipoNotificacion}
             masterArticulo={masterArticulo}
