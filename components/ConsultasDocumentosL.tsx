@@ -326,7 +326,18 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      <button onClick={() => setSelectedDoc(doc)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all"><Icons.Eye className="w-4 h-4" /></button>
+                      <button onClick={() => setSelectedDoc(doc)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all" title="Ver Detalle"><Icons.Eye className="w-4 h-4" /></button>
+                      
+                      {doc.status === DocStatus.INVENTORED && (
+                        <button 
+                          onClick={() => handleResendClick(doc)}
+                          className="p-3 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
+                          title="Reenviar Correo"
+                        >
+                          <Icons.Send className="w-4 h-4" />
+                        </button>
+                      )}
+
                       <button 
                         onClick={() => { 
                           if ((doc as any).paymentsCount > 0) {
@@ -346,6 +357,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                         <button 
                           onClick={() => handleDeleteDocument(doc.id)} 
                           className="p-3 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
+                          title="Eliminar"
                         >
                           <Icons.Trash className="w-4 h-4" />
                         </button>

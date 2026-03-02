@@ -20,6 +20,7 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
     const [activeInvoice, setActiveInvoice] = useState<any | null>(null); // Detail view
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [selectedHelpers, setSelectedHelpers] = useState<User[]>([]);
+    const [helperSearch, setHelperSearch] = useState('');
     
     // Picking Progress
     const [confirmedItems, setConfirmedItems] = useState<string[]>([]); // SKU list
@@ -71,6 +72,15 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
     const helpersList = useMemo(() => {
         return allUsers.filter(u => u.id !== user.id);
     }, [allUsers, user.id]);
+
+    const filteredHelpers = useMemo(() => {
+        if (!helperSearch) return helpersList;
+        const lower = helperSearch.toLowerCase();
+        return helpersList.filter(u => 
+            (u.name || '').toLowerCase().includes(lower) ||
+            (u.role || '').toLowerCase().includes(lower)
+        );
+    }, [helpersList, helperSearch]);
 
     const handleItemToggle = (uiId: string) => {
         setConfirmedItems(prev => 
@@ -240,8 +250,22 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
                                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">¿Con quién más realizó este alistado? (Opcional)</p>
                             </div>
 
+                            {/* BUSCADOR DE AYUDANTES */}
+                            <div className="px-2">
+                                <div className="relative group">
+                                    <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="BUSCAR POR NOMBRE O ROL..." 
+                                        value={helperSearch}
+                                        onChange={(e) => setHelperSearch(e.target.value)}
+                                        className="w-full pl-11 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-3xl text-[10px] font-black text-slate-900 uppercase outline-none focus:border-emerald-500 focus:bg-white shadow-sm transition-all"
+                                    />
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-64 overflow-y-auto p-2 custom-scrollbar">
-                                {helpersList.map(h => (
+                                {filteredHelpers.map(h => (
                                     <button 
                                         key={h.id}
                                         onClick={() => {
