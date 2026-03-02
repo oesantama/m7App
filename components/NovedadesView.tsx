@@ -9,6 +9,7 @@ interface Novedad {
     id: number;
     document_id: string;
     article_id: string;
+    article_sku?: string;
     article_name?: string;
     quantity: number;
     observation: string;
@@ -84,7 +85,7 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
         if (quantity <= 0) return toast.error("Ingrese una cantidad válida");
         if (!observation) return toast.error("Ingrese una observación");
 
-        const existing = novedades.find(n => n.article_id === selectedArticle.sku);
+        const existing = novedades.find(n => n.article_sku === selectedArticle.sku);
         if (existing) {
             if (!confirm(`El artículo ${selectedArticle.sku} ya tiene novedades registradas. ¿Desea ADICIONAR esta información al registro existente?`)) {
                 return;
@@ -95,7 +96,7 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
         try {
             const res = await api.saveNovedad({
                 documentId: selectedDoc.id,
-                articleId: selectedArticle.sku,
+                articleId: selectedArticle.id, // CORRECCIÓN: Usar .id en lugar de .sku para la DB
                 quantity,
                 observation,
                 photoUrls: photos,
@@ -159,9 +160,9 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                     </div>
                 </div>
 
-                <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
+                <div className="flex-1 flex flex-col lg:flex-row p-2 md:p-4 gap-4 overflow-y-auto lg:overflow-hidden custom-scrollbar">
                     {/* Formulario Izquierda */}
-                    <div className="w-full lg:w-5/12 bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col space-y-4 overflow-y-auto custom-scrollbar">
+                    <div className="w-full lg:w-5/12 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 flex flex-col space-y-4 shrink-0 lg:overflow-y-auto custom-scrollbar">
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight border-b border-slate-50 pb-2">Nueva Novedad</h3>
                         
                         <div className="space-y-4">
@@ -218,7 +219,15 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                     >
                                         <Icons.Plus className="w-3 h-3" /> ADJUNTAR
                                     </button>
-                                    <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                                    <input 
+                                        type="file" 
+                                        multiple 
+                                        accept="image/*" 
+                                        capture="environment" 
+                                        ref={fileInputRef} 
+                                        onChange={handleFileChange} 
+                                        className="hidden" 
+                                    />
                                 </div>
                             </div>
 
@@ -277,7 +286,7 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                 <div key={n.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-3">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-[9px] font-black text-blue-600 uppercase">{n.article_id}</p>
+                                            <p className="text-[9px] font-black text-blue-600 uppercase">{n.article_sku}</p>
                                             <p className="text-xs font-black text-slate-900 uppercase leading-none mt-1">{n.article_name || 'Sin descripción'}</p>
                                         </div>
                                         <div className="text-right">

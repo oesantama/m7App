@@ -7,7 +7,7 @@ export const getNovedades = async (req: Request, res: Response) => {
     const { docId } = req.params;
     try {
         const result = await pool.query(`
-            SELECT n.*, a.name as article_name
+            SELECT n.*, a.sku as article_sku, a.name as article_name
             FROM inventory_news n
             LEFT JOIN articles a ON n.article_id = a.id
             WHERE n.document_id = $1
@@ -62,7 +62,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         const doc = docRes.rows[0];
 
         const newsRes = await pool.query(`
-            SELECT n.*, a.name as article_name
+            SELECT n.*, a.sku as article_sku, a.name as article_name
             FROM inventory_news n
             LEFT JOIN articles a ON n.article_id = a.id
             WHERE n.document_id = $1
@@ -73,7 +73,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
 
         const newsHtml = news.map(n => `
             <div style="margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px;">
-                <h3 style="color: #0f172a; margin-bottom: 5px;">${n.article_id} - ${n.article_name || 'Sin descripción'}</h3>
+                <h3 style="color: #0f172a; margin-bottom: 5px;">${n.article_sku} - ${n.article_name || 'Sin descripción'}</h3>
                 <p style="font-size: 14px; color: #64748b;"><strong>Cantidad:</strong> ${n.quantity}</p>
                 <p style="font-size: 14px; color: #64748b;"><strong>Observación:</strong> ${n.observation}</p>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
