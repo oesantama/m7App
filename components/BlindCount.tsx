@@ -735,25 +735,25 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 <Icons.Excel className="w-3.5 h-3.5" /> XLS
               </button>
 
-              {/* UNIT COUNTER (NEW) */}
-              <div className="flex items-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-lg border border-white/10 shrink-0">
-                <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Total:</span>
-                <span className="text-sm font-black text-white">{totalUnits}</span>
-                <span className="text-[7px] font-bold text-slate-400 uppercase">Unds</span>
-              </div>
-
               {/* LAST SCAN FEEDBACK (IMAGEN 2) */}
               {lastScan && (
-                <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 animate-in slide-in-from-left-4 shadow-sm shrink-0 ${lastScan.status === 'success' ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${lastScan.status === 'success' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-red-500 text-white shadow-sm'}`}>
-                    {lastScan.status === 'success' ? <Icons.Check className="w-4 h-4" /> : <Icons.Alert className="w-4 h-4" />}
+                <div className={`px-4 py-2 rounded-2xl border flex items-center gap-3 animate-in slide-in-from-left-4 shadow-xl shrink-0 ${lastScan.status === 'success' ? 'bg-white border-slate-100' : 'bg-red-50 border-red-100'}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-lg ${lastScan.status === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                    {lastScan.status === 'success' ? <Icons.Check className="w-5 h-5" /> : <Icons.Alert className="w-5 h-5" />}
                   </div>
-                  <div className="min-w-0">
-                    <p className={`font-black text-[9px] uppercase truncate ${lastScan.status === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>{lastScan.message}</p>
+                  <div className="min-w-0 pr-2">
+                    <p className={`font-black text-[8px] uppercase tracking-widest mb-1 ${lastScan.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {lastScan.status === 'success' ? 'NUEVO ITEM AGREGADO: ' : 'ERROR: '} {lastScan.message}
+                    </p>
                     {lastScan.article && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[12px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{lastScan.article.id}</span>
-                        <span className="text-xl font-black text-slate-900 leading-none">{counts[lastScan.article.id]} <span className="text-[7px] text-slate-400">UNDS</span></span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[12px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">
+                          {lastScan.article.id}
+                        </span>
+                        <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl shadow-lg border border-white/10 shrink-0">
+                          <span className="text-xl font-black text-white leading-none">{counts[lastScan.article.id]}</span>
+                          <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">UNDS</span>
+                        </div>
                       </div>
                     )}
                   </div>
