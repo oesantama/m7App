@@ -41,6 +41,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'deletion_logs': ['table_name', 'record_id', 'record_data', 'deleted_by', 'deleted_at'],
   'vehicle_locations': ['vehicle_id', 'driver_id', 'latitude', 'longitude', 'accuracy', 'speed', 'heading', 'updated_at', 'timestamp'],
   'document_consolidated_items': ['document_id', 'article_id', 'count_1', 'count_2', 'inventory_user', 'inventory_observation', 'expected_qty', 'picked_qty', 'dispatched_qty'],
+  'inventario_clientes': ['client_id', 'article_id', 'batch', 'quantity', 'last_user', 'last_updated'],
   'training_categories': ['name', 'description', 'created_at'],
   'training_courses': ['category_id', 'title', 'description', 'cover_image', 'level', 'status_id', 'created_at'],
   'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', '"order"', 'created_at'],
@@ -141,6 +142,51 @@ const healSchema = async (client: any) => {
         }
       }
     } catch (e) {}
+  }
+
+  // FASE ESPECIAL: LIMPIEZA DE DUPLICADOS PARA ON CONFLICT (ESTABILIDAD NUCLEAR)
+  try {
+    console.log('[M7-DB-HEAL] Limpiando duplicados para estabilidad ON CONFLICT...');
+    
+    // Limpiar document_consolidated_items
+    await client.query(`
+      DELETE FROM document_consolidated_items a USING (
+        SELECT MIN(ctid) as keepid, document_id, article_id
+        FROM document_consolidated_items
+        GROUP BY document_id, article_id HAVING COUNT(*) > 1
+      ) b
+      WHERE a.document_id = b.document_id 
+        AND a.article_id = b.article_id 
+        AND a.ctid > b.keepid
+    `);
+
+    // Limpiar inventario_clientes
+    await client.query(`
+      DELETE FROM inventario_clientes a USING (
+        SELECT MIN(ctid) as keepid, client_id, article_id, batch
+        FROM inventario_clientes
+        GROUP BY client_id, article_id, batch HAVING COUNT(*) > 1
+      ) b
+      WHERE a.client_id = b.client_id 
+        AND a.article_id = b.article_id 
+        AND a.batch = b.batch
+        AND a.ctid > b.keepid
+    `);
+
+    console.log('[M7-DB-HEAL] Creando restricciones UNIQUE definitivas...');
+    
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS unq_doc_art_consolidated 
+      ON document_consolidated_items (document_id, article_id)
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS unq_inv_cli_batch 
+      ON inventario_clientes (client_id, article_id, batch)
+    `);
+
+  } catch (e: any) {
+    console.error('[M7-DB-HEAL] Error en fase de estabilidad nuclear:', e.message);
   }
 };
 
