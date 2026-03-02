@@ -149,20 +149,20 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
         return (
             <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
                 {/* Cabecera del Documento Seleccionado */}
-                <div className="bg-slate-900 p-6 text-white flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => setSelectedDoc(null)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><Icons.ChevronRight className="rotate-180 w-6 h-6" /></button>
+                <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0 border-b border-white/5">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setSelectedDoc(null)} className="p-2 hover:bg-white/10 rounded-lg transition-all"><Icons.ChevronRight className="rotate-180 w-5 h-5" /></button>
                         <div>
-                            <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">{selectedDoc.externalDocId}</h2>
-                            <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Registrando Novedades | {selectedDoc.vehicleData || 'S/A'}</p>
+                            <h2 className="text-lg font-black uppercase tracking-tight leading-none">{selectedDoc.externalDocId}</h2>
+                            <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Novedades | {selectedDoc.vehicleData || 'SIN PLACA'}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 flex flex-col lg:flex-row p-8 gap-8 overflow-hidden">
+                <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
                     {/* Formulario Izquierda */}
-                    <div className="w-full lg:w-1/2 bg-white rounded-[3rem] p-10 shadow-xl border border-slate-100 flex flex-col space-y-6 overflow-y-auto custom-scrollbar">
-                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Nueva Novedad</h3>
+                    <div className="w-full lg:w-5/12 bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col space-y-4 overflow-y-auto custom-scrollbar">
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight border-b border-slate-50 pb-2">Nueva Novedad</h3>
                         
                         <div className="space-y-4">
                             <div className="relative">
@@ -200,35 +200,35 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-2">Cantidad</label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">Cantidad</label>
                                     <input 
                                         type="number" 
                                         value={quantity}
                                         onChange={e => setQuantity(Number(e.target.value))}
-                                        className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs outline-none focus:border-emerald-500 transition-all"
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xs outline-none focus:border-blue-500 transition-all"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-2">Fotos ({photos.length})</label>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">Fotos ({photos.length})</label>
                                     <button 
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-full p-4 bg-emerald-50 text-emerald-600 border-2 border-dashed border-emerald-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                                        className="w-full p-3 bg-slate-50 text-slate-600 border border-dashed border-slate-300 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
                                     >
-                                        <Icons.Plus className="w-4 h-4" /> Adjuntar Fotos
+                                        <Icons.Plus className="w-3 h-3" /> ADJUNTAR
                                     </button>
                                     <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-2">Observación de Novedad</label>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">Observación</label>
                                 <textarea 
                                     value={observation}
                                     onChange={e => setObservation(e.target.value)}
-                                    placeholder="DETALLE LA NOVEDAD..."
-                                    className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 transition-all resize-none h-32"
+                                    placeholder="DETALLE..."
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xs uppercase outline-none focus:border-blue-500 transition-all resize-none h-24"
                                 />
                             </div>
 
@@ -251,56 +251,56 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                             <button 
                                 onClick={handleSaveNovedad}
                                 disabled={isLoading || !selectedArticle}
-                                className="w-full py-5 bg-slate-900 text-white rounded-[2.5rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-2xl disabled:opacity-20 active:scale-95 flex items-center justify-center gap-3"
+                                className="w-full py-4 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md disabled:opacity-20 active:scale-95 flex items-center justify-center gap-2"
                             >
-                                {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Icons.Plus className="w-5 h-5" />}
-                                Guardar Novedad
+                                {isLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Icons.Plus className="w-4 h-4" />}
+                                GUARDAR REGISTRO
                             </button>
                         </div>
                     </div>
 
                     {/* Listado Derecha */}
-                    <div className="w-full lg:w-1/2 flex flex-col space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Novedades Registradas</h3>
+                    <div className="w-full lg:w-7/12 flex flex-col space-y-4">
+                        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Reporte Actual ({novedades.length})</h3>
                             <button 
                                 onClick={handleSendReport}
                                 disabled={novedades.length === 0 || isLoading}
-                                className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-20"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-20"
                             >
-                                <Icons.Send className="w-4 h-4" /> Enviar Reporte
+                                <Icons.Send className="w-3 h-3" /> ENVIAR REPORTE
                             </button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
                             {novedades.map(n => (
-                                <div key={n.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all space-y-4">
+                                <div key={n.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-3">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-[10px] font-black text-emerald-500 uppercase">{n.article_id}</p>
-                                            <p className="text-sm font-black text-slate-900 uppercase leading-none mt-1">{n.article_name || 'Sin descripción'}</p>
+                                            <p className="text-[9px] font-black text-blue-600 uppercase">{n.article_id}</p>
+                                            <p className="text-xs font-black text-slate-900 uppercase leading-none mt-1">{n.article_name || 'Sin descripción'}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-lg font-black text-slate-900 leading-none">{n.quantity}</p>
-                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Unidades</p>
+                                            <p className="text-base font-black text-slate-900 leading-none">{n.quantity}</p>
+                                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Unidades</p>
                                         </div>
                                     </div>
-                                    <p className="text-[11px] text-slate-500 font-bold uppercase leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100">{n.observation}</p>
+                                    <p className="text-[10px] text-slate-600 font-bold uppercase leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 italic">"{n.observation}"</p>
                                     {n.photo_urls && n.photo_urls.length > 0 && (
-                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                        <div className="flex gap-2 overflow-x-auto pb-1">
                                             {n.photo_urls.map((url, i) => (
                                                 <img 
                                                     key={i} 
                                                     src={url} 
-                                                    className="w-24 h-24 object-cover rounded-xl border border-slate-100 hover:scale-105 transition-all cursor-zoom-in"
+                                                    className="w-16 h-16 object-cover rounded-lg border border-slate-200 hover:scale-105 transition-all cursor-zoom-in"
                                                     onClick={() => window.open(url, '_blank')}
                                                 />
                                             ))}
                                         </div>
                                     )}
-                                    <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-                                        <p className="text-[8px] text-slate-400 font-black uppercase">Responsable: {n.user_name}</p>
-                                        <p className="text-[8px] text-slate-400 font-black uppercase">{new Date(n.created_at).toLocaleString()}</p>
+                                    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                                        <p className="text-[7px] text-slate-400 font-black uppercase">{n.user_name}</p>
+                                        <p className="text-[7px] text-slate-400 font-black uppercase">{new Date(n.created_at).toLocaleString()}</p>
                                     </div>
                                 </div>
                             ))}
@@ -318,25 +318,25 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     }
 
     return (
-        <div className="p-8 h-full flex flex-col bg-slate-50 overflow-hidden">
-            <div className="max-w-4xl mx-auto w-full flex flex-col h-full space-y-8 animate-in fade-in duration-500">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg"><Icons.Alert className="w-8 h-8" /></div>
+        <div className="p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
+            <div className="max-w-4xl mx-auto w-full flex flex-col h-full space-y-4 animate-in fade-in duration-500">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg"><Icons.Alert className="w-5 h-5" /></div>
                     <div>
-                        <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Gestión de Novedades</h2>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reporte de daños, faltantes y evidencias multimedia</p>
+                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Gestión de Novedades</h2>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Auditoría de averías y faltantes</p>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-100 flex-1 flex flex-col min-h-0 overflow-hidden">
-                    <div className="relative mb-8">
-                        <Icons.Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5" />
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div className="relative mb-6">
+                        <Icons.Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
                         <input 
                             type="text" 
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
-                            placeholder="BUSCAR DOCUMENTO POR ID O PLACA..."
-                            className="w-full pl-16 pr-6 py-6 bg-slate-50 border-2 border-slate-100 rounded-[2rem] text-slate-900 font-black text-sm outline-none focus:border-blue-600 transition-all shadow-inner"
+                            placeholder="DOCUMENTO O PLACA..."
+                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-black text-xs outline-none focus:border-blue-600 transition-all shadow-inner"
                         />
                     </div>
 
@@ -345,15 +345,15 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                             <button
                                 key={doc.id}
                                 onClick={() => handleSelectDoc(doc)}
-                                className="w-full p-6 bg-white hover:bg-slate-50 border-2 border-slate-50 rounded-[2.5rem] text-left transition-all group flex items-center justify-between gap-6 shadow-sm hover:shadow-md"
+                                className="w-full p-4 bg-white hover:bg-slate-50 border border-slate-100 rounded-xl text-left transition-all group flex items-center justify-between gap-4 shadow-sm hover:shadow-md"
                             >
                                 <div className="min-w-0">
-                                    <p className="text-[10px] font-black text-blue-600 uppercase mb-1">{doc.externalDocId}</p>
-                                    <p className="text-xl font-black text-slate-900 uppercase tracking-tighter truncate">{doc.vehicleData || 'S/A'}</p>
-                                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">{new Date(doc.createdAt).toLocaleDateString()}</p>
+                                    <p className="text-[9px] font-black text-blue-600 uppercase mb-0.5">{doc.externalDocId}</p>
+                                    <p className="text-base font-black text-slate-900 uppercase tracking-tighter truncate">{doc.vehicleData || 'SIN PLACA'}</p>
+                                    <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">{doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : 'FECHA S/A'}</p>
                                 </div>
-                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-600/10 transition-all shrink-0">
-                                    <Icons.ChevronRight className="w-6 h-6" />
+                                <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-600/10 transition-all shrink-0 border border-slate-100">
+                                    <Icons.ChevronRight className="w-5 h-5" />
                                 </div>
                             </button>
                         ))}
