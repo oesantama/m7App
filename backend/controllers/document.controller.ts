@@ -201,13 +201,14 @@ export const syncInventory = async (req: Request, res: Response) => {
 
         const hasDiscrepancies = itemsWithDiscrepancies.length > 0;
         const subject = hasDiscrepancies
-          ? `⚠️ NOVEDADES EN RECIBO: ${docL.external_doc_id || docL.externalDocId} [${docL.vehicle_plate || docL.vehicleData || 'S/V'}]`
-          : `✅ RECIBO CONFORME: ${docL.external_doc_id || docL.externalDocId} [${docL.vehicle_plate || docL.vehicleData || 'S/V'}]`;
+          ? `⚠️ NOVEDADES EN RECIBIDO INVENTARIO AJOVER: ${docL.external_doc_id || docL.externalDocId} [${docL.vehicle_plate || docL.vehicleData || 'S/V'}]`
+          : `✅ RECIBIDO INVENTARIO AJOVER: ${docL.external_doc_id || docL.externalDocId} [${docL.vehicle_plate || docL.vehicleData || 'S/V'}]`;
 
         const tableRows = (hasDiscrepancies ? itemsWithDiscrepancies : items).map((it: any) => {
-          const counted = Number(it.count2 || it.countedQty || 0);
+          const count1 = Number(it.count1 || 0);
+          const count2 = Number(it.count2 || it.countedQty || 0);
           const expected = Number(it.expectedQty || 0);
-          const diff = counted - expected;
+          const diff = count2 - expected;
           const diffColor = diff < 0 ? '#ef4444' : (diff > 0 ? '#f59e0b' : '#10b981');
           const diffPrefix = diff > 0 ? '+' : '';
 
@@ -217,9 +218,9 @@ export const syncInventory = async (req: Request, res: Response) => {
                   ${it.articleId}
                   <div style="font-size: 9px; color: #94a3b8; font-weight: normal;">${it.unCode || '-'}</div>
                 </td>
-                <td style="padding: 12px; font-size: 10px; color: #64748b;">${it.clientRef || 'S/R'}</td>
                 <td style="padding: 12px; font-size: 12px; color: #64748b; text-align: center;">${expected}</td>
-                <td style="padding: 12px; font-size: 12px; color: #0f172a; font-weight: 900; text-align: center; background: #f8fafc;">${counted}</td>
+                <td style="padding: 12px; font-size: 12px; color: #64748b; text-align: center;">${count1}</td>
+                <td style="padding: 12px; font-size: 12px; color: #0f172a; font-weight: 900; text-align: center; background: #f8fafc;">${count2}</td>
                 <td style="padding: 12px; font-size: 11px; color: ${diffColor}; font-weight: bold; text-align: center;">${diff === 0 ? 'OK' : diffPrefix + diff}</td>
                 <td style="padding: 12px; font-size: 10px; color: #94a3b8; font-style: italic;">${it.inventoryNote || ''}</td>
               </tr>
@@ -281,9 +282,9 @@ export const syncInventory = async (req: Request, res: Response) => {
                 <thead>
                   <tr>
                     <th>SKU</th>
-                    <th>Ref Cliente</th>
                     <th style="text-align: center;">Cant (Orig)</th>
-                    <th style="text-align: center;">Cant (Inv)</th>
+                    <th style="text-align: center;">Conteo 1</th>
+                    <th style="text-align: center;">Conteo 2</th>
                     <th style="text-align: center;">Dif</th>
                     <th>Nota</th>
                   </tr>
