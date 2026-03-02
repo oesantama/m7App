@@ -31,7 +31,7 @@ export class EvolutionService {
                 console.log(`[EVO] Checking instance: ${instanceName}`);
                 const response = await axios.get(`${EVO_URL}/instance/connectionState/${instanceName}`, {
                     headers: this.getHeaders(),
-                    timeout: 5000
+                    timeout: 10000
                 });
 
                 const status = (response.data?.instance?.state || response.data?.instance?.status || '').toUpperCase();

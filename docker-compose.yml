@@ -45,9 +45,19 @@ services:
       - DEL_INSTANCE=false
       - STORE_MESSAGES=true
       - STORE_MESSAGE_UP=true
+      - DATABASE_ENABLED=true
+      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER:-m7_admin}:${POSTGRES_PASSWORD:-m7_master_password}@postgres:5432/${POSTGRES_DB:-m7_logistica}?sslmode=disable
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     volumes:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
+    depends_on:
+      - postgres
     networks:
       - m7-network
 
