@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import https from 'https';
+import pool from '../config/database.js';
 
-// Caché en memoria para evitar geocodificar la misma dirección dos veces
+// Caché en memoria para velocidad extra (L1)
 const geocodeCache = new Map<string, [number, number] | null>();
 
-// Rate limit: 1 req/seg a Nominatim
+// Rate limit: 1.1 req/seg a Nominatim
 let lastNominatimCall = 0;
 const NOMINATIM_DELAY_MS = 1100;
 
@@ -53,8 +54,6 @@ const httpsGet = (url: string): Promise<any[]> => {
 
 const callNominatim = async (query: string): Promise<[number, number] | null> => {
     await waitForRateLimit();
-    // Restringir búsqueda al Valle de Aburrá (Medellín y alrededores) mediante viewbox y bounded=1
-    // Viewbox approx: MinLon -75.83, MaxLat 6.45, MaxLon -75.35, MinLat 5.95
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=co&viewbox=-75.83,6.45,-75.35,5.95&bounded=1`;
     try {
         const results = await httpsGet(url);
@@ -76,34 +75,49 @@ export const geocodeAddress = async (req: Request, res: Response) => {
 
     const cacheKey = `${(address || '').toLowerCase().trim()}|${(city || '').toLowerCase().trim()}`;
 
+    // 1. Verificar Caché L1 (Memoria)
     if (geocodeCache.has(cacheKey)) {
-        const cached = geocodeCache.get(cacheKey);
-        return res.json({ success: true, coords: cached, source: 'cache' });
+        return res.json({ success: true, coords: geocodeCache.get(cacheKey), source: 'cache_l1' });
     }
 
     try {
-        let coords: [number, number] | null = null;
+        // 2. Verificar Caché L2 (Base de Datos)
+        const dbRes = await pool.query('SELECT latitude, longitude FROM geocoding_cache WHERE query = $1', [cacheKey]);
+        if (dbRes.rows.length > 0) {
+            const coords: [number, number] = [dbRes.rows[0].latitude, dbRes.rows[0].longitude];
+            geocodeCache.set(cacheKey, coords);
+            return res.json({ success: true, coords, source: 'cache_l2_db' });
+        }
 
+        // 3. Realizar Búsqueda Real
+        let coords: [number, number] | null = null;
         if (address && city) {
             coords = await callNominatim(`${address}, ${city}, Colombia`);
         }
-
         if (!coords && address) {
             coords = await callNominatim(`${address}, Colombia`);
         }
-
         if (!coords && city) {
-            coords = await callNominatim(`${city}, Colombia`);
-            if (coords) {
+            const cityCoords = await callNominatim(`${city}, Colombia`);
+            if (cityCoords) {
+                // Jitter para evitar solapamiento si solo tenemos ciudad
                 coords = [
-                    coords[0] + (Math.random() - 0.5) * 0.009,
-                    coords[1] + (Math.random() - 0.5) * 0.009
+                    cityCoords[0] + (Math.random() - 0.5) * 0.009,
+                    cityCoords[1] + (Math.random() - 0.5) * 0.009
                 ];
             }
         }
 
+        // 4. Guardar en Caché (Memoria y DB)
         geocodeCache.set(cacheKey, coords);
-        return res.json({ success: true, coords, source: 'nominatim' });
+        if (coords) {
+            await pool.query(
+                'INSERT INTO geocoding_cache (query, latitude, longitude) VALUES ($1, $2, $3) ON CONFLICT (query) DO NOTHING',
+                [cacheKey, coords[0], coords[1]]
+            );
+        }
+
+        return res.json({ success: true, coords, source: 'nominatim_fresh' });
     } catch (err: any) {
         console.error('[M7-GEO-PROXY] Error:', err.message);
         return res.status(500).json({ success: false, error: 'Error al geocodificar', coords: null });
