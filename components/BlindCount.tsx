@@ -735,6 +735,13 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 <Icons.Excel className="w-3.5 h-3.5" /> XLS
               </button>
 
+              {/* UNIT COUNTER (NEW) */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-lg border border-white/10 shrink-0">
+                <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Total:</span>
+                <span className="text-sm font-black text-white">{totalUnits}</span>
+                <span className="text-[7px] font-bold text-slate-400 uppercase">Unds</span>
+              </div>
+
               {/* LAST SCAN FEEDBACK (IMAGEN 2) */}
               {lastScan && (
                 <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 animate-in slide-in-from-left-4 shadow-sm shrink-0 ${lastScan.status === 'success' ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
@@ -789,9 +796,15 @@ const BlindCount: React.FC<BlindCountProps> = ({
                     const currentCount = counts[it.articleId] || 0;
                     return (
                       <tr key={it.articleId} className={`hover:bg-slate-50/50 transition-all font-bold group ${validationAttempts === 1 ? 'bg-red-50/10' : ''}`}>
-                        <td className="px-4 py-3 max-w-[150px]">
-                          <p className="font-black text-slate-900 text-xs uppercase tracking-tight leading-none truncate" title={it.articleId}>{it.articleId}</p>
-                          <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mt-1 truncate" title={(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId) as any)?.name || ''}>{(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId) as any)?.name || 'Sin descripción'}</p>
+                        <td className="px-4 py-3 min-w-[200px]">
+                          <div className="flex flex-col">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[9px] font-black uppercase tracking-widest w-fit mb-1">
+                              Ref: {it.articleId}
+                            </span>
+                            <p className="font-black text-slate-900 text-[10px] uppercase tracking-tight leading-tight" title={(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId) as any)?.name || ''}>
+                              {(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId) as any)?.name || 'SIN DESCRIPCIÓN'}
+                            </p>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-center">
                           {validationAttempts === 1 ? (
