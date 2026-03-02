@@ -44,7 +44,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'inventario_clientes': ['client_id', 'article_id', 'batch', 'quantity', 'last_user', 'last_updated'],
   'training_categories': ['name', 'description', 'created_at'],
   'training_courses': ['category_id', 'title', 'description', 'cover_image', 'level', 'status_id', 'created_at'],
-  'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', '"order"', 'created_at'],
+  'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', 'order', 'created_at'],
   'user_training_progress': ['user_id', 'lesson_id', 'status', 'finished_at', 'updated_at']
 };
 
@@ -92,7 +92,7 @@ const healSchema = async (client: any) => {
           if (col === 'permissions' || col === 'record_data') type = 'JSONB';
           if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved') || col === 'aceptapolitica' || col === 'aprobada' || col === 'signed') type = 'BOOLEAN DEFAULT FALSE';
           
-          alterStatements.push(`ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+          alterStatements.push(`ADD COLUMN IF NOT EXISTS "${col}" ${type}`);
         }
       }
 
