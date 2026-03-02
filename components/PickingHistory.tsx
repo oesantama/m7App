@@ -40,20 +40,19 @@ const PickingHistory: React.FC<PickingHistoryProps> = ({ onBack }) => {
     async function loadHistory() {
         setLoading(true);
         try {
-            // Llamar con history=true para obtener los registros finalizados
-            const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/documents/invoices?history=true`);
-            const data = await res.json();
+            // Utilizamos el servicio api unificado que inyecta automáticamente el token JWT
+            const data = await api.getInvoices(undefined, undefined, true);
             
             // Si el backend aún no se ha reiniciado o no soporta el query param directamente en la API de api.ts,
             // usamos fetch manual temporalmente o confiamos en que api.getInvoices sea actualizado.
-            // Por ahora, asumimos que api.getInvoices(undefined, undefined) fue actualizado en nuestro pensamiento previo,
+            // Por ahora, asumimos que api.getInvoices(undefined, undefined, true) fue actualizado en nuestro pensamiento previo,
             // pero para asegurar la reactividad del cambio de estado, filtramos los que tengan actividad.
-            const history = data.filter((inv: any) => 
+            const history = Array.isArray(data) ? data.filter((inv: any) => 
                 inv.pickingId || inv.pickerLeader ||
                 inv.status === 'Entregado' || 
                 inv.status === 'EST-11' ||
                 inv.status === 'ALISTADO'
-            );
+            ) : [];
             setInvoices(history);
         } catch (e) {
             toast.error("Error al cargar historial");

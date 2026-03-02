@@ -334,10 +334,11 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
-  getInvoices: (clientId?: string, ids?: string) => {
+  getInvoices: (clientId?: string, ids?: string, history?: boolean) => {
     let url = `${API_URL}/documents/invoices?`;
     if (clientId) url += `clientId=${clientId}&`;
-    if (ids) url += `ids=${encodeURIComponent(ids)}`;
+    if (ids) url += `ids=${encodeURIComponent(ids)}&`;
+    if (history) url += `history=${history}&`;
     return fetchJson(url);
   },
 
