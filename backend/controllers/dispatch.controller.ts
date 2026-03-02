@@ -199,6 +199,17 @@ export const initDeliveryTables = async () => {
                 unit                TEXT,
                 notes               TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS inventory_news (
+                id SERIAL PRIMARY KEY,
+                document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE,
+                article_id TEXT,
+                quantity NUMERIC DEFAULT 0,
+                observation TEXT,
+                photo_urls TEXT[], 
+                user_name TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
         `);
         console.log('[M7-DISPATCH] initDeliveryTables: Tablas verificadas/creadas correctamente.');
     } catch (err: any) {

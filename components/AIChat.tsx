@@ -66,7 +66,7 @@ const AIChat: React.FC<AIChatProps> = ({ context }) => {
   }, []);
 
   const trigger = (
-    <div className="fixed top-[5%] left-1/2 -translate-x-1/2 z-[2147483647]">
+    <div className="fixed top-0 left-1/2 -translate-x-1/2 z-[2147483647]">
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`relative rounded-full flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-95 group overflow-visible ${
