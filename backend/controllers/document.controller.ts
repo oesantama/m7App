@@ -808,7 +808,6 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
               ${it.article_id}
               <div style="font-size: 9px; color: #94a3b8; font-weight: normal;">${it.article_name || '-'}</div>
             </td>
-            <td style="padding: 12px; font-size: 10px; color: #64748b;">${it.client_ref || 'S/R'}</td>
             <td style="padding: 12px; font-size: 12px; color: #64748b; text-align: center;">${expected}</td>
             <td style="padding: 12px; font-size: 12px; color: #64748b; text-align: center;">${count1}</td>
             <td style="padding: 12px; font-size: 12px; color: #0f172a; font-weight: 900; text-align: center; background: #f8fafc;">${counted}</td>
@@ -842,7 +841,7 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
     <body>
       <div class="container">
         <div class="header">
-          <div class="logo">MILLA SIETE</div>
+          <div class="logo">ORBITM7</div>
           <div class="subtitle">Reenvío Informe Auditoría (Manual)</div>
         </div>
         
@@ -857,7 +856,11 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
                 <div class="info-value">${docL.inventory_user || 'S/I'}</div>
               </div>
               <div class="info-item">
-                <div class="info-label">Fecha Auditoría</div>
+                <div class="info-label">Fecha Inicio Conteo</div>
+                <div class="info-value">${docL.created_at ? new Date(docL.created_at).toLocaleString('es-CO') : 'S/I'}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Fecha Final Conteo</div>
                 <div class="info-value">${docL.inventory_date ? new Date(docL.inventory_date).toLocaleString('es-CO') : 'S/I'}</div>
               </div>
               <div class="info-item">
@@ -872,9 +875,9 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
             <thead>
               <tr>
                 <th>SKU</th>
-                <th>Ref Cliente</th>
                 <th style="text-align: center;">Cant (Orig)</th>
-                <th style="text-align: center;">Cant (Inv)</th>
+                <th style="text-align: center;">Cant (conteo Inv 1)</th>
+                <th style="text-align: center;">Cant (conteo Inv 2)</th>
                 <th style="text-align: center;">Dif</th>
                 <th>Nota</th>
               </tr>
@@ -884,7 +887,7 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
             </tbody>
           </table>
           <div style="margin-top: 20px; padding: 15px; background: #f1f5f9; border-radius: 8px; color: #64748b; font-size: 10px; text-align: center;">
-             Este es un reenvío manual del informe original. Los datos reflejan el estado del inventario al momento del cierre.
+             Este es un reenvío manual del informe original por el sistema <strong>ORBITM7</strong>. Los datos reflejan el estado del inventario al momento del cierre oficial.
           </div>
         </div>
 
