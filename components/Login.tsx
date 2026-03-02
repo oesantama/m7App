@@ -135,20 +135,25 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Simulación de búsqueda en el CORE M7
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const demoEmail = import.meta.env.VITE_APP_DEMO_EMAIL || 'admin@millasiete.com';
-      if (email.trim().toLowerCase() !== demoEmail.trim().toLowerCase()) {
-          setError("ORBIT SECURITY: El correo ingresado no se encuentra en nuestra base de datos.");
-          setIsLoading(false);
-          return;
+      // 1. Petición real al NÚCLEO M7
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Falla en el servicio de recuperación.");
+        setIsLoading(false);
+        return;
       }
 
       setForgotSuccess(true);
       setError(null);
     } catch (err) {
-      setError("Falla crítica en el servicio de recuperación.");
+      setError("Error de red: No se pudo contactar al núcleo OrbitM7.");
     } finally {
       setIsLoading(false);
     }
