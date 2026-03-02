@@ -554,4 +554,24 @@ export const api = {
   // --- DASHBOARD & INTELLIGENCE ---
   getDashboardStats: (period: string) => fetchJson(`${API_URL}/dashboard/stats?period=${period}`),
   getDemandPrediction: () => fetchJson(`${API_URL}/dashboard/prediction`),
+
+  // Novedades de Inventario
+  getNovedades: (docId: string) => fetchJson(`${API_URL}/inventory-news/${docId}`),
+  saveNovedad: (data: {
+    documentId: string,
+    articleId: string,
+    quantity: number,
+    observation: string,
+    photoUrls: string[],
+    userName: string
+  }) => fetchJson(`${API_URL}/inventory-news`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  sendNovedadesReport: (docId: string, targetEmails: string[]) => fetchJson(`${API_URL}/inventory-news/send-report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ docId, targetEmails })
+  }),
 };

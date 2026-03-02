@@ -39,6 +39,7 @@ import pickingRoutes from './picking.routes.js';
 import geocodeRoutes from './geocode.routes.js';
 import backupRoutes from './backup.routes.js';
 import trainingRoutes from './training.routes.js';
+import inventoryNewsRoutes from './inventory-news.routes.js';
 
 
 const router = Router();
@@ -46,6 +47,7 @@ const router = Router();
 router.use('/masters', masterRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/training', trainingRoutes);
+router.use('/inventory-news', inventoryNewsRoutes);
 router.use('/routes', routeRoutes);
 router.use('/admin', adminRoutes); // Database Manager
 router.use('/estados', estadoRoutes);

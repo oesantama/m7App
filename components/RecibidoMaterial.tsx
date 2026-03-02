@@ -6,6 +6,7 @@ import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem } from
 import BlindCount from './BlindCount';
 import PickingView from './PickingView';
 import PickingHistory from './PickingHistory';
+import NovedadesView from './NovedadesView';
 import { hasPermission } from '../utils/permissions';
 
 interface RecibidoMaterialProps {
@@ -33,7 +34,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [manualEmail, setManualEmail] = useState('');
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [resendTarget, setResendTarget] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'recibo' | 'picking' | 'historico'>('recibo');
+  const [activeTab, setActiveTab] = useState<'recibo' | 'picking' | 'novedades' | 'historico'>('recibo');
   const [pickingSearch, setPickingSearch] = useState('');
   const [isSyncingPartial, setIsSyncingPartial] = useState(false);
   const [isSyncingFinal, setIsSyncingFinal] = useState(false);
@@ -204,6 +205,13 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
               Alistado / Picking
             </button>
             <button 
+              onClick={() => setActiveTab('novedades')}
+              className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'novedades' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Icons.Alert className="w-4 h-4" />
+              Novedades
+            </button>
+            <button 
               onClick={() => setActiveTab('historico')}
               className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'historico' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
@@ -322,6 +330,15 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         ) : activeTab === 'picking' ? (
           <div className="p-8 flex-1 overflow-hidden flex flex-col">
             <PickingView user={user} documents={documents} />
+          </div>
+        ) : activeTab === 'novedades' ? (
+          <div className="p-8 flex-1 overflow-hidden flex flex-col h-full">
+            <NovedadesView 
+              documents={documents} 
+              user={user} 
+              masterArticulo={masterArticulo} 
+              masterNotificaciones={masterNotificaciones} 
+            />
           </div>
         ) : (
           <div className="p-8 flex-1 overflow-hidden flex flex-col">
