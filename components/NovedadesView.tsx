@@ -44,6 +44,9 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     const [targetEmails, setTargetEmails] = useState<string[]>([]);
     const [newEmail, setNewEmail] = useState('');
 
+    // Modal de Confirmación Adicionar
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
     const filteredDocs = useMemo(() => {
         return documents.filter(d => 
             (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING) &&
@@ -132,9 +135,16 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
 
         const existing = novedades.find(n => n.article_sku === selectedArticle.sku || n.article_id === selectedArticle.id);
         if (existing) {
-            const confirmMsg = `El artículo ${selectedArticle.sku} ya tiene novedades registradas. ¿Desea ADICIONAR esta información al registro existente?`;
-            if (!window.confirm(confirmMsg)) return;
+            setIsConfirmModalOpen(true);
+            return;
         }
+
+        await executeSaveNovedad();
+    };
+
+    const executeSaveNovedad = async () => {
+        if (!selectedDoc || !selectedArticle) return;
+        setIsConfirmModalOpen(false);
 
         const saveToast = toast.loading("Guardando novedad...");
         setIsLoading(true);
@@ -462,6 +472,39 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                     {isLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Icons.Send className="w-4 h-4" />}
                                     ENVIAR REPORTE
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal de Confirmación Adicionar Profesional */}
+                {isConfirmModalOpen && selectedArticle && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+                        <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 duration-500 border border-slate-200">
+                            <div className="p-8 text-center space-y-6">
+                                <div className="mx-auto w-20 h-20 bg-blue-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-blue-200 animate-bounce-subtle">
+                                    <Icons.Alert className="w-10 h-10 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">¿Adicionar Novedad?</h3>
+                                    <p className="text-xs text-slate-500 font-bold leading-relaxed px-4">
+                                        El artículo <span className="text-blue-600 font-black">{selectedArticle.sku}</span> ya tiene registros. ¿Deseas sumar esta información al registro actual?
+                                    </p>
+                                </div>
+                                <div className="flex flex-col gap-3 pt-2">
+                                    <button 
+                                        onClick={executeSaveNovedad}
+                                        className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                        SÍ, ADICIONAR REGISTRO
+                                    </button>
+                                    <button 
+                                        onClick={() => setIsConfirmModalOpen(false)}
+                                        className="w-full py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-900 transition-all"
+                                    >
+                                        CANCELAR
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

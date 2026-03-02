@@ -12,7 +12,7 @@ export const getNovedades = async (req: Request, res: Response) => {
         const result = await pool.query(`
             SELECT n.*, COALESCE(a.sku, 'S/SKU') as article_sku, COALESCE(a.name, 'SIN NOMBRE') as article_name
             FROM inventory_news n
-            LEFT JOIN articles a ON CAST(n.article_id AS TEXT) = CAST(a.id AS TEXT)
+            LEFT JOIN articles a ON TRIM(CAST(n.article_id AS TEXT)) = TRIM(CAST(a.id AS TEXT))
             WHERE n.document_id = $1
             ORDER BY n.created_at DESC
         `, [docId]);
@@ -62,11 +62,14 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         const docRes = await pool.query('SELECT * FROM documents_l WHERE id = $1', [docId]);
         if (docRes.rows.length === 0) return res.status(404).json({ error: "Documento no encontrado" });
         const doc = docRes.rows[0];
+        
+        // Corregir placa: vehicle_plate es el campo real en la BD
+        const placa = doc.vehicle_plate || doc.vehicleData || doc.vehicle_data || 'SIN PLACA';
 
         const newsRes = await pool.query(`
             SELECT n.*, COALESCE(a.sku, 'S/SKU') as article_sku, COALESCE(a.name, n.observation) as article_name
             FROM inventory_news n
-            LEFT JOIN articles a ON CAST(n.article_id AS TEXT) = CAST(a.id AS TEXT)
+            LEFT JOIN articles a ON TRIM(CAST(n.article_id AS TEXT)) = TRIM(CAST(a.id AS TEXT))
             WHERE n.document_id = $1
             ORDER BY n.created_at ASC
         `, [docId]);
@@ -89,7 +92,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         
         doc_pdf.setFontSize(10);
         doc_pdf.text(`DOCUMENTO: ${doc.external_doc_id || doc.externalDocId}`, 14, 30);
-        doc_pdf.text(`PLACA: ${doc.vehicle_data || doc.vehicleData || 'SIN PLACA'}`, 14, 35);
+        doc_pdf.text(`PLACA: ${placa}`, 14, 35);
         
         doc_pdf.setFontSize(8);
         doc_pdf.text(`GENERADO: ${new Date().toLocaleString()}`, pageWidth - 14, 35, { align: 'right' });
@@ -131,10 +134,13 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
 
         for (const n of news) {
             if (n.photo_urls && n.photo_urls.length > 0) {
-                doc_pdf.setFontSize(9);
-                doc_pdf.setTextColor(100, 116, 139);
-                doc_pdf.text(`FOTOS: ${n.article_sku}`, xPos, currentY);
-                currentY += 5;
+                if (currentY + 10 > 280) { doc_pdf.addPage(); currentY = 20; }
+                
+                doc_pdf.setFontSize(10);
+                doc_pdf.setTextColor(30, 41, 59);
+                doc_pdf.setFont("helvetica", "bold");
+                doc_pdf.text(`ARTÍCULO: ${n.article_sku}`, xPos, currentY);
+                currentY += 7;
 
                 for (const url of n.photo_urls) {
                     if (currentY + photoSize > 280) {
@@ -142,7 +148,6 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
                         currentY = 20;
                     }
                     try {
-                        // Al ser base64, jspdf lo maneja directamente
                         doc_pdf.addImage(url, 'JPEG', xPos, currentY, photoSize, photoSize);
                         xPos += photoSize + margin;
                         if (xPos + photoSize > pageWidth) {
@@ -156,6 +161,8 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
                 if (xPos !== 14) {
                     xPos = 14;
                     currentY += photoSize + margin;
+                } else {
+                    currentY += margin;
                 }
             }
         }
@@ -163,7 +170,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         const pdfBuffer = Buffer.from(doc_pdf.output('arraybuffer'));
 
         // CUERPO DEL CORREO SIMPLIFICADO
-        const subject = `⚠️ REPORTE DE NOVEDADES: ${doc.external_doc_id || doc.externalDocId} | ${doc.vehicle_data || doc.vehicleData || 'SIN PLACA'}`;
+        const subject = `⚠️ REPORTE DE NOVEDADES: ${doc.external_doc_id || doc.externalDocId} | ${placa}`;
         const html = `
             <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
                 <div style="background-color: #0f172a; padding: 24px; text-align: center; color: white;">
@@ -176,7 +183,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
                         <p style="margin: 0; font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase;">Documento</p>
                         <p style="margin: 4px 0 12px 0; font-size: 16px; font-weight: 800; color: #0f172a;">${doc.external_doc_id || doc.externalDocId}</p>
                         <p style="margin: 0; font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase;">Vehículo</p>
-                        <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 800; color: #0f172a;">${doc.vehicle_data || doc.vehicleData || 'SIN PLACA'}</p>
+                        <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 800; color: #0f172a;">${placa}</p>
                     </div>
                     <p>Encontrará adjunto a este correo el documento PDF con el detalle de los artículos, cantidades, observaciones y sus respectivos anexos fotográficos.</p>
                     <p style="margin-bottom: 0;">Si tiene alguna duda sobre esta información, por favor contacte al equipo de auditoría.</p>
