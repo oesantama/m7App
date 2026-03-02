@@ -41,7 +41,15 @@ export const normalizeData = (data: any) => {
       notificationEmail: getVal('notificationEmail', 'notification_email'),
       tipoNotificacionId: getVal('tipoNotificacionId', 'tipo_notificacion_id'),
       logoUrl: getVal('logoUrl', 'logo_url'),
-      imageUrl: getVal('imageUrl', 'image_url')
+      imageUrl: getVal('imageUrl', 'image_url'),
+      // Campos de Artículo M7
+      categoryArticuloId: getVal('categoryArticuloId', 'category_articulo_id'),
+      uomGeneralId: getVal('uomGeneralId', 'uom_general_id'),
+      uomInterId: getVal('uomInterId', 'uom_inter_id'),
+      uomStdId: getVal('uomStdId', 'uom_std'),
+      factorInter: getVal('factorInter', 'factor_inter'),
+      factorStd: getVal('factorStd', 'factor_std'),
+      clientId: getVal('clientId', 'client_id')
     };
   });
 };

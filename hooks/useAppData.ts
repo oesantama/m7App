@@ -76,7 +76,16 @@ export const useAppData = () => {
         }
 
         const mappedArticles = normalizeData(Array.isArray(articlesRaw) ? articlesRaw.map((a: any) => ({
-          ...a, statusId: a.status_id, clientId: a.client_id, imageUrl: a.image_url 
+          ...a, 
+          statusId: a.status_id || a.statusId, 
+          clientId: a.client_id || a.clientId, 
+          imageUrl: a.image_url || a.imageUrl,
+          categoryArticuloId: a.category_articulo_id || a.categoryArticuloId,
+          uomGeneralId: a.uom_general_id || a.uomGeneralId,
+          uomInterId: a.uom_inter_id || a.uomInterId,
+          uomStdId: a.uom_std || a.uomStdId, // Mapeo crítico para unidades estándar
+          factorInter: a.factor_inter || a.factorInter,
+          factorStd: a.factor_std || a.factorStd
         })) : []);
 
         const mappedVehicles = normalizeData(Array.isArray(vehiclesRaw) ? vehiclesRaw.map((v: any) => ({

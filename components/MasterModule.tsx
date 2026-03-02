@@ -260,7 +260,12 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       iconClass: record.iconClass || record.icon_class || '',
       notificationEmail: record.notificationEmail || record.notification_email || '',
       tipoNotificacionId: record.tipoNotificacionId || record.tipo_notificacion_id || '',
-      categoryArticuloId: record.categoryArticuloId || record.category_articulo_id || ''
+      categoryArticuloId: record.categoryArticuloId || record.category_articulo_id || '',
+      uomGeneralId: record.uomGeneralId || record.uom_general_id || '',
+      uomInterId: record.uomInterId || record.uom_inter_id || '',
+      uomStdId: record.uomStdId || record.uom_std || '',
+      factorInter: record.factorInter !== undefined ? record.factorInter : (record.factor_inter || 1),
+      factorStd: record.factorStd !== undefined ? record.factorStd : (record.factor_std || 1)
     };
 
     return { ...defaults, ...normalizedRecord };
@@ -634,7 +639,16 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               createdAt: getVal('createdAt', 'created_at'),
               updatedAt: getVal('updatedAt', 'updated_at'),
               createdBy: getVal('createdBy', 'created_by'),
-              updatedBy: getVal('updatedBy', 'updated_by')
+              updatedBy: getVal('updatedBy', 'updated_by'),
+              // [M7-FIX] Campos críticos de Artículo para evitar pérdida de datos visual
+              categoryArticuloId: getVal('categoryArticuloId', 'category_articulo_id'),
+              uomGeneralId: getVal('uomGeneralId', 'uom_general_id'),
+              uomInterId: getVal('uomInterId', 'uom_inter_id'),
+              uomStdId: getVal('uomStdId', 'uom_std'),
+              factorInter: getVal('factorInter', 'factor_inter'),
+              factorStd: getVal('factorStd', 'factor_std'),
+              imageUrl: getVal('imageUrl', 'image_url'),
+              clientId: getVal('clientId', 'client_id')
             };
           });
 
