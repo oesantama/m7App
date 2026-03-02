@@ -18,7 +18,7 @@ export const useAppData = () => {
   const refreshAppData = useCallback(async (forcedClientId?: string) => {
     // IMPORTANTE: Obtener el usuario directamente del store para evitar cierres (closures) obsoletos
     const currentUser = useAppStore.getState().user;
-    const targetClientId = forcedClientId || currentUser?.clientId || 'CLI-01';
+    const targetClientId = forcedClientId || currentUser?.clientId || (currentUser?.clientIds && currentUser.clientIds.length > 0 ? currentUser.clientIds[0] : 'CLI-01');
     
     try {
       // 1. CARGA CRÍTICA (Bloqueante para pintar el Layout/Menú)
@@ -41,16 +41,16 @@ export const useAppData = () => {
         api.getGenericMasters().then(normalizeData).catch(() => []),
         api.getCategories().then(normalizeData).catch(() => []), 
         hasPerm('ARTICULOS') ? api.getArticles().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        hasPerm('VEHICULOS') ? api.getVehicles().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        hasPerm('CONDUCTORES') ? api.getDrivers().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('VEHICULOS') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L')) ? api.getVehicles().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('CONDUCTORES') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L')) ? api.getDrivers().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('USUARIOS') ? api.getUsers().then(normalizeData).catch(() => []) : Promise.resolve([]),
 
 
         isSuper ? api.getRoles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper ? api.getPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper || hasPerm('MATRIZ_PERMISOS') ? api.getAllUserPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        (hasPerm('CLIENTES') || hasPerm('RUTAS')) ? api.getClients().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        hasPerm('ASIGNACIONES') ? api.getAssignments().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('CLIENTES') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L')) ? api.getClients().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (hasPerm('ASIGNACIONES') || hasPerm('RUTAS') || hasPerm('DOCUMENTOS_L')) ? api.getAssignments().then(normalizeData).catch(() => []) : Promise.resolve([]),
         hasPerm('DOCUMENTOS_L') ? api.getInvoices(targetClientId).catch(() => []) : Promise.resolve([]),
         hasPerm('RUTAS') ? api.getRoutes().catch(() => []) : Promise.resolve([]),
         api.getEstados().then(normalizeData).catch(() => []), // Maestros base (Siempre cargar)
