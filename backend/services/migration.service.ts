@@ -40,7 +40,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'routing_patterns': ['city', 'vehicle_id', 'strength', 'last_used'],
   'deletion_logs': ['table_name', 'record_id', 'record_data', 'deleted_by', 'deleted_at'],
   'vehicle_locations': ['vehicle_id', 'driver_id', 'latitude', 'longitude', 'accuracy', 'speed', 'heading', 'updated_at', 'timestamp'],
-  'document_consolidated_items': ['document_id', 'article_id', 'count_1', 'count_2', 'inventory_user', 'inventory_observation', 'expected_qty'],
+  'document_consolidated_items': ['document_id', 'article_id', 'count_1', 'count_2', 'inventory_user', 'inventory_observation', 'expected_qty', 'picked_qty', 'dispatched_qty'],
   'training_categories': ['name', 'description', 'created_at'],
   'training_courses': ['category_id', 'title', 'description', 'cover_image', 'level', 'status_id', 'created_at'],
   'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', '"order"', 'created_at'],
