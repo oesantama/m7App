@@ -25,6 +25,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [displayMode, setDisplayMode] = useState<'table' | 'grid'>('table');
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
@@ -388,6 +389,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsSaving(true);
 
     if (activeMaster === 'masterUsuarios') {
       // RFC 5322 Email Regex
@@ -683,6 +685,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         description: errorMessage,
         duration: 5000
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -759,6 +763,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       toast.error("Operación Restringida", { description: friendlyMsg, duration: 6000 });
       setShowDeleteConfirm(false);
       setRecordToDelete(null);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -2060,12 +2066,30 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   <div className="mb-8 p-6 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-4 animate-in shake"><Icons.Alert /> {error}</div>
                 )}
                 {renderFormFields()}
-                <div className="pt-10 border-t border-slate-200 flex flex-col md:flex-row gap-6 mt-10">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-12 py-5 bg-red-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl transition-all active:scale-95">{isReadOnly ? 'Cerrar' : 'Descartar'}</button>
-                  {!isReadOnly && (
-                    <button type="submit" className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-xl transition-all active:scale-95">Confirmar Operación M7</button>
-                  )}
-                </div>
+                <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shrink-0">
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(false)} 
+                disabled={isSaving}
+                className="px-10 py-4 bg-white text-slate-500 rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all border-2 border-slate-100 disabled:opacity-50"
+              >
+                Cerrar
+              </button>
+              <button 
+                type="submit" 
+                disabled={isSaving}
+                className="px-12 py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-500 shadow-2xl transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Guardando...</span>
+                  </>
+                ) : (
+                  editingRecord ? 'Actualizar Registro' : 'Guardar Registro'
+                )}
+              </button>
+            </div>
               </form>
             </fieldset>
           </div>
@@ -2091,8 +2115,15 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               Esta acción eliminará a <span className="text-red-600">{recordToDelete?.name || recordToDelete?.id}</span> permanentemente del sistema M7 Intelligence.
             </p>
             <div className="flex gap-4">
-              <button onClick={() => { setShowDeleteConfirm(false); setRecordToDelete(null); }} className="flex-1 py-4 bg-slate-100 text-slate-900 rounded-xl font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
-              <button onClick={handleDelete} className="flex-1 py-4 bg-red-600 text-white rounded-xl font-black uppercase hover:bg-red-700 shadow-xl transition-all">Sí, Eliminar</button>
+              <button onClick={() => { setShowDeleteConfirm(false); setRecordToDelete(null); }} disabled={isSaving} className="flex-1 py-4 bg-slate-100 text-slate-900 rounded-xl font-black uppercase hover:bg-slate-200 transition-all disabled:opacity-50">Cancelar</button>
+              <button onClick={() => { setIsSaving(true); handleDelete(); }} disabled={isSaving} className="flex-1 py-4 bg-red-600 text-white rounded-xl font-black uppercase hover:bg-red-700 shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Eliminando...</span>
+                  </>
+                ) : 'Sí, Eliminar'}
+              </button>
             </div>
           </div>
         </div>

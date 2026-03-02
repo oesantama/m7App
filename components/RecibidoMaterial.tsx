@@ -33,8 +33,10 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [manualEmail, setManualEmail] = useState('');
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [resendTarget, setResendTarget] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'recibo' | 'picking'>('recibo');
+  const [activeTab, setActiveTab] = useState<'recibo' | 'picking' | 'historico'>('recibo');
   const [pickingSearch, setPickingSearch] = useState('');
+  const [isSyncingPartial, setIsSyncingPartial] = useState(false);
+  const [isSyncingFinal, setIsSyncingFinal] = useState(false);
 
   const pendingRecibo = useMemo(() =>
     documents.filter(d => d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING),
@@ -59,6 +61,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const handlePartialSave = (currentItems: DocumentLItem[], generalObs: string) => {
     if (!selectedDocForCount) return;
 
+    setIsSyncingPartial(true);
     api.syncInventory({
       docId: selectedDocForCount.id,
       items: currentItems,
@@ -75,6 +78,9 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
       }
     }).catch(err => {
       console.error('[M7-PARTIAL-SYNC] Error:', err);
+      toast.error("Error al guardar progreso parcial.");
+    }).finally(() => {
+      setIsSyncingPartial(false);
     });
   };
 
@@ -85,6 +91,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
       onUpdateNotificationEmail(updateEmail);
     }
 
+    setIsSyncingFinal(true);
     // Persistir en el servidor
     api.syncInventory({
       docId: selectedDocForCount.id,
@@ -122,7 +129,9 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
       }
     }).catch(err => {
       console.error('[M7-FINISH-SYNC] Error:', err);
-      toast.error("Error de conexión al finalizar.");
+      toast.error("Error al finalizar inventario.");
+    }).finally(() => {
+      setIsSyncingFinal(false);
     });
   };
 
@@ -172,7 +181,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         <div className="bg-white overflow-hidden h-full flex flex-col">
           {/* TABS DE NAVEGACIÓN */}
           <div className="flex bg-slate-100/50 p-2 shrink-0 border-b border-slate-200">
-            <button 
+            <button
               onClick={() => setActiveTab('recibo')}
               className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'recibo' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >

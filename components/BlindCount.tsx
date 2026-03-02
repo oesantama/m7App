@@ -94,6 +94,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     };
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isLoaded = useRef(false);
@@ -915,11 +916,23 @@ const BlindCount: React.FC<BlindCountProps> = ({
             />
             <div className="flex flex-col gap-4">
               <button
-                onClick={() => finalizeProcess(manualEmail)}
-                disabled={!manualEmail.includes('@')}
-                className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-2xl transition-all disabled:opacity-20 active:scale-95"
+                onClick={async () => {
+                  setIsFinalizing(true);
+                  try {
+                    await finalizeProcess(manualEmail);
+                  } finally {
+                    setIsFinalizing(false);
+                  }
+                }}
+                disabled={!manualEmail.includes('@') || isFinalizing}
+                className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-2xl transition-all disabled:opacity-20 active:scale-95 flex items-center justify-center gap-3"
               >
-                Enviar y Finalizar
+                {isFinalizing ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Sincronizando...</span>
+                  </>
+                ) : 'Enviar y Finalizar'}
               </button>
               <button onClick={() => setShowEmailInput(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Cancelar</button>
             </div>
