@@ -37,19 +37,27 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [pickingSearch, setPickingSearch] = useState('');
   const [isSyncingPartial, setIsSyncingPartial] = useState(false);
   const [isSyncingFinal, setIsSyncingFinal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const pendingRecibo = useMemo(() =>
     documents.filter(d => d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING),
     [documents]
   );
 
-  const paginatedPending = useMemo(() => {
-    if (rowsPerPage === 'all') return pendingRecibo;
-    const start = (currentPage - 1) * rowsPerPage;
-    return pendingRecibo.slice(start, start + rowsPerPage);
-  }, [pendingRecibo, currentPage, rowsPerPage]);
+  const completedRecibo = useMemo(() =>
+    documents.filter(d => d.status === DocStatus.INVENTORED),
+    [documents]
+  );
 
-  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(pendingRecibo.length / rowsPerPage);
+  const activeList = showHistory ? completedRecibo : pendingRecibo;
+
+  const paginatedDocs = useMemo(() => {
+    if (rowsPerPage === 'all') return activeList;
+    const start = (currentPage - 1) * rowsPerPage;
+    return activeList.slice(start, start + rowsPerPage);
+  }, [activeList, currentPage, rowsPerPage]);
+
+  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(activeList.length / rowsPerPage);
 
   const handleStartCount = (doc: DocumentL) => {
     api.updateDocumentStatus(doc.id, DocStatus.COUNTING, user.name);
@@ -209,8 +217,19 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
               {/* SUBHEADER DE CONTROL (RECIBO) */}
               <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center shrink-0 px-8">
                 <div className="flex items-center gap-4">
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Planes en Espera</h3>
-                  <span className="px-4 py-1.5 bg-emerald-500 text-slate-950 rounded-xl text-[9px] font-black uppercase shadow-md shadow-emerald-500/10">{pendingRecibo.length} ACTIVOS</span>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">{showHistory ? 'Historial de Auditoría' : 'Planes en Espera'}</h3>
+                  <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase shadow-md ${showHistory ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-slate-950'}`}>
+                    {activeList.length} {showHistory ? 'FINALIZADOS' : 'ACTIVOS'}
+                  </span>
+                  
+                  {/* TOGGLE HISTORIAL */}
+                  <button 
+                    onClick={() => { setShowHistory(!showHistory); setCurrentPage(1); }}
+                    className={`ml-4 flex items-center gap-2 px-4 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all border-2 ${showHistory ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100 hover:border-blue-500 hover:text-blue-500'}`}
+                  >
+                    <Icons.History className="w-3 h-3" />
+                    {showHistory ? 'Ver Pendientes' : 'Ver Historial'}
+                  </button>
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Filas:</label>
@@ -223,9 +242,9 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
               <div className="p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar bg-slate-50/5">
                 {/* ... (Contenido de Recibo existente) ... */}
             <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
-              {paginatedPending.map(doc => (
+              {paginatedDocs.map(doc => (
                 <div key={doc.id} className="flex flex-col p-6 bg-white border-2 border-slate-50 rounded-[2.5rem] hover:border-emerald-500 transition-all group shadow-md hover:shadow-xl relative overflow-hidden">
-                  <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${doc.status === DocStatus.COUNTING ? 'bg-blue-500' : 'bg-amber-400'}`}></div>
+                  <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${doc.status === DocStatus.COUNTING ? 'bg-blue-500' : doc.status === DocStatus.INVENTORED ? 'bg-slate-400' : 'bg-amber-400'}`}></div>
 
                   <div className="flex justify-between items-start mb-6">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${doc.status === DocStatus.COUNTING ? 'bg-blue-900 text-blue-400 animate-pulse' : 'bg-slate-900 text-emerald-500'}`}>
@@ -258,9 +277,13 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                   </div>
 
                   <div className="mt-6 pt-6 border-t border-slate-50">
-                    <button onClick={() => handleStartCount(doc)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3">
+                    <button 
+                      onClick={() => handleStartCount(doc)} 
+                      disabled={doc.status === DocStatus.INVENTORED}
+                      className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3 disabled:opacity-20"
+                    >
                       {doc.status === DocStatus.COUNTING ? <Icons.Audit /> : <Icons.Signature />}
-                      {doc.status === DocStatus.COUNTING ? 'CONTINUAR' : 'AUDITAR'}
+                      {doc.status === DocStatus.INVENTORED ? 'INVENTARIADO' : (doc.status === DocStatus.COUNTING ? 'CONTINUAR' : 'AUDITAR')}
                     </button>
                     {doc.status === DocStatus.INVENTORED && (
                       <button
@@ -273,10 +296,12 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                   </div>
                 </div>
               ))}
-              {pendingRecibo.length === 0 && (
+               {activeList.length === 0 && (
                 <div className="col-span-full py-32 flex flex-col items-center justify-center text-center space-y-4">
                   <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 border-4 border-dashed border-slate-100"><Icons.Check /></div>
-                  <h4 className="text-xl font-black text-slate-200 uppercase tracking-[0.4em] animate-pulse">Operación al día</h4>
+                  <h4 className="text-xl font-black text-slate-200 uppercase tracking-[0.4em] animate-pulse">
+                    {showHistory ? 'Historial vacío' : 'Operación al día'}
+                  </h4>
                 </div>
               )}
             </div>
