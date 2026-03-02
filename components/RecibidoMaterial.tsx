@@ -375,11 +375,16 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${doc.status === DocStatus.COUNTING ? 'bg-blue-900 text-blue-400 animate-pulse' : 'bg-slate-900 text-emerald-500'}`}>
                       <Icons.Package />
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end gap-2">
                       <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border tracking-widest ${doc.status === DocStatus.COUNTING ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
                         {doc.status}
                       </span>
-                      <p className="text-[9px] text-slate-400 font-black uppercase mt-2 tracking-widest">{new Date(doc.createdAt).toLocaleDateString()}</p>
+                      {doc.planType === 'MANUAL' && (
+                        <span className="px-3 py-1 bg-slate-900 text-emerald-400 rounded-lg text-[8px] font-black uppercase border border-emerald-500/30 tracking-widest shadow-lg animate-pulse">
+                          MODO MANUAL
+                        </span>
+                      )}
+                      <p className="text-[9px] text-slate-400 font-black uppercase mt-1 tracking-widest">{new Date(doc.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
 
@@ -411,10 +416,10 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                       {doc.status === DocStatus.INVENTORED ? 'INVENTARIADO' : (doc.status === DocStatus.COUNTING ? 'CONTINUAR' : 'AUDITAR')}
                     </button>
 
-                    {/* BOTÓN CARGA EXCEL PARA MANUALES */}
+                    {/* BOTÓN CARGA EXCEL PARA MANUALES (Visible en Pendientes e Historial) */}
                     {doc.planType === 'MANUAL' && (
-                      <label className="mt-2 w-full py-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white cursor-pointer active:scale-95">
-                        <Icons.Excel className="w-4 h-4" />
+                      <label className="mt-2 w-full py-4 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-3 hover:bg-emerald-600 hover:text-white cursor-pointer active:scale-95">
+                        <Icons.Excel className="w-5 h-5" />
                         Cargar Referencia Excel
                         <input 
                           type="file" 
@@ -485,8 +490,23 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           <div className="bg-white w-full max-w-lg rounded-[3.5rem] p-12 text-center space-y-8 shadow-2xl border border-white/5">
             <div className="w-16 h-16 bg-blue-500 text-white rounded-[1.5rem] mx-auto flex items-center justify-center shadow-xl mb-4"><Icons.Send className="w-8 h-8" /></div>
             <div className="space-y-3">
-              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Reenviar Informe</h3>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ingrese el correo de destino para reenviar las novedades.</p>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Nuevo Recibo Manual</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inicie un proceso sin documento previo</p>
+              </div>
+            </div>
+
+            {/* CONSEJO M7 PRACTICO */}
+            <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] flex items-start gap-4">
+               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm shrink-0"><Icons.Excel className="w-5 h-5" /></div>
+               <div>
+                  <h4 className="text-[10px] font-black text-emerald-700 uppercase mb-1">¿Cómo cargar el archivo Excel?</h4>
+                  <p className="text-[9px] text-emerald-600/80 font-bold leading-relaxed">
+                    1. Inicie su auditoría aquí a la izquierda.<br/>
+                    2. Al lado aparecerá su plan en <strong>"PENDIENTES"</strong>.<br/>
+                    3. Use el botón <strong>"SUBIR EXCEL"</strong> para completar los datos.
+                  </p>
+               </div>
             </div>
             <input
               type="email"

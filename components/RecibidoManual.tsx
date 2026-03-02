@@ -35,7 +35,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
 
   const filteredDocs = useMemo(() => {
     return documents.filter(d => 
-      d.clientId === selectedClientId && 
+      (!selectedClientId || d.clientId === selectedClientId) && 
       (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING) &&
       (d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase()) || d.vehicleData?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
@@ -357,31 +357,39 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
 
           <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
             {filteredDocs.map(doc => (
-              <div key={doc.id} className="relative group/card">
-                <button
-                  onClick={() => setSelectedDocForCount(doc)}
-                  className="w-full p-6 bg-white/5 hover:bg-white/10 border border-white/5 rounded-[2rem] text-left transition-all flex items-center justify-between gap-4"
-                >
-                  <div className="min-w-0">
+              <div key={doc.id} className="bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden group/card hover:bg-white/10 transition-all">
+                <div className="p-6 flex items-center justify-between gap-4">
+                  <button
+                    onClick={() => setSelectedDocForCount(doc)}
+                    className="flex-1 text-left min-w-0"
+                  >
                     <p className="text-[10px] font-black text-emerald-500 uppercase mb-1">{doc.externalDocId}</p>
                     <p className="text-lg font-black text-white uppercase tracking-tighter truncate">{doc.vehicleData || 'S/A'}</p>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">{new Date(doc.createdAt).toLocaleDateString()}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 group-hover/card:text-emerald-500 group-hover/card:bg-emerald-500/10 transition-all shrink-0">
-                    <Icons.ChevronRight className="w-6 h-6" />
-                  </div>
-                </button>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">HACE {Math.round((Date.now() - new Date(doc.createdAt).getTime()) / 60000)} MINS</p>
+                  </button>
+                  <button 
+                    onClick={() => setSelectedDocForCount(doc)}
+                    className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-white hover:bg-emerald-500 transition-all shrink-0"
+                  >
+                    <Icons.ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
                 
-                {/* BOTÓN FLOTANTE PARA CARGAR EXCEL EN LA MINIATURA */}
-                <label className="absolute right-20 top-1/2 -translate-y-1/2 p-3 bg-white/10 text-emerald-400 rounded-xl hover:bg-emerald-500 hover:text-white cursor-pointer transition-all opacity-0 group-hover/card:opacity-100 shadow-xl border border-white/10" title="Cargar Referencia Excel">
-                  <Icons.Excel className="w-4 h-4" />
-                  <input 
-                    type="file" 
-                    accept=".xlsx,.xls" 
-                    className="hidden" 
-                    onChange={(e) => handleManualExcelUpload(e, doc)} 
-                  />
-                </label>
+                {/* BOTÓN CARGA EXCEL VISIBLE Y CLARO */}
+                {doc.planType === 'MANUAL' && (
+                  <div className="px-6 pb-6 mt-[-10px]">
+                    <label className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border border-emerald-500/20 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg">
+                      <Icons.Excel className="w-4 h-4" />
+                      SUBIR EXCEL DE REFERENCIA
+                      <input 
+                        type="file" 
+                        accept=".xlsx,.xls" 
+                        className="hidden" 
+                        onChange={(e) => handleManualExcelUpload(e, doc)} 
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             ))}
             {filteredDocs.length === 0 && (
