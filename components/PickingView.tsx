@@ -240,63 +240,65 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
 
                 {/* Modal de Finalización (Equipo y Firmas) */}
                 {showSaveModal && (
-                    <div className="fixed inset-0 z-[800] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
-                        <div className="bg-white w-full max-w-3xl rounded-[4rem] p-12 shadow-2xl border border-white/10 space-y-10">
-                            <div className="text-center space-y-3">
-                                <div className="w-20 h-20 bg-emerald-500 text-white rounded-[2rem] mx-auto flex items-center justify-center shadow-2xl mb-4 rotate-3">
-                                    <Icons.Signature className="w-10 h-10" />
+                    <div className="fixed inset-0 z-[800] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-6 animate-in fade-in duration-300">
+                        <div className="bg-white w-full max-w-2xl h-fit max-h-[90vh] rounded-[3rem] p-8 md:p-10 shadow-2xl border border-white/10 flex flex-col space-y-6 overflow-hidden">
+                            <div className="text-center space-y-2 shrink-0">
+                                <div className="w-14 h-14 bg-emerald-500 text-white rounded-[1.5rem] mx-auto flex items-center justify-center shadow-lg mb-2 rotate-3">
+                                    <Icons.Signature className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Finalizar Proceso</h3>
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">¿Con quién más realizó este alistado? (Opcional)</p>
+                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Finalizar Proceso</h3>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-tight">¿Con quién más realizó este alistado? (Opcional)</p>
                             </div>
 
-                            {/* BUSCADOR DE AYUDANTES */}
-                            <div className="px-2">
-                                <div className="relative group">
-                                    <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="BUSCAR POR NOMBRE O ROL..." 
-                                        value={helperSearch}
-                                        onChange={(e) => setHelperSearch(e.target.value)}
-                                        className="w-full pl-11 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-3xl text-[10px] font-black text-slate-900 uppercase outline-none focus:border-emerald-500 focus:bg-white shadow-sm transition-all"
-                                    />
+                            <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-hidden">
+                                {/* BUSCADOR DE AYUDANTES */}
+                                <div className="px-1">
+                                    <div className="relative group">
+                                        <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="BUSCAR EQUIPO..." 
+                                            value={helperSearch}
+                                            onChange={(e) => setHelperSearch(e.target.value)}
+                                            className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[10px] font-black text-slate-900 uppercase outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-inner"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto p-2 custom-scrollbar flex-1 bg-slate-50/50 rounded-[2rem] border border-slate-100">
+                                    {filteredHelpers.map(h => (
+                                        <button 
+                                            key={h.id}
+                                            onClick={() => {
+                                                if (selectedHelpers.find(x => x.id === h.id)) {
+                                                    setSelectedHelpers(prev => prev.filter(x => x.id !== h.id));
+                                                } else if (selectedHelpers.length < 5) {
+                                                    setSelectedHelpers(prev => [...prev, h]);
+                                                }
+                                            }}
+                                            className={`p-3 rounded-2xl border-2 text-left transition-all relative h-fit ${selectedHelpers.find(x => x.id === h.id) ? 'bg-white border-emerald-500 shadow-md scale-[0.98]' : 'bg-white border-transparent hover:border-slate-200'}`}
+                                        >
+                                            <p className={`text-[9px] font-black uppercase truncate ${selectedHelpers.find(x => x.id === h.id) ? 'text-emerald-700' : 'text-slate-600'}`}>{h.name}</p>
+                                            <p className="text-[7px] font-bold text-slate-300 uppercase mt-0.5">{h.role}</p>
+                                            {selectedHelpers.find(x => x.id === h.id) && (
+                                                <div className="absolute top-1 right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                                                    <Icons.Check className="w-2 h-2 text-white" />
+                                                </div>
+                                            )}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-64 overflow-y-auto p-2 custom-scrollbar">
-                                {filteredHelpers.map(h => (
-                                    <button 
-                                        key={h.id}
-                                        onClick={() => {
-                                            if (selectedHelpers.find(x => x.id === h.id)) {
-                                                setSelectedHelpers(prev => prev.filter(x => x.id !== h.id));
-                                            } else if (selectedHelpers.length < 5) {
-                                                setSelectedHelpers(prev => [...prev, h]);
-                                            }
-                                        }}
-                                        className={`p-4 rounded-3xl border-2 text-left transition-all relative ${selectedHelpers.find(x => x.id === h.id) ? 'bg-emerald-50 border-emerald-500 shadow-xl' : 'bg-slate-50 border-slate-50 hover:border-slate-200'}`}
-                                    >
-                                        <p className={`text-[10px] font-black uppercase truncate ${selectedHelpers.find(x => x.id === h.id) ? 'text-emerald-700' : 'text-slate-600'}`}>{h.name}</p>
-                                        <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{h.role}</p>
-                                        {selectedHelpers.find(x => x.id === h.id) && (
-                                            <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
-                                                <Icons.Check className="w-2.5 h-2.5 text-white" />
-                                            </div>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-2 shrink-0 pt-2">
                                 <button 
                                     onClick={processSaveFinal}
-                                    className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-[12px] uppercase tracking-[0.3em] hover:bg-emerald-600 transition-all shadow-2xl flex items-center justify-center gap-4"
+                                    className="w-full py-5 bg-slate-950 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.2em] hover:bg-emerald-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-[0.98]"
                                 >
                                     Confirmar y Guardar Alistado
-                                    <Icons.Zap className="w-5 h-5 text-amber-400" />
+                                    <Icons.Zap className="w-4 h-4 text-amber-400" />
                                 </button>
-                                <button onClick={() => setShowSaveModal(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Cancelar</button>
+                                <button onClick={() => setShowSaveModal(false)} className="py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors">Cancelar / Volver</button>
                             </div>
                         </div>
                     </div>

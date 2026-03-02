@@ -789,12 +789,13 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
 
     const hasDiscrepancies = itemsWithDiscrepancies.length > 0;
     const subject = hasDiscrepancies
-      ? `⚠️ REENVÍO NOVEDADES: ${docL.external_doc_id} [${docL.vehicle_plate || 'S/V'}]`
-      : `✅ REENVÍO CONFORME: ${docL.external_doc_id} [${docL.vehicle_plate || 'S/V'}]`;
+      ? `⚠️ REENVÍO NOVEDADES INVENTARIO AJOVER: ${docL.external_doc_id} [${docL.vehicle_plate || 'S/V'}]`
+      : `✅ REENVÍO INVENTARIO AJOVER: ${docL.external_doc_id} [${docL.vehicle_plate || 'S/V'}]`;
 
     const itemsToShow = hasDiscrepancies ? itemsWithDiscrepancies : items;
 
     const tableRows = itemsToShow.map((it: any) => {
+      const count1 = Number(it.count_1 || 0);
       const counted = Number(it.count_2 || it.count_1 || 0);
       const expected = Number(it.expected_qty || 0);
       const diff = counted - expected;
@@ -809,6 +810,7 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
             </td>
             <td style="padding: 12px; font-size: 10px; color: #64748b;">${it.client_ref || 'S/R'}</td>
             <td style="padding: 12px; font-size: 12px; color: #64748b; text-align: center;">${expected}</td>
+            <td style="padding: 12px; font-size: 12px; color: #64748b; text-align: center;">${count1}</td>
             <td style="padding: 12px; font-size: 12px; color: #0f172a; font-weight: 900; text-align: center; background: #f8fafc;">${counted}</td>
             <td style="padding: 12px; font-size: 11px; color: ${diffColor}; font-weight: bold; text-align: center;">${diff === 0 ? 'OK' : diffPrefix + diff}</td>
             <td style="padding: 12px; font-size: 10px; color: #94a3b8; font-style: italic;">${it.inventory_note || ''}</td>
