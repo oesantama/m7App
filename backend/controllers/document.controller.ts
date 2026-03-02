@@ -23,9 +23,13 @@ export const getDocuments = async (req: Request, res: Response) => {
         SELECT i.*, 
                p.metodo_pago as "paymentMethod", 
                p.vmetodo as "paymentValue", 
-               p.client_ref as "paymentRef"
+               p.client_ref as "paymentRef",
+               c.count_1 as "count1",
+               c.count_2 as "count2",
+               c.inventory_observation as "inventoryNote"
         FROM document_items i
         LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND TRIM(UPPER(i.invoice)) = TRIM(UPPER(p.invoice))
+        LEFT JOIN document_consolidated_items c ON i.document_id = c.document_id AND TRIM(UPPER(i.article_id)) = TRIM(UPPER(c.article_id))
         WHERE i.document_id = d.id
       ) item_with_payment) as items,
       (SELECT json_agg(item_mapped) FROM (
