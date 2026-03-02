@@ -39,6 +39,11 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     const [photos, setPhotos] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Modal de Reporte
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [targetEmails, setTargetEmails] = useState<string[]>([]);
+    const [newEmail, setNewEmail] = useState('');
+
     const filteredDocs = useMemo(() => {
         return documents.filter(d => 
             (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING) &&
@@ -162,25 +167,27 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
         }
     };
 
-    const handleSendReport = async () => {
+    const handleOpenReportModal = () => {
         if (!selectedDoc || novedades.length === 0) return;
-
         const defaultEmails = masterNotificaciones
             .filter(n => n.name?.toLowerCase().includes('inventario') && n.notificationEmail)
             .map(n => n.notificationEmail!);
+        setTargetEmails(defaultEmails);
+        setIsReportModalOpen(true);
+    };
 
-        const emailInput = prompt("Enviar reporte a las siguientes direcciones (separadas por coma):", defaultEmails.join(', '));
-        if (emailInput === null) return;
+    const handleSendReport = async () => {
+        if (!selectedDoc || targetEmails.length === 0) return toast.error("Seleccione al menos un destinatario");
 
-        const emails = emailInput.split(',').map(e => e.trim()).filter(e => e.includes('@'));
-        if (emails.length === 0) return toast.error("Ingrese al menos un correo válido");
-
-        setIsLoading(true);
+        const reportToast = toast.loading("Enviando reporte por correo...");
         try {
-            const res = await api.sendNovedadesReport(selectedDoc.id, emails);
-            if (res.success) toast.success("Reporte enviado con éxito");
+            const res = await api.sendNovedadesReport(selectedDoc.id, targetEmails);
+            if (res.success) {
+                toast.success("Reporte enviado con éxito", { id: reportToast });
+                setIsReportModalOpen(false);
+            }
         } catch (err) {
-            toast.error("Error al enviar reporte");
+            toast.error("Error al enviar reporte", { id: reportToast });
         } finally {
             setIsLoading(false);
         }
@@ -241,7 +248,7 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                 </div>
                             )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">Cantidad</label>
                                     <input 
@@ -313,7 +320,7 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                         <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                             <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Reporte Actual ({novedades.length})</h3>
                             <button 
-                                onClick={handleSendReport}
+                                onClick={handleOpenReportModal}
                                 disabled={novedades.length === 0 || isLoading}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-20"
                             >
@@ -362,6 +369,103 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                         </div>
                     </div>
                 </div>
+
+                {/* Modal de Reporte Profesional */}
+                {isReportModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200">
+                            <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg"><Icons.Send className="w-5 h-5" /></div>
+                                    <div>
+                                        <h3 className="text-sm font-black uppercase tracking-tight">Enviar Reporte</h3>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">{selectedDoc.externalDocId}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setIsReportModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-all"><Icons.Alert className="w-4 h-4 rotate-45" /></button>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Destinatarios Sugeridos</label>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                                        {masterNotificaciones
+                                            .filter(n => n.name?.toLowerCase().includes('inventario') && n.notificationEmail)
+                                            .map((n, i) => (
+                                            <label key={i} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group border-2 ${targetEmails.includes(n.notificationEmail!) ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={targetEmails.includes(n.notificationEmail!)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setTargetEmails(prev => [...prev, n.notificationEmail!]);
+                                                        else setTargetEmails(prev => prev.filter(email => email !== n.notificationEmail));
+                                                    }}
+                                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <div className="min-w-0">
+                                                    <p className="text-[10px] font-black text-slate-900 uppercase truncate">{n.name}</p>
+                                                    <p className="text-[9px] text-blue-600 font-bold">{n.notificationEmail}</p>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Añadir Otro Correo</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="email" 
+                                            value={newEmail}
+                                            onChange={(e) => setNewEmail(e.target.value)}
+                                            placeholder="CORREO@EJEMPLO.COM"
+                                            className="flex-1 p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs outline-none focus:border-blue-500 transition-all shadow-inner"
+                                        />
+                                        <button 
+                                            onClick={() => {
+                                                if (newEmail.includes('@') && !targetEmails.includes(newEmail)) {
+                                                    setTargetEmails(prev => [...prev, newEmail]);
+                                                    setNewEmail('');
+                                                }
+                                            }}
+                                            className="px-6 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-blue-600 transition-all shadow-md active:scale-95"
+                                        >
+                                            AÑADIR
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {targetEmails.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 mt-2">
+                                        {targetEmails.map((email, i) => (
+                                            <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 animate-in zoom-in-95">
+                                                <span className="text-[9px] font-black">{email}</span>
+                                                <button onClick={() => setTargetEmails(prev => prev.filter(e => e !== email))} className="hover:text-red-500 font-bold transition-colors">×</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4">
+                                <button 
+                                    onClick={() => setIsReportModalOpen(false)}
+                                    className="flex-1 py-4 bg-white text-slate-500 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all active:scale-95 shadow-sm"
+                                >
+                                    CANCELAR
+                                </button>
+                                <button 
+                                    onClick={handleSendReport}
+                                    disabled={targetEmails.length === 0 || isLoading}
+                                    className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 disabled:opacity-20 flex items-center justify-center gap-2"
+                                >
+                                    {isLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Icons.Send className="w-4 h-4" />}
+                                    ENVIAR REPORTE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }

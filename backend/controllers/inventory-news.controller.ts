@@ -104,7 +104,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
             </html>
         `;
 
-        const subject = `⚠️ REPORTE DE NOVEDADES: ${doc.external_doc_id} [${doc.vehicle_plate || 'S/V'}]`;
+        const subject = `⚠️ REPORTE DE NOVEDADES: ${doc.external_doc_id || doc.externalDocId} [${doc.vehicle_data || doc.vehicleData || 'S/V'}]`;
         
         for (const email of targetEmails) {
             await sendEmail(email, subject, html);
@@ -112,6 +112,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
 
         res.json({ success: true, message: "Reporte enviado correctamente" });
     } catch (err: any) {
+        console.error('[REPORT-ERROR]', err);
         res.status(500).json({ error: "Error al enviar reporte", details: err.message });
     }
 };
