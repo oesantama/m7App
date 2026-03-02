@@ -191,6 +191,8 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
 
         // Mapeo selectivo según tipo detectado
         const iArt = findIdx(['articulo', 'item', 'codigo', 'sku']);
+        const iUn = findIdx(['un orig', 'un', 'un code', 'cod plan']);
+        const iRef = findIdx(['ref 1', 'referencia', 'client ref', 'ref']);
         const iCant = findIdx(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
         const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
         const iFactura = findIdx(['remision', 'factura', 'documento', 'invoice']);
@@ -235,7 +237,9 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
             invoice: iFactura !== -1 ? String(row[iFactura]) : '',
             city: iCity !== -1 ? String(row[iCity]) : '',
             address: iDir !== -1 ? String(row[iDir]) : '',
-            volume: String(volVal)
+            volume: String(volVal),
+            unCode: iUn !== -1 ? String(row[iUn]) : '',
+            clientRef: iRef !== -1 ? String(row[iRef]) : ''
           } as DocumentLItem);
 
           consolidatedItems.push({

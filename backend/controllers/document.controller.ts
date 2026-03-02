@@ -165,17 +165,24 @@ export const syncInventory = async (req: Request, res: Response) => {
 
     // 3. Actualizar DETALLE (Solo notas, batch y conteos - item_status NO se toca por solicitud del usuario)
     for (const item of items) {
+      const artId = (item.articleId || item.article_id || '').trim().toUpperCase();
+      if (!artId) continue;
+
       await client.query(`
-        UPDATE document_items 
-        SET notes = $1, batch = $2, count_1 = $3, count_2 = $4
-        WHERE document_id = $5 AND article_id = $6
+        INSERT INTO document_items (document_id, article_id, notes, batch, count_1, count_2, expected_qty)
+        VALUES ($1, $2, $3, $4, $5, $6, 0)
+        ON CONFLICT (document_id, article_id) DO UPDATE SET
+        notes = EXCLUDED.notes,
+        batch = EXCLUDED.batch,
+        count_1 = EXCLUDED.count_1,
+        count_2 = EXCLUDED.count_2
       `, [
-        item.inventoryNote || '',
-        item.batch || 'S/L',
-        item.count1 || 0,
-        item.count2 || item.countedQty || 0,
         docId,
-        (item.articleId || '').trim().toUpperCase()
+        artId,
+        item.inventoryNote || item.notes || '',
+        item.batch || 'S/L',
+        Number(item.count1 || 0),
+        Number(item.count2 || item.countedQty || 0)
       ]);
     }
 
@@ -512,11 +519,11 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               ON CONFLICT (document_id, article_id) DO UPDATE SET
               expected_qty = EXCLUDED.expected_qty,
-              count_1 = EXCLUDED.count_1,
-              count_2 = EXCLUDED.count_2,
-              picked_qty = EXCLUDED.picked_qty,
-              dispatched_qty = EXCLUDED.dispatched_qty,
-              inventory_observation = EXCLUDED.inventory_observation
+              count_1 = COALESCE(NULLIF(EXCLUDED.count_1, 0), document_consolidated_items.count_1),
+              count_2 = COALESCE(NULLIF(EXCLUDED.count_2, 0), document_consolidated_items.count_2),
+              picked_qty = COALESCE(NULLIF(EXCLUDED.picked_qty, 0), document_consolidated_items.picked_qty),
+              dispatched_qty = COALESCE(NULLIF(EXCLUDED.dispatched_qty, 0), document_consolidated_items.dispatched_qty),
+              inventory_observation = COALESCE(NULLIF(EXCLUDED.inventory_observation, ''), document_consolidated_items.inventory_observation)
            `, [
             doc.id,
             articleId,

@@ -42,12 +42,15 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [showHistory, setShowHistory] = useState(false);
 
   const pendingRecibo = useMemo(() =>
-    documents.filter(d => d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING),
+    documents.filter(d => 
+      String(d.status).toUpperCase() === DocStatus.PENDING.toUpperCase() || 
+      String(d.status).toUpperCase() === DocStatus.COUNTING.toUpperCase()
+    ),
     [documents]
   );
 
   const completedRecibo = useMemo(() =>
-    documents.filter(d => d.status === DocStatus.INVENTORED),
+    documents.filter(d => String(d.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase()),
     [documents]
   );
 
@@ -194,6 +197,8 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
         // Mapeo selectivo según tipo detectado
         const iArt = findIdx(['articulo', 'item', 'codigo', 'sku']);
+        const iUn = findIdx(['un orig', 'un', 'un code', 'cod plan']);
+        const iRef = findIdx(['ref 1', 'referencia', 'client ref', 'ref']);
         const iCant = findIdx(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
         const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
         const iFactura = findIdx(['remision', 'factura', 'documento', 'invoice']);
@@ -239,7 +244,9 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
             invoice: iFactura !== -1 ? String(row[iFactura]) : '',
             city: iCity !== -1 ? String(row[iCity]) : '',
             address: iDir !== -1 ? String(row[iDir]) : '',
-            volume: String(volVal)
+            volume: String(volVal),
+            unCode: iUn !== -1 ? String(row[iUn]) : '',
+            clientRef: iRef !== -1 ? String(row[iRef]) : ''
           });
 
           consolidatedItems.push({
@@ -394,7 +401,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                       <Icons.Package />
                     </div>
                     <div className="text-right flex flex-col items-end gap-2">
-                      <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border tracking-widest ${doc.status === DocStatus.COUNTING ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                      <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border tracking-widest ${String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase() ? 'bg-blue-50 text-blue-600 border-blue-100' : (String(doc.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase() ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100')}`}>
                         {doc.status}
                       </span>
                       {doc.planType === 'MANUAL' && (
@@ -402,7 +409,11 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                           MODO MANUAL
                         </span>
                       )}
-                      <p className="text-[9px] text-slate-400 font-black uppercase mt-1 tracking-widest">{new Date(doc.createdAt).toLocaleDateString()}</p>
+                      <p className="text-[9px] text-slate-400 font-black uppercase mt-1 tracking-widest">
+                        {doc.inventoryDate && !isNaN(new Date(doc.inventoryDate).getTime()) 
+                          ? new Date(doc.inventoryDate).toLocaleDateString() + ' ' + new Date(doc.inventoryDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : (doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : 'SIN FECHA')}
+                      </p>
                     </div>
                   </div>
 
@@ -430,8 +441,8 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                       disabled={doc.status === DocStatus.INVENTORED || !hasPermission(user, 'RECIBIDO_MATERIAL', 'create')}
                       className={`w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-3 ${(doc.status === DocStatus.INVENTORED || !hasPermission(user, 'RECIBIDO_MATERIAL', 'create')) ? 'opacity-20 cursor-not-allowed hidden' : 'hover:bg-emerald-600 active:scale-95'}`}
                     >
-                      {doc.status === DocStatus.COUNTING ? <Icons.Audit /> : <Icons.Signature />}
-                      {doc.status === DocStatus.INVENTORED ? 'INVENTARIADO' : (doc.status === DocStatus.COUNTING ? 'CONTINUAR' : 'AUDITAR')}
+                      {String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase() ? <Icons.Audit /> : <Icons.Signature />}
+                      {String(doc.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase() ? 'INVENTARIADO' : (String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase() ? 'CONTINUAR' : 'AUDITAR')}
                     </button>
 
                     {/* BOTONES CARGA EXCEL PARA MANUALES (Plan Normal / Plan R) */}
