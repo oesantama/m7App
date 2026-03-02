@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 
 const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'roles': ['name', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+  'categories': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'modules': ['name', 'icon_class', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'pages': ['name', 'route', 'module_id', 'parent_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'clients': ['name', 'logo_url', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
