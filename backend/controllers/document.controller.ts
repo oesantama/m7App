@@ -168,22 +168,36 @@ export const syncInventory = async (req: Request, res: Response) => {
       const artId = (item.articleId || item.article_id || '').trim().toUpperCase();
       if (!artId) continue;
 
-      await client.query(`
-        INSERT INTO document_items (document_id, article_id, notes, batch, count_1, count_2, expected_qty)
-        VALUES ($1, $2, $3, $4, $5, $6, 0)
-        ON CONFLICT (document_id, article_id) DO UPDATE SET
-        notes = EXCLUDED.notes,
-        batch = EXCLUDED.batch,
-        count_1 = EXCLUDED.count_1,
-        count_2 = EXCLUDED.count_2
-      `, [
-        docId,
-        artId,
-        item.inventoryNote || item.notes || '',
-        item.batch || 'S/L',
-        Number(item.count1 || 0),
-        Number(item.count2 || item.countedQty || 0)
-      ]);
+      // [M7-PATCH] Estrategia SELECT -> UPDATE/INSERT para evitar error de constraint único
+      const checkItem = await client.query(
+        'SELECT id FROM document_items WHERE document_id = $1 AND article_id = $2 LIMIT 1',
+        [docId, artId]
+      );
+
+      if (checkItem.rowCount && checkItem.rowCount > 0) {
+        await client.query(`
+          UPDATE document_items SET
+            notes = $1, batch = $2, count_1 = $3, count_2 = $4
+          WHERE document_id = $5 AND article_id = $6
+        `, [
+          item.inventoryNote || item.notes || '',
+          item.batch || 'S/L',
+          Number(item.count1 || 0),
+          Number(item.count2 || item.countedQty || 0),
+          docId, artId
+        ]);
+      } else {
+        await client.query(`
+          INSERT INTO document_items (document_id, article_id, notes, batch, count_1, count_2, expected_qty, invoice)
+          VALUES ($1, $2, $3, $4, $5, $6, 0, 'S/I')
+        `, [
+          docId, artId,
+          item.inventoryNote || item.notes || '',
+          item.batch || 'S/L',
+          Number(item.count1 || 0),
+          Number(item.count2 || item.countedQty || 0)
+        ]);
+      }
     }
 
     await client.query('COMMIT');
