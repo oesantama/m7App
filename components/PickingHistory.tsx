@@ -254,13 +254,23 @@ const PickingHistory: React.FC<PickingHistoryProps> = ({ onBack }) => {
                         </div>
                         <div className="flex-1 overflow-y-auto p-8 space-y-3 custom-scrollbar">
                            {(viewDetail.items || []).map((item: any, i: number) => (
-                               <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center">
-                                   <div>
-                                       <p className="text-sm font-black text-slate-900">{item.articleName || item.sku}</p>
-                                       <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku}</p>
+                               <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center group/item hover:bg-white transition-all shadow-sm">
+                                   <div className="flex-1 min-w-0">
+                                       <p className="text-sm font-black text-slate-900 truncate">{item.articleName || item.sku}</p>
+                                       <div className="flex items-center gap-2 mt-1">
+                                          <p className="text-[10px] font-bold text-slate-400 uppercase">SKU: {item.sku}</p>
+                                          {item.unCode && <span className="text-[8px] bg-slate-200 text-slate-500 px-1.5 rounded font-black uppercase">{item.unCode}</span>}
+                                       </div>
                                    </div>
-                                   <div className="text-right">
-                                       <p className="text-lg font-black text-indigo-600">{item.expectedQty} <span className="text-[10px] text-slate-400">{item.unit || 'UND'}</span></p>
+                                   <div className="text-right flex items-center gap-4">
+                                       <div className="text-right">
+                                          <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5 tracking-tighter">Esperado</p>
+                                          <p className="text-xs font-black text-slate-400">{item.qty || 0} {item.unit || 'UND'}</p>
+                                       </div>
+                                       <div className="text-right bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
+                                          <p className="text-[8px] font-black text-indigo-400 uppercase mb-0.5 tracking-tighter">Alistado</p>
+                                          <p className="text-lg font-black text-indigo-600">{item.receivedQty || 0}</p>
+                                       </div>
                                    </div>
                                </div>
                            ))}

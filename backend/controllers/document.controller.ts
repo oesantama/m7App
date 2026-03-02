@@ -600,15 +600,25 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(document_items.client_ref) as "clientRef",
         MAX(COALESCE(p.vmetodo::numeric, 0)) as "invoiceValue",
         MAX(p.metodo_pago) as "paymentMethod",
-        JSON_AGG(JSON_BUILD_OBJECT(
-          'sku', document_items.article_id,
-          'qty', document_items.expected_qty,
-          'receivedQty', document_items.received_qty,
-          'articleName', COALESCE(articles.name, document_items.article_id),
-          'unit', document_items.unit,
-          'unCode', document_items.un_code,
-          'clientRef', document_items.client_ref
-        )) as "items",
+        (
+          SELECT JSON_AGG(JSON_BUILD_OBJECT(
+            'sku', items_sub.article_id,
+            'qty', SUM(items_sub.expected_qty),
+            'receivedQty', SUM(items_sub.received_qty),
+            'articleName', MAX(COALESCE(art_sub.name, items_sub.article_id)),
+            'unit', MAX(items_sub.unit),
+            'unCode', MAX(items_sub.un_code),
+            'clientRef', MAX(items_sub.client_ref)
+          ))
+          FROM document_items items_sub
+          LEFT JOIN articles art_sub ON items_sub.article_id = art_sub.id
+          WHERE items_sub.document_id = document_items.document_id 
+          AND (
+            TRIM(COALESCE(NULLIF(items_sub.invoice, ''), items_sub.order_number)) 
+            = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
+          )
+          GROUP BY items_sub.article_id
+        ) as "items",
         6.2518 as lat,
         -75.5636 as lng
       FROM document_items
@@ -657,7 +667,7 @@ export const getInvoices = async (req: Request, res: Response) => {
          )`;
       });
       if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;
-    } else {
+    } else if (history !== 'true') {
       query += ` AND (
         documents_l.status NOT IN ('Finalizado', 'Entregado', 'ELIMINADO') 
         OR documents_l.status IS NULL
