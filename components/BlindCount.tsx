@@ -64,6 +64,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  const processingTimer = useRef<NodeJS.Timeout | null>(null);
   const [mismatchIds, setMismatchIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [validationAttempts, setValidationAttempts] = useState(0);
@@ -267,74 +268,81 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase();
 
+    // Limpiar cualquier temporizador pendiente si el usuario sigue "escribiendo" (ráfaga de scanner)
+    if (processingTimer.current) {
+      clearTimeout(processingTimer.current);
+      processingTimer.current = null;
+    }
+
     // Si estamos en periodo de bloqueo (procesando basura post-escaneo), forzamos limpieza
     if (ignoreScan.current) {
       setScanInput('');
       return;
     }
 
-    // M7 REVOLUTION V2: Algoritmo de Longest Prefix Match con Delimitadores
+    // M7 REVOLUTION V8: Speed-Buffered Logic
     // Solo disparamos el match automático si vemos un indicio de "basura de hardware" (:, Ñ, S4:)
     const scannerGarbageRegex = /(:|Ñ|S4:)/i;
     const match = val.match(scannerGarbageRegex);
 
     if (match) {
-      // M7 ULTIMATE: Analizamos la cadena COMPLETA hasta el momento
-      // Ya no cortamos por el delimitador, lo usamos solo como trigger.
-      // Esto permite que si 'S4' es parte legítima del SKU, se encuentre.
-      let bestMatch: string | null = null;
-      
-      if (val.length >= 3) {
-        for (let i = val.length; i >= 3; i--) {
-          const prefix = val.substring(0, i);
-          
-          const inPlan = groupedItems.some(it => 
-            it.articleId?.toUpperCase() === prefix || 
-            it.sku?.toUpperCase() === prefix
-          );
-          
-          const inMaster = (masterArticulo as Article[]).some(a => 
-            a.sku?.toUpperCase() === prefix || 
-            a.barcode?.toUpperCase() === prefix || 
-            a.id?.toUpperCase() === prefix
-          );
+      // SET SCAN INPUT para que se vea visualmente mientras esperamos el buffer
+      setScanInput(val);
 
-          if (inPlan || inMaster) {
-            bestMatch = prefix;
-            break;
+      // Iniciamos un pequeño buffer (60ms) para asegurar que el scanner terminó de enviar la cadena
+      // Esto evita que ráfagas rápidas se procesen como "artículos nuevos" accidentalmente.
+      processingTimer.current = setTimeout(() => {
+          // ANALISIS FINAL DE LA CADENA COMPLETA
+          let bestMatch: string | null = null;
+          
+          if (val.length >= 3) {
+            for (let i = val.length; i >= 3; i--) {
+              const prefix = val.substring(0, i);
+              
+              const inPlan = groupedItems.some(it => 
+                it.articleId?.toUpperCase() === prefix || 
+                it.sku?.toUpperCase() === prefix
+              );
+              
+              const inMaster = (masterArticulo as Article[]).some(a => 
+                a.sku?.toUpperCase() === prefix || 
+                a.barcode?.toUpperCase() === prefix || 
+                a.id?.toUpperCase() === prefix
+              );
+
+              if (inPlan || inMaster) {
+                bestMatch = prefix;
+                break;
+              }
+            }
           }
-        }
-      }
 
-      if (bestMatch && bestMatch !== scanInput) {
-        processBarcode(bestMatch);
-        ignoreScan.current = true;
-        setTimeout(() => {
-          ignoreScan.current = false;
-          setScanInput('');
-        }, 500);
-        setScanInput('');
-      } else if (!bestMatch && allowExtraItems) {
-        // FALLBACK M7: Si no hay match en DB pero es un artículo nuevo, 
-        // tomamos lo que está antes del trigger de hardware.
-        const fallbackMatch = val.split(match[0])[0];
-        if (fallbackMatch && fallbackMatch.length >= 3) {
-           processBarcode(fallbackMatch);
-           ignoreScan.current = true;
-           setTimeout(() => {
-             ignoreScan.current = false;
-             setScanInput('');
-           }, 500);
-           setScanInput('');
-        }
-      } else {
-        // Opción de seguridad: Si hay delimitador pero no encontramos NINGUNA coincidencia en DB,
-        // no limpiamos de inmediato para permitir que el operario vea el error o termine de escanear.
-        // Pero si el código es basura pura (ej. "::::"), limpiamos.
-        if (val.length > 15) setScanInput('');
-      }
+          if (bestMatch) {
+            processBarcode(bestMatch);
+            ignoreScan.current = true;
+            setTimeout(() => {
+              ignoreScan.current = false;
+              setScanInput('');
+            }, 300); // Bloqueo reducido para permitir ráfagas rápidas de diferentes artículos
+            setScanInput('');
+          } else if (allowExtraItems) {
+            // FALLBACK M7: Solo después de la pausa de 60ms tomamos lo anterior al trigger
+            const fallbackMatch = val.split(match[0])[0];
+            if (fallbackMatch && fallbackMatch.length >= 3) {
+               processBarcode(fallbackMatch);
+               ignoreScan.current = true;
+               setTimeout(() => {
+                 ignoreScan.current = false;
+                 setScanInput('');
+               }, 300);
+               setScanInput('');
+            }
+          }
+          processingTimer.current = null;
+      }, 60); 
+
     } else {
-      // Si NO hay delimitador, solo acumulamos (evita procesar "D751600" si el usuario va para "D751600G")
+      // Si NO hay delimitador, solo acumulamos
       setScanInput(val);
     }
   };

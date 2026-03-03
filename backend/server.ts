@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import apiRoutes from './routes/index.js';
 import { initDeliveryTables } from './controllers/dispatch.controller.js';
+import { initScheduler } from './services/scheduler.service.js';
 
 
 dotenv.config();
@@ -79,6 +80,7 @@ app.listen(PORT, () => {
   console.log(`[ORBIT-SYSTEM] Versión: 1.0.5-FORCE-SYNC - NUCLEAR-RELOAD`);
   console.log(`[ORBIT-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
+  initScheduler();
 
   // Inicialización de WhatsApp 
   console.log('[ORBIT-SYSTEM] Evolution API Integration Active');
