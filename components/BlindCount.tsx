@@ -239,14 +239,17 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase();
 
-    // Si estamos en periodo de bloqueo (procesando basura post-Ñ), forzamos limpieza
+    // Si estamos en periodo de bloqueo (procesando basura post-escaneo), forzamos limpieza
     if (ignoreScan.current) {
       setScanInput('');
       return;
     }
 
-    if (val.includes('Ñ')) {
-      const cleanCode = val.split('Ñ')[0];
+    // M7 FIX: Detección inteligente de fin de código (Ñ o S4:)
+    const codeSeparator = val.includes('Ñ') ? 'Ñ' : (val.includes('S4:') ? 'S4:' : null);
+
+    if (codeSeparator) {
+      const cleanCode = val.split(codeSeparator)[0];
       if (cleanCode) {
         processBarcode(cleanCode);
 
