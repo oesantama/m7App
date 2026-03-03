@@ -180,6 +180,7 @@ export interface DocumentLItem {
   paymentMethod?: string;
   paymentValue?: string;
   paymentRef?: string;
+  notes?: string;
 }
 
 export interface Invoice extends AuditBase {

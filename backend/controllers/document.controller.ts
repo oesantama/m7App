@@ -551,7 +551,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             item.count2 || 0,
             item.pickedQty || 0,
             item.dispatchedQty || 0,
-            item.inventoryObservation || item.observation || ''
+            '' // M7-FIX: Las notas de auditoría deben empezar vacías
           ]);
         }
       } else if (doc.items && doc.items.length > 0) {
@@ -565,7 +565,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
                VALUES ($1, $2, $3, $4)
                ON CONFLICT (document_id, article_id) DO UPDATE SET
                expected_qty = EXCLUDED.expected_qty
-            `, [doc.id, articleId, item.expectedQty || 0, item.observation || '']);
+            `, [doc.id, articleId, item.expectedQty || 0, '']);
         }
       }
     }

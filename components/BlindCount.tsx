@@ -55,7 +55,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [itemObservations, setItemObservations] = useState<{ [articleId: string]: string }>(() => {
     const initial: { [id: string]: string } = {};
     docL.items.forEach(it => {
-      if (it.inventoryNote) initial[it.articleId] = it.inventoryNote;
+      // M7-FIX: Solo cargar si es una nota REAL de inventario, no instrucciones de entrega
+      // Las instrucciones de entrega vienen en 'notes', no en 'inventoryNote'
+      if (it.inventoryNote && it.inventoryNote !== it.notes) {
+        initial[it.articleId] = it.inventoryNote;
+      }
     });
     return initial;
   });
@@ -80,6 +84,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     type: 'CONVERT' | 'REVERSE';
     articleId: string;
     currentQty: number;
+    qtyToProcess: number; // Nueva: cantidad parcial
     options: {
       id: string;
       label: string;
@@ -548,6 +553,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
         type,
         articleId,
         currentQty,
+        qtyToProcess: currentQty, // Por defecto procesamos todo
         options,
     });
   };
@@ -556,19 +562,28 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (!unitTransaction || !unitTransaction.selectedOption) return;
 
     const opt = unitTransaction.selectedOption;
+    const qtyToProc = unitTransaction.qtyToProcess;
     
+    // M7-LOGIC: (qtyToProcess * factor) + (originalQty - qtyToProcess)
+    const convertedPart = opt.operation === 'multiply' 
+        ? (qtyToProc * opt.factor) 
+        : (qtyToProc / opt.factor);
+    
+    const remainder = unitTransaction.currentQty - qtyToProc;
+    const finalResult = Number((convertedPart + remainder).toFixed(2));
+
     // Validación de decimales
-    if (!Number.isInteger(Number(opt.resultQty))) {
-        if(!confirm(`La operación resultará en decimales (${(Number(opt.resultQty) || 0).toFixed(2)}). ¿Continuar?`)) return;
+    if (!Number.isInteger(finalResult)) {
+        if(!confirm(`La operación resultará en decimales (${finalResult}). ¿Continuar?`)) return;
     }
 
     setCounts(prev => ({
       ...prev,
-      [unitTransaction.articleId]: Number((Number(opt.resultQty) || 0).toFixed(2))
+      [unitTransaction.articleId]: finalResult
     }));
 
     const opSymbol = opt.operation === 'multiply' ? 'x' : '/';
-    const logMsg = `${unitTransaction.type === 'CONVERT' ? 'Conv' : 'Rev'}: ${unitTransaction.currentQty} ${opt.sourceUnit} ${opSymbol} ${opt.factor} = ${(Number(opt.resultQty) || 0).toFixed(2)} ${opt.targetUnit}`;
+    const logMsg = `${unitTransaction.type === 'CONVERT' ? 'Conv' : 'Rev'} PARCIAL: ${qtyToProc} ${opt.sourceUnit} ${opSymbol} ${opt.factor} + ${remainder} rem = ${finalResult} ${opt.targetUnit}`;
 
     setItemObservations(prev => ({
       ...prev,
@@ -853,6 +868,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                     <th className="px-4 py-4 text-center min-w-[100px]">Auditado</th>
                     <th className="px-4 py-4 text-right min-w-[60px]">UM</th>
                     <th className="px-4 py-4 text-right cursor-pointer hover:text-emerald-400 min-w-[80px]" onClick={() => requestSort('volume')}>Vol{getSortIndicator('volume')}</th>
+                    <th className="px-4 py-4 text-left min-w-[200px]">Instrucciones Entrega</th>
                     <th className="px-4 py-4 text-left min-w-[200px]">Notas Inventario</th>
                     <th className="px-4 py-4 text-right pr-6 min-w-[80px]">Acción</th>
                   </tr>
@@ -887,11 +903,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
                         <td className="px-4 py-3 text-right text-[9px] text-slate-500">{it.unit || 'UND'}</td>
                         <td className="px-4 py-3 text-right text-[9px] text-slate-500">{(it as any).volume || '-'}</td>
                         <td className="px-4 py-3 text-left">
+                          <div className="max-w-[180px] break-words text-[8px] text-slate-400 font-bold italic uppercase leading-tight">
+                            {it.notes || '-'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-left">
                           <input
                             type="text"
                             value={itemObservations[it.articleId] || ''}
                             onChange={(e) => setItemObservations(prev => ({ ...prev, [it.articleId]: e.target.value }))}
-                            placeholder="NOTA SKU..."
+                            placeholder="AÑADIR NOVEDAD..."
                             className="w-full bg-slate-50 border border-transparent rounded-lg px-2 py-1 text-[8px] font-bold text-slate-600 outline-none focus:bg-white focus:border-emerald-500 transition-all uppercase"
                           />
                         </td>
@@ -1073,30 +1094,58 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
              {/* Selector de Opciones */}
              <div className="space-y-4 mb-8">
-                <p className="text-left text-[9px] font-black text-slate-400 uppercase ml-2">Seleccione Operación:</p>
-                {unitTransaction.options.map(opt => (
-                    <div 
-                        key={opt.id}
-                        onClick={() => setUnitTransaction({...unitTransaction, selectedOption: opt})}
-                        className={`cursor-pointer p-4 rounded-2xl border-2 transition-all group relative overflow-hidden ${unitTransaction.selectedOption?.id === opt.id ? (unitTransaction.type === 'CONVERT' ? 'border-blue-500 bg-blue-50/50' : 'border-amber-500 bg-amber-50/50') : 'border-slate-100 bg-white hover:border-slate-300'}`}
-                    >
-                         <div className="flex justify-between items-center relative z-10">
-                            <div className="text-left">
-                                <p className="text-[11px] font-black uppercase text-slate-800">{opt.label}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">Factor: {opt.factor}</span>
-                                    <span className="text-[9px] font-bold text-slate-400">{opt.sourceUnit} → {opt.targetUnit}</span>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <p className={`text-xl font-black ${unitTransaction.type === 'CONVERT' ? 'text-blue-600' : 'text-amber-600'}`}>
-                                    {(Number(opt.resultQty) || 0).toFixed(2).replace(/\.00$/, '')}
-                                </p>
-                                <p className="text-[8px] font-bold text-slate-400 uppercase">Resultado</p>
-                            </div>
-                         </div>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
+                    <p className="text-left text-[9px] font-black text-slate-400 uppercase mb-2">Cantidad a Procesar (de {unitTransaction.currentQty}):</p>
+                    <div className="flex items-center gap-4">
+                        <input 
+                            type="number"
+                            min={0}
+                            max={unitTransaction.currentQty}
+                            value={unitTransaction.qtyToProcess}
+                            onChange={(e) => {
+                                const val = Math.min(unitTransaction.currentQty, Math.max(0, Number(e.target.value)));
+                                setUnitTransaction({...unitTransaction, qtyToProcess: val});
+                            }}
+                            className="bg-white border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-black text-slate-900 w-full outline-none focus:border-blue-500 transition-all"
+                        />
+                        <div className="shrink-0 flex flex-col items-center">
+                            <span className="text-[10px] font-black text-slate-300">EXCEDENTE</span>
+                            <span className="text-xs font-black text-slate-900">{(unitTransaction.currentQty - unitTransaction.qtyToProcess).toFixed(2).replace(/\.00$/, '')}</span>
+                        </div>
                     </div>
-                ))}
+                </div>
+
+                <p className="text-left text-[9px] font-black text-slate-400 uppercase ml-2">Seleccione Operación:</p>
+                {unitTransaction.options.map(opt => {
+                    const partialResult = opt.operation === 'multiply' 
+                        ? (unitTransaction.qtyToProcess * opt.factor) 
+                        : (unitTransaction.qtyToProcess / opt.factor);
+                    const finalDisplayResult = (partialResult + (unitTransaction.currentQty - unitTransaction.qtyToProcess)).toFixed(2).replace(/\.00$/, '');
+
+                    return (
+                        <div 
+                            key={opt.id}
+                            onClick={() => setUnitTransaction({...unitTransaction, selectedOption: opt})}
+                            className={`cursor-pointer p-4 rounded-2xl border-2 transition-all group relative overflow-hidden ${unitTransaction.selectedOption?.id === opt.id ? (unitTransaction.type === 'CONVERT' ? 'border-blue-500 bg-blue-50/50' : 'border-amber-500 bg-amber-50/50') : 'border-slate-100 bg-white hover:border-slate-300'}`}
+                        >
+                             <div className="flex justify-between items-center relative z-10">
+                                <div className="text-left">
+                                    <p className="text-[11px] font-black uppercase text-slate-800">{opt.label}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">Factor: {opt.factor}</span>
+                                        <span className="text-[9px] font-bold text-slate-400">{opt.sourceUnit} → {opt.targetUnit}</span>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className={`text-xl font-black ${unitTransaction.type === 'CONVERT' ? 'text-blue-600' : 'text-amber-600'}`}>
+                                        {finalDisplayResult}
+                                    </p>
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase">Resultado Total</p>
+                                </div>
+                             </div>
+                        </div>
+                    );
+                })}
              </div>
 
              <div className="grid grid-cols-2 gap-4">
