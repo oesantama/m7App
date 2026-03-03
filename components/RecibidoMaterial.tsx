@@ -326,6 +326,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
             onCancel={() => setSelectedDocForCount(null)}
             onAddArticleToMaster={onAddArticleToMaster}
             onAddNotificationToMaster={onAddNotificationToMaster}
+            allowExtraItems={true}
           />
         </div>
       ) : (

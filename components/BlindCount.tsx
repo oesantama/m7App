@@ -124,7 +124,35 @@ const BlindCount: React.FC<BlindCountProps> = ({
     return Object.values(groups);
   }, [docL.items, extraItems]);
 
-  // ... (Efectos de localStorage y Cloud Sync se mantienen igual)
+  // AUTO-SAVE CLOUD M7 (Protección de Datos en Tiempo Real)
+  useEffect(() => {
+    // Evitar disparo inicial vacío
+    if (!isLoaded.current) {
+      isLoaded.current = true;
+      return;
+    }
+
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+    setSyncStatus('syncing');
+    autoSaveTimer.current = setTimeout(() => {
+      const finalItems: DocumentLItem[] = groupedItems.map(it => ({
+        ...it,
+        countedQty: counts[it.articleId] || 0,
+        count1: count1Data[it.articleId] || 0,
+        count2: counts[it.articleId] || 0,
+        inventoryNote: itemObservations[it.articleId] || '',
+      }));
+
+      onPartialSave(finalItems, inventoryObservation);
+      setSyncStatus('synced');
+      setLastSyncTime(new Date());
+    }, 2000); // 2 segundos de debounce
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [counts, itemObservations, inventoryObservation, groupedItems]);
 
   const processBarcode = (rawCode: string) => {
     const input = rawCode.trim().toUpperCase().replace(/'/g, '-');
@@ -245,47 +273,55 @@ const BlindCount: React.FC<BlindCountProps> = ({
       return;
     }
 
-    // M7 REVOLUTION: Algoritmo de Longest Prefix Match (Búsqueda por Prefijo Más Largo)
-    // Buscamos la sub-cadena más larga (empezando desde el inicio) que sea un SKU o Barcode real.
-    let bestMatch: string | null = null;
-    
-    // Solo intentamos el match si la cadena tiene una longitud razonable
-    if (val.length >= 3) {
-      for (let i = val.length; i >= 3; i--) {
-        const prefix = val.substring(0, i);
-        
-        // ¿Existe este prefijo en el plan actual?
-        const inPlan = groupedItems.some(it => 
-          it.articleId?.toUpperCase() === prefix || 
-          it.sku?.toUpperCase() === prefix
-        );
-        
-        // ¿Existe este prefijo en el maestro de artículos?
-        const inMaster = (masterArticulo as Article[]).some(a => 
-          a.sku?.toUpperCase() === prefix || 
-          a.barcode?.toUpperCase() === prefix || 
-          a.id?.toUpperCase() === prefix
-        );
+    // M7 REVOLUTION V2: Algoritmo de Longest Prefix Match con Delimitadores
+    // Solo disparamos el match automático si vemos un indicio de "basura de hardware" (:, Ñ, S4:)
+    const scannerGarbageRegex = /(:|Ñ|S4:)/i;
+    const match = val.match(scannerGarbageRegex);
 
-        if (inPlan || inMaster) {
-          bestMatch = prefix;
-          break;
+    if (match) {
+      // M7 ULTIMATE: Analizamos la cadena COMPLETA hasta el momento
+      // Ya no cortamos por el delimitador, lo usamos solo como trigger.
+      // Esto permite que si 'S4' es parte legítima del SKU, se encuentre.
+      let bestMatch: string | null = null;
+      
+      if (val.length >= 3) {
+        for (let i = val.length; i >= 3; i--) {
+          const prefix = val.substring(0, i);
+          
+          const inPlan = groupedItems.some(it => 
+            it.articleId?.toUpperCase() === prefix || 
+            it.sku?.toUpperCase() === prefix
+          );
+          
+          const inMaster = (masterArticulo as Article[]).some(a => 
+            a.sku?.toUpperCase() === prefix || 
+            a.barcode?.toUpperCase() === prefix || 
+            a.id?.toUpperCase() === prefix
+          );
+
+          if (inPlan || inMaster) {
+            bestMatch = prefix;
+            break;
+          }
         }
       }
-    }
 
-    // Si encontramos un match real (un SKU que conocemos), procesamos inmediatamente
-    // y bloqueamos el input para que la "basura" del scanner no ensucie la siguiente lectura.
-    if (bestMatch && bestMatch !== scanInput) {
-      processBarcode(bestMatch);
-      ignoreScan.current = true;
-      setTimeout(() => {
-        ignoreScan.current = false;
+      if (bestMatch && bestMatch !== scanInput) {
+        processBarcode(bestMatch);
+        ignoreScan.current = true;
+        setTimeout(() => {
+          ignoreScan.current = false;
+          setScanInput('');
+        }, 500);
         setScanInput('');
-      }, 500);
-      setScanInput('');
+      } else {
+        // Opción de seguridad: Si hay delimitador pero no encontramos NINGUNA coincidencia en DB,
+        // no limpiamos de inmediato para permitir que el operario vea el error o termine de escanear.
+        // Pero si el código es basura pura (ej. "::::"), limpiamos.
+        if (val.length > 15) setScanInput('');
+      }
     } else {
-      // Si no hay match de prefijo, seguimos acumulando el input (para búsqueda manual o códigos nuevos)
+      // Si NO hay delimitador, solo acumulamos (evita procesar "D751600" si el usuario va para "D751600G")
       setScanInput(val);
     }
   };
