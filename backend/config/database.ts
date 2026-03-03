@@ -18,8 +18,9 @@ const pool = new Pool({
   connectionString,
 });
 
-pool.on('connect', () => {
-  console.log('[M7-DB] Cliente conectado a la base de datos');
+pool.on('connect', (client) => {
+  client.query("SET TIME ZONE 'America/Bogota'");
+  console.log('[M7-DB] Cliente conectado y zona horaria establecida a Colombia');
 });
 
 pool.on('error', (err) => {
