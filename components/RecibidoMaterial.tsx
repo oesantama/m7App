@@ -404,7 +404,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                       <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border tracking-widest ${String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase() ? 'bg-blue-50 text-blue-600 border-blue-100' : (String(doc.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase() ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100')}`}>
                         {doc.status}
                       </span>
-                      {doc.planType === 'MANUAL' && (
+                      {String(doc.planType).toUpperCase().includes('MANUAL') && (
                         <span className="px-3 py-1 bg-slate-900 text-emerald-400 rounded-lg text-[8px] font-black uppercase border border-emerald-500/30 tracking-widest shadow-lg animate-pulse">
                           MODO MANUAL
                         </span>
@@ -446,7 +446,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                     </button>
 
                     {/* BOTONES CARGA EXCEL PARA MANUALES (Plan Normal / Plan R) */}
-                    {doc.planType === 'MANUAL' && (
+                    {String(doc.planType).toUpperCase().includes('MANUAL') && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <label className="py-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-black text-[9px] uppercase tracking-tight transition-all shadow-sm flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white cursor-pointer active:scale-95 group">
                           <Icons.Excel className="w-4 h-4 group-hover:scale-110 transition-transform" />

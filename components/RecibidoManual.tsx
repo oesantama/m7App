@@ -410,7 +410,11 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
                   >
                     <p className="text-[10px] font-black text-emerald-500 uppercase mb-1">{doc.externalDocId}</p>
                     <p className="text-lg font-black text-white uppercase tracking-tighter truncate">{doc.vehicleData || 'S/A'}</p>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">HACE {Math.round((Date.now() - new Date(doc.createdAt).getTime()) / 60000)} MINS</p>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">
+                      {doc.createdAt && !isNaN(new Date(doc.createdAt).getTime()) 
+                        ? `HACE ${Math.round((Date.now() - new Date(doc.createdAt).getTime()) / 60000)} MINS`
+                        : 'RECIÉN CREADO'}
+                    </p>
                   </button>
                   <button 
                     onClick={() => setSelectedDocForCount(doc)}
@@ -421,7 +425,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
                 </div>
                 
                 {/* BOTONES CARGA EXCEL PARA MANUALES (Plan Normal / Plan R) */}
-                {doc.planType === 'MANUAL' && (
+                {String(doc.planType).toUpperCase().includes('MANUAL') && (
                   <div className="px-6 pb-6 mt-[-10px] grid grid-cols-2 gap-2">
                     <label className="py-3 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border border-emerald-500/20 rounded-xl font-black text-[8px] uppercase tracking-tighter transition-all flex items-center justify-center gap-1 cursor-pointer shadow-lg group">
                       <Icons.Excel className="w-3 h-3 group-hover:scale-110 transition-transform" />

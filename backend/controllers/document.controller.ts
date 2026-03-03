@@ -393,7 +393,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
       
       if (plate !== 'S/A') {
           const duplicateCheck = await client.query(`
-            SELECT id FROM documents_l 
+            SELECT id, plan_type FROM documents_l 
             WHERE client_id = $1 
             AND external_doc_id = $2 
             AND vehicle_plate = $3
@@ -402,11 +402,15 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
           `, [doc.clientId, extId, plate]);
 
           if (duplicateCheck.rowCount && duplicateCheck.rowCount > 0) {
-            await client.query('ROLLBACK');
-            return res.status(409).json({ 
-                error: "Documento duplicado", 
-                details: `Ya existe un inventario activo para la placa ${plate} con el documento ${extId}.` 
-            });
+            const existingPlanType = String(duplicateCheck.rows[0].plan_type || '').toUpperCase();
+            // [M7-PATCH] Si es manual, permitimos actualizar (hacer UPSERT) en lugar de dar error 409
+            if (!existingPlanType.includes('MANUAL')) {
+              await client.query('ROLLBACK');
+              return res.status(409).json({ 
+                  error: "Documento duplicado", 
+                  details: `Ya existe un inventario activo (${existingPlanType}) para la placa ${plate} con el documento ${extId}.` 
+              });
+            }
           }
       }
 
