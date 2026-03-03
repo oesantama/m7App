@@ -368,14 +368,18 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2 mb-8">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                            {inv.customerName || 'CLIENTE PENDIENTE'}
-                                        </p>
-                                        <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-tight">
-                                            #{inv.invoiceNumber || inv.id}
-                                        </h4>
+                                    <div className="space-y-3 mb-8">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1 h-8 bg-emerald-500 rounded-full" />
+                                            <div>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none">
+                                                    {inv.customerName || 'CLIENTE PENDIENTE'}
+                                                </p>
+                                                <h4 className="text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none mt-1">
+                                                    #{inv.invoiceNumber || inv.id}
+                                                </h4>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 mb-8">

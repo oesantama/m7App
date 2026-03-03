@@ -16,7 +16,12 @@ export const getMasters = async (req: Request, res: Response) => {
 export const saveMasterRecord = async (req: Request, res: Response) => {
   const { category } = req.params;
   const r = req.body;
-  
+  // M7 BLINDAJE: Validar ID obligatorio
+  if (!r.id || String(r.id).trim() === '') {
+    console.error(`[M7-MASTER-ERROR] Intento de guardado sin ID en categoría ${category}:`, r);
+    return res.status(400).json({ success: false, error: 'El ID es obligatorio para registros maestros.' });
+  }
+
   // M7 BLINDAJE: Asegurar que los campos opcionales sean null si vienen undefined
   const id = r.id;
   const name = r.name;

@@ -519,6 +519,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     const emailInMaster = masterNotificaciones.some(n => n.notificationEmail === email && n.name?.toLowerCase().includes('ajover'));
     if (!emailInMaster) {
       onAddNotificationToMaster({
+        id: `not-ajover-${Date.now()}`,
         name: `inventario ajover`,
         notificationEmail: email,
         tipoNotificacionId: 'TN-01',

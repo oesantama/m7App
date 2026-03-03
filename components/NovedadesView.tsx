@@ -48,10 +48,11 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     const filteredDocs = useMemo(() => {
-        return documents.filter(d => 
-            (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING) &&
-            d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        return documents.filter(d => {
+            const s = String(d.status || '').toUpperCase();
+            const matchStatus = s === DocStatus.PENDING.toUpperCase() || s === DocStatus.COUNTING.toUpperCase();
+            return matchStatus && d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase());
+        });
     }, [documents, searchTerm]);
 
     const handleSelectDoc = async (doc: DocumentL) => {
