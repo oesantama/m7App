@@ -245,24 +245,47 @@ const BlindCount: React.FC<BlindCountProps> = ({
       return;
     }
 
-    // M7 FIX: Motor de limpieza avanzado (Regex para patrones S4:, :CJ, Ñ, etc.)
-    const scannerGarbageRegex = /(S4:|:CJ|Ñ|:1)/i;
-    const match = val.match(scannerGarbageRegex);
+    // M7 REVOLUTION: Algoritmo de Longest Prefix Match (Búsqueda por Prefijo Más Largo)
+    // Buscamos la sub-cadena más larga (empezando desde el inicio) que sea un SKU o Barcode real.
+    let bestMatch: string | null = null;
+    
+    // Solo intentamos el match si la cadena tiene una longitud razonable
+    if (val.length >= 3) {
+      for (let i = val.length; i >= 3; i--) {
+        const prefix = val.substring(0, i);
+        
+        // ¿Existe este prefijo en el plan actual?
+        const inPlan = groupedItems.some(it => 
+          it.articleId?.toUpperCase() === prefix || 
+          it.sku?.toUpperCase() === prefix
+        );
+        
+        // ¿Existe este prefijo en el maestro de artículos?
+        const inMaster = (masterArticulo as Article[]).some(a => 
+          a.sku?.toUpperCase() === prefix || 
+          a.barcode?.toUpperCase() === prefix || 
+          a.id?.toUpperCase() === prefix
+        );
 
-    if (match) {
-      const cleanCode = val.split(match[0])[0];
-      if (cleanCode && cleanCode !== scanInput) {
-        processBarcode(cleanCode);
-
-        // ACTIVAR BLOQUEO: Ignorar cualquier input por 500ms (lo que tarda el scanner en escupir el resto)
-        ignoreScan.current = true;
-        setTimeout(() => {
-          ignoreScan.current = false;
-          setScanInput(''); // Limpieza final de seguridad
-        }, 500);
+        if (inPlan || inMaster) {
+          bestMatch = prefix;
+          break;
+        }
       }
+    }
+
+    // Si encontramos un match real (un SKU que conocemos), procesamos inmediatamente
+    // y bloqueamos el input para que la "basura" del scanner no ensucie la siguiente lectura.
+    if (bestMatch && bestMatch !== scanInput) {
+      processBarcode(bestMatch);
+      ignoreScan.current = true;
+      setTimeout(() => {
+        ignoreScan.current = false;
+        setScanInput('');
+      }, 500);
       setScanInput('');
     } else {
+      // Si no hay match de prefijo, seguimos acumulando el input (para búsqueda manual o códigos nuevos)
       setScanInput(val);
     }
   };
