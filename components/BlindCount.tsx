@@ -314,6 +314,19 @@ const BlindCount: React.FC<BlindCountProps> = ({
           setScanInput('');
         }, 500);
         setScanInput('');
+      } else if (!bestMatch && allowExtraItems) {
+        // FALLBACK M7: Si no hay match en DB pero es un artículo nuevo, 
+        // tomamos lo que está antes del trigger de hardware.
+        const fallbackMatch = val.split(match[0])[0];
+        if (fallbackMatch && fallbackMatch.length >= 3) {
+           processBarcode(fallbackMatch);
+           ignoreScan.current = true;
+           setTimeout(() => {
+             ignoreScan.current = false;
+             setScanInput('');
+           }, 500);
+           setScanInput('');
+        }
       } else {
         // Opción de seguridad: Si hay delimitador pero no encontramos NINGUNA coincidencia en DB,
         // no limpiamos de inmediato para permitir que el operario vea el error o termine de escanear.
@@ -893,14 +906,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
                               </button>
                             </>
                           )}
-                          <button
-                            onClick={() => handleSubtract(it.articleId)}
-                            disabled={currentCount === 0}
-                            className="inline-flex items-center justify-center w-7 h-7 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md active:scale-90 disabled:opacity-10"
-                            title="Restar Unidad"
-                          >
-                            <span className="font-black text-xs">-1</span>
-                          </button>
+                          {(user?.roleId === 'ROL-01' || user?.roleId === 'ROL-02') && (
+                            <button
+                              onClick={() => handleSubtract(it.articleId)}
+                              disabled={currentCount === 0}
+                              className="inline-flex items-center justify-center w-7 h-7 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md active:scale-90 disabled:opacity-10"
+                              title="Restar Unidad"
+                            >
+                              <span className="font-black text-xs">-1</span>
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );

@@ -234,7 +234,8 @@ export const syncInventory = async (req: Request, res: Response) => {
           ? `⚠️ NOVEDADES EN RECIBIDO INVENTARIO AJOVER: ${docL.external_doc_id || docL.externalDocId} [${docL.vehicle_plate || docL.vehicleData || 'S/V'}]`
           : `✅ RECIBIDO INVENTARIO AJOVER: ${docL.external_doc_id || docL.externalDocId} [${docL.vehicle_plate || docL.vehicleData || 'S/V'}]`;
 
-        const tableRows = (hasDiscrepancies ? itemsWithDiscrepancies : items).map((it: any) => {
+        // MOSTRAR SOLO NOVEDADES POR SOLICITUD DEL USUARIO
+        const tableRows = itemsWithDiscrepancies.map((it: any) => {
           const count1 = Number(it.count1 || 0);
           const count2 = Number(it.count2 || it.countedQty || 0);
           const expected = Number(it.expectedQty || 0);
@@ -298,11 +299,11 @@ export const syncInventory = async (req: Request, res: Response) => {
                   </div>
                   <div class="info-item">
                     <div class="info-label">Fecha Inicio</div>
-                    <div class="info-value">${new Date(docL.created_at || new Date()).toLocaleString('es-CO')}</div>
+                    <div class="info-value">${new Date(docL.created_at || new Date()).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</div>
                   </div>
                   <div class="info-item">
                     <div class="info-label">Fecha Cierre</div>
-                    <div class="info-value">${new Date().toLocaleString('es-CO')}</div>
+                    <div class="info-value">${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</div>
                   </div>
                </div>
             </div>
@@ -863,9 +864,8 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
       ? `⚠️ REENVÍO NOVEDADES INVENTARIO AJOVER: ${docL.external_doc_id} [${docL.vehicle_plate || 'S/V'}]`
       : `✅ REENVÍO INVENTARIO AJOVER: ${docL.external_doc_id} [${docL.vehicle_plate || 'S/V'}]`;
 
-    const itemsToShow = hasDiscrepancies ? itemsWithDiscrepancies : items;
-
-    const tableRows = itemsToShow.map((it: any) => {
+    // MOSTRAR SOLO NOVEDADES POR SOLICITUD DEL USUARIO
+    const tableRows = itemsWithDiscrepancies.map((it: any) => {
       const count1 = Number(it.count_1 || 0);
       const counted = Number(it.count_2 || it.count_1 || 0);
       const expected = Number(it.expected_qty || 0);
@@ -928,11 +928,11 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
               </div>
               <div class="info-item">
                 <div class="info-label">Fecha Inicio Conteo</div>
-                <div class="info-value">${docL.created_at ? new Date(docL.created_at).toLocaleString('es-CO') : 'S/I'}</div>
+                <div class="info-value">${docL.created_at ? new Date(docL.created_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'S/I'}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Fecha Final Conteo</div>
-                <div class="info-value">${docL.inventory_date ? new Date(docL.inventory_date).toLocaleString('es-CO') : 'S/I'}</div>
+                <div class="info-value">${docL.inventory_date ? new Date(docL.inventory_date).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'S/I'}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Reenviado A</div>
@@ -948,7 +948,7 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
                 <th>SKU</th>
                 <th style="text-align: center;">Cant (Orig)</th>
                 <th style="text-align: center;">Cant (conteo Inv 1)</th>
-                <th style="text-align: center;">Cant (conteo Inv 2)</th>
+                <th style="text-align: center;">Cant (Conteo Inv 2)</th>
                 <th style="text-align: center;">Dif</th>
                 <th>Nota</th>
               </tr>
@@ -957,6 +957,7 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
               ${tableRows}
             </tbody>
           </table>
+          ${(docL.inventory_notes || docL.inventory_observation) ? `<div style="margin-top: 20px; padding: 15px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; color: #92400e; font-size: 12px;"><strong>Nota General:</strong> ${docL.inventory_notes || docL.inventory_observation}</div>` : ''}
           <div style="margin-top: 20px; padding: 15px; background: #f1f5f9; border-radius: 8px; color: #64748b; font-size: 10px; text-align: center;">
              Este es un reenvío manual del informe original por el sistema <strong>ORBITM7</strong>. Los datos reflejan el estado del inventario al momento del cierre oficial.
           </div>

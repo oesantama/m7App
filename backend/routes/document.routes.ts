@@ -6,6 +6,19 @@ import { requirePermission } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
+// Middleware flexible para permitir Auditoría tanto a Admins como a Auxiliares (PAG-17/PAG-30)
+const requireAuditEdit = (req: any, res: any, next: any) => {
+  const user = req.user;
+  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const hasPerm = user?.permissions?.some((p: any) => 
+    (p.module === 'PAG-16' || p.module === 'DOCUMENTOS_L' || p.module === 'PAG-17' || p.module === 'PAG-30') && 
+    (p.actions.includes('edit') || p.actions.includes('create'))
+  );
+
+  if (isSuper || hasPerm) return next();
+  res.status(403).json({ success: false, error: 'Permiso insuficiente. Se requiere DOCUMENTOS_L:edit o acceso a Recibido.' });
+};
+
 router.get('/', (req, res, next) => {
   const user = (req as any).user;
   const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
@@ -19,10 +32,10 @@ router.get('/', (req, res, next) => {
 }, getDocuments);
 router.post('/bulk', requirePermission('DOCUMENTOS_L', 'create'), bulkCreateDocuments);
 router.post('/manual', requirePermission('PAG-30', 'create'), createManualDocument);
-router.patch('/status/:id', requirePermission('DOCUMENTOS_L', 'edit'), updateStatus);
+router.patch('/status/:id', requireAuditEdit, updateStatus);
 router.delete('/:id', requirePermission('DOCUMENTOS_L', 'delete'), deleteDocument);
-router.post('/sync-inventory', requirePermission('DOCUMENTOS_L', 'edit'), syncInventory);
-router.post('/resend-notification', requirePermission('DOCUMENTOS_L', 'edit'), resendInventoryNotification);
+router.post('/sync-inventory', requireAuditEdit, syncInventory);
+router.post('/resend-notification', requireAuditEdit, resendInventoryNotification);
 router.get('/invoices', (req, res, next) => {
   const user = (req as any).user;
   const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';

@@ -107,7 +107,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         doc_pdf.text(`PLACA: ${placa}`, 14, 35);
         
         doc_pdf.setFontSize(8);
-        doc_pdf.text(`GENERADO: ${new Date().toLocaleString()}`, pageWidth - 14, 35, { align: 'right' });
+        doc_pdf.text(`GENERADO: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`, pageWidth - 14, 35, { align: 'right' });
 
         // Tabla de Contenido
         const tableBody = news.map(n => [
