@@ -50,7 +50,12 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     const filteredDocs = useMemo(() => {
         return documents.filter(d => {
             const s = String(d.status || '').toUpperCase();
-            const matchStatus = s === DocStatus.PENDING.toUpperCase() || s === DocStatus.COUNTING.toUpperCase();
+            // M7 FIX: Permitir ver documentos en Pendiente, En Conteo e Inventariado (Auditados)
+            const matchStatus = 
+                s === DocStatus.PENDING.toUpperCase() || 
+                s === DocStatus.COUNTING.toUpperCase() ||
+                s === DocStatus.INVENTORED.toUpperCase();
+            
             return matchStatus && d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase());
         });
     }, [documents, searchTerm]);
