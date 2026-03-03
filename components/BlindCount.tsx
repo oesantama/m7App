@@ -245,12 +245,13 @@ const BlindCount: React.FC<BlindCountProps> = ({
       return;
     }
 
-    // M7 FIX: Detección inteligente de fin de código (Ñ o S4:)
-    const codeSeparator = val.includes('Ñ') ? 'Ñ' : (val.includes('S4:') ? 'S4:' : null);
+    // M7 FIX: Motor de limpieza avanzado (Regex para patrones S4:, :CJ, Ñ, etc.)
+    const scannerGarbageRegex = /(S4:|:CJ|Ñ|:1)/i;
+    const match = val.match(scannerGarbageRegex);
 
-    if (codeSeparator) {
-      const cleanCode = val.split(codeSeparator)[0];
-      if (cleanCode) {
+    if (match) {
+      const cleanCode = val.split(match[0])[0];
+      if (cleanCode && cleanCode !== scanInput) {
         processBarcode(cleanCode);
 
         // ACTIVAR BLOQUEO: Ignorar cualquier input por 500ms (lo que tarda el scanner en escupir el resto)
