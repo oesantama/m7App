@@ -26,7 +26,7 @@ export enum DocStatus {
 }
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'active';
-export type PageModule = 'dashboard' | 'inventory' | 'routing' | 'fleet' | 'master' | 'assignments' | 'access';
+export type PageModule = 'home' | 'master' | 'inventory' | 'inventory-counts' | 'routes' | 'users' | 'drivers' | 'assignments' | 'reports' | 'notifications' | 'scanning' | 'whatsapp' | 'whatsapp-campaign' | 'whatsapp-status' | 'balance' | 'training' | 'inventory-news' | 'dispatch' | 'picking' | 'recibido-manual' | 'grupo-inter-ops';
 
 export interface UserPermission {
   module: string; 

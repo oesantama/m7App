@@ -45,12 +45,13 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'training_categories': ['name', 'description', 'created_at'],
   'training_courses': ['category_id', 'title', 'description', 'cover_image', 'level', 'status_id', 'created_at'],
   'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', 'order', 'created_at'],
-  'user_training_progress': ['user_id', 'lesson_id', 'status', 'finished_at', 'updated_at']
+  'user_training_progress': ['user_id', 'lesson_id', 'status', 'finished_at', 'updated_at'],
+  'grupo_inter_pedidos': ['nro_documento', 'cliente', 'ciudad_origen', 'ciudad_origen_cod', 'ciudad_destino', 'ciudad_destino_cod', 'estado', 'nro_guia', 'fecha_entregado', 'latitud', 'longitud', 'placa', 'acta_entrega_b64', 'peso', 'cantidad', 'valor_flete', 'valor_declarado', 'history', 'created_at', 'updated_at']
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
@@ -240,11 +241,11 @@ export const restoreSystem = async () => {
         'PAG-01','PAG-03','PAG-04','PAG-05','PAG-06','PAG-07','PAG-08','PAG-09','PAG-10','PAG-11',
         'PAG-12','PAG-13','PAG-14','PAG-15','PAG-16','PAG-17',
         'PAG-18','PAG-19','PAG-20','PAG-21','PAG-22','PAG-23','PAG-24',
-        'PAG-25','PAG-26','PAG-27','PAG-28','PAG-29','PAG-30','PAG-SQL'
+        'PAG-25','PAG-26','PAG-27','PAG-28','PAG-29','PAG-30','PAG-SQL', 'PAG-31'
       )
     `);
     await client.query(`
-      DELETE FROM modules WHERE id NOT IN ('MOD-01','MOD-02','MOD-03','MOD-04','MOD-05','MOD-06')
+      DELETE FROM modules WHERE id NOT IN ('MOD-01','MOD-02','MOD-03','MOD-04','MOD-05','MOD-06', 'MOD-07')
     `);
 
     await client.query(`
@@ -254,7 +255,8 @@ export const restoreSystem = async () => {
       ('MOD-03', 'GESTIÓN AJOVER', 'Package', 'EST-01'),
       ('MOD-04', 'SEGURIDAD & ACCESO', 'Shield', 'EST-01'),
       ('MOD-05', 'M7 INTELLIGENCE', 'Sparkles', 'EST-01'),
-      ('MOD-06', 'ADMINISTRACIÓN', 'Database', 'EST-01')
+      ('MOD-06', 'ADMINISTRACIÓN', 'Database', 'EST-01'),
+      ('MOD-07', 'GESTIÓN GRUPO INTER', 'Truck', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class, status_id = EXCLUDED.status_id;
     `);
 
@@ -308,6 +310,12 @@ export const restoreSystem = async () => {
         module_id = EXCLUDED.module_id, 
         parent_id = EXCLUDED.parent_id,
         status_id = EXCLUDED.status_id;
+    `);
+
+    await client.query(`
+      INSERT INTO pages (id, name, route, module_id, parent_id, status_id) VALUES
+      ('PAG-31', 'GESTIÓN OPERATIVA', 'grupo-inter-ops', 'MOD-07', 'MOD-07', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route, module_id = EXCLUDED.module_id, parent_id = EXCLUDED.parent_id;
     `);
 
     const adminHash = await bcrypt.hash('admin123', 10);

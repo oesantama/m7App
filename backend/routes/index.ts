@@ -40,6 +40,8 @@ import geocodeRoutes from './geocode.routes.js';
 import backupRoutes from './backup.routes.js';
 import trainingRoutes from './training.routes.js';
 import inventoryNewsRoutes from './inventory-news.routes.js';
+import grupoInterRoutes from './grupoInter.routes.js';
+
 
 
 const router = Router();
@@ -84,6 +86,12 @@ router.use('/dispatch', dispatchRoutes);
 router.use('/picking', pickingRoutes);
 router.use('/geocode', geocodeRoutes);
 router.use('/admin/backup', backupRoutes); // DB Backup endpoint
+router.use('/grupo-inter', grupoInterRoutes);
+router.get('/public/order-status/:orderNumber', (req: any, res: any) => {
+    // Redirigir al controlador de grupo inter para el endpoint público
+    import('../controllers/grupoInter.controller.js').then(m => m.getOrderPublic(req, res));
+});
+
 
 export default router;
 

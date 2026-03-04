@@ -88,7 +88,8 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ user, onClose }) => {
   }
 
   return (
-    <div className="fixed top-6 right-6 w-96 h-[600px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden z-50 border border-slate-200">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-2xl h-[700px] bg-white rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300">
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -189,6 +190,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({ user, onClose }) => {
         <p className="text-[10px] text-slate-400 mt-2 text-center">
           Powered by Gemini AI • M7 Logistics
         </p>
+      </div>
       </div>
     </div>
   );

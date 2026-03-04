@@ -574,4 +574,25 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ docId, targetEmails })
   }),
+  
+  // --- GRUPO INTER ---
+  getGrupoInterOrders: (search?: string) => fetchJson(`${API_URL}/grupo-inter/orders${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  uploadGrupoInterExcel: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchJson(`${API_URL}/grupo-inter/upload-excel`, {
+      method: 'POST',
+      body: formData,
+      headers: {} // fetchJson manejará el token, y no ponemos Content-Type para que el navegador ponga el boundary del FormData
+    });
+  },
+  processGrupoInterPDF: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchJson(`${API_URL}/grupo-inter/process-pdf`, {
+      method: 'POST',
+      body: formData,
+      headers: {}
+    });
+  },
 };

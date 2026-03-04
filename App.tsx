@@ -47,6 +47,7 @@ const ApprovalManager = lazyWithRetry(() => import('./components/ApprovalManager
 const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
 const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
 const ExecutiveDashboard = lazyWithRetry(() => import('./components/ExecutiveDashboard'));
+const GrupoInterView = lazyWithRetry(() => import('./components/GrupoInterView'));
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
 import { useAppStore } from './stores/useAppStore';
@@ -704,6 +705,12 @@ const App: React.FC = () => {
               setAllMasterData({ ...allMasterData, masterArticulo: [...(allMasterData.masterArticulo || []), article as MasterRecord] });
             }}
           />
+        );
+      case 'grupo-inter-ops':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Grupo Inter View...</div>}>
+            <GrupoInterView />
+          </React.Suspense>
         );
       case 'flotas':
         return (
