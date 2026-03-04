@@ -21,14 +21,21 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
         
         let headerRowIndex = -1;
-        const requiredColumns = ['NRO DOCUMENTO', 'CLIENTE', 'CIUDAD DESTINO'];
+        const columnAliases: Record<string, string[]> = {
+            'nro_documento': ['NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'ORDEN', 'NUMERO', 'NRO', 'FACTURA'],
+            'cliente': ['CLIENTE', 'NOMBRE', 'DESTINATARIO', 'RAZON SOCIAL'],
+            'ciudad_destino': ['CIUDAD DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO']
+        };
         
         // Buscar encabezados en las primeras 25 filas
         for (let i = 0; i < Math.min(rows.length, 25); i++) {
-            const currentRow = rows[i].map(cell => String(cell || '').trim().toUpperCase());
-            const foundAll = requiredColumns.every(col => currentRow.includes(col));
+            const currentRow = (rows[i] || []).map(cell => String(cell || '').trim().toUpperCase());
             
-            if (foundAll) {
+            const hasDoc = columnAliases.nro_documento.some(alias => currentRow.includes(alias.toUpperCase()));
+            const hasCliente = columnAliases.cliente.some(alias => currentRow.includes(alias.toUpperCase()));
+            const hasDestino = columnAliases.ciudad_destino.some(alias => currentRow.includes(alias.toUpperCase()));
+            
+            if (hasDoc && (hasCliente || hasDestino)) {
                 headerRowIndex = i;
                 break;
             }

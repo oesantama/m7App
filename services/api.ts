@@ -18,10 +18,19 @@ export const fetchJson = async (url: string, options?: any) => {
     if (token) {
       // Guardar en un lugar estándar para consistencia
       localStorage.setItem('token', token);
+      if (import.meta.env.DEV) {
+        console.log(`[API-DEBUG] Token detectado: ${token.substring(0, 15)}...`);
+      }
+    } else {
+      if (import.meta.env.DEV) {
+        console.warn('[API-DEBUG] No se detectó token en localStorage');
+      }
     }
 
     const customHeaders: any = { ...options?.headers };
-    if (token) customHeaders['Authorization'] = `Bearer ${token}`;
+    if (token) {
+      customHeaders['Authorization'] = `Bearer ${token}`;
+    }
 
     // DETECCIÓN CRÍTICA: Si el body es FormData, NO debemos poner application/json
     // El navegador necesita poner multipart/form-data con el boundary correcto
@@ -35,6 +44,11 @@ export const fetchJson = async (url: string, options?: any) => {
       },
       cache: 'no-cache' as RequestCache
     };
+
+    if (import.meta.env.DEV) {
+        console.log(`[API-DEBUG] Petición: ${options?.method || 'GET'} ${url}`);
+        console.log(`[API-DEBUG] Headers Finales:`, fetchOptions.headers);
+    }
 
     try {
       const res = await fetch(url, fetchOptions);

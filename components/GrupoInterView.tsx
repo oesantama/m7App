@@ -48,7 +48,7 @@ const GrupoInterView: React.FC = () => {
       const data = await api.getGrupoInterOrders(query);
       setOrders(data);
     } catch (error: any) {
-      toast.error(error.message || 'Error al cargar pedidos');
+      toast.error(error.message || error.error || 'Error al cargar pedidos');
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ const GrupoInterView: React.FC = () => {
       setExcelFile(null);
       fetchOrders();
     } catch (error: any) {
-      toast.error(error.message || 'Error al subir Excel');
+      toast.error(error.message || error.error || 'Error al subir Excel');
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ const GrupoInterView: React.FC = () => {
       toast.success(res.message || 'PDF procesado con captura de actas');
       setPdfFile(null);
     } catch (error: any) {
-      toast.error(error.message || 'Error al procesar PDF');
+      toast.error(error.message || error.error || 'Error al procesar PDF');
     } finally {
       setLoading(false);
     }
