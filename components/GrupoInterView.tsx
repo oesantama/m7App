@@ -4,6 +4,7 @@ import {
   MapPin, Package, Truck, Clock, CheckCircle, 
   AlertCircle, ChevronRight, Download, Filter 
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
@@ -76,9 +77,9 @@ const GrupoInterView: React.FC = () => {
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
-        const workbook = (window as any).XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'binary' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = (window as any).XLSX.utils.sheet_to_json(sheet);
+        const json = XLSX.utils.sheet_to_json(sheet);
         setPreviewData(json);
         setShowPreviewModal(true);
       } catch (err) {

@@ -17,21 +17,19 @@ export const fetchJson = async (url: string, options?: any) => {
       } catch (e) {}
     }
 
-    if (token) {
-      // Unificar para futuras peticiones
-      localStorage.setItem('token', token);
-      if (import.meta.env.DEV) {
-        console.log(`[API-DEBUG] ✅ Token encontrado: ${token.substring(0, 15)}...`);
-      }
-    } else {
-      if (import.meta.env.DEV) {
-        console.error('[API-DEBUG] ❌ No se encontró ningún token en localStorage. La petición fallará con 401.');
+    if (!token && import.meta.env.DEV) {
+      console.error('[API-TOKEN-DIAGNOSTIC] ❌ Token no encontrado. Contenido de localStorage:');
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) console.log(`   - ${key}: ${localStorage.getItem(key)?.substring(0, 20)}...`);
       }
     }
 
     const customHeaders: any = { ...options?.headers };
     if (token) {
-      customHeaders['Authorization'] = `Bearer ${token}`;
+      // Normalizar para que todas las peticiones usen la misma llave
+      localStorage.setItem('token', token);
+      customHeaders['Authorization'] = `Bearer ${token.trim()}`;
     }
 
     // DETECCIÓN CRÍTICA: Si el body es FormData, NO debemos poner application/json

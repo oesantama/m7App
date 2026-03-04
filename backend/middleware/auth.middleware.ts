@@ -39,7 +39,8 @@ const ID_MAP: Record<string, string> = {
     'DOCUMENTOS_L': 'PAG-16',
     'RUTAS': 'PAG-15',
     'DASHBOARD': 'PAG-25',
-    'NOTIFICACIONES': 'PAG-07'
+    'NOTIFICACIONES': 'PAG-07',
+    'GRUPO_INTER': 'PAG-31'
 };
 
 export const requirePermission = (moduleName: string, action: string) => {

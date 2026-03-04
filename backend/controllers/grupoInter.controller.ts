@@ -77,24 +77,34 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             return foundKey ? String(row[foundKey] || '').trim() : '';
         };
 
+        let savedCount = 0;
+        let skippedCount = 0;
+
         for (const row of excelData) {
             const nro_documento = getVal(row, columnAliases.nro_documento);
-            if (!nro_documento) continue;
+            if (!nro_documento) {
+                skippedCount++;
+                continue;
+            }
 
             const cliente = getVal(row, columnAliases.cliente);
             const ciudad_destino = getVal(row, columnAliases.ciudad_destino);
+            const ciudad_origen = getVal(row, ['CIUDAD ORIGEN', 'ORIGEN', 'CIUDAD_ORIGEN']) || 'MEDELLIN';
+            const nro_guia = getVal(row, ['NRO GUIA', 'GUIA', 'NRO_GUIA', 'REBU']);
+            const placa = getVal(row, ['PLACA', 'VEHICULO', 'TRUCK']);
             
             // Cantidad y otros campos numéricos
-            const cantidadRaw = getVal(row, ['CANTIDAD', 'TOTAL', 'QTY']);
-            const pesoRaw = getVal(row, ['PESO', 'WEIGHT']);
-            const fleteRaw = getVal(row, ['FLETE', 'PRECIO']);
-            const valorRaw = getVal(row, ['VALOR', 'PRECIO', 'TOTAL']);
+            const cantidadRaw = getVal(row, ['CANTIDAD', 'TOTAL', 'QTY', 'UNIDADES']);
+            const pesoRaw = getVal(row, ['PESO', 'WEIGHT', 'KILOS']);
+            const fleteRaw = getVal(row, ['FLETE', 'PRECIO', 'VALOR_FLETE']);
+            const valorRaw = getVal(row, ['VALOR', 'PRECIO', 'TOTAL', 'VALOR_DECLARADO']);
 
             const query = `
                 INSERT INTO grupo_inter_pedidos (
                     nro_documento, cliente, ciudad_origen, ciudad_destino, 
-                    peso, cantidad, valor_flete, valor_declarado, nro_guia, placa
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                    peso, cantidad, valor_flete, valor_declarado, nro_guia, placa,
+                    estado
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Pendiente')
                 ON CONFLICT (nro_documento) DO UPDATE SET
                     cliente = EXCLUDED.cliente,
                     ciudad_origen = EXCLUDED.ciudad_origen,
@@ -111,20 +121,26 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             const values = [
                 nro_documento,
                 cliente,
-                row['CIUDAD ORIGEN'] || 'MEDELLIN',
+                ciudad_origen,
                 ciudad_destino,
                 parseFloat(String(pesoRaw || 0)),
                 parseFloat(String(cantidadRaw || 0)),
                 parseFloat(String(fleteRaw || 0)),
                 parseFloat(String(valorRaw || 0)),
-                row['NRO GUIA'] || '',
-                row['PLACA'] || ''
+                nro_guia,
+                placa
             ];
 
             await pool.query(query, values);
+            savedCount++;
         }
 
-        res.json({ message: 'Excel procesado correctamente', count: excelData.length });
+        console.log(`[GRUPO-INTER] Carga completada: ${savedCount} guardados, ${skippedCount} saltados.`);
+        res.json({ 
+            message: `Excel procesado: ${savedCount} registros actualizados/creados`, 
+            count: savedCount,
+            skipped: skippedCount
+        });
     } catch (error) {
         console.error('[GRUPO-INTER] Error al subir Excel:', error);
         res.status(500).json({ message: 'Error interno al procesar el Excel' });
