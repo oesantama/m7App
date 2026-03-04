@@ -22,6 +22,8 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             String(str || '')
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+                .replace(/[^a-zA-Z0-9 ]/g, " ")   // Reemplazar caracteres especiales por espacios
+                .replace(/\s+/g, " ")            // Colapsar espacios múltiples
                 .trim()
                 .toUpperCase();
 
@@ -29,26 +31,24 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         
         let headerRowIndex = -1;
         const columnAliases = {
-            nro_documento: ['NRO DOCUMENTO', 'NUMERO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'ORDEN', 'FACTURA', 'NRO_DOCUMENTO'],
-            cliente: ['CLIENTE', 'NOMBRE CLIENTE', 'NOMBRE', 'DESTINATARIO', 'RAZON SOCIAL', 'NOMBRE_CLIENTE'],
-            ciudad_destino: ['CIUDAD DESTINO', 'MUNICIPIO DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO', 'MUNICIPIO_DESTINO']
+            nro_documento: ['NUMERO DOCUMENTO', 'NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'ORDEN', 'FACTURA', 'NRO_DOCUMENTO'],
+            cliente: ['NOMBRE CLIENTE', 'NIT CLIENTE', 'CLIENTE', 'NOMBRE', 'DESTINATARIO', 'RAZON SOCIAL', 'NOMBRE_CLIENTE'],
+            ciudad_destino: ['MUNICIPIO DESTINO', 'CIUDAD DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO', 'MUNICIPIO_DESTINO']
         };
         
         // Buscar encabezados en las primeras 25 filas
         for (let i = 0; i < Math.min(rows.length, 25); i++) {
             const currentRow = (rows[i] || []).map(cell => normalize(String(cell)));
             
-            const hasDoc = columnAliases.nro_documento.some(alias => 
-                currentRow.some(cell => cell === normalize(alias) || cell.includes(normalize(alias)))
+            // Verificación por inclusión parcial para mayor robustez
+            const hasDoc = currentRow.some(cell => 
+                columnAliases.nro_documento.some(alias => cell.includes(normalize(alias)) || normalize(alias).includes(cell))
             );
-            const hasCliente = columnAliases.cliente.some(alias => 
-                currentRow.some(cell => cell === normalize(alias) || cell.includes(normalize(alias)))
-            );
-            const hasDestino = columnAliases.ciudad_destino.some(alias => 
-                currentRow.some(cell => cell === normalize(alias) || cell.includes(normalize(alias)))
+            const hasCliente = currentRow.some(cell => 
+                columnAliases.cliente.some(alias => cell.includes(normalize(alias)) || normalize(alias).includes(cell))
             );
             
-            if (hasDoc && (hasCliente || hasDestino)) {
+            if (hasDoc && hasCliente) {
                 headerRowIndex = i;
                 break;
             }
@@ -57,7 +57,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         if (headerRowIndex === -1) {
             console.error('[GRUPO-INTER] No se detectó el encabezado. Filas analizadas:', rows.slice(0, 5));
             res.status(400).json({ 
-                message: 'El formato no es el indicado (no se encontraron encabezados validos en las primeras 25 líneas)',
+                message: 'El formato no es el indicado (no se encontraron encabezados validos)',
                 details: 'Se buscan columnas como: Número Documento, Cliente o Ciudad/Municipio Destino'
             });
             return;
@@ -66,14 +66,23 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         // Extraer los datos a partir del encabezado encontrado
         const excelData = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex }) as any[];
 
+        console.log(`[GRUPO-INTER] Header detectado en fila: ${headerRowIndex + 1}`);
         console.log(`[GRUPO-INTER] Procesando ${excelData.length} filas del Excel...`);
+        
+        if (excelData.length > 0) {
+            console.log('[GRUPO-INTER] Columnas encontradas:', Object.keys(excelData[0]));
+        }
 
         // Función para obtener valor de una columna usando aliases
         const getVal = (row: any, aliases: string[]) => {
             const keys = Object.keys(row);
-            const foundKey = keys.find(k => 
-                aliases.some(alias => normalize(k) === normalize(alias) || normalize(k).includes(normalize(alias)))
-            );
+            const foundKey = keys.find(k => {
+                const normK = normalize(k);
+                return aliases.some(alias => {
+                    const normA = normalize(alias);
+                    return normK === normA || normK.includes(normA) || normA.includes(normK);
+                });
+            });
             return foundKey ? String(row[foundKey] || '').trim() : '';
         };
 
@@ -82,22 +91,28 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
 
         for (const row of excelData) {
             const nro_documento = getVal(row, columnAliases.nro_documento);
-            if (!nro_documento) {
+            if (!nro_documento || nro_documento.length < 3) {
                 skippedCount++;
                 continue;
             }
 
             const cliente = getVal(row, columnAliases.cliente);
             const ciudad_destino = getVal(row, columnAliases.ciudad_destino);
-            const ciudad_origen = getVal(row, ['CIUDAD ORIGEN', 'ORIGEN', 'CIUDAD_ORIGEN']) || 'MEDELLIN';
-            const nro_guia = getVal(row, ['NRO GUIA', 'GUIA', 'NRO_GUIA', 'REBU']);
-            const placa = getVal(row, ['PLACA', 'VEHICULO', 'TRUCK']);
+            const ciudad_origen = getVal(row, ['CIUDAD ORIGEN', 'ORIGEN', 'CIUDAD_ORIGEN', 'PROVENIENCIA']) || 'MEDELLIN';
+            const nro_guia = getVal(row, ['NRO GUIA', 'GUIA', 'NRO_GUIA', 'REBU', 'NOTA ENCABEZADO']);
+            const placa = getVal(row, ['PLACA', 'VEHICULO', 'TRUCK', 'CABEZOTE']);
             
             // Cantidad y otros campos numéricos
             const cantidadRaw = getVal(row, ['CANTIDAD TOTAL', 'CANTIDAD', 'TOTAL', 'QTY', 'UNIDADES']);
-            const pesoRaw = getVal(row, ['PESO TOTAL PROD.', 'PESO', 'WEIGHT', 'KILOS']);
-            const fleteRaw = getVal(row, ['VALOR FLETE', 'FLETE', 'PRECIO', 'VALOR_FLETE']);
+            const pesoRaw = getVal(row, ['PESO TOTAL PROD.', 'PESO', 'WEIGHT', 'KILOS', 'PESO TOTAL']);
+            const fleteRaw = getVal(row, ['VALOR FLETE', 'FLETE', 'PRECIO', 'VALOR_FLETE', 'PRECIO TOTAL']);
             const valorRaw = getVal(row, ['VALOR DECLARADO', 'PRECIO TOTAL', 'VALOR', 'PRECIO', 'TOTAL', 'VALOR_DECLARADO']);
+
+            // Parsear números de forma segura quitando caracteres no numéricos excepto punto/coma
+            const parseNum = (val: string) => {
+                const clean = val.replace(/[^0-9.,]/g, '').replace(',', '.');
+                return parseFloat(clean) || 0;
+            };
 
             const query = `
                 INSERT INTO grupo_inter_pedidos (
@@ -123,10 +138,10 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 cliente,
                 ciudad_origen,
                 ciudad_destino,
-                parseFloat(String(pesoRaw || 0)),
-                parseFloat(String(cantidadRaw || 0)),
-                parseFloat(String(fleteRaw || 0)),
-                parseFloat(String(valorRaw || 0)),
+                parseNum(pesoRaw),
+                parseNum(cantidadRaw),
+                parseNum(fleteRaw),
+                parseNum(valorRaw),
                 nro_guia,
                 placa
             ];
@@ -135,7 +150,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             savedCount++;
         }
 
-        console.log(`[GRUPO-INTER] Carga completada: ${savedCount} guardados, ${skippedCount} saltados.`);
+        console.log(`[GRUPO-INTER] Resultado: ${savedCount} guardados, ${skippedCount} saltados.`);
         res.json({ 
             message: `Excel procesado: ${savedCount} registros actualizados/creados`, 
             count: savedCount,

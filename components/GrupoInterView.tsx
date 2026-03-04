@@ -344,8 +344,9 @@ const GrupoInterView: React.FC = () => {
       {/* Modal de Previsualización de Excel */}
       {showPreviewModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowPreviewModal(false)}></div>
-          <div className="relative bg-white w-full max-w-6xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col scale-100 animate-in fade-in zoom-in duration-300">
+          {/* Fondo persistente (sin clic para cerrar) */}
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"></div>
+          <div className="relative bg-white w-[95vw] max-w-7xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col scale-100 animate-in fade-in zoom-in duration-300">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl">
@@ -353,7 +354,7 @@ const GrupoInterView: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-2xl font-black text-slate-900">Previsualización de Carga</h2>
-                  <p className="text-slate-500 text-sm font-medium">Filtra y revisa los datos antes de sincronizar</p>
+                  <p className="text-slate-500 text-sm font-medium">Revisa la totalidad de los datos antes de sincronizar con el servidor</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -370,21 +371,18 @@ const GrupoInterView: React.FC = () => {
                     }}
                   />
                 </div>
-                <button onClick={() => setShowPreviewModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400">
-                  <ChevronRight size={28} className="rotate-90 md:rotate-0" />
-                </button>
               </div>
             </div>
 
             <div className="flex-1 overflow-auto p-0">
-               <table className="w-full text-left text-sm border-collapse">
+               <table className="w-full text-left text-xs border-collapse">
                  <thead className="sticky top-0 bg-slate-50 z-20 border-b border-slate-200">
                    <tr>
-                     <th className="px-6 py-4 font-bold text-slate-600">Documento</th>
-                     <th className="px-6 py-4 font-bold text-slate-600">Cliente</th>
-                     <th className="px-6 py-4 font-bold text-slate-600">Ciudad Destino</th>
-                     <th className="px-6 py-4 font-bold text-slate-600">Cantidad</th>
-                     <th className="px-6 py-4 font-bold text-slate-600">Peso</th>
+                     {previewData.length > 0 && Object.keys(previewData[0]).map((key) => (
+                       <th key={key} className="px-4 py-3 font-bold text-slate-600 whitespace-nowrap bg-slate-50">
+                         {key.toUpperCase()}
+                       </th>
+                     ))}
                    </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-100">
@@ -394,30 +392,15 @@ const GrupoInterView: React.FC = () => {
                       return str.includes(previewFilter.toLowerCase());
                     })
                     .slice((previewPage - 1) * itemsPerPage, previewPage * itemsPerPage)
-                    .map((row: any, idx) => {
-                      const getExcelVal = (aliases: string[]) => {
-                        const key = Object.keys(row).find(k => 
-                          aliases.some(a => a.toLowerCase() === k.toLowerCase().trim())
-                        );
-                        return key ? row[key] : null;
-                      };
-
-                      const doc = getExcelVal(['Número Documento', 'Nro Documento', 'Documento', 'Nro_Documento', 'NRO DOCUMENTO']);
-                      const cliente = getExcelVal(['Nombre Cliente', 'Cliente', 'Nombre', 'Razon Social', 'NIT Cliente', 'CLIENTE']);
-                      const destino = getExcelVal(['Municipio Destino', 'Ciudad Destino', 'Destino', 'Municipio', 'CIUDAD DESTINO']);
-                      const cant = getExcelVal(['Cantidad Total', 'Cantidad', 'Unidades', 'Cant', 'CANTIDAD']);
-                      const peso = getExcelVal(['Peso Total Prod.', 'Peso Total', 'Peso', 'Kilos', 'PESO']);
-
-                      return (
-                        <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                          <td className="px-6 py-3 font-bold text-blue-600">{doc || 'N/A'}</td>
-                          <td className="px-6 py-3 text-slate-600">{cliente || 'N/A'}</td>
-                          <td className="px-6 py-3 text-slate-500">{destino || 'N/A'}</td>
-                          <td className="px-6 py-3 font-mono">{cant || 0}</td>
-                          <td className="px-6 py-3 font-mono">{peso || 0} kg</td>
-                        </tr>
-                      );
-                    })}
+                    .map((row: any, idx) => (
+                      <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                        {Object.values(row).map((val: any, vIdx) => (
+                          <td key={vIdx} className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                            {String(val || '')}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
                  </tbody>
                </table>
             </div>
@@ -442,7 +425,20 @@ const GrupoInterView: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-4">
-                <span className="text-sm text-slate-400 font-medium">Total: {previewData.length} registros</span>
+                <span className="text-sm text-slate-400 font-medium mr-4">Total: {previewData.length} registros</span>
+                
+                <button 
+                  onClick={() => {
+                    setExcelFile(null);
+                    setPreviewData([]);
+                    setShowPreviewModal(false);
+                    toast.info('Carga cancelada y archivo purgado');
+                  }}
+                  className="px-6 py-3 rounded-2xl font-bold border border-slate-200 text-slate-500 hover:bg-white transition"
+                >
+                  Cancelar
+                </button>
+
                 <button 
                   onClick={handleExcelUpload}
                   disabled={loading}
