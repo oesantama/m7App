@@ -6,7 +6,7 @@ export const fetchJson = async (url: string, options?: any) => {
   const executeFetch = async (retryCount = 0): Promise<any> => {
     // Búsqueda exhaustiva del token
     const sessionStr = localStorage.getItem('m7_user_session');
-    let token = localStorage.getItem('token');
+    let token = localStorage.getItem('token') || localStorage.getItem('m7_auth_token');
     
     if (!token && sessionStr) {
       try {
@@ -15,13 +15,22 @@ export const fetchJson = async (url: string, options?: any) => {
       } catch (e) {}
     }
 
+    if (token) {
+      // Guardar en un lugar estándar para consistencia
+      localStorage.setItem('token', token);
+    }
+
     const customHeaders: any = { ...options?.headers };
     if (token) customHeaders['Authorization'] = `Bearer ${token}`;
+
+    // DETECCIÓN CRÍTICA: Si el body es FormData, NO debemos poner application/json
+    // El navegador necesita poner multipart/form-data con el boundary correcto
+    const isFormData = options?.body instanceof FormData;
 
     const fetchOptions = {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...customHeaders
       },
       cache: 'no-cache' as RequestCache
