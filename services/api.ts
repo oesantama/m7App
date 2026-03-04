@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const isDev = import.meta.env.DEV;
+const API_URL = isDev ? 'http://localhost:8080/api' : (import.meta.env.VITE_API_URL || '/api');
 
 export const fetchJson = async (url: string, options?: any) => {
   const executeFetch = async (retryCount = 0): Promise<any> => {
@@ -27,9 +28,14 @@ export const fetchJson = async (url: string, options?: any) => {
 
     const customHeaders: any = { ...options?.headers };
     if (token) {
-      // Normalizar para que todas las peticiones usen la misma llave
+      if (import.meta.env.DEV) {
+          console.log('%c [API-AUTH-DIAGNOSTIC] 🔑 TOKEN ENCONTRADO', 'background: #059669; color: white; padding: 4px; border-radius: 4px;');
+          console.table({ token_preview: token.substring(0, 30) + '...', length: token.length });
+      }
       localStorage.setItem('token', token);
       customHeaders['Authorization'] = `Bearer ${token.trim()}`;
+    } else if (import.meta.env.DEV) {
+      console.error('%c [API-AUTH-DIAGNOSTIC] ❌ NO HAY TOKEN DISPONIBLE EN LOCALSTORAGE', 'background: #dc2626; color: white; padding: 4px; border-radius: 4px;');
     }
 
     // DETECCIÓN CRÍTICA: Si el body es FormData, NO debemos poner application/json

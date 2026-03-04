@@ -10,8 +10,10 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-        console.error(`[AUTH-FAILURE] No se recibió cabecera Authorization para: ${req.method} ${req.url}`);
-        console.log('[DEBUG-HEADERS]:', JSON.stringify(req.headers, null, 2));
+        console.error('--- [M7-SECURITY-AUDIT] 🚨 FALLA DE AUTENTICACIÓN ---');
+        console.error(`Método: ${req.method} | URL: ${req.url}`);
+        console.error('Cabeceras Recibidas:', JSON.stringify(req.headers, null, 2));
+        console.error('-------------------------------------------------------');
         return res.status(401).json({ success: false, error: 'Acceso denegado. No se proporcionó un token.' });
     }
 

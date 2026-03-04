@@ -29,9 +29,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         
         let headerRowIndex = -1;
         const columnAliases = {
-            nro_documento: ['NRO DOCUMENTO', 'NUMERO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'ORDEN', 'FACTURA'],
-            cliente: ['CLIENTE', 'NOMBRE CLIENTE', 'NOMBRE', 'DESTINATARIO'],
-            ciudad_destino: ['CIUDAD DESTINO', 'MUNICIPIO DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO']
+            nro_documento: ['NRO DOCUMENTO', 'NUMERO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'ORDEN', 'FACTURA', 'NRO_DOCUMENTO'],
+            cliente: ['CLIENTE', 'NOMBRE CLIENTE', 'NOMBRE', 'DESTINATARIO', 'RAZON SOCIAL', 'NOMBRE_CLIENTE'],
+            ciudad_destino: ['CIUDAD DESTINO', 'MUNICIPIO DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO', 'MUNICIPIO_DESTINO']
         };
         
         // Buscar encabezados en las primeras 25 filas
@@ -94,10 +94,10 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             const placa = getVal(row, ['PLACA', 'VEHICULO', 'TRUCK']);
             
             // Cantidad y otros campos numéricos
-            const cantidadRaw = getVal(row, ['CANTIDAD', 'TOTAL', 'QTY', 'UNIDADES']);
-            const pesoRaw = getVal(row, ['PESO', 'WEIGHT', 'KILOS']);
-            const fleteRaw = getVal(row, ['FLETE', 'PRECIO', 'VALOR_FLETE']);
-            const valorRaw = getVal(row, ['VALOR', 'PRECIO', 'TOTAL', 'VALOR_DECLARADO']);
+            const cantidadRaw = getVal(row, ['CANTIDAD TOTAL', 'CANTIDAD', 'TOTAL', 'QTY', 'UNIDADES']);
+            const pesoRaw = getVal(row, ['PESO TOTAL PROD.', 'PESO', 'WEIGHT', 'KILOS']);
+            const fleteRaw = getVal(row, ['VALOR FLETE', 'FLETE', 'PRECIO', 'VALOR_FLETE']);
+            const valorRaw = getVal(row, ['VALOR DECLARADO', 'PRECIO TOTAL', 'VALOR', 'PRECIO', 'TOTAL', 'VALOR_DECLARADO']);
 
             const query = `
                 INSERT INTO grupo_inter_pedidos (

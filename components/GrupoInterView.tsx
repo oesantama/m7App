@@ -394,15 +394,30 @@ const GrupoInterView: React.FC = () => {
                       return str.includes(previewFilter.toLowerCase());
                     })
                     .slice((previewPage - 1) * itemsPerPage, previewPage * itemsPerPage)
-                    .map((row, idx) => (
-                      <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                        <td className="px-6 py-3 font-bold text-blue-600">{row['NRO DOCUMENTO'] || row['Documento'] || row['Documento_Externo'] || 'N/A'}</td>
-                        <td className="px-6 py-3 text-slate-600">{row['CLIENTE'] || row['Nombre'] || 'N/A'}</td>
-                        <td className="px-6 py-3 text-slate-500">{row['CIUDAD DESTINO'] || row['Destino'] || 'N/A'}</td>
-                        <td className="px-6 py-3 font-mono">{row['CANTIDAD'] || row['Unidades'] || 0}</td>
-                        <td className="px-6 py-3 font-mono">{row['PESO'] || 0} kg</td>
-                      </tr>
-                   ))}
+                    .map((row: any, idx) => {
+                      const getExcelVal = (aliases: string[]) => {
+                        const key = Object.keys(row).find(k => 
+                          aliases.some(a => a.toLowerCase() === k.toLowerCase().trim())
+                        );
+                        return key ? row[key] : null;
+                      };
+
+                      const doc = getExcelVal(['Número Documento', 'Nro Documento', 'Documento', 'Nro_Documento', 'NRO DOCUMENTO']);
+                      const cliente = getExcelVal(['Nombre Cliente', 'Cliente', 'Nombre', 'Razon Social', 'NIT Cliente', 'CLIENTE']);
+                      const destino = getExcelVal(['Municipio Destino', 'Ciudad Destino', 'Destino', 'Municipio', 'CIUDAD DESTINO']);
+                      const cant = getExcelVal(['Cantidad Total', 'Cantidad', 'Unidades', 'Cant', 'CANTIDAD']);
+                      const peso = getExcelVal(['Peso Total Prod.', 'Peso Total', 'Peso', 'Kilos', 'PESO']);
+
+                      return (
+                        <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                          <td className="px-6 py-3 font-bold text-blue-600">{doc || 'N/A'}</td>
+                          <td className="px-6 py-3 text-slate-600">{cliente || 'N/A'}</td>
+                          <td className="px-6 py-3 text-slate-500">{destino || 'N/A'}</td>
+                          <td className="px-6 py-3 font-mono">{cant || 0}</td>
+                          <td className="px-6 py-3 font-mono">{peso || 0} kg</td>
+                        </tr>
+                      );
+                    })}
                  </tbody>
                </table>
             </div>
