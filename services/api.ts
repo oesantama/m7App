@@ -4,26 +4,28 @@ const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const fetchJson = async (url: string, options?: any) => {
   const executeFetch = async (retryCount = 0): Promise<any> => {
-    // Búsqueda exhaustiva del token
+    // Búsqueda exhaustiva del token en múltiples llaves
     const sessionStr = localStorage.getItem('m7_user_session');
-    let token = localStorage.getItem('token') || localStorage.getItem('m7_auth_token');
+    let token = localStorage.getItem('token') || 
+                localStorage.getItem('m7_auth_token') || 
+                localStorage.getItem('m7_client_token');
     
     if (!token && sessionStr) {
       try {
         const session = JSON.parse(sessionStr);
-        token = session.token || session.accessToken;
+        token = session.token || session.accessToken || session.auth_token;
       } catch (e) {}
     }
 
     if (token) {
-      // Guardar en un lugar estándar para consistencia
+      // Unificar para futuras peticiones
       localStorage.setItem('token', token);
       if (import.meta.env.DEV) {
-        console.log(`[API-DEBUG] Token detectado: ${token.substring(0, 15)}...`);
+        console.log(`[API-DEBUG] ✅ Token encontrado: ${token.substring(0, 15)}...`);
       }
     } else {
       if (import.meta.env.DEV) {
-        console.warn('[API-DEBUG] No se detectó token en localStorage');
+        console.error('[API-DEBUG] ❌ No se encontró ningún token en localStorage. La petición fallará con 401.');
       }
     }
 

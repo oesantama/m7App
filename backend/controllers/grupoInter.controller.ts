@@ -18,22 +18,35 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const worksheet = workbook.Sheets[sheetName];
         
         // Convertir a matriz de arreglos (aoa) para buscar el encabezado manualmente
+        const normalize = (str: string) => 
+            String(str || '')
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+                .trim()
+                .toUpperCase();
+
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
         
         let headerRowIndex = -1;
-        const columnAliases: Record<string, string[]> = {
-            'nro_documento': ['NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'ORDEN', 'NUMERO', 'NRO', 'FACTURA'],
-            'cliente': ['CLIENTE', 'NOMBRE', 'DESTINATARIO', 'RAZON SOCIAL'],
-            'ciudad_destino': ['CIUDAD DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO']
+        const columnAliases = {
+            nro_documento: ['NRO DOCUMENTO', 'NUMERO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'ORDEN', 'FACTURA'],
+            cliente: ['CLIENTE', 'NOMBRE CLIENTE', 'NOMBRE', 'DESTINATARIO'],
+            ciudad_destino: ['CIUDAD DESTINO', 'MUNICIPIO DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO']
         };
         
         // Buscar encabezados en las primeras 25 filas
         for (let i = 0; i < Math.min(rows.length, 25); i++) {
-            const currentRow = (rows[i] || []).map(cell => String(cell || '').trim().toUpperCase());
+            const currentRow = (rows[i] || []).map(cell => normalize(String(cell)));
             
-            const hasDoc = columnAliases.nro_documento.some(alias => currentRow.includes(alias.toUpperCase()));
-            const hasCliente = columnAliases.cliente.some(alias => currentRow.includes(alias.toUpperCase()));
-            const hasDestino = columnAliases.ciudad_destino.some(alias => currentRow.includes(alias.toUpperCase()));
+            const hasDoc = columnAliases.nro_documento.some(alias => 
+                currentRow.some(cell => cell === normalize(alias) || cell.includes(normalize(alias)))
+            );
+            const hasCliente = columnAliases.cliente.some(alias => 
+                currentRow.some(cell => cell === normalize(alias) || cell.includes(normalize(alias)))
+            );
+            const hasDestino = columnAliases.ciudad_destino.some(alias => 
+                currentRow.some(cell => cell === normalize(alias) || cell.includes(normalize(alias)))
+            );
             
             if (hasDoc && (hasCliente || hasDestino)) {
                 headerRowIndex = i;
@@ -42,18 +55,40 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         }
 
         if (headerRowIndex === -1) {
-            res.status(400).json({ message: 'El formato no es el indicado (no se encontraron encabezados en las primeras 25 líneas)' });
+            console.error('[GRUPO-INTER] No se detectó el encabezado. Filas analizadas:', rows.slice(0, 5));
+            res.status(400).json({ 
+                message: 'El formato no es el indicado (no se encontraron encabezados validos en las primeras 25 líneas)',
+                details: 'Se buscan columnas como: Número Documento, Cliente o Ciudad/Municipio Destino'
+            });
             return;
         }
 
         // Extraer los datos a partir del encabezado encontrado
-        const excelData = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex });
+        const excelData = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex }) as any[];
 
-        console.log(`[GRUPO-INTER] Procesando ${excelData.length} filas del Excel (empezando desde fila ${headerRowIndex + 1})...`);
+        console.log(`[GRUPO-INTER] Procesando ${excelData.length} filas del Excel...`);
 
-        for (const row of (excelData as any[])) {
-            const nro_documento = String(row['NRO DOCUMENTO'] || row['Documento'] || '').trim();
+        // Función para obtener valor de una columna usando aliases
+        const getVal = (row: any, aliases: string[]) => {
+            const keys = Object.keys(row);
+            const foundKey = keys.find(k => 
+                aliases.some(alias => normalize(k) === normalize(alias) || normalize(k).includes(normalize(alias)))
+            );
+            return foundKey ? String(row[foundKey] || '').trim() : '';
+        };
+
+        for (const row of excelData) {
+            const nro_documento = getVal(row, columnAliases.nro_documento);
             if (!nro_documento) continue;
+
+            const cliente = getVal(row, columnAliases.cliente);
+            const ciudad_destino = getVal(row, columnAliases.ciudad_destino);
+            
+            // Cantidad y otros campos numéricos
+            const cantidadRaw = getVal(row, ['CANTIDAD', 'TOTAL', 'QTY']);
+            const pesoRaw = getVal(row, ['PESO', 'WEIGHT']);
+            const fleteRaw = getVal(row, ['FLETE', 'PRECIO']);
+            const valorRaw = getVal(row, ['VALOR', 'PRECIO', 'TOTAL']);
 
             const query = `
                 INSERT INTO grupo_inter_pedidos (
