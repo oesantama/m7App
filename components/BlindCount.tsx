@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { Article, DocumentL, DocumentLItem, MasterRecord, DocStatus, User } from '../types';
+import { cleanSkuM7 } from '../utils/scanner';
 
 interface BlindCountProps {
   document: DocumentL;
@@ -161,13 +162,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
   }, [counts, itemObservations, inventoryObservation, groupedItems]);
 
   const processBarcode = (rawCode: string) => {
-    const input = rawCode.trim().toUpperCase().replace(/'/g, '-');
-    if (!input) return;
+    const input = cleanSkuM7(rawCode);
+    if (!input) {
+      setScanInput('');
+      return;
+    }
 
-    // 1. Buscar en el plan (agrupado)
+    // 1. Buscar en el plan (agrupado) - PRIORIDAD M7
     const itemInDoc = groupedItems.find(it => 
-      it.articleId?.toUpperCase() === input || 
-      it.sku?.toUpperCase() === input
+      (it.articleId?.toUpperCase() === input) || 
+      (it.sku?.toUpperCase() === input)
     );
     
     // 2. Si es un item extra (MANUAL)
@@ -298,8 +302,36 @@ const BlindCount: React.FC<BlindCountProps> = ({
       // Esto evita que ráfagas rápidas se procesen como "artículos nuevos" accidentalmente.
       processingTimer.current = setTimeout(() => {
           // ANALISIS FINAL DE LA CADENA COMPLETA
-          let bestMatch: string | null = null;
+          const cleanedInput = cleanSkuM7(val);
           
+          if (cleanedInput.length >= 3) {
+            // Verificamos si el código limpio existe en plan o maestra
+            const inPlan = groupedItems.some(it => 
+              it.articleId?.toUpperCase() === cleanedInput || 
+              it.sku?.toUpperCase() === cleanedInput
+            );
+            
+            const inMaster = (masterArticulo as Article[]).some(a => 
+              a.sku?.toUpperCase() === cleanedInput || 
+              a.barcode?.toUpperCase() === cleanedInput || 
+              a.id?.toUpperCase() === cleanedInput
+            );
+
+            if (inPlan || inMaster) {
+              processBarcode(cleanedInput);
+              ignoreScan.current = true;
+              setTimeout(() => {
+                ignoreScan.current = false;
+                setScanInput('');
+              }, 300);
+              setScanInput('');
+              processingTimer.current = null;
+              return;
+            }
+          }
+
+          // FALLBACK M7: Búsqueda incremental solo si no hay match directo con el limpio
+          let bestMatch: string | null = null;
           if (val.length >= 3) {
             for (let i = val.length; i >= 3; i--) {
               const prefix = val.substring(0, i);
