@@ -5,8 +5,8 @@ WORKDIR /app
 
 # Instalar dependencias
 COPY package*.json ./
-ENV NODE_OPTIONS="--max-old-space-size=8192"
-RUN npm install --legacy-peer-deps && npm cache clean --force
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+RUN npm install --legacy-peer-deps --no-audit && npm cache clean --force
 
 # Build
 COPY . .

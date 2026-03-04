@@ -15,6 +15,7 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 # Compilamos usando el tsconfig.server.json
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build:server
 
 # Stage 2: Production
