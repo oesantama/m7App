@@ -97,17 +97,35 @@ export const saveUser = async (req: Request, res: Response) => {
           INSERT INTO users (id, email, name, password, role_id, client_ids, status_id, phone, avatar, document_type, document_number, two_factor_enabled)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         `, [u.id, u.email, u.name, hashedPassword, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled]);
+        const roleId = u.roleId || u.role_id || 'ROL-02';
+        console.log(`[M7-USERS] Inicializando permisos para usuario ${u.id} con rol ${roleId}`);
         
-        const rolePermsResult = await pool.query('SELECT permissions FROM role_permissions WHERE role_id = $1', [u.roleId]);
-        const initialPermissions = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : '{}';
+        const rolePermsResult = await pool.query('SELECT permissions FROM role_permissions WHERE role_id = $1', [roleId]);
+        let permissionsObj = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : {};
+        
+        // Convertir string a objeto si es necesario
+        if (typeof permissionsObj === 'string') {
+            try { permissionsObj = JSON.parse(permissionsObj); } catch(e) { permissionsObj = {}; }
+        }
+
+        // GARANTÍA NUCLEAR: Si es Admin, tiene acceso a Grupo Inter (PAG-31)
+        if (roleId === 'ROL-01') {
+            permissionsObj['PAG-31'] = { view: true, create: true, edit: true, delete: true, active: true };
+            permissionsObj['page_PAG-31_view'] = true;
+            permissionsObj['page_PAG-31_create'] = true;
+            permissionsObj['page_PAG-31_edit'] = true;
+            permissionsObj['page_PAG-31_delete'] = true;
+            permissionsObj['page_PAG-31_active'] = true;
+        }
 
         await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
         await pool.query(`
           INSERT INTO user_permissions (id, user_id, permissions, status_id)
           VALUES ($1, $2, $3, $4)
-        `, [`PUS-${u.id}`, u.id, initialPermissions, u.statusId]);
+        `, [`PUS-${u.id}`, u.id, JSON.stringify(permissionsObj), u.statusId || 'EST-01']);
 
-        res.json({ success: true, message: 'Usuario creado y perfil de permisos inicializado' });
+        console.log(`[M7-USERS] ✅ Permisos sincronizados para ${u.email}`);
+        res.json({ success: true, message: 'Usuario creado/editado y perfil de permisos sincronizado' });
     }
 } catch (err: any) {
     console.error('[M7-USERS] Error saving user:', err);

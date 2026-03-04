@@ -8,6 +8,7 @@ export const fetchJson = async (url: string, options?: any) => {
     // Búsqueda exhaustiva del token en múltiples llaves
     const sessionStr = localStorage.getItem('m7_user_session');
     let token = localStorage.getItem('token') || 
+                localStorage.getItem('m7_token') || 
                 localStorage.getItem('m7_auth_token') || 
                 localStorage.getItem('m7_client_token');
     
