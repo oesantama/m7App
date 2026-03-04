@@ -69,8 +69,17 @@ export const saveUser = async (req: Request, res: Response) => {
           WHERE id = $1
         `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled, u.updatedBy || 'System']);
         
-        // M7 FIX: No sobreescribir permisos en UPDATE. La gestión de permisos es independiente.
-        res.json({ success: true, message: 'Usuario actualizado correctamente' });
+        // M7 FIX: Sincronización automática de permisos en UPDATE
+        const rolePermsResult = await pool.query('SELECT permissions FROM role_permissions WHERE role_id = $1', [u.roleId]);
+        const initialPermissions = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : '{}';
+
+        await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
+        await pool.query(`
+          INSERT INTO user_permissions (id, user_id, permissions, status_id)
+          VALUES ($1, $2, $3, $4)
+        `, [`PUS-${u.id}`, u.id, initialPermissions, u.statusId]);
+
+        res.json({ success: true, message: 'Usuario y permisos actualizados correctamente' });
     } else {
         // INSERT
         if (!u.password) {
