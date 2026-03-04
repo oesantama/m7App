@@ -7,6 +7,7 @@ import {
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { useAppStore } from '../stores/useAppStore';
 
 interface Order {
   id: number;
@@ -18,12 +19,16 @@ interface Order {
   nro_guia: string;
   fecha_entregado: string | null;
   placa: string;
+  producto: string;
   peso: number;
   cantidad: number;
   valor_flete: number;
   valor_declarado: number;
   acta_entrega_b64: string | null;
   created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 const GrupoInterView: React.FC = () => {
@@ -89,13 +94,25 @@ const GrupoInterView: React.FC = () => {
     reader.readAsBinaryString(file);
   };
 
+  const { user } = useAppStore();
+
   const handleExcelUpload = async () => {
     if (!excelFile) return;
     try {
       setLoading(true);
-      const res = await api.uploadGrupoInterExcel(excelFile);
-      toast.success(res.message || 'Excel procesado con éxito');
+      const res = await api.uploadGrupoInterExcel(excelFile, user?.name || 'System');
+      
+      if (res.duplicates > 0) {
+        toast.warning(`Completado: ${res.count} nuevos. Se omitieron ${res.duplicates} duplicados (Documento + Producto ya existentes).`, {
+            duration: 6000
+        });
+      } else {
+        toast.success(res.message || 'Excel procesado con éxito');
+      }
+
       setExcelFile(null);
+      setPreviewData([]);
+      setShowPreviewModal(false);
       fetchOrders();
     } catch (error: any) {
       toast.error(error.message || error.error || 'Error al subir Excel');

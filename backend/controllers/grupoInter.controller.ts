@@ -66,12 +66,34 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         // Extraer los datos a partir del encabezado encontrado
         const excelData = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex }) as any[];
 
+        // M7 NUCLEAR HEAL: Asegurar columnas de auditoría y unicidad
+        try {
+            await pool.query('ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS producto TEXT;');
+            await pool.query('ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS created_by TEXT;');
+            await pool.query('ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS updated_by TEXT;');
+            
+            // Reconfigurar unicidad: Eliminar la vieja de nro_documento y crear la compuesta con producto
+            await pool.query('ALTER TABLE grupo_inter_pedidos DROP CONSTRAINT IF EXISTS grupo_inter_pedidos_nro_documento_key;');
+            await pool.query(`
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'grupo_inter_pedidos_doc_prod_key') THEN
+                        ALTER TABLE grupo_inter_pedidos ADD CONSTRAINT grupo_inter_pedidos_doc_prod_key UNIQUE (nro_documento, producto);
+                    END IF;
+                END $$;
+            `);
+        } catch (healErr) {
+            console.warn('[GRUPO-INTER] Nuclear Heal Warning:', healErr);
+        }
+
         console.log(`[GRUPO-INTER] Header detectado en fila: ${headerRowIndex + 1}`);
         console.log(`[GRUPO-INTER] Procesando ${excelData.length} filas del Excel...`);
         
         if (excelData.length > 0) {
             console.log('[GRUPO-INTER] Columnas encontradas:', Object.keys(excelData[0]));
         }
+
+        const username = req.body.username || 'System';
 
         // Función para obtener valor de una columna usando aliases
         const getVal = (row: any, aliases: string[]) => {
@@ -88,12 +110,26 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
 
         let savedCount = 0;
         let skippedCount = 0;
+        let duplicateCount = 0;
 
         for (const row of excelData) {
             const nro_documento = getVal(row, columnAliases.nro_documento);
+            const producto = getVal(row, ['PRODUCTO', 'ARTICULO', 'REFERENCIA', 'DESCRIPCION', 'ITEM']) || 'GENERAL';
+            
             if (!nro_documento || nro_documento.length < 3) {
                 skippedCount++;
                 continue;
+            }
+
+            // Verificar duplicado antes de insertar (Documento + Producto)
+            const exists = await pool.query(
+                'SELECT 1 FROM grupo_inter_pedidos WHERE nro_documento = $1 AND producto = $2',
+                [nro_documento, producto]
+            );
+
+            if (exists.rows.length > 0) {
+                duplicateCount++;
+                continue; // No cargar porque ya existe
             }
 
             const cliente = getVal(row, columnAliases.cliente);
@@ -116,25 +152,15 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
 
             const query = `
                 INSERT INTO grupo_inter_pedidos (
-                    nro_documento, cliente, ciudad_origen, ciudad_destino, 
+                    nro_documento, producto, cliente, ciudad_origen, ciudad_destino, 
                     peso, cantidad, valor_flete, valor_declarado, nro_guia, placa,
-                    estado
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Pendiente')
-                ON CONFLICT (nro_documento) DO UPDATE SET
-                    cliente = EXCLUDED.cliente,
-                    ciudad_origen = EXCLUDED.ciudad_origen,
-                    ciudad_destino = EXCLUDED.ciudad_destino,
-                    peso = EXCLUDED.peso,
-                    cantidad = EXCLUDED.cantidad,
-                    valor_flete = EXCLUDED.valor_flete,
-                    valor_declarado = EXCLUDED.valor_declarado,
-                    nro_guia = EXCLUDED.nro_guia,
-                    placa = EXCLUDED.placa,
-                    updated_at = CURRENT_TIMESTAMP
+                    estado, created_by, updated_by
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Pendiente', $12, $12)
             `;
 
             const values = [
                 nro_documento,
+                producto,
                 cliente,
                 ciudad_origen,
                 ciudad_destino,
@@ -143,17 +169,19 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 parseNum(fleteRaw),
                 parseNum(valorRaw),
                 nro_guia,
-                placa
+                placa,
+                username
             ];
 
             await pool.query(query, values);
             savedCount++;
         }
 
-        console.log(`[GRUPO-INTER] Resultado: ${savedCount} guardados, ${skippedCount} saltados.`);
+        console.log(`[GRUPO-INTER] Resultado: ${savedCount} guardados, ${duplicateCount} duplicados, ${skippedCount} saltados.`);
         res.json({ 
-            message: `Excel procesado: ${savedCount} registros actualizados/creados`, 
+            message: `Excel procesado: ${savedCount} registros nuevos, ${duplicateCount} duplicados omitidos`, 
             count: savedCount,
+            duplicates: duplicateCount,
             skipped: skippedCount
         });
     } catch (error) {

@@ -609,13 +609,14 @@ export const api = {
     const qs = new URLSearchParams(params as any).toString();
     return fetchJson(`${API_URL}/grupo-inter/orders${qs ? `?${qs}` : ''}`);
   },
-  uploadGrupoInterExcel: (file: File) => {
+  uploadGrupoInterExcel: (file: File, username: string) => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('username', username);
     return fetchJson(`${API_URL}/grupo-inter/upload-excel`, {
       method: 'POST',
       body: formData,
-      headers: {} // fetchJson manejará el token, y no ponemos Content-Type para que el navegador ponga el boundary del FormData
+      headers: {} // fetchJson manejará el token
     });
   },
   processGrupoInterPDF: (file: File) => {
