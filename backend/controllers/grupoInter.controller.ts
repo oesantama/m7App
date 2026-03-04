@@ -90,9 +90,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         console.log(`[GRUPO-INTER] Procesando ${excelData.length} filas del Excel...`);
         
         if (excelData.length > 0) {
-            console.log('[GRUPO-INTER] Columnas encontradas:', Object.keys(excelData[0]));
-        }
-
+        
         const username = req.body.username || 'System';
 
         // Función para obtener valor de una columna usando aliases
@@ -108,15 +106,24 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             return foundKey ? String(row[foundKey] || '').trim() : '';
         };
 
+        // Extraer las cabeceras reales de la primera fila para el log de diagnóstico
+        const realHeaders = Object.keys(excelData[0] || {});
+        console.log(`[GRUPO-INTER] Procesando ${excelData.length} filas. Cabeceras detectadas encontradas en el archivo:`, realHeaders);
+
         let savedCount = 0;
         let skippedCount = 0;
         let duplicateCount = 0;
 
-        for (const row of excelData) {
+        for (let index = 0; index < excelData.length; index++) {
+            const row = excelData[index];
             const nro_documento = getVal(row, columnAliases.nro_documento);
             const producto = getVal(row, ['PRODUCTO', 'ARTICULO', 'REFERENCIA', 'DESCRIPCION', 'ITEM']) || 'GENERAL';
             
-            if (!nro_documento || nro_documento.length < 3) {
+            // Validación relajada: Solo pedimos que el documento exista y tenga al menos 1 caracter.
+            if (!nro_documento || String(nro_documento).trim().length < 1) {
+                if (skippedCount < 3) {
+                     console.log(`[GRUPO-INTER] ⚠️ Fila ${index + 2} saltada. No se detectó un número de documento válido en esta fila. Cabeceras evaluadas:`, JSON.stringify(Object.fromEntries(Object.entries(row).slice(0, 5))));
+                }
                 skippedCount++;
                 continue;
             }
