@@ -131,7 +131,71 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
     }
 };
 
-// ... processPDF se mantiene igual ...
+export const processPDF = async (req: any, res: Response): Promise<void> => {
+    try {
+        if (!req.file) {
+            res.status(400).json({ message: 'No se subió ningún PDF' });
+            return;
+        }
+
+        console.log('[GRUPO-INTER] Iniciando procesamiento de PDF...');
+        
+        const pdfInstance = new PDFParse({ data: req.file.buffer, verbosity: 0 });
+        const pdfData = await pdfInstance.getText();
+        const totalPages = pdfData.total;
+        console.log(`[GRUPO-INTER] PDF leído: ${totalPages} páginas.`);
+
+        // Obtener documentos pendientes para buscar
+        const ordersResult = await pool.query("SELECT nro_documento FROM grupo_inter_pedidos WHERE acta_entrega_b64 IS NULL");
+        const pendingDocs = ordersResult.rows.map(r => r.nro_documento);
+
+        if (pendingDocs.length === 0) {
+            res.json({ message: 'No hay pedidos pendientes de acta para este PDF.' });
+            return;
+        }
+
+        // Cargar el documento original con pdf-lib para extraer páginas
+        const mainPdfDoc = await PDFDocument.load(req.file.buffer);
+        let matches = 0;
+
+        for (let i = 0; i < totalPages; i++) {
+            // Extraer la página individualmente con pdf-lib y pasarla a pdf-parse
+            const subPdf = await PDFDocument.create();
+            const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [i]);
+            subPdf.addPage(copiedPage);
+            const subPdfBuffer = Buffer.from(await subPdf.save());
+            
+            const subPdfInstance = new PDFParse({ data: subPdfBuffer, verbosity: 0 });
+            const subPdfData = await subPdfInstance.getText();
+            const pageText = subPdfData.text;
+
+            for (const docNum of pendingDocs) {
+                if (pageText.includes(docNum)) {
+                    console.log(`[GRUPO-INTER] Match encontrado: Doc ${docNum} en pág ${i + 1}`);
+                    
+                    // Extraer esta página como base64
+                    const base64 = await subPdf.saveAsBase64();
+                    
+                    // Guardar en DB
+                    await pool.query(
+                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', updated_at = CURRENT_TIMESTAMP WHERE nro_documento = $2",
+                        [base64, docNum]
+                    );
+                    matches++;
+                }
+            }
+        }
+
+        res.json({ 
+            message: `Procesamiento completado. Se encontraron ${matches} coincidencias.`, 
+            matches 
+        });
+
+    } catch (error) {
+        console.error('[GRUPO-INTER] Error al procesar PDF:', error);
+        res.status(500).json({ message: 'Error al procesar PDF' });
+    }
+};
 
 export const getOrders = async (req: Request, res: Response): Promise<void> => {
     try {
