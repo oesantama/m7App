@@ -89,8 +89,6 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         console.log(`[GRUPO-INTER] Header detectado en fila: ${headerRowIndex + 1}`);
         console.log(`[GRUPO-INTER] Procesando ${excelData.length} filas del Excel...`);
         
-        if (excelData.length > 0) {
-        
         const username = req.body.username || 'System';
 
         // Función para obtener valor de una columna usando aliases
