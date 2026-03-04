@@ -34,7 +34,16 @@ const GrupoInterView: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState({ excel: 0, pdf: 0 });
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewFilter, setPreviewFilter] = useState('');
+  const [previewPage, setPreviewPage] = useState(1);
+  const itemsPerPage = 10;
+  
+  const [filters, setFilters] = useState({
+    status: '',
+    client: '',
+  });
 
   useEffect(() => {
     if (activeTab === 'gestion') {
@@ -45,7 +54,11 @@ const GrupoInterView: React.FC = () => {
   const fetchOrders = async (query = '') => {
     try {
       setLoading(true);
-      const data = await api.getGrupoInterOrders(query);
+      const params: any = { search: query };
+      if (filters.status) params.status = filters.status;
+      if (filters.client) params.client = filters.client;
+      
+      const data = await api.getGrupoInterOrders(params);
       setOrders(data);
     } catch (error: any) {
       toast.error(error.message || error.error || 'Error al cargar pedidos');
@@ -54,9 +67,25 @@ const GrupoInterView: React.FC = () => {
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchOrders(searchTerm);
+  const handleExcelFileChange = async (file: File | null) => {
+    if (!file) return;
+    setExcelFile(file);
+    
+    // Leer para previsualización
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = (window as any).XLSX.read(data, { type: 'binary' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = (window as any).XLSX.utils.sheet_to_json(sheet);
+        setPreviewData(json);
+        setShowPreviewModal(true);
+      } catch (err) {
+        toast.error('Error al leer el archivo para previsualización');
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleExcelUpload = async () => {
@@ -138,7 +167,7 @@ const GrupoInterView: React.FC = () => {
                   <Upload size={48} className="text-slate-400 group-hover:text-blue-500 mb-4 transition-colors" />
                   <span className="text-slate-600 font-medium">Arrastra el archivo Excel aquí</span>
                   <span className="text-slate-400 text-sm mt-1">Soporta .xlsx y .csv</span>
-                  <input type="file" className="hidden" accept=".xlsx,.csv" onChange={(e) => setExcelFile(e.target.files?.[0] || null)} />
+                  <input type="file" className="hidden" accept=".xlsx,.csv" onChange={(e) => handleExcelFileChange(e.target.files?.[0] || null)} />
                 </label>
                 
                 {excelFile && (
@@ -197,26 +226,46 @@ const GrupoInterView: React.FC = () => {
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-            {/* Buscador */}
-            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <form onSubmit={handleSearch} className="relative flex-1 max-w-lg">
+            {/* Buscador y Filtros Avanzados */}
+            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/30">
+              <div className="relative flex-1 max-w-lg">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                 <input 
                   type="text" 
-                  placeholder="Buscar por documento, guía o cliente..." 
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                  placeholder="Documento, guía o cliente..." 
+                  className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyUp={(e) => e.key === 'Enter' && fetchOrders(searchTerm)}
                 />
-              </form>
+              </div>
               
-              <div className="flex gap-2">
-                <button className="p-3 bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-200 rounded-xl transition text-slate-600">
-                  <Filter size={20} />
-                </button>
+              <div className="flex flex-wrap gap-2">
+                <select 
+                  className="px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-medium"
+                  value={filters.status}
+                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                >
+                  <option value="">Todos los Estados</option>
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="Entregado">Entregado</option>
+                </select>
+
                 <button 
-                  onClick={() => fetchOrders()}
-                  className="p-3 bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-200 rounded-xl transition text-slate-600"
+                  onClick={() => fetchOrders(searchTerm)}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95"
+                >
+                  Filtrar Resultados
+                </button>
+
+                <button 
+                  onClick={() => {
+                    setFilters({status: '', client: ''});
+                    setSearchTerm('');
+                    fetchOrders('');
+                  }}
+                  className="p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition text-slate-400"
+                  title="Limpiar Filtros"
                 >
                   <Clock size={20} />
                 </button>
@@ -232,7 +281,7 @@ const GrupoInterView: React.FC = () => {
                     <th className="px-6 py-4">Cliente</th>
                     <th className="px-6 py-4">Origen / Destino</th>
                     <th className="px-6 py-4">Estado</th>
-                    <th className="px-6 py-4">Guía</th>
+                    <th className="px-6 py-4">Guía / Placa</th>
                     <th className="px-6 py-4 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -241,7 +290,7 @@ const GrupoInterView: React.FC = () => {
                     <tr>
                       <td colSpan={6} className="px-6 py-20 text-center">
                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-                        <p className="mt-2 text-slate-500 font-medium">Cargando registros del sistema...</p>
+                        <p className="mt-2 text-slate-500 font-medium">Sincronizando con el núcleo Orbit...</p>
                       </td>
                     </tr>
                   ) : orders.length === 0 ? (
@@ -254,25 +303,30 @@ const GrupoInterView: React.FC = () => {
                   ) : orders.map((order) => (
                     <tr key={order.id} className="hover:bg-slate-50/80 transition-colors group">
                       <td className="px-6 py-4 font-bold text-slate-900">{order.nro_documento}</td>
-                      <td className="px-6 py-4 text-slate-600">{order.cliente}</td>
+                      <td className="px-6 py-4 text-slate-600 font-medium max-w-[200px] truncate">{order.cliente}</td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="text-slate-400 text-[10px] font-bold">DE: {order.ciudad_origen}</span>
-                          <span className="text-slate-900 text-sm font-medium">A: {order.ciudad_destino}</span>
+                          <span className="text-slate-400 text-[10px] font-bold">A: {order.ciudad_destino}</span>
+                          <span className="text-slate-900 text-xs font-semibold">{order.ciudad_origen || 'MEDELLIN'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          order.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          order.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700 border border-amber-200'
                         }`}>
-                          {order.estado}
+                          {order.estado || 'Pendiente'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-mono text-sm text-blue-600 font-semibold">{order.nro_guia}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-mono text-sm text-blue-600 font-semibold">{order.nro_guia}</span>
+                          <span className="text-[10px] text-slate-400 font-bold">{order.placa || 'SIN PLACA'}</span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <button 
                           onClick={() => openDetail(order)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all transform active:scale-95"
+                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-xl transition-all transform active:scale-95"
                         >
                           <Eye size={20} />
                         </button>
@@ -285,6 +339,107 @@ const GrupoInterView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Modal de Previsualización de Excel */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowPreviewModal(false)}></div>
+          <div className="relative bg-white w-full max-w-6xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col scale-100 animate-in fade-in zoom-in duration-300">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl">
+                  <FileSpreadsheet size={24} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900">Previsualización de Carga</h2>
+                  <p className="text-slate-500 text-sm font-medium">Filtra y revisa los datos antes de sincronizar</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Filtrar en tabla..." 
+                    className="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={previewFilter}
+                    onChange={(e) => {
+                      setPreviewFilter(e.target.value);
+                      setPreviewPage(1);
+                    }}
+                  />
+                </div>
+                <button onClick={() => setShowPreviewModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400">
+                  <ChevronRight size={28} className="rotate-90 md:rotate-0" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-0">
+               <table className="w-full text-left text-sm border-collapse">
+                 <thead className="sticky top-0 bg-slate-50 z-20 border-b border-slate-200">
+                   <tr>
+                     <th className="px-6 py-4 font-bold text-slate-600">Documento</th>
+                     <th className="px-6 py-4 font-bold text-slate-600">Cliente</th>
+                     <th className="px-6 py-4 font-bold text-slate-600">Ciudad Destino</th>
+                     <th className="px-6 py-4 font-bold text-slate-600">Cantidad</th>
+                     <th className="px-6 py-4 font-bold text-slate-600">Peso</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-100">
+                   {previewData
+                    .filter(row => {
+                      const str = JSON.stringify(row).toLowerCase();
+                      return str.includes(previewFilter.toLowerCase());
+                    })
+                    .slice((previewPage - 1) * itemsPerPage, previewPage * itemsPerPage)
+                    .map((row, idx) => (
+                      <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                        <td className="px-6 py-3 font-bold text-blue-600">{row['NRO DOCUMENTO'] || row['Documento'] || row['Documento_Externo'] || 'N/A'}</td>
+                        <td className="px-6 py-3 text-slate-600">{row['CLIENTE'] || row['Nombre'] || 'N/A'}</td>
+                        <td className="px-6 py-3 text-slate-500">{row['CIUDAD DESTINO'] || row['Destino'] || 'N/A'}</td>
+                        <td className="px-6 py-3 font-mono">{row['CANTIDAD'] || row['Unidades'] || 0}</td>
+                        <td className="px-6 py-3 font-mono">{row['PESO'] || 0} kg</td>
+                      </tr>
+                   ))}
+                 </tbody>
+               </table>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button 
+                  disabled={previewPage === 1}
+                  onClick={() => setPreviewPage(p => p - 1)}
+                  className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-30"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm font-bold text-slate-600 px-4">Página {previewPage}</span>
+                <button 
+                  disabled={previewPage * itemsPerPage >= previewData.length}
+                  onClick={() => setPreviewPage(p => p + 1)}
+                  className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-30"
+                >
+                  Siguiente
+                </button>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-slate-400 font-medium">Total: {previewData.length} registros</span>
+                <button 
+                  onClick={handleExcelUpload}
+                  disabled={loading}
+                  className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black shadow-xl shadow-blue-200 hover:bg-blue-700 transition flex items-center gap-2"
+                >
+                  {loading ? 'Cargando...' : 'Confirmar y Guardar'}
+                  <CheckCircle size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Detalle Express con Glassmorphism */}
       {showDetailModal && selectedOrder && (

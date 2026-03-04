@@ -601,7 +601,10 @@ export const api = {
   }),
   
   // --- GRUPO INTER ---
-  getGrupoInterOrders: (search?: string) => fetchJson(`${API_URL}/grupo-inter/orders${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getGrupoInterOrders: (params: { search?: string, status?: string, client?: string } = {}) => {
+    const qs = new URLSearchParams(params as any).toString();
+    return fetchJson(`${API_URL}/grupo-inter/orders${qs ? `?${qs}` : ''}`);
+  },
   uploadGrupoInterExcel: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
