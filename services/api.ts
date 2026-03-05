@@ -620,13 +620,50 @@ export const api = {
       headers: {} // fetchJson manejará el token
     });
   },
-  processGrupoInterPDF: (file: File) => {
+  processGrupoInterPDF: async (file: File, onProgress: (data: any) => void) => {
     const formData = new FormData();
     formData.append('file', file);
-    return fetchJson(`${API_URL}/grupo-inter/process-pdf`, {
+    
+    // Obtenemos el token manualmente para el fetch directo
+    const token = localStorage.getItem('token') || 
+                  localStorage.getItem('m7_token') || 
+                  localStorage.getItem('m7_auth_token');
+
+    const response = await fetch(`${API_URL}/grupo-inter/process-pdf`, {
       method: 'POST',
       body: formData,
-      headers: {}
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) throw new Error("No se pudo iniciar el stream de respuesta");
+
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Guardamos la última línea incompleta
+
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const data = JSON.parse(line);
+            onProgress(data);
+          } catch (e) {
+            console.warn("Error parseando línea de stream:", line);
+          }
+        }
+      }
+    }
   },
 };

@@ -335,11 +335,39 @@ export const syncInventory = async (req: Request, res: Response) => {
 
         if (targetEmails.length > 0) {
           const { sendEmail } = await import('../services/notification.service.js');
+          
+          // Crear un adjunto Excel con la totalidad de los items contabilizados
+          let attachments: any[] = [];
+          try {
+            const XLSX = await import('xlsx');
+            const excelData = items.map((it: any) => ({
+                 'SKU': it.articleId?.trim() || it.article_id?.trim() || '',
+                 'Cant (Orig)': Number(it.expectedQty || it.expected_qty || 0),
+                 'Conteo 1': Number(it.count1 || it.count_1 || 0),
+                 'Conteo 2 (Final)': Number(it.count2 || it.countedQty || it.count_2 || 0),
+                 'Diferencia': Number(it.count2 || it.countedQty || it.count_2 || 0) - Number(it.expectedQty || it.expected_qty || 0),
+                 'Nota': it.inventoryNote || it.inventory_observation || it.notes || ''
+            }));
+            
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
+            
+            const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+            
+            attachments.push({
+                filename: `Inventario_${docL.external_doc_id || docL.externalDocId || 'Reporte'}.xlsx`,
+                content: excelBuffer
+            });
+          } catch (xlsErr) {
+            console.error('[M7-NOTIF] Falló la creación del Excel Adjunto:', xlsErr);
+          }
+
           console.log(`[M7-NOTIF] Iniciando envío de correos a: ${targetEmails.join(', ')}`);
           
           for (const targetEmail of targetEmails) {
             try {
-              await sendEmail(targetEmail, subject, html);
+              await sendEmail(targetEmail, subject, html, attachments);
             } catch (innerErr: any) {
               console.error(`[M7-NOTIF-ERR] Falló envío a ${targetEmail}:`, innerErr.message);
             }
@@ -971,9 +999,37 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
     </html>
     `;
 
-    // 4. Enviar Correo
+    // 4. Generar Adjunto Excel y Enviar Correo
     const { sendEmail } = await import('../services/notification.service.js');
-    await sendEmail(targetEmail, subject, html);
+    let attachments: any[] = [];
+    
+    try {
+      const XLSX = await import('xlsx');
+      const excelData = items.map((it: any) => ({
+           'SKU': it.article_id?.trim() || '',
+           'Nombre': it.article_name || '',
+           'Cant (Orig)': Number(it.expected_qty || 0),
+           'Conteo 1': Number(it.count_1 || 0),
+           'Conteo 2 (Final)': Number(it.count_2 || it.count_1 || 0),
+           'Diferencia': Number(it.count_2 || it.count_1 || 0) - Number(it.expected_qty || 0),
+           'Nota': it.inventory_note || it.inventory_observation || ''
+      }));
+      
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
+      
+      const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      attachments.push({
+          filename: `Inventario_Reenvio_${docL.external_doc_id || 'Reporte'}.xlsx`,
+          content: excelBuffer
+      });
+    } catch (xlsErr) {
+      console.error('[M7-RESEND] Falló la creación del Excel Adjunto:', xlsErr);
+    }
+
+    await sendEmail(targetEmail, subject, html, attachments);
 
     // 5. Registrar Log
     const notifLogId = `NOT-RESEND-${Date.now()}`;

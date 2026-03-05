@@ -8,6 +8,11 @@ RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
+    libcairo2-dev \
+    libjpeg-dev \
+    libpango1.0-dev \
+    libgif-dev \
+    librsvg2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
@@ -34,6 +39,12 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     build-essential \
     python3 \
+    libcairo2 \
+    libjpeg62-turbo \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgif7 \
+    librsvg2-2 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \

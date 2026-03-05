@@ -36,7 +36,31 @@ END $$;
 -- Permitir duplicados controlados por ID de documento, SKU y Factura/Pedido
 ALTER TABLE document_items ADD CONSTRAINT document_items_pk_composite UNIQUE (document_id, article_id, invoice, order_number);
 
--- 5. Tabla de Auditoría y Trazabilidad (M7 Core)
+-- 5. Tabla de Pedidos (Grupo Inter)
+CREATE TABLE IF NOT EXISTS grupo_inter_pedidos (
+    id SERIAL PRIMARY KEY,
+    nro_documento VARCHAR(100),
+    cliente VARCHAR(255),
+    ciudad_origen VARCHAR(255),
+    ciudad_destino VARCHAR(255),
+    estado VARCHAR(50) DEFAULT 'Pendiente',
+    nro_guia VARCHAR(100),
+    fecha_entregado TIMESTAMP,
+    placa VARCHAR(50),
+    acta_entrega_b64 TEXT,
+    producto TEXT,
+    cantidad NUMERIC,
+    peso NUMERIC,
+    valor_flete NUMERIC,
+    valor_declarado NUMERIC,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(50),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(50),
+    UNIQUE (nro_documento, producto)
+);
+
+-- 6. Tabla de Auditoría y Trazabilidad (M7 Core)
 CREATE TABLE IF NOT EXISTS inventory_audit_log (
     id SERIAL PRIMARY KEY,
     document_id TEXT,
@@ -50,7 +74,7 @@ CREATE TABLE IF NOT EXISTS inventory_audit_log (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. Sistema de Autorización Remota
+-- 7. Sistema de Autorización Remota
 CREATE TABLE IF NOT EXISTS auth_codes (
     code TEXT PRIMARY KEY,
     requester_id TEXT,

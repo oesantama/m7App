@@ -46,7 +46,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'training_courses': ['category_id', 'title', 'description', 'cover_image', 'level', 'status_id', 'created_at'],
   'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', 'order', 'created_at'],
   'user_training_progress': ['user_id', 'lesson_id', 'status', 'finished_at', 'updated_at'],
-  'grupo_inter_pedidos': ['nro_documento', 'cliente', 'ciudad_origen', 'ciudad_origen_cod', 'ciudad_destino', 'ciudad_destino_cod', 'estado', 'nro_guia', 'fecha_entregado', 'latitud', 'longitud', 'placa', 'acta_entrega_b64', 'peso', 'cantidad', 'valor_flete', 'valor_declarado', 'history', 'created_at', 'updated_at'],
+  'grupo_inter_pedidos': ['nro_documento', 'producto', 'cliente', 'ciudad_origen', 'ciudad_origen_cod', 'ciudad_destino', 'ciudad_destino_cod', 'estado', 'nro_guia', 'fecha_entregado', 'latitud', 'longitud', 'placa', 'acta_entrega_b64', 'peso', 'cantidad', 'valor_flete', 'valor_declarado', 'history', 'created_at', 'updated_at', 'created_by', 'updated_by'],
   'document_l_payments': ['document_id', 'invoice', 'client_ref', 'un_code', 'metodo_pago', 'vmetodo', 'user_id', 'processed_at']
 };
 
@@ -89,7 +89,7 @@ const healSchema = async (client: any) => {
           let type = 'TEXT';
           if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at') type = 'TIMESTAMP WITH TIME ZONE';
           if (col === 'permissions' || col.endsWith('_ids') || col.includes('items') || col === 'scanned_items' || col === 'helper_ids' || col === 'recent_assignments' || col === 'record_data') type = 'JSONB';
-          if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order') type = 'NUMERIC DEFAULT 0';
+          if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado') type = 'NUMERIC DEFAULT 0';
           if (col === 'client_ids') type = 'TEXT[]';
           if (col === 'permissions' || col === 'record_data') type = 'JSONB';
           if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved') || col === 'aceptapolitica' || col === 'aprobada' || col === 'signed') type = 'BOOLEAN DEFAULT FALSE';

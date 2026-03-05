@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Upload, FileSpreadsheet, FileText, Search, Eye, 
   MapPin, Package, Truck, Clock, CheckCircle, 
-  AlertCircle, ChevronRight, Download, Filter 
+  AlertCircle, ChevronRight, Download, Filter, User 
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -13,23 +13,47 @@ interface Order {
   id: number;
   nro_documento: string;
   cliente: string;
+  nit_cliente: string;
+  direccion: string;
+  nota_encabezado: string;
   ciudad_origen: string;
   ciudad_destino: string;
+  muni_destino_original: string;
   estado: string;
   nro_guia: string;
   fecha_entregado: string | null;
+  f_ultimo_corte: string | null;
   placa: string;
   producto: string;
   peso: number;
   cantidad: number;
   valor_flete: number;
   valor_declarado: number;
+  clasificacion: string;
+  empresa: string;
   acta_entrega_b64: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
   updated_by: string | null;
 }
+
+const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
+  <div className="flex items-start gap-3">
+    <div className="mt-1 text-blue-500">{icon}</div>
+    <div className="flex flex-col">
+      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{label}</span>
+      <span className="text-slate-900 font-semibold">{value}</span>
+    </div>
+  </div>
+);
+
+const MetricBox: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">{label}</span>
+    <span className="text-lg font-black text-slate-900">{value}</span>
+  </div>
+);
 
 const GrupoInterView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'carga' | 'gestion'>('gestion');
@@ -44,18 +68,45 @@ const GrupoInterView: React.FC = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewFilter, setPreviewFilter] = useState('');
   const [previewPage, setPreviewPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPagePreview = 10;
   
+  // Paginación Gestión Operativa
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  // Estados de Progreso y Diagnóstico
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState("Iniciando...");
+  const [finalMatches, setFinalMatches] = useState(0);
+
+  // Auto-scroll para los logs
+  useEffect(() => {
+    if (isProcessing) {
+      const terminal = document.getElementById('ocr-terminal');
+      if (terminal) {
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+    }
+  }, [debugLogs, isProcessing]);
+
   const [filters, setFilters] = useState({
     status: '',
     client: '',
+    fechaCorteDesde: '',
+    fechaCorteHasta: '',
   });
 
   useEffect(() => {
     if (activeTab === 'gestion') {
-      fetchOrders();
+      const delayDebounceFn = setTimeout(() => {
+        fetchOrders(searchTerm);
+      }, 600);
+      return () => clearTimeout(delayDebounceFn);
     }
-  }, [activeTab]);
+  }, [searchTerm, activeTab, filters.status, filters.fechaCorteDesde, filters.fechaCorteHasta]);
 
   const fetchOrders = async (query = '') => {
     try {
@@ -63,9 +114,12 @@ const GrupoInterView: React.FC = () => {
       const params: any = { search: query };
       if (filters.status) params.status = filters.status;
       if (filters.client) params.client = filters.client;
+      if (filters.fechaCorteDesde) params.fechaCorteDesde = filters.fechaCorteDesde;
+      if (filters.fechaCorteHasta) params.fechaCorteHasta = filters.fechaCorteHasta;
       
       const data = await api.getGrupoInterOrders(params);
       setOrders(data);
+      setCurrentPage(1); // Resetear a la primera página en cada búsqueda
     } catch (error: any) {
       toast.error(error.message || error.error || 'Error al cargar pedidos');
     } finally {
@@ -84,8 +138,24 @@ const GrupoInterView: React.FC = () => {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet);
-        setPreviewData(json);
+        // Usar formato array para evitar que las columnas sin nombre se salten y desplacen la info visualmente
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        if (rows.length > 0) {
+          const headers = rows[0] || [];
+          const json = rows.slice(1).map(row => {
+            const obj: any = {};
+            // Alineación estricta por longitud de encabezado (llena huecos nulos)
+            for (let i = 0; i < headers.length; i++) {
+              const h = headers[i];
+              const val = row[i];
+              obj[String(h || `COL_${i}`)] = (val === undefined || val === null || val === '') ? ' ' : val;
+            }
+            return obj;
+          });
+          setPreviewData(json);
+        } else {
+          setPreviewData([]);
+        }
         setShowPreviewModal(true);
       } catch (err) {
         toast.error('Error al leer el archivo para previsualización');
@@ -125,11 +195,37 @@ const GrupoInterView: React.FC = () => {
     if (!pdfFile) return;
     try {
       setLoading(true);
-      const res = await api.processGrupoInterPDF(pdfFile);
-      toast.success(res.message || 'PDF procesado con captura de actas');
+      setIsProcessing(true);
+      setUploadProgress(0);
+      setDebugLogs([]);
+      setFinalMatches(0);
+      setProcessingStatus("Subiendo archivo y preparando escaneo...");
+      
+      await api.processGrupoInterPDF(pdfFile, (data) => {
+        if (data.type === 'start') {
+          setProcessingStatus(`Procesando ${data.totalPages} páginas...`);
+        } else if (data.type === 'log') {
+          setDebugLogs(prev => [...prev, data.message]);
+          setProcessingStatus(data.message);
+          if (data.progress) setUploadProgress(data.progress);
+        } else if (data.type === 'end') {
+          setFinalMatches(data.matches);
+          setUploadProgress(100);
+          setProcessingStatus(`Completado: ${data.matches} coincidencias.`);
+          
+          if (data.matches > 0) {
+            toast.success(`Se encontraron ${data.matches} coincidencias.`);
+          } else {
+            toast.info("No se encontraron coincidencias en este documento.");
+          }
+        }
+      });
+      
       setPdfFile(null);
+      fetchOrders();
     } catch (error: any) {
-      toast.error(error.message || error.error || 'Error al procesar PDF');
+      toast.error(error.message || 'Error al procesar PDF');
+      setIsProcessing(false);
     } finally {
       setLoading(false);
     }
@@ -225,18 +321,54 @@ const GrupoInterView: React.FC = () => {
                 </label>
 
                 {pdfFile && (
-                  <div className="mt-4 flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <FileText className="text-blue-600 flex-shrink-0" size={20} />
-                      <span className="text-blue-700 font-medium truncate">{pdfFile.name}</span>
+                  <div className="mt-4 space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <FileText className="text-blue-600 flex-shrink-0" size={20} />
+                        <span className="text-blue-700 font-medium truncate">{pdfFile.name}</span>
+                      </div>
+                      <button 
+                        onClick={handlePdfUpload}
+                        disabled={loading}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition disabled:opacity-50 inline-flex items-center gap-2"
+                      >
+                        {loading ? 'Analizando...' : 'Iniciar Escaneo'}
+                      </button>
                     </div>
+
+                    {loading && (
+                      <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200 shadow-inner">
+                        <div 
+                          className="h-full bg-blue-500 transition-all duration-500 ease-out"
+                          style={{ width: `${uploadProgress || 45}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {debugLogs.length > 0 && (
+                  <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden bg-slate-900 shadow-2xl">
                     <button 
-                      onClick={handlePdfUpload}
-                      disabled={loading}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition disabled:opacity-50 inline-flex items-center gap-2"
+                      onClick={() => setShowDebug(!showDebug)}
+                      className="w-full flex items-center justify-between p-3 bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition"
                     >
-                      {loading ? 'Escaneando...' : 'Iniciar Escaneo'}
+                      <span className="flex items-center gap-2">
+                         <AlertCircle size={14} className="text-amber-400" />
+                         CONSOLA DE DIAGNÓSTICO OCR
+                      </span>
+                      <span>{showDebug ? 'OCULTAR' : 'VER DETALLE'}</span>
                     </button>
+                    {showDebug && (
+                      <div className="p-4 bg-black/50 font-mono text-[10px] text-emerald-400 h-48 overflow-y-auto space-y-1">
+                        {debugLogs.map((log, lIdx) => (
+                          <div key={lIdx} className="border-l border-emerald-900/50 pl-2">
+                            <span className="text-slate-500 mr-2">[{lIdx + 1}]</span>
+                            {log}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -259,34 +391,59 @@ const GrupoInterView: React.FC = () => {
               </div>
               
               <div className="flex flex-wrap gap-2">
-                <select 
-                  className="px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-medium"
-                  value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
-                >
-                  <option value="">Todos los Estados</option>
-                  <option value="Pendiente">Pendiente</option>
-                  <option value="Entregado">Entregado</option>
-                </select>
+                <div className="flex flex-col">
+                   <span className="text-[10px] text-slate-400 font-bold ml-1">F. CORTE DESDE</span>
+                   <input 
+                    type="date"
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-sm"
+                    value={filters.fechaCorteDesde}
+                    onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})}
+                  />
+                </div>
 
-                <button 
-                  onClick={() => fetchOrders(searchTerm)}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95"
-                >
-                  Filtrar Resultados
-                </button>
+                <div className="flex flex-col">
+                   <span className="text-[10px] text-slate-400 font-bold ml-1">F. CORTE HASTA</span>
+                   <input 
+                    type="date"
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-sm"
+                    value={filters.fechaCorteHasta}
+                    onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})}
+                  />
+                </div>
 
-                <button 
-                  onClick={() => {
-                    setFilters({status: '', client: ''});
-                    setSearchTerm('');
-                    fetchOrders('');
-                  }}
-                  className="p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition text-slate-400"
-                  title="Limpiar Filtros"
-                >
-                  <Clock size={20} />
-                </button>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-bold ml-1">ESTADO</span>
+                  <select 
+                    className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-sm"
+                    value={filters.status}
+                    onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  >
+                    <option value="">Todos</option>
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Entregado">Entregado</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end gap-2">
+                  <button 
+                    onClick={() => fetchOrders(searchTerm)}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 text-sm"
+                  >
+                    Filtrar
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setFilters({status: '', client: '', fechaCorteDesde: '', fechaCorteHasta: ''});
+                      setSearchTerm('');
+                      fetchOrders('');
+                    }}
+                    className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition text-slate-400"
+                    title="Limpiar Filtros"
+                  >
+                    <Clock size={20} />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -294,13 +451,14 @@ const GrupoInterView: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-slate-50/50 text-slate-500 uppercase text-xs font-bold tracking-wider">
-                    <th className="px-6 py-4">Documento</th>
-                    <th className="px-6 py-4">Cliente</th>
-                    <th className="px-6 py-4">Origen / Destino</th>
-                    <th className="px-6 py-4">Estado</th>
-                    <th className="px-6 py-4">Guía / Placa</th>
-                    <th className="px-6 py-4 text-right">Acciones</th>
+                  <tr className="bg-slate-50/50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                    <th className="px-4 py-4">Documento</th>
+                    <th className="px-4 py-4">F. Corte</th>
+                    <th className="px-4 py-4">Cliente / NIT</th>
+                    <th className="px-4 py-4">Dirección / Destino</th>
+                    <th className="px-4 py-4">Estado</th>
+                    <th className="px-4 py-4">Guía / Placa</th>
+                    <th className="px-4 py-4 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -318,42 +476,101 @@ const GrupoInterView: React.FC = () => {
                         <p className="text-slate-500 font-medium">No se encontraron pedidos de Grupo Inter</p>
                       </td>
                     </tr>
-                  ) : orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-6 py-4 font-bold text-slate-900">{order.nro_documento}</td>
-                      <td className="px-6 py-4 text-slate-600 font-medium max-w-[200px] truncate">{order.cliente}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-slate-400 text-[10px] font-bold">A: {order.ciudad_destino}</span>
-                          <span className="text-slate-900 text-xs font-semibold">{order.ciudad_origen || 'MEDELLIN'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          order.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700 border border-amber-200'
-                        }`}>
-                          {order.estado || 'Pendiente'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-mono text-sm text-blue-600 font-semibold">{order.nro_guia}</span>
-                          <span className="text-[10px] text-slate-400 font-bold">{order.placa || 'SIN PLACA'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={() => openDetail(order)}
-                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-xl transition-all transform active:scale-95"
-                        >
-                          <Eye size={20} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  ) : (
+                    orders
+                      .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                      .map((order) => (
+                        <tr key={order.id} className="hover:bg-slate-50/80 transition-colors group text-xs">
+                          <td className="px-4 py-4 font-bold text-slate-900">{order.nro_documento}</td>
+                          <td className="px-4 py-4 text-slate-500 font-medium">
+                            {order.f_ultimo_corte ? new Date(order.f_ultimo_corte).toLocaleDateString() : '-'}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-slate-900 font-bold max-w-[200px] truncate">{order.cliente}</span>
+                              <span className="text-slate-400 text-[10px] font-bold">{order.nit_cliente}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-slate-600 font-medium max-w-[200px] truncate">{order.direccion}</span>
+                              <span className="text-slate-400 text-[10px] font-bold">A: {order.ciudad_destino}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              order.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700 border border-amber-200'
+                            }`}>
+                              {order.estado || 'Pendiente'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-mono text-blue-600 font-semibold">{order.nro_guia}</span>
+                              <span className="text-[10px] text-slate-400 font-bold">{order.placa || 'SIN PLACA'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <button 
+                              onClick={() => openDetail(order)}
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-xl transition-all transform active:scale-95"
+                            >
+                              <Eye size={20} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Paginación Gestión Operativa */}
+            {!loading && orders.length > 0 && (
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-slate-500 font-medium">Mostrar</span>
+                  <select 
+                    className="p-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value={5}>5 registros</option>
+                    <option value={10}>10 registros</option>
+                    <option value={20}>20 registros</option>
+                    <option value={50}>50 registros</option>
+                    <option value={10000}>Todos</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => p - 1)}
+                    className="p-2 bg-white border border-slate-200 rounded-xl disabled:opacity-30 hover:bg-slate-50 transition drop-shadow-sm"
+                  >
+                    Anterior
+                  </button>
+                  <div className="flex items-center px-4">
+                    <span className="text-sm font-bold text-slate-600">Página {currentPage} de {Math.ceil(orders.length / itemsPerPage)}</span>
+                  </div>
+                  <button 
+                    disabled={currentPage >= Math.ceil(orders.length / itemsPerPage)}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    className="p-2 bg-white border border-slate-200 rounded-xl disabled:opacity-30 hover:bg-slate-50 transition drop-shadow-sm"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+
+                <div className="text-sm text-slate-400 font-medium">
+                  Total: <span className="font-bold text-slate-600">{orders.length}</span> registros encontrados
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -408,16 +625,20 @@ const GrupoInterView: React.FC = () => {
                       const str = JSON.stringify(row).toLowerCase();
                       return str.includes(previewFilter.toLowerCase());
                     })
-                    .slice((previewPage - 1) * itemsPerPage, previewPage * itemsPerPage)
-                    .map((row: any, idx) => (
-                      <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                        {Object.values(row).map((val: any, vIdx) => (
-                          <td key={vIdx} className="px-4 py-2 text-slate-600 whitespace-nowrap">
-                            {String(val || '')}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
+                    .slice((previewPage - 1) * itemsPerPagePreview, previewPage * itemsPerPagePreview)
+                    .map((row: any, idx) => {
+                      // Usar las llaves del primer objeto para garantizar el orden de las columnas
+                      const headers = Object.keys(previewData[0]);
+                      return (
+                        <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                          {headers.map((key, vIdx) => (
+                            <td key={vIdx} className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                              {String(row[key] || ' ')}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
                  </tbody>
                </table>
             </div>
@@ -433,7 +654,7 @@ const GrupoInterView: React.FC = () => {
                 </button>
                 <span className="text-sm font-bold text-slate-600 px-4">Página {previewPage}</span>
                 <button 
-                  disabled={previewPage * itemsPerPage >= previewData.length}
+                  disabled={previewPage * itemsPerPagePreview >= previewData.length}
                   onClick={() => setPreviewPage(p => p + 1)}
                   className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-30"
                 >
@@ -489,12 +710,19 @@ const GrupoInterView: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Info Card */}
                 <div className="md:col-span-2 grid grid-cols-2 gap-6">
+                  <DetailItem icon={<User size={20} />} label="Cliente / NIT" value={`${selectedOrder.cliente} (${selectedOrder.nit_cliente})`} />
+                  <DetailItem icon={<MapPin size={20} />} label="Dirección de Entrega" value={selectedOrder.direccion} />
                   <DetailItem icon={<Truck size={20} />} label="Vehículo / Placa" value={selectedOrder.placa || 'No asignada'} />
                   <DetailItem icon={<Package size={20} />} label="Guía de Transporte" value={selectedOrder.nro_guia} />
                   <DetailItem icon={<MapPin size={20} />} label="Ciudad Destino" value={selectedOrder.ciudad_destino} />
                   <DetailItem icon={<Clock size={20} />} label="Fecha Entrega" value={selectedOrder.fecha_entregado ? new Date(selectedOrder.fecha_entregado).toLocaleString() : 'Pendiente'} />
+                  <DetailItem icon={<Clock size={20} />} label="F. Ultimo Corte" value={selectedOrder.f_ultimo_corte ? new Date(selectedOrder.f_ultimo_corte).toLocaleDateString() : 'N/A'} />
                   <DetailItem icon={<AlertCircle size={20} />} label="Estado Actual" value={selectedOrder.estado} />
-                  <DetailItem icon={<Package size={20} />} label="Unidades / Cantidad" value={selectedOrder.cantidad.toString()} />
+                  <DetailItem icon={<Package size={20} />} label="Producto" value={selectedOrder.producto} />
+                  <DetailItem icon={<CheckCircle size={20} />} label="Empresa / Clasif." value={`${selectedOrder.empresa} / ${selectedOrder.clasificacion}`} />
+                  <div className="col-span-2">
+                    <DetailItem icon={<FileText size={20} />} label="Nota Encabezado" value={selectedOrder.nota_encabezado || 'Sin notas'} />
+                  </div>
                 </div>
 
                 {/* Acta de Entrega - Screenshot del PDF */}
@@ -539,25 +767,67 @@ const GrupoInterView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Persistente de Progreso OCR */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"></div>
+          <div className="relative bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="p-8 text-center">
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                <FileText size={40} className="text-blue-600" />
+              </div>
+              
+              <h3 className="text-2xl font-black text-slate-900 mb-2">Escaneando Documento</h3>
+              <p className="text-slate-500 font-medium mb-8">Por favor, no cierre esta ventana hasta finalizar.</p>
+
+              {/* Barra de Progreso */}
+              <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden border border-slate-200 shadow-inner mb-4">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500 ease-out flex items-center justify-end px-2"
+                  style={{ width: `${uploadProgress}%` }}
+                >
+                  <span className="text-[10px] font-black text-white">{uploadProgress}%</span>
+                </div>
+              </div>
+
+              {/* Terminal de Logs */}
+              <div 
+                id="ocr-terminal"
+                className="bg-slate-900 rounded-xl p-4 h-40 overflow-y-auto text-left font-mono text-[10px] text-emerald-400 border border-slate-800 shadow-2xl mb-8"
+              >
+                {debugLogs.length === 0 && <span className="animate-pulse">Esperando respuesta del servidor...</span>}
+                {debugLogs.map((log, idx) => (
+                  <div key={idx} className={`${log.includes('✅') ? 'text-blue-300 font-bold' : log.includes('❌') ? 'text-rose-400' : ''}`}>
+                    <span className="text-slate-500 mr-2">[{idx + 1}]</span>
+                    {log}
+                  </div>
+                ))}
+                <div id="logs-end"></div>
+              </div>
+
+              {/* Status footer */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-400 italic text-xs">
+                  <Clock size={14} className="animate-spin" />
+                  <span className="truncate max-w-[250px]">{processingStatus}</span>
+                </div>
+                
+                {uploadProgress === 100 && (
+                  <button 
+                    onClick={() => setIsProcessing(false)}
+                    className="bg-blue-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-blue-700 transition animate-in slide-in-from-bottom-2"
+                  >
+                    Cerrar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
-  <div className="flex items-start gap-3">
-    <div className="mt-1 text-blue-500">{icon}</div>
-    <div className="flex flex-col">
-      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{label}</span>
-      <span className="text-slate-900 font-semibold">{value}</span>
-    </div>
-  </div>
-);
-
-const MetricBox: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
-    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">{label}</span>
-    <span className="text-lg font-black text-slate-900">{value}</span>
-  </div>
-);
 
 export default GrupoInterView;
