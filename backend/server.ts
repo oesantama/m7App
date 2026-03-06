@@ -45,9 +45,9 @@ app.use('/api/auth/login', loginLimiter);
 
 // Middleware de Whitelisting y Protección Global (Seguridad Arquitectónica)
 app.use('/api', (req, res, next) => {
-  const publicPaths = ['/auth/login', '/health', '/', '/geocode', '/public/order-status'];
+  const publicPaths = ['/auth/login', '/health', '/', '/geocode', '/public/order-status', '/health-sec', '/api/health-sec'];
   
-  if (publicPaths.includes(req.path) || req.path.startsWith('/public/order-status')) {
+  if (publicPaths.includes(req.path) || req.path.startsWith('/public/order-status') || req.path === '/health-sec' || req.path === '/api/health-sec') {
     return next();
   }
   return authenticateToken(req, res, next);
