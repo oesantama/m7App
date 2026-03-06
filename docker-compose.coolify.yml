@@ -13,6 +13,9 @@ services:
       - DB_PASS=${POSTGRES_PASSWORD}
       - DB_NAME=${POSTGRES_DB}
       - NODE_ENV=production
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - AI_MODEL=${AI_MODEL}
     depends_on:
       postgres:
         condition: service_healthy

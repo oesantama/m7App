@@ -56,7 +56,19 @@ app.use('/api', (req, res, next) => {
 
 // Health Check Global para Proxies (Coolify/Nginx)
 app.get('/', (req, res) => {
-  res.json({ ok: true, message: 'Orbit Kernal Operational', version: '1.0.5-FORCE-SYNC' });
+  res.json({ ok: true, message: 'Orbit Kernal Operational', version: '1.9.15-NUCLEAR-OCR-FIX' });
+});
+
+app.get('/api/health-sec', (req, res) => {
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  res.json({ 
+    status: 'UP', 
+    version: '1.9.15-NUCLEAR-OCR-FIX',
+    key_detected: !!key,
+    key_length: key.length,
+    key_prefix: key.substring(0, 4) + '***',
+    env: process.env.NODE_ENV
+  });
 });
 
 app.get('/health', (req, res) => {
@@ -76,7 +88,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
   console.log(`[ORBIT-SYSTEM] Servidor Operacional en Puerto ${PORT}`);
-  console.log(`[ORBIT-SYSTEM] Versión: 1.0.5-FORCE-SYNC - NUCLEAR-RELOAD`);
+  console.log(`[ORBIT-SYSTEM] Versión: 1.9.15-NUCLEAR-OCR-FIX`);
   console.log(`[ORBIT-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
   initScheduler();

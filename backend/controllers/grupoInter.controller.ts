@@ -10,13 +10,15 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const getVisionModel = (name?: string) => {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
     if (!apiKey) {
-        console.error('[OCR-NUCLEAR] ERROR: No se detectó API Key en el subproceso.');
+        console.error('[OCR-NUCLEAR] ❌ ERROR CRÍTICO: No se detectó API Key en el subproceso.');
+    } else {
+        console.log(`[OCR-NUCLEAR] ✅ Key Detectada: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)} (Len: ${apiKey.length})`);
     }
     
     // Inicializar el cliente cada vez o mantener uno si la clave ya está presente
     const genAI = new GoogleGenerativeAI(apiKey);
     const modelId = name || process.env.AI_MODEL || "gemini-2.0-flash"; 
-    console.log(`[OCR-NUCLEAR] Usando modelo: ${modelId} (Key OK: ${!!apiKey})`);
+    console.log(`[OCR-NUCLEAR] 🧠 Instanciando modelo: ${modelId}`);
     return genAI.getGenerativeModel({ model: modelId });
 };
 
