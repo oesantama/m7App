@@ -553,8 +553,37 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
     if (action === 'confirm') {
       const targetCode = incident.suggestion || incident.code;
-      processBarcode(targetCode);
-      toast.success(`Artículo ${targetCode} integrado al plan.`);
+      
+      // M7-FIX: Verificar si ya existe en el plan (incluyendo extras anteriores)
+      const exists = groupedItems.find(it => 
+        it.articleId?.toUpperCase() === targetCode.toUpperCase() || 
+        it.sku?.toUpperCase() === targetCode.toUpperCase()
+      );
+
+      if (!exists) {
+        // ES UN ITEM EXTRA NUEVO: Añadirlo a la lista de extras antes de procesar el barcode
+        const newExtra = {
+          articleId: targetCode,
+          sku: targetCode,
+          ['articleName' as any]: `SINCRO M7: ${targetCode}`,
+          expectedQty: 0,
+          count1: 0,
+          countedQty: 0,
+          unit: 'UND',
+          id: `extra-${Date.now()}`,
+          status: 'pending' as DocStatus
+        } as unknown as DocumentLItem;
+
+        setExtraItems(prev => [...prev, newExtra]);
+        // Pequeño delay para que useMemo de groupedItems se actualice antes de procesar el barcode
+        setTimeout(() => {
+            processBarcode(targetCode);
+            toast.success(`Artículo ${targetCode} integrado al plan.`);
+        }, 50);
+      } else {
+        processBarcode(targetCode);
+        toast.success(`Artículo ${targetCode} integrado al plan.`);
+      }
     }
 
     setIncidents(prev => prev.filter(inc => inc.id !== incidentId));
@@ -745,8 +774,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
       {/* DISEÑO RESPONSIVO M7: LADO A LADO EN DESKTOP, UNO SOBRE OTRO EN TABLET/MOBILE */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-white overflow-hidden h-[calc(100vh-250px)]">
         
-        {/* TABLA 1: PLAN DE AUDITORÍA (IZQUIERDA / ARRIBA) */}
-        <div className="flex-1 lg:flex-[0.7] flex flex-col min-h-0 w-full overflow-hidden border-b-4 lg:border-b-0 lg:border-r-4 border-slate-100">
+        {/* TABLA 1: PLAN DE AUDITORÍA (IZQUIERDA / ARRIBA) - M7-MOD: Ocupa el 80% en LG para dar más espacio */}
+        <div className="flex-1 lg:flex-[0.8] flex flex-col min-h-0 w-full overflow-hidden border-b-4 lg:border-b-0 lg:border-r-4 border-slate-100">
           <div className="bg-white flex flex-col h-full relative">
             <div className="px-4 py-2 border-b border-slate-50 bg-white flex items-center shrink-0 gap-4 overflow-x-auto z-30">
               {/* SEARCH INPUT */}
@@ -823,9 +852,13 @@ const BlindCount: React.FC<BlindCountProps> = ({
                               <button onClick={() => handleOpenTransaction(it.articleId, 'REVERSE')} className="w-8 h-8 bg-amber-500 text-white rounded-lg shadow-md hover:bg-amber-600 flex items-center justify-center"><Icons.RotateCcw className="w-4 h-4" /></button>
                             </>
                           )}
-                          {(user?.roleId === 'ROL-01' || user?.roleId === 'ROL-02') && (
-                            <button onClick={() => handleSubtract(it.articleId)} disabled={currentCount === 0} className="w-8 h-8 bg-red-400 text-white rounded-lg shadow-md disabled:opacity-10 flex items-center justify-center"><Icons.Trash className="w-3 h-3" /></button>
-                          )}
+                          <button 
+                            onClick={() => handleSubtract(it.articleId)} 
+                            disabled={currentCount === 0} 
+                            className="w-8 h-8 bg-red-500 text-white rounded-lg shadow-lg disabled:opacity-20 flex items-center justify-center font-black text-xs hover:bg-red-600 active:scale-90 transition-all"
+                          >
+                            -1
+                          </button>
                         </td>
                       </tr>
                     );
@@ -860,8 +893,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
           </div>
         </div>
 
-        {/* TABLA 2: INCIDENCIAS / NOVEDADES (DERECHA / ABAJO) */}
-        <div className="lg:w-[400px] flex flex-col min-h-[250px] lg:min-h-0 bg-slate-50 overflow-hidden shrink-0">
+        {/* TABLA 2: INCIDENCIAS / NOVEDADES (DERECHA / ABAJO) - M7-MOD: Ancho reducido para priorizar el plan */}
+        <div className="lg:w-[320px] flex flex-col min-h-[250px] lg:min-h-0 bg-slate-50 overflow-hidden shrink-0">
           <div className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-slate-900 text-amber-500 rounded-xl flex items-center justify-center shadow-md">
