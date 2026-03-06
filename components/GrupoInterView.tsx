@@ -31,11 +31,13 @@ interface Order {
   valor_declarado: number;
   clasificacion: string;
   empresa: string;
+  tipo_articulo: string;
   acta_entrega_b64: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
   updated_by: string | null;
+  history: any[];
 }
 
 const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
@@ -452,12 +454,11 @@ const GrupoInterView: React.FC = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50/50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
-                    <th className="px-4 py-4">Documento</th>
-                    <th className="px-4 py-4">F. Corte</th>
-                    <th className="px-4 py-4">Cliente / NIT</th>
-                    <th className="px-4 py-4">Dirección / Destino</th>
+                    <th className="px-4 py-4">Número Documento</th>
+                    <th className="px-4 py-4">Fct. Último Co</th>
+                    <th className="px-4 py-4">Nombre Cliente / NIT</th>
+                    <th className="px-4 py-4">Dirección / Municipio Destino</th>
                     <th className="px-4 py-4">Estado</th>
-                    <th className="px-4 py-4">Guía / Placa</th>
                     <th className="px-4 py-4 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -503,12 +504,6 @@ const GrupoInterView: React.FC = () => {
                             }`}>
                               {order.estado || 'Pendiente'}
                             </span>
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex flex-col">
-                              <span className="font-mono text-blue-600 font-semibold">{order.nro_guia}</span>
-                              <span className="text-[10px] text-slate-400 font-bold">{order.placa || 'SIN PLACA'}</span>
-                            </div>
                           </td>
                           <td className="px-4 py-4 text-right">
                             <button 
@@ -708,23 +703,61 @@ const GrupoInterView: React.FC = () => {
             
             <div className="overflow-y-auto p-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {/* Info Card */}
-                <div className="md:col-span-2 grid grid-cols-2 gap-6">
-                  <DetailItem icon={<User size={20} />} label="Cliente / NIT" value={`${selectedOrder.cliente} (${selectedOrder.nit_cliente})`} />
-                  <DetailItem icon={<MapPin size={20} />} label="Dirección de Entrega" value={selectedOrder.direccion} />
-                  <DetailItem icon={<Truck size={20} />} label="Vehículo / Placa" value={selectedOrder.placa || 'No asignada'} />
-                  <DetailItem icon={<Package size={20} />} label="Guía de Transporte" value={selectedOrder.nro_guia} />
-                  <DetailItem icon={<MapPin size={20} />} label="Ciudad Destino" value={selectedOrder.ciudad_destino} />
-                  <DetailItem icon={<Clock size={20} />} label="Fecha Entrega" value={selectedOrder.fecha_entregado ? new Date(selectedOrder.fecha_entregado).toLocaleString() : 'Pendiente'} />
-                  <DetailItem icon={<Clock size={20} />} label="F. Ultimo Corte" value={selectedOrder.f_ultimo_corte ? new Date(selectedOrder.f_ultimo_corte).toLocaleDateString() : 'N/A'} />
-                  <DetailItem icon={<AlertCircle size={20} />} label="Estado Actual" value={selectedOrder.estado} />
-                  <DetailItem icon={<Package size={20} />} label="Producto" value={selectedOrder.producto} />
-                  <DetailItem icon={<CheckCircle size={20} />} label="Empresa / Clasif." value={`${selectedOrder.empresa} / ${selectedOrder.clasificacion}`} />
-                  <div className="col-span-2">
-                    <DetailItem icon={<FileText size={20} />} label="Nota Encabezado" value={selectedOrder.nota_encabezado || 'Sin notas'} />
-                  </div>
-                </div>
+                {/* Grilla de Detalles Detallada */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <DetailItem icon={<Package size={18} />} label="Producto" value={selectedOrder.producto} />
+                <DetailItem icon={<MapPin size={18} />} label="Nombre Cliente" value={selectedOrder.cliente} />
+                <DetailItem icon={<User size={18} />} label="NIT Cliente" value={selectedOrder.nit_cliente} />
+                <DetailItem icon={<CheckCircle size={18} />} label="Dirección" value={selectedOrder.direccion} />
+                <DetailItem icon={<Truck size={18} />} label="Municipio Destino" value={selectedOrder.ciudad_destino} />
+                <DetailItem icon={<Clock size={18} />} label="Nro Guía / Remisión" value={selectedOrder.nro_guia} />
+                <DetailItem icon={<AlertCircle size={18} />} label="Placa" value={selectedOrder.placa || 'Pendiente'} />
+                <DetailItem icon={<FileText size={18} />} label="Nota Encabezado" value={selectedOrder.nota_encabezado || '-'} />
+                <DetailItem icon={<FileText size={18} />} label="Tipo Artículo" value={selectedOrder.tipo_articulo || '-'} />
+                <DetailItem icon={<FileText size={18} />} label="Empresa" value={selectedOrder.empresa || '-'} />
+                <DetailItem icon={<FileText size={18} />} label="Clasificación" value={selectedOrder.clasificacion || '-'} />
+              </div>
 
+              {/* Historial de Trazabilidad */}
+              <div className="mt-8 border-t border-slate-100 pt-6">
+                <h4 className="text-sm font-black text-slate-900 mb-4 flex items-center gap-2">
+                  <Clock size={18} className="text-blue-600" />
+                  Historial de Trazabilidad (HISTORY)
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">CREATED_AT</span>
+                        <span className="text-xs font-bold text-slate-700">{new Date(selectedOrder.created_at).toLocaleString()}</span>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">UPDATED_AT</span>
+                        <span className="text-xs font-bold text-slate-700">{new Date(selectedOrder.updated_at).toLocaleString()}</span>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">CREATED_BY</span>
+                        <span className="text-xs font-bold text-slate-700">{selectedOrder.created_by || 'System'}</span>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">UPDATED_BY</span>
+                        <span className="text-xs font-bold text-slate-700">{selectedOrder.updated_by || 'System'}</span>
+                    </div>
+                </div>
+                
+                {selectedOrder.history && selectedOrder.history.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedOrder.history.map((h: any, idx: number) => (
+                      <div key={idx} className="flex gap-4 p-3 bg-white border border-slate-100 rounded-xl shadow-sm italic text-xs">
+                        <span className="text-slate-400 font-bold w-32">{new Date(h.date || h.fecha).toLocaleString()}</span>
+                        <span className="text-slate-600">{h.action || h.novedad}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <p className="text-slate-400 text-sm font-medium italic">No hay novedades registradas en el historial</p>
+                  </div>
+                )}
+              </div>
                 {/* Acta de Entrega - Screenshot del PDF */}
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 aspect-square md:aspect-auto flex flex-col items-center justify-center text-center overflow-hidden">
                   {selectedOrder.acta_entrega_b64 ? (

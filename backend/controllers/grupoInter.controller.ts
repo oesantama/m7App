@@ -44,7 +44,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const columnAliases = {
             nro_documento: ['NUMERO DOCUMENTO', 'NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'ORDEN', 'FACTURA', 'NRO_DOCUMENTO'],
             cliente: ['NOMBRE CLIENTE', 'NIT CLIENTE', 'CLIENTE', 'NOMBRE', 'DESTINATARIO', 'RAZON SOCIAL', 'NOMBRE_CLIENTE'],
-            ciudad_destino: ['MUNICIPIO DESTINO', 'CIUDAD DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO', 'MUNICIPIO_DESTINO']
+            ciudad_destino: ['MUNICIPIO DESTINO', 'CIUDAD DESTINO', 'CIUDAD', 'DESTINO', 'MUNICIPIO', 'MUNICIPIO_DESTINO', 'DESTINO FINAL'],
+            tipo_articulo: ['TIPO ARTICULO', 'TIPO ARTICULO', 'TIPO_ARTICULO', 'CATEGORIA ARTICULO'],
+            corte: ['F. ULTIMO CORTE', 'F ULTIMO CORTE', 'FECHA CORTE', 'FCT. ULTIMO CO', 'ULTIMO CORTE']
         };
         
         // Buscar encabezados en las primeras 25 filas
@@ -105,9 +107,10 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const idxNit = getColIndex(['NIT CLIENTE', 'NIT', 'IDENTIFICACION', 'CEDULA']);
         const idxDir = getColIndex(['DIRECCION', 'DIR', 'DOMICILIO']);
         const idxNota = getColIndex(['NOTA ENCABEZADO', 'NOTAS', 'OBSERVACIONES', 'COMENTARIO']);
-        const idxCorte = getColIndex(['F. ULTIMO CORTE', 'F ULTIMO CORTE', 'FECHA CORTE', 'CORTE']);
+        const idxCorte = getColIndex(columnAliases.corte);
         const idxClasif = getColIndex(['CLASIFICACION', 'CATEGORIA', 'TIPO']);
         const idxEmpresa = getColIndex(['EMPRESA', 'COMPAÑIA', 'CIA']);
+        const idxTipoArt = getColIndex(columnAliases.tipo_articulo);
 
         let savedCount = 0;
         let skippedCount = 0;
@@ -178,14 +181,15 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             const f_ultimo_corte = idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null;
             const clasificacion = idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '';
             const empresa = idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '';
+            const tipo_articulo = idxTipoArt >= 0 ? String(rowArr[idxTipoArt] || '').trim() : '';
 
             const query = `
                 INSERT INTO grupo_inter_pedidos (
                     nro_documento, producto, cliente, ciudad_origen, ciudad_destino, 
                     peso, cantidad, valor_flete, valor_declarado, nro_guia, placa,
                     estado, created_by, updated_by,
-                    nit_cliente, direccion, nota_encabezado, f_ultimo_corte, clasificacion, empresa, muni_destino_original
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Pendiente', $12, $12, $13, $14, $15, $16, $17, $18, $19)
+                    nit_cliente, direccion, nota_encabezado, f_ultimo_corte, clasificacion, empresa, muni_destino_original, tipo_articulo
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Pendiente', $12, $12, $13, $14, $15, $16, $17, $18, $19, $20)
             `;
 
             const values = [
@@ -207,7 +211,8 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 f_ultimo_corte,
                 clasificacion,
                 empresa,
-                ciudad_destino // muni_destino_original
+                ciudad_destino, // muni_destino_original
+                tipo_articulo
             ];
 
             await pool.query(query, values);
