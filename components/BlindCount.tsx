@@ -857,7 +857,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                           <button 
                             onClick={() => handleSubtract(it.articleId)} 
                             disabled={currentCount === 0} 
-                            className="w-9 h-9 bg-slate-900 text-white rounded-xl shadow-lg disabled:opacity-20 flex items-center justify-center font-black text-sm hover:bg-slate-800 active:scale-95 transition-all border border-slate-700/50"
+                            className="w-9 h-9 bg-red-600 text-white rounded-xl shadow-lg disabled:opacity-20 flex items-center justify-center font-black text-sm hover:bg-red-700 active:scale-95 transition-all border border-red-500/50"
                           >
                             -1
                           </button>

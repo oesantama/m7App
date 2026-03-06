@@ -24,7 +24,9 @@ const getGenAI = () => {
 
 const getVisionModel = (name?: string) => {
     const ai = getGenAI();
-    const modelId = name || process.env.AI_MODEL || "gemini-1.5-flash"; // gemini-1.5-flash es el más estable
+    // Gemini 2.0 Flash es el modelo recomendado para evitar errores 403 con PDFs via API Key
+    const modelId = name || process.env.AI_MODEL || "gemini-2.0-flash"; 
+    console.log(`[OCR-NUCLEAR] Instanciando modelo: ${modelId}`);
     return ai.getGenerativeModel({ model: modelId });
 };
 
@@ -276,8 +278,8 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 try {
                     result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 } catch (e: any) {
-                    // Fallback a modelo estable confirmado en el sistema (1.5-flash es el estándar nuclear)
-                    visionModel = getVisionModel("gemini-1.5-flash");
+                    // Fallback a modelo de nueva generación (2.0 Flash) para máxima compatibilidad
+                    visionModel = getVisionModel("gemini-2.0-flash");
                     result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 }
                 
