@@ -43,20 +43,49 @@ import { authenticateToken } from './middleware/auth.middleware.js';
 // Montaje de API Modular
 app.use('/api/auth/login', loginLimiter); 
 
+// Endpoint de diagnóstico RAÍZ absoluto (Omitir cualquier middleware de /api)
+app.get('/health-sec', (req, res) => {
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  res.json({ 
+    status: 'UP', 
+    version: '1.9.16-NUCLEAR',
+    key_detected: !!key,
+    key_length: key.length,
+    key_prefix: key.substring(0, 4) + '***',
+    env: process.env.NODE_ENV
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'UP', version: '1.9.16-NUCLEAR', timestamp: new Date() });
+});
+
 // Middleware de Whitelisting y Protección Global (Seguridad Arquitectónica)
 app.use('/api', (req, res, next) => {
-  const publicPaths = ['/auth/login', '/health', '/', '/geocode', '/public/order-status', '/health-sec', '/api/health-sec'];
+  const publicPaths = ['/auth/login', '/health', '/', '/geocode', '/public/order-status'];
   
-  if (publicPaths.includes(req.path) || req.path.startsWith('/public/order-status') || req.path === '/health-sec' || req.path === '/api/health-sec') {
+  if (publicPaths.includes(req.path) || req.path.startsWith('/public/order-status')) {
     return next();
   }
   return authenticateToken(req, res, next);
 }, apiRoutes);
 
-
 // Health Check Global para Proxies (Coolify/Nginx)
 app.get('/', (req, res) => {
-  res.json({ ok: true, message: 'Orbit Kernal Operational', version: '1.9.15-NUCLEAR-OCR-FIX' });
+  res.json({ ok: true, message: 'Orbit Kernal Operational', version: '1.9.16-NUCLEAR' });
+});
+
+// Endpoint de diagnóstico RAÍZ (Fuera de cualquier middleware de protección)
+app.get('/health-sec', (req, res) => {
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  res.json({ 
+    status: 'UP', 
+    version: '1.9.16-NUCLEAR',
+    key_detected: !!key,
+    key_length: key.length,
+    key_prefix: key.substring(0, 4) + '***',
+    env: process.env.NODE_ENV
+  });
 });
 
 app.get('/api/health-sec', (req, res) => {
@@ -88,7 +117,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
   console.log(`[ORBIT-SYSTEM] Servidor Operacional en Puerto ${PORT}`);
-  console.log(`[ORBIT-SYSTEM] Versión: 1.9.15-NUCLEAR-OCR-FIX`);
+  console.log(`[ORBIT-SYSTEM] Versión: 1.9.16-NUCLEAR`);
   console.log(`[ORBIT-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
   initScheduler();
