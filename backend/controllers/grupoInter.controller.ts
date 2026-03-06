@@ -16,6 +16,27 @@ const getVisionModel = (name?: string) => {
 
 let visionModel = getVisionModel();
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const result = await model.generateContent(promptData);
+            return result;
+        } catch (error: any) {
+            const isQuotaError = error.message?.includes('429') || error.status === 429 || error.toString().includes('429');
+            if (isQuotaError && i < maxRetries - 1) {
+                const waitTime = Math.pow(2, i) * 3000 + Math.random() * 1000;
+                sendProgress({ type: 'log', message: `⚠️ Cuota excedida (429). Reintentando en ${Math.round(waitTime/1000)}s...` });
+                await sleep(waitTime);
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error('Máximo de reintentos de cuota AI excedido.');
+}
+
 export const uploadExcel = async (req: any, res: Response): Promise<void> => {
     try {
         if (!req.file) {
@@ -202,12 +223,17 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             try {
                 const prompt = `Analiza detalladamente esta página y extrae el Número de Documento/Factura. Suele estar arriba a la derecha cerca de "No.", "FACTURA", "REMISIÓN". Responde solo con el número encontrado o "VACIO".`;
                 
+                // Throttling preventivo para cuota gratuita (15 RPM)
+                if (i > 0) {
+                    await sleep(2500); 
+                }
+
                 let result;
                 try {
-                    result = await visionModel.generateContent([{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }]);
+                    result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 } catch (e: any) {
-                    visionModel = getVisionModel("gemini-flash-latest");
-                    result = await visionModel.generateContent([{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }]);
+                    visionModel = getVisionModel("gemini-1.5-flash-latest");
+                    result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 }
                 
                 const response = await result.response;
