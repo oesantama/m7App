@@ -46,7 +46,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'training_courses': ['category_id', 'title', 'description', 'cover_image', 'level', 'status_id', 'created_at'],
   'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', 'order', 'created_at'],
   'user_training_progress': ['user_id', 'lesson_id', 'status', 'finished_at', 'updated_at'],
-  'grupo_inter_pedidos': ['nro_documento', 'producto', 'cliente', 'ciudad_origen', 'ciudad_origen_cod', 'ciudad_destino', 'ciudad_destino_cod', 'estado', 'nro_guia', 'fecha_entregado', 'latitud', 'longitud', 'placa', 'acta_entrega_b64', 'peso', 'cantidad', 'valor_flete', 'valor_declarado', 'history', 'created_at', 'updated_at', 'created_by', 'updated_by'],
+  'grupo_inter_pedidos': ['numero_documento', 'nit', 'cliente', 'direccion', 'notas_encabezado', 'municipio_destino', 'producto', 'cantidad_total', 'precio_total', 'tipo_articulo', 'empresa', 'peso_total_prod', 'f_ultimo_corte', 'clasificacion', 'numero_guia', 'latitud', 'longitud', 'placa', 'estado', 'history', 'fecha_entregado', 'fecha_carge', 'acta_entrega_b64', 'create_at', 'create_by', 'update_at', 'update_by'],
   'document_l_payments': ['document_id', 'invoice', 'client_ref', 'un_code', 'metodo_pago', 'vmetodo', 'user_id', 'processed_at']
 };
 
@@ -87,9 +87,9 @@ const healSchema = async (client: any) => {
       for (const col of columns) {
         if (!existingCols.has(col)) {
           let type = 'TEXT';
-          if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at') type = 'TIMESTAMP WITH TIME ZONE';
-          if (col === 'permissions' || col.endsWith('_ids') || col.includes('items') || col === 'scanned_items' || col === 'helper_ids' || col === 'recent_assignments' || col === 'record_data') type = 'JSONB';
-          if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado') type = 'NUMERIC DEFAULT 0';
+          if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at' || col === 'f_ultimo_corte' || col === 'fecha_carge' || col === 'fecha_entregado' || col === 'create_at' || col === 'update_at') type = 'TIMESTAMP WITH TIME ZONE';
+          if (col === 'permissions' || col.endsWith('_ids') || col.includes('items') || col === 'scanned_items' || col === 'helper_ids' || col === 'recent_assignments' || col === 'record_data' || col === 'history') type = 'JSONB';
+          if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod') type = 'NUMERIC DEFAULT 0';
           if (col === 'client_ids') type = 'TEXT[]';
           if (col === 'permissions' || col === 'record_data') type = 'JSONB';
           if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved') || col === 'aceptapolitica' || col === 'aprobada' || col === 'signed') type = 'BOOLEAN DEFAULT FALSE';
