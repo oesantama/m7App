@@ -33,8 +33,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
   allowExtraItems = false
 }) => {
   const [scanInput, setScanInput] = useState('');
-  const [extraItems, setExtraItems] = useState<DocumentLItem[]>([]);
+  const [extraItems, setExtraItems] = useState<DocumentLItem[]>(() => {
+    const saved = localStorage.getItem(`m7_extras_${docL.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
   const [tableSearch, setTableSearch] = useState('');
+
+  // Persistir extras
+  useEffect(() => {
+    localStorage.setItem(`m7_extras_${docL.id}`, JSON.stringify(extraItems));
+  }, [extraItems, docL.id]);
   // ESTADOS DE INVENTARIO M7
   const [counts, setCounts] = useState<{ [articleId: string]: number }>(() => {
     const initial: { [id: string]: number } = {};
@@ -552,20 +560,20 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (!incident) return;
 
     if (action === 'confirm') {
-      const targetCode = incident.suggestion || incident.code;
+      const targetCode = cleanSkuM7(incident.suggestion || incident.code);
       
       // M7-FIX: Verificar si ya existe en el plan (incluyendo extras anteriores)
       const exists = groupedItems.find(it => 
-        it.articleId?.toUpperCase() === targetCode.toUpperCase() || 
-        it.sku?.toUpperCase() === targetCode.toUpperCase()
+        (it.articleId?.toUpperCase() === targetCode.toUpperCase()) || 
+        (it.sku?.toUpperCase() === targetCode.toUpperCase())
       );
 
       if (!exists) {
-        // ES UN ITEM EXTRA NUEVO: Añadirlo a la lista de extras antes de procesar el barcode
+        // ES UN ITEM EXTRA NUEVO
         const newExtra = {
           articleId: targetCode,
           sku: targetCode,
-          ['articleName' as any]: `SINCRO M7: ${targetCode}`,
+          ['articleName' as any]: `AUTO-CREATED ${targetCode}`,
           expectedQty: 0,
           count1: 0,
           countedQty: 0,
@@ -575,11 +583,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
         } as unknown as DocumentLItem;
 
         setExtraItems(prev => [...prev, newExtra]);
-        // Pequeño delay para que useMemo de groupedItems se actualice antes de procesar el barcode
+        // Delay para asegurar que el estado se procese antes del barcode logic
         setTimeout(() => {
             processBarcode(targetCode);
             toast.success(`Artículo ${targetCode} integrado al plan.`);
-        }, 50);
+        }, 100);
       } else {
         processBarcode(targetCode);
         toast.success(`Artículo ${targetCode} integrado al plan.`);
@@ -816,46 +824,40 @@ const BlindCount: React.FC<BlindCountProps> = ({
                     <th className="px-4 py-4 text-right pr-6">Acción</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   {paginatedItems.map(it => {
                     const currentCount = counts[it.articleId] || 0;
                     return (
-                      <tr key={it.articleId} className={`hover:bg-slate-50/50 transition-all font-bold group ${validationAttempts === 1 ? 'bg-red-50/10' : ''}`}>
-                        <td className="px-6 py-2 min-w-[250px]">
+                      <tr key={it.articleId} className={`hover:bg-slate-50 transition-all font-bold ${validationAttempts === 1 ? 'bg-red-50/10' : ''}`}>
+                        <td className="px-6 py-2 border-r border-slate-50">
                           <div className="flex flex-col">
-                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest w-fit mb-0.5 ${ (it as any).isExtra ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+                            <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest w-fit mb-0.5 ${ (it as any).isExtra ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'}`}>
                               { (it as any).isExtra ? 'EXTRA / SINCRO' : `ID: ${it.articleId}` }
                             </span>
-                            <p className="font-black text-slate-900 text-[10px] uppercase tracking-tight leading-none truncate max-w-[300px]">
+                            <p className="font-extrabold text-slate-900 text-[10px] uppercase tracking-tight leading-tight truncate max-w-[350px]">
                                {(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId || m.sku === it.articleId) as any)?.name || it.articleId || 'SIN DESCRIPCIÓN'}
                             </p>
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-center">
-                          <div className={`inline-flex items-center justify-center min-w-[50px] h-8 rounded-lg text-base font-black shadow-inner transition-all ${currentCount > 0 ? (validationAttempts === 1 ? 'bg-slate-800 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-50 text-slate-200'}`}>
+                        <td className="px-4 py-2 text-center border-r border-slate-50">
+                          <div className={`inline-flex items-center justify-center min-w-[60px] h-9 rounded-xl text-lg font-black shadow-sm transition-all ${currentCount > 0 ? (validationAttempts === 1 ? 'bg-slate-900 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-300'}`}>
                             {currentCount}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-left">
+                        <td className="px-4 py-2 text-left border-r border-slate-50">
                           <input
                             type="text"
                             value={itemObservations[it.articleId] || ''}
                             onChange={(e) => setItemObservations(prev => ({ ...prev, [it.articleId]: e.target.value }))}
                             placeholder="NOTAS..."
-                            className="w-full bg-slate-50 border border-transparent rounded-lg px-2 py-1.5 text-[9px] font-bold text-slate-600 outline-none focus:bg-white focus:border-emerald-500 transition-all uppercase"
+                            className="w-full bg-slate-50/50 border border-slate-100 rounded-lg px-3 py-1.5 text-[10px] font-bold text-slate-600 outline-none focus:bg-white focus:border-emerald-500 transition-all uppercase"
                           />
                         </td>
-                        <td className="px-4 py-2 text-right pr-6 flex justify-end gap-1.5">
-                          {validationAttempts === 1 && (
-                            <>
-                              <button onClick={() => handleOpenTransaction(it.articleId, 'CONVERT')} className="w-8 h-8 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 flex items-center justify-center"><Icons.RefreshCw className="w-4 h-4" /></button>
-                              <button onClick={() => handleOpenTransaction(it.articleId, 'REVERSE')} className="w-8 h-8 bg-amber-500 text-white rounded-lg shadow-md hover:bg-amber-600 flex items-center justify-center"><Icons.RotateCcw className="w-4 h-4" /></button>
-                            </>
-                          )}
+                        <td className="px-4 py-2 text-right pr-6 flex justify-end items-center h-full gap-2">
                           <button 
                             onClick={() => handleSubtract(it.articleId)} 
                             disabled={currentCount === 0} 
-                            className="w-8 h-8 bg-red-500 text-white rounded-lg shadow-lg disabled:opacity-20 flex items-center justify-center font-black text-xs hover:bg-red-600 active:scale-90 transition-all"
+                            className="w-9 h-9 bg-white border-2 border-slate-100 text-slate-950 rounded-xl shadow-sm disabled:opacity-20 flex items-center justify-center font-black text-sm hover:bg-slate-50 active:scale-95 transition-all text-red-500"
                           >
                             -1
                           </button>
@@ -915,36 +917,43 @@ const BlindCount: React.FC<BlindCountProps> = ({
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-slate-50/50">
             {incidents.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-3">
                 {incidents.map(inc => (
-                  <div key={inc.id} className="p-4 bg-white rounded-2xl border border-slate-200 hover:border-amber-500 transition-all font-bold shadow-sm group">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="text-[8px] text-slate-400 font-black tracking-widest uppercase">{inc.timestamp}</span>
-                      <span className="px-2 py-0.5 bg-slate-950 text-white rounded text-[9px] font-black uppercase shadow-lg">
-                        {inc.code}
-                      </span>
+                  <div key={inc.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group transition-all hover:border-amber-400">
+                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                      <span className="text-[8px] text-slate-400 font-extrabold tracking-widest uppercase">{inc.timestamp}</span>
+                      <Icons.Alert className="w-3 h-3 text-amber-500" />
                     </div>
-                    <div className="flex items-start gap-2 mb-3 bg-amber-50/50 p-2 rounded-xl">
-                      <Icons.Brain className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-                      <p className={`text-[10px] uppercase tracking-tight leading-tight ${inc.suggestion ? 'text-amber-700 font-black' : 'text-slate-500'}`}>
-                        {inc.note}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                       <button
-                         onClick={() => handleResolveIncident(inc.id, 'confirm')}
-                         className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${inc.suggestion ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/20 shadow-lg' : 'bg-blue-500 text-white hover:bg-blue-400 shadow-blue-500/20 shadow-lg'}`}
-                       >
-                         {inc.suggestion ? `Integrar ${inc.suggestion}` : 'Forzar como Extra'}
-                       </button>
-                       <button
+                    <div className="p-4 flex flex-col gap-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase shadow-md truncate flex-1">
+                          {inc.code}
+                        </span>
+                        <button
                          onClick={() => handleResolveIncident(inc.id, 'delete')}
-                         className="p-1.5 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                       >
-                         <Icons.Trash className="w-4 h-4" />
-                       </button>
+                         className="p-2 bg-red-50 text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm"
+                        >
+                          <Icons.Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100/50">
+                        <div className="flex items-start gap-2">
+                          <Icons.Brain className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+                          <p className="text-[10px] uppercase font-bold text-amber-800 leading-tight">
+                            {inc.note}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleResolveIncident(inc.id, 'confirm')}
+                        className="w-full py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all shadow-lg active:scale-95 shadow-blue-600/20"
+                      >
+                        {inc.suggestion ? `Sugerir ${inc.suggestion}` : 'Forzar como Extra'}
+                      </button>
                     </div>
                   </div>
                 ))}

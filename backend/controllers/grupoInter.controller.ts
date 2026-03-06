@@ -6,12 +6,21 @@ import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Configuración de Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Configuración de Gemini con Blindaje Nuclear
+const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+if (!apiKey) {
+    console.error('[OCR-NUCLEAR] ERROR: No se detectó GEMINI_API_KEY en las variables de entorno.');
+} else {
+    console.log(`[OCR-NUCLEAR] API Key detectada (Longitud: ${apiKey.length})`);
+}
+
+const genAI = new GoogleGenerativeAI(apiKey);
 
 const getVisionModel = (name?: string) => {
     // Usar modelos confirmados por el sistema para evitar 404
-    const modelId = name || process.env.AI_MODEL || "gemini-2.0-flash";
+    // gemini-1.5-flash es el modelo más estable para OCR masivo
+    const modelId = name || process.env.AI_MODEL || "gemini-1.5-flash";
+    console.log(`[OCR-NUCLEAR] Instanciando modelo: ${modelId}`);
     return genAI.getGenerativeModel({ model: modelId });
 };
 
