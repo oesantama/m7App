@@ -10,6 +10,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 const getVisionModel = (name?: string) => {
+    // Usar modelos confirmados por el sistema para evitar 404
     const modelId = name || process.env.AI_MODEL || "gemini-2.0-flash";
     return genAI.getGenerativeModel({ model: modelId });
 };
@@ -221,7 +222,13 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             const base64Page = await subPdf.saveAsBase64();
             
             try {
-                const prompt = `Analiza detalladamente esta página y extrae el Número de Documento/Factura. Suele estar arriba a la derecha cerca de "No.", "FACTURA", "REMISIÓN". Responde solo con el número encontrado o "VACIO".`;
+                // Prompt optimizado para extracción pura de datos
+                const prompt = `Actúa como un motor OCR de alta precisión. 
+                Analiza esta imagen de una factura/remisión de transporte. 
+                Busca y extrae exclusivamente el NÚMERO DE DOCUMENTO (Factura No., Remisión No., Guía No.). 
+                Ignora fechas, valores monetarios y NITs. 
+                Si encuentras el número, responde SOLO con el número (ej: 123456). 
+                Si no hay un número de documento claro, responde "VACIO".`;
                 
                 // Throttling preventivo para cuota gratuita (15 RPM)
                 if (i > 0) {
@@ -232,17 +239,22 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 try {
                     result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 } catch (e: any) {
-                    visionModel = getVisionModel("gemini-1.5-flash-latest");
+                    // Fallback a modelo estable confirmado en el sistema
+                    visionModel = getVisionModel("gemini-flash-latest");
                     result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 }
                 
                 const response = await result.response;
-                const rawText = response.text().trim().toUpperCase();
+                // Limpieza agresiva de texto para evitar ruidos de OCR
+                const rawText = response.text().trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
-                if (rawText !== "VACIO") {
+                if (rawText && rawText !== "VACIO") {
                     for (const docNum of pendingDocs) {
-                        if (rawText.includes(docNum.toUpperCase()) || docNum.toUpperCase().includes(rawText)) {
-                            sendProgress({ type: 'log', message: `✅ MATCH: ${docNum}` });
+                        const cleanDocNum = docNum.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                        
+                        // Coincidencia flexible (contiene o es contenido)
+                        if (rawText.includes(cleanDocNum) || cleanDocNum.includes(rawText)) {
+                            sendProgress({ type: 'log', message: `✅ MATCH DETECTADO: ${docNum} (Extracted: ${rawText})` });
                             await pool.query(
                                 "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
                                 [base64Page, docNum]
