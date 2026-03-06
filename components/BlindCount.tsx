@@ -137,7 +137,19 @@ const BlindCount: React.FC<BlindCountProps> = ({
       if (!id) return;
 
       if (!groups[id]) {
-        groups[id] = { ...item, articleId: id, expectedQty: item.expectedQty || 0 };
+        // M7-FIX: Limpiar nombre para evitar prefijos redundantes en la vista
+        let cleanName = (item as any).articleName || '';
+        if (cleanName.startsWith('SINCRO M7: ')) {
+          cleanName = cleanName.replace('SINCRO M7: ', '');
+        }
+
+        groups[id] = { 
+          ...item, 
+          articleId: id, 
+          ['articleName' as any]: cleanName,
+          expectedQty: item.expectedQty || 0,
+          ['isExtra' as any]: extraItems.some(ex => ex.articleId === item.articleId)
+        } as DocumentLItem;
       } else {
         groups[id].expectedQty += (item.expectedQty || 0);
       }
@@ -730,9 +742,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
-        {/* PANEL DERECHO: TABLA - M7-MOD: Limitado a 70% para ver incidencias */}
-        <div className="flex-[0.7] flex flex-col min-h-0 w-full overflow-hidden border-b-2 border-slate-100">
+      <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden h-[calc(100vh-250px)]">
+        {/* TABLA PRINCIPAL - M7-MOD: Ocupa el 70% del alto con scroll interno */}
+        <div className="flex-[0.7] flex flex-col min-h-0 w-full overflow-hidden border-b-4 border-slate-100">
           <div className="bg-white flex flex-col h-full relative">
             <div className="px-0 py-1 border-b border-slate-50 bg-white flex items-center shrink-0 gap-4 overflow-x-auto z-30">
               {/* SEARCH INPUT */}
@@ -752,61 +764,34 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 <Icons.Excel className="w-3.5 h-3.5" /> XLS
               </button>
 
-              {/* LAST SCAN FEEDBACK (IMAGEN 2) */}
+              {/* LAST SCAN FEEDBACK */}
               {lastScan && (
                 <div className={`px-4 py-2 rounded-2xl border flex items-center gap-3 animate-in slide-in-from-left-4 shadow-xl shrink-0 ${lastScan.status === 'success' ? 'bg-white border-slate-100' : 'bg-red-50 border-red-100'}`}>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-lg ${lastScan.status === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-                    {lastScan.status === 'success' ? <Icons.Check className="w-5 h-5" /> : <Icons.Alert className="w-5 h-5" />}
-                  </div>
-                  <div className="min-w-0 pr-2">
-                    <p className={`font-black text-[8px] uppercase tracking-widest mb-1 ${lastScan.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {lastScan.status === 'success' ? 'NUEVO ITEM AGREGADO: ' : 'ERROR: '} {lastScan.message}
-                    </p>
-                    {lastScan.article && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-[12px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">
-                          {lastScan.article.id}
-                        </span>
-                        <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl shadow-lg border border-white/10 shrink-0">
-                          <span className="text-xl font-black text-white leading-none">{counts[lastScan.article.id]}</span>
-                          <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">UNDS</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                   <p className={`font-black text-[9px] uppercase tracking-widest ${lastScan.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {lastScan.message}
+                   </p>
                 </div>
               )}
 
-              {/* NOTAS DEL INVENTARIO (FOTO 2) */}
+              {/* NOTAS DEL INVENTARIO */}
               <div className="flex-1 max-w-md shrink-0">
                 <textarea
                   value={inventoryObservation}
                   onChange={(e) => setInventoryObservation(e.target.value)}
-                  placeholder="NOTAS GENERALES DEL INVENTARIO..."
+                  placeholder="OBSERVACIONES GENERALES..."
                   className="w-full h-11 bg-slate-50 border-2 border-transparent rounded-xl px-4 py-3 text-[10px] font-bold text-slate-900 outline-none focus:bg-white focus:border-emerald-500/50 transition-all resize-none placeholder:text-slate-300 uppercase leading-tight"
                 />
               </div>
-
-              {validationAttempts === 1 && (
-                <div className="ml-auto flex items-center gap-2 text-red-600 animate-pulse shrink-0 mr-4">
-                  <Icons.Alert className="w-3 h-3" />
-                  <span className="text-[8px] font-black uppercase">Revisión</span>
-                </div>
-              )}
             </div>
 
             <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[1200px]">
+              <table className="w-full text-left border-collapse min-w-[800px]">
                 <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px] sticky top-0 z-20 shadow-sm">
                   <tr>
-                    <th className="px-6 py-4 cursor-pointer hover:text-emerald-400 min-w-[200px]" onClick={() => requestSort('articleId')}>Artículo / Ref{getSortIndicator('articleId')}</th>
-                    <th className="px-4 py-4 text-center cursor-pointer hover:text-emerald-400 min-w-[100px]" onClick={() => requestSort('status')}>Estado{getSortIndicator('status')}</th>
-                    <th className="px-4 py-4 text-center min-w-[100px]">Auditado</th>
-                    <th className="px-4 py-4 text-right min-w-[60px]">UM</th>
-                    <th className="px-4 py-4 text-right cursor-pointer hover:text-emerald-400 min-w-[80px]" onClick={() => requestSort('volume')}>Vol{getSortIndicator('volume')}</th>
-                    <th className="px-4 py-4 text-left min-w-[200px]">Instrucciones Entrega</th>
-                    <th className="px-4 py-4 text-left min-w-[200px]">Notas Inventario</th>
-                    <th className="px-4 py-4 text-right pr-6 min-w-[80px]">Acción</th>
+                    <th className="px-6 py-4 cursor-pointer hover:text-emerald-400" onClick={() => requestSort('articleId')}>Artículo / Referencia{getSortIndicator('articleId')}</th>
+                    <th className="px-4 py-4 text-center">Auditado</th>
+                    <th className="px-4 py-4 text-left">Novedades / Notas</th>
+                    <th className="px-4 py-4 text-right pr-6">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -814,72 +799,39 @@ const BlindCount: React.FC<BlindCountProps> = ({
                     const currentCount = counts[it.articleId] || 0;
                     return (
                       <tr key={it.articleId} className={`hover:bg-slate-50/50 transition-all font-bold group ${validationAttempts === 1 ? 'bg-red-50/10' : ''}`}>
-                        <td className="px-4 py-3 min-w-[200px]">
+                        <td className="px-3 py-1.5 min-w-[300px]">
                           <div className="flex flex-col">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[9px] font-black uppercase tracking-widest w-fit mb-1">
-                              Ref: {it.articleId}
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest w-fit mb-0.5 ${ (it as any).isExtra ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+                              { (it as any).isExtra ? 'EXTRA / SINCRO' : `PLAN ID: ${it.articleId}` }
                             </span>
-                            <p className="font-black text-slate-900 text-[10px] uppercase tracking-tight leading-tight" title={(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId || m.sku === it.articleId) as any)?.name || ''}>
+                            <p className="font-black text-slate-900 text-[10px] uppercase tracking-tight leading-none">
                                {(it as any).articleName || (masterArticulo.find(m => m.id === it.articleId || m.sku === it.articleId) as any)?.name || it.articleId || 'SIN DESCRIPCIÓN'}
                             </p>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          {validationAttempts === 1 ? (
-                            <span className="px-2 py-0.5 bg-red-500 text-white rounded text-[7px] font-black uppercase tracking-widest shadow-sm">REVISIÓN</span>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[7px] font-black uppercase tracking-widest">EN CONTEO</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className={`inline-flex items-center justify-center min-w-[50px] h-8 rounded-lg text-sm font-black shadow-inner transition-all ${currentCount > 0 ? (validationAttempts === 1 ? 'bg-slate-800 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-100 text-slate-300'}`}>
+                        <td className="px-3 py-1.5 text-center">
+                          <div className={`inline-flex items-center justify-center min-w-[50px] h-8 rounded-lg text-base font-black shadow-inner transition-all ${currentCount > 0 ? (validationAttempts === 1 ? 'bg-slate-800 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-50 text-slate-200'}`}>
                             {currentCount}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right text-[9px] text-slate-500">{it.unit || 'UND'}</td>
-                        <td className="px-4 py-3 text-right text-[9px] text-slate-500">{(it as any).volume || '-'}</td>
-                        <td className="px-4 py-3 text-left">
-                          <div className="max-w-[180px] break-words text-[8px] text-slate-400 font-bold italic uppercase leading-tight">
-                            {it.notes || '-'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-left">
+                        <td className="px-3 py-1.5 text-left">
                           <input
                             type="text"
                             value={itemObservations[it.articleId] || ''}
                             onChange={(e) => setItemObservations(prev => ({ ...prev, [it.articleId]: e.target.value }))}
-                            placeholder="AÑADIR NOVEDAD..."
-                            className="w-full bg-slate-50 border border-transparent rounded-lg px-2 py-1 text-[8px] font-bold text-slate-600 outline-none focus:bg-white focus:border-emerald-500 transition-all uppercase"
+                            placeholder="NOTAS..."
+                            className="w-full bg-slate-50 border border-transparent rounded-lg px-2 py-1.5 text-[9px] font-bold text-slate-600 outline-none focus:bg-white focus:border-emerald-500 transition-all uppercase"
                           />
                         </td>
                         <td className="px-4 py-3 text-right pr-6 flex justify-end gap-2">
                           {validationAttempts === 1 && (
                             <>
-                              <button
-                                onClick={() => handleOpenTransaction(it.articleId, 'CONVERT')}
-                                className="inline-flex items-center justify-center w-7 h-7 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-md active:scale-90"
-                                title="Convertir Unidades (Desglosar)"
-                              >
-                                <Icons.RefreshCw className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleOpenTransaction(it.articleId, 'REVERSE')}
-                                className="inline-flex items-center justify-center w-7 h-7 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all shadow-md active:scale-90"
-                                title="Reversar Unidades (Agrupar)"
-                              >
-                                <Icons.RotateCcw className="w-3.5 h-3.5" />
-                              </button>
+                              <button onClick={() => handleOpenTransaction(it.articleId, 'CONVERT')} className="w-8 h-8 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 flex items-center justify-center"><Icons.RefreshCw className="w-4 h-4" /></button>
+                              <button onClick={() => handleOpenTransaction(it.articleId, 'REVERSE')} className="w-8 h-8 bg-amber-500 text-white rounded-lg shadow-md hover:bg-amber-600 flex items-center justify-center"><Icons.RotateCcw className="w-4 h-4" /></button>
                             </>
                           )}
                           {(user?.roleId === 'ROL-01' || user?.roleId === 'ROL-02') && (
-                            <button
-                              onClick={() => handleSubtract(it.articleId)}
-                              disabled={currentCount === 0}
-                              className="inline-flex items-center justify-center w-7 h-7 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md active:scale-90 disabled:opacity-10"
-                              title="Restar Unidad"
-                            >
-                              <span className="font-black text-xs">-1</span>
-                            </button>
+                            <button onClick={() => handleSubtract(it.articleId)} disabled={currentCount === 0} className="w-8 h-8 bg-red-400 text-white rounded-lg shadow-md disabled:opacity-10 flex items-center justify-center"><Icons.Trash className="w-3 h-3" /></button>
                           )}
                         </td>
                       </tr>
@@ -887,10 +839,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
                   })}
                   {filteredItems.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-24 text-center">
-                        <p className="font-black text-slate-300 uppercase text-[10px] tracking-[0.3em]">
-                          {validationAttempts === 0 ? 'Escanee para iniciar inventario' : 'Sin novedades registradas ✓'}
-                        </p>
+                      <td colSpan={4} className="py-20 text-center">
+                        <p className="font-black text-slate-300 uppercase text-[10px] tracking-[0.3em]">No hay registros para mostrar</p>
                       </td>
                     </tr>
                   )}
@@ -898,47 +848,26 @@ const BlindCount: React.FC<BlindCountProps> = ({
               </table>
             </div>
 
-            {/* PAGINACIÓN INFERIOR (FOTO 4) */}
-            <div className="p-4 bg-slate-900 border-t border-white/5 flex justify-between items-center shrink-0 px-6">
+            {/* PAGINACIÓN INFERIOR COMPACTA */}
+            <div className="p-3 bg-slate-900 border-t border-white/5 flex justify-between items-center shrink-0 px-6">
               <div className="flex items-center gap-4">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Mostrar:</span>
                 <select
                   value={rowsPerPage}
                   onChange={e => { setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1); }}
-                  className="p-2 bg-slate-800 border border-white/10 rounded-lg text-[10px] font-black text-white uppercase outline-none focus:border-emerald-500 shadow-sm cursor-pointer"
+                  className="p-1.5 bg-slate-800 border border-white/10 rounded-lg text-[10px] font-black text-white uppercase outline-none"
                 >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={15}>15</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value="all">Todos</option>
+                  <option value={5}>5 líneas</option>
+                  <option value={10}>10 líneas</option>
+                  <option value={20}>20 líneas</option>
+                  <option value="all">Todo</option>
                 </select>
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">
-                  Total: {filteredItems.length} registros
-                </span>
+                <span className="text-[9px] font-black text-slate-500 uppercase">Total: {filteredItems.length}</span>
               </div>
 
-              <div className="flex items-center gap-6">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  className="p-2 bg-slate-800 border border-white/10 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"
-                >
-                  <Icons.ChevronRight className="w-5 h-5 rotate-180" />
-                </button>
-
-                <span className="text-[11px] font-black uppercase text-white tracking-widest">
-                  Página {currentPage} / {totalPages || 1}
-                </span>
-
-                <button
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  className="p-2 bg-slate-800 border border-white/10 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"
-                >
-                  <Icons.ChevronRight className="w-5 h-5" />
-                </button>
+              <div className="flex items-center gap-4">
+                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1.5 bg-slate-800 border border-white/10 rounded-lg text-slate-400 disabled:opacity-20"><Icons.ChevronRight className="w-4 h-4 rotate-180" /></button>
+                <span className="text-[10px] font-black uppercase text-white">Pag {currentPage} / {totalPages || 1}</span>
+                <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-1.5 bg-slate-800 border border-white/10 rounded-lg text-slate-400 disabled:opacity-20"><Icons.ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
           </div>
