@@ -11,33 +11,33 @@ import { useAppStore } from '../stores/useAppStore';
 
 interface Order {
   id: number;
-  nro_documento: string;
+  numero_documento: string;
+  nit: string;
   cliente: string;
-  nit_cliente: string;
   direccion: string;
-  nota_encabezado: string;
-  ciudad_origen: string;
-  ciudad_destino: string;
-  muni_destino_original: string;
-  estado: string;
-  nro_guia: string;
-  fecha_entregado: string | null;
-  f_ultimo_corte: string | null;
-  placa: string;
+  notas_encabezado: string;
+  municipio_destino: string;
   producto: string;
-  peso: number;
-  cantidad: number;
-  valor_flete: number;
-  valor_declarado: number;
-  clasificacion: string;
-  empresa: string;
+  cantidad_total: number;
+  precio_total: number;
   tipo_articulo: string;
-  acta_entrega_b64: string | null;
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-  updated_by: string | null;
+  empresa: string;
+  peso_total_prod: number;
+  f_ultimo_corte: string | null;
+  clasificacion: string;
+  numero_guia: string;
+  latitud: string;
+  longitud: string;
+  placa: string;
+  estado: string;
   history: any[];
+  fecha_entregado: string | null;
+  fecha_carge: string;
+  acta_entrega_b64: string | null;
+  create_at: string;
+  create_by: string | null;
+  update_at: string;
+  update_by: string | null;
 }
 
 const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
@@ -482,20 +482,20 @@ const GrupoInterView: React.FC = () => {
                       .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                       .map((order) => (
                         <tr key={order.id} className="hover:bg-slate-50/80 transition-colors group text-xs">
-                          <td className="px-4 py-4 font-bold text-slate-900">{order.nro_documento}</td>
+                          <td className="px-4 py-4 font-bold text-slate-900">{order.numero_documento}</td>
                           <td className="px-4 py-4 text-slate-500 font-medium">
                             {order.f_ultimo_corte ? new Date(order.f_ultimo_corte).toLocaleDateString() : '-'}
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex flex-col">
                               <span className="text-slate-900 font-bold max-w-[200px] truncate">{order.cliente}</span>
-                              <span className="text-slate-400 text-[10px] font-bold">{order.nit_cliente}</span>
+                              <span className="text-slate-400 text-[10px] font-bold">{order.nit}</span>
                             </div>
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex flex-col">
-                              <span className="text-slate-600 font-medium max-w-[200px] truncate">{order.direccion}</span>
-                              <span className="text-slate-400 text-[10px] font-bold">A: {order.ciudad_destino}</span>
+                              <span className="text-slate-600 font-medium max-w-[200px] truncate">{order.direccion === ' ' ? '' : order.direccion}</span>
+                              <span className="text-slate-400 text-[10px] font-bold">A: {order.municipio_destino}</span>
                             </div>
                           </td>
                           <td className="px-4 py-4">
@@ -702,99 +702,94 @@ const GrupoInterView: React.FC = () => {
             </div>
             
             <div className="overflow-y-auto p-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {/* Grilla de Detalles Detallada */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <DetailItem icon={<Package size={18} />} label="Producto" value={selectedOrder.producto} />
-                <DetailItem icon={<MapPin size={18} />} label="Nombre Cliente" value={selectedOrder.cliente} />
-                <DetailItem icon={<User size={18} />} label="NIT Cliente" value={selectedOrder.nit_cliente} />
-                <DetailItem icon={<CheckCircle size={18} />} label="Dirección" value={selectedOrder.direccion} />
-                <DetailItem icon={<Truck size={18} />} label="Municipio Destino" value={selectedOrder.ciudad_destino} />
-                <DetailItem icon={<Clock size={18} />} label="Nro Guía / Remisión" value={selectedOrder.nro_guia} />
-                <DetailItem icon={<AlertCircle size={18} />} label="Placa" value={selectedOrder.placa || 'Pendiente'} />
-                <DetailItem icon={<FileText size={18} />} label="Nota Encabezado" value={selectedOrder.nota_encabezado || '-'} />
-                <DetailItem icon={<FileText size={18} />} label="Tipo Artículo" value={selectedOrder.tipo_articulo || '-'} />
-                <DetailItem icon={<FileText size={18} />} label="Empresa" value={selectedOrder.empresa || '-'} />
-                <DetailItem icon={<FileText size={18} />} label="Clasificación" value={selectedOrder.clasificacion || '-'} />
-              </div>
-
-              {/* Historial de Trazabilidad */}
-              <div className="mt-8 border-t border-slate-100 pt-6">
-                <h4 className="text-sm font-black text-slate-900 mb-4 flex items-center gap-2">
-                  <Clock size={18} className="text-blue-600" />
-                  Historial de Trazabilidad (HISTORY)
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">CREATED_AT</span>
-                        <span className="text-xs font-bold text-slate-700">{new Date(selectedOrder.created_at).toLocaleString()}</span>
-                    </div>
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">UPDATED_AT</span>
-                        <span className="text-xs font-bold text-slate-700">{new Date(selectedOrder.updated_at).toLocaleString()}</span>
-                    </div>
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">CREATED_BY</span>
-                        <span className="text-xs font-bold text-slate-700">{selectedOrder.created_by || 'System'}</span>
-                    </div>
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">UPDATED_BY</span>
-                        <span className="text-xs font-bold text-slate-700">{selectedOrder.updated_by || 'System'}</span>
-                    </div>
+              <div className="space-y-8">
+                {/* Grilla de Detalles */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <DetailItem icon={<Package size={18} />} label="Producto" value={selectedOrder.producto} />
+                  <DetailItem icon={<User size={18} />} label="Nombre Cliente" value={selectedOrder.cliente} />
+                  <DetailItem icon={<FileText size={18} />} label="NIT Cliente" value={selectedOrder.nit} />
+                  <DetailItem icon={<MapPin size={18} />} label="Dirección" value={selectedOrder.direccion} />
+                  <DetailItem icon={<Truck size={18} />} label="Municipio Destino" value={selectedOrder.municipio_destino} />
+                  <DetailItem icon={<Filter size={18} />} label="Tipo Artículo" value={selectedOrder.tipo_articulo} />
+                  <DetailItem icon={<AlertCircle size={18} />} label="Empresa" value={selectedOrder.empresa} />
+                  <DetailItem icon={<AlertCircle size={18} />} label="Clasificación" value={selectedOrder.clasificacion} />
+                  <DetailItem icon={<Clock size={18} />} label="Fecha Carga" value={new Date(selectedOrder.fecha_carge).toLocaleString()} />
                 </div>
-                
-                {selectedOrder.history && selectedOrder.history.length > 0 ? (
-                  <div className="space-y-3">
-                    {selectedOrder.history.map((h: any, idx: number) => (
-                      <div key={idx} className="flex gap-4 p-3 bg-white border border-slate-100 rounded-xl shadow-sm italic text-xs">
-                        <span className="text-slate-400 font-bold w-32">{new Date(h.date || h.fecha).toLocaleString()}</span>
-                        <span className="text-slate-600">{h.action || h.novedad}</span>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <MetricBox label="Cantidad" value={String(selectedOrder.cantidad_total)} />
+                  <MetricBox label="Peso Total" value={`${selectedOrder.peso_total_prod} Kg`} />
+                  <MetricBox label="Precio Total" value={`$ ${new Intl.NumberFormat().format(selectedOrder.precio_total)}`} />
+                  <MetricBox label="Estado" value={selectedOrder.estado} />
+                </div>
+
+                {/* Historial de Trazabilidad */}
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                  <h3 className="text-sm font-black text-slate-900 mb-4 flex items-center gap-2">
+                    <Clock size={16} className="text-blue-500" />
+                    HISTORIAL DE TRAZABILIDAD
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 border-b border-slate-200 pb-2">
+                      <div className="flex items-center gap-4">
+                        <span>CREADO: {new Date(selectedOrder.create_at).toLocaleString()}</span>
+                        <span>POR: {selectedOrder.create_by || 'SISTEMA'}</span>
                       </div>
-                    ))}
+                      <div className="flex items-center gap-4">
+                        <span>ULT. ACTUALIZACIÓN: {new Date(selectedOrder.update_at).toLocaleString()}</span>
+                        <span>POR: {selectedOrder.update_by || 'SISTEMA'}</span>
+                      </div>
+                    </div>
+
+                    {selectedOrder.history && selectedOrder.history.length > 0 ? (
+                      <div className="space-y-3">
+                        {selectedOrder.history.map((h: any, idx: number) => (
+                          <div key={idx} className="flex gap-4 p-3 bg-white border border-slate-100 rounded-xl shadow-sm italic text-xs">
+                            <span className="text-slate-400 font-bold w-32">{new Date(h.date || h.fecha).toLocaleString()}</span>
+                            <span className="text-slate-600">{h.action || h.novedad}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200">
+                        <p className="text-slate-400 text-sm font-medium italic">No hay novedades registradas en el historial</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    <p className="text-slate-400 text-sm font-medium italic">No hay novedades registradas en el historial</p>
-                  </div>
-                )}
-              </div>
-                {/* Acta de Entrega - Screenshot del PDF */}
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 aspect-square md:aspect-auto flex flex-col items-center justify-center text-center overflow-hidden">
+                </div>
+
+                {/* Acta de Entrega */}
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                  <h3 className="text-sm font-black text-slate-900 mb-4 flex items-center gap-2">
+                    <FileText size={16} className="text-blue-500" />
+                    ACTA DE ENTREGA (DOCUMENTO DIGITAL)
+                  </h3>
                   {selectedOrder.acta_entrega_b64 ? (
-                    <div className="w-full h-full flex flex-col gap-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Acta Digitalizada (PDF)</span>
+                    <div className="flex flex-col gap-4">
                       <iframe 
                         src={`data:application/pdf;base64,${selectedOrder.acta_entrega_b64}`} 
-                        className="w-full h-80 rounded-lg shadow-sm border border-slate-200 bg-white"
+                        className="w-full h-96 rounded-xl shadow-sm border border-slate-200 bg-white"
                         title="Acta de Entrega"
                       />
                       <button 
                         onClick={() => {
                           const link = document.createElement('a');
                           link.href = `data:application/pdf;base64,${selectedOrder.acta_entrega_b64}`;
-                          link.download = `Acta_${selectedOrder.nro_documento}.pdf`;
+                          link.download = `Acta_${selectedOrder.numero_documento}.pdf`;
                           link.click();
                         }}
-                        className="mt-auto flex items-center justify-center gap-2 w-full py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg"
                       >
-                        <Download size={16} /> Descargar Acta
+                        <Download size={18} /> Descargar Acta PDF
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center p-8">
-                      <FileText size={48} className="text-slate-300 mb-4" />
+                    <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-dashed border-slate-200">
+                      <FileText size={48} className="text-slate-200 mb-4" />
                       <p className="text-slate-400 text-sm font-medium italic">El acta aún no ha sido cargada vía PDF</p>
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Métricas Adicionales */}
-              <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <MetricBox label="Peso" value={`${selectedOrder.peso} kg`} />
-                <MetricBox label="Flete" value={`$${selectedOrder.valor_flete.toLocaleString()}`} />
-                <MetricBox label="Declarado" value={`$${selectedOrder.valor_declarado.toLocaleString()}`} />
-                <MetricBox label="Fecha Creación" value={new Date(selectedOrder.created_at).toLocaleDateString()} />
               </div>
             </div>
           </div>
