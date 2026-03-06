@@ -19,33 +19,36 @@ let visionModel = getVisionModel();
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 5) {
+async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 10) {
     for (let i = 0; i < maxRetries; i++) {
         try {
             const result = await model.generateContent(promptData);
             return result;
         } catch (error: any) {
             const errorStr = error.toString() + (error.message || '');
-            const isQuotaError = errorStr.includes('429') || error.status === 429;
+            const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.toLowerCase().includes('quota');
             
             if (isQuotaError && i < maxRetries - 1) {
                 // Intentar extraer el tiempo de espera del mensaje de error
                 let waitSeconds = 0;
-                const match = errorStr.match(/retry in ([\d.]+)(s|ms)/i);
+                // Regex mejorado para capturar "54.5s", "54s", "54 seconds", "1000ms", etc.
+                const match = errorStr.match(/retry in ([\d.]+)\s*(s|ms|seconds?|milliseconds?)/i);
+                
                 if (match) {
                     waitSeconds = parseFloat(match[1]);
-                    if (match[2].toLowerCase() === 'ms') waitSeconds /= 1000;
-                    // Añadir un margen de seguridad de 2 segundos
-                    waitSeconds += 2;
+                    const unit = match[2].toLowerCase();
+                    if (unit.startsWith('m')) waitSeconds /= 1000;
+                    // Añadir un margen de seguridad más amplio (5 segundos)
+                    waitSeconds += 5;
                 } else {
-                    // Backoff exponencial si no hay tiempo sugerido
-                    waitSeconds = Math.pow(2, i) * 5 + Math.random() * 2;
+                    // Backoff exponencial más agresivo si no hay tiempo sugerido
+                    waitSeconds = Math.pow(2, i) * 10 + Math.random() * 5;
                 }
 
                 const waitMs = Math.round(waitSeconds * 1000);
                 sendProgress({ 
                     type: 'log', 
-                    message: `⚠️ Límite de Google (429). Esperando ${Math.round(waitSeconds)}s para continuar...`,
+                    message: `⚠️ Límite de Cuota (429). Reintentando en ${Math.round(waitSeconds)}s (${i+1}/${maxRetries})...`,
                     isWaiting: true 
                 });
                 
@@ -55,7 +58,7 @@ async function generateContentWithRetry(model: any, promptData: any, sendProgres
             throw error;
         }
     }
-    throw new Error('La cuota de Google AI se agotó completamente. Por favor, intenta de nuevo en unos minutos.');
+    throw new Error('La cuota de Google AI se agotó o el límite de tiempo fue excedido. Intenta de nuevo en unos minutos.');
 }
 
 export const uploadExcel = async (req: any, res: Response): Promise<void> => {

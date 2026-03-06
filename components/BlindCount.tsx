@@ -234,109 +234,43 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase();
 
-    // Limpiar cualquier temporizador pendiente si el usuario sigue "escribiendo" (ráfaga de scanner)
     if (processingTimer.current) {
       clearTimeout(processingTimer.current);
       processingTimer.current = null;
     }
 
-    // Si estamos en periodo de bloqueo (procesando basura post-escaneo), forzamos limpieza
     if (ignoreScan.current) {
       setScanInput('');
       return;
     }
 
-    // M7 REVOLUTION V8: Speed-Buffered Logic
-    // Solo disparamos el match automático si vemos un indicio de "basura de hardware" (:, Ñ, S4:)
+    // M7 REVOLUTION V9: Integridad Total
+    // Solo disparamos el match automático si vemos un indicio de "basura de hardware"
     const scannerGarbageRegex = /(:|Ñ|S4:)/i;
     const match = val.match(scannerGarbageRegex);
 
     if (match) {
-      // SET SCAN INPUT para que se vea visualmente mientras esperamos el buffer
       setScanInput(val);
 
-      // Iniciamos un pequeño buffer (60ms) para asegurar que el scanner terminó de enviar la cadena
-      // Esto evita que ráfagas rápidas se procesen como "artículos nuevos" accidentalmente.
+      // Esperamos 80ms para recibir la ráfaga completa
       processingTimer.current = setTimeout(() => {
-          // ANALISIS FINAL DE LA CADENA COMPLETA
           const cleanedInput = cleanSkuM7(val);
           
           if (cleanedInput.length >= 3) {
-            // Verificamos si el código limpio existe en plan o maestra
-            const inPlan = groupedItems.some(it => 
-              it.articleId?.toUpperCase() === cleanedInput || 
-              it.sku?.toUpperCase() === cleanedInput
-            );
+            // PROCESAMIENTO ÚNICO: Pasamos a processBarcode que decidirá si va a Tabla 1 o Tabla 2
+            processBarcode(cleanedInput);
             
-            const inMaster = (masterArticulo as Article[]).some(a => 
-              a.sku?.toUpperCase() === cleanedInput || 
-              a.barcode?.toUpperCase() === cleanedInput || 
-              a.id?.toUpperCase() === cleanedInput
-            );
-
-            if (inPlan || inMaster) {
-              processBarcode(cleanedInput);
-              ignoreScan.current = true;
-              setTimeout(() => {
-                ignoreScan.current = false;
-                setScanInput('');
-              }, 300);
-              setScanInput('');
-              processingTimer.current = null;
-              return;
-            }
-          }
-
-          // FALLBACK M7: Búsqueda incremental solo si no hay match directo con el limpio
-          let bestMatch: string | null = null;
-          if (val.length >= 3) {
-            for (let i = val.length; i >= 3; i--) {
-              const prefix = val.substring(0, i);
-              
-              const inPlan = groupedItems.some(it => 
-                it.articleId?.toUpperCase() === prefix || 
-                it.sku?.toUpperCase() === prefix
-              );
-              
-              const inMaster = (masterArticulo as Article[]).some(a => 
-                a.sku?.toUpperCase() === prefix || 
-                a.barcode?.toUpperCase() === prefix || 
-                a.id?.toUpperCase() === prefix
-              );
-
-              if (inPlan || inMaster) {
-                bestMatch = prefix;
-                break;
-              }
-            }
-          }
-
-          if (bestMatch) {
-            processBarcode(bestMatch);
+            // Bloqueo temporal para ignorar el resto de la ráfaga de basura
             ignoreScan.current = true;
             setTimeout(() => {
               ignoreScan.current = false;
               setScanInput('');
-            }, 300); // Bloqueo reducido para permitir ráfagas rápidas de diferentes artículos
-            setScanInput('');
-          } else if (allowExtraItems) {
-            // FALLBACK M7: Solo después de la pausa de 60ms tomamos lo anterior al trigger
-            const fallbackMatch = val.split(match[0])[0];
-            if (fallbackMatch && fallbackMatch.length >= 3) {
-               processBarcode(fallbackMatch);
-               ignoreScan.current = true;
-               setTimeout(() => {
-                 ignoreScan.current = false;
-                 setScanInput('');
-               }, 300);
-               setScanInput('');
-            }
+            }, 400);
           }
           processingTimer.current = null;
-      }, 60); 
+      }, 80); 
 
     } else {
-      // Si NO hay delimitador, solo acumulamos
       setScanInput(val);
     }
   };
@@ -797,8 +731,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
-        {/* PANEL DERECHO: TABLA - SIN MARGENES (FLUSH) */}
-        <div className="flex-1 flex flex-col min-h-0 w-full overflow-hidden">
+        {/* PANEL DERECHO: TABLA - M7-MOD: Limitado a 70% para ver incidencias */}
+        <div className="flex-[0.7] flex flex-col min-h-0 w-full overflow-hidden border-b-2 border-slate-100">
           <div className="bg-white flex flex-col h-full relative">
             <div className="px-0 py-1 border-b border-slate-50 bg-white flex items-center shrink-0 gap-4 overflow-x-auto z-30">
               {/* SEARCH INPUT */}
@@ -1010,8 +944,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
           </div>
         </div>
 
-        {/* TABLA 2: INCIDENCIAS / NOVEDADES INTELIGENTES (M7-MOD) */}
-        <div className="h-48 md:h-64 border-t-4 border-slate-100 flex flex-col bg-slate-50 overflow-hidden shrink-0">
+        {/* TABLA 2: INCIDENCIAS / NOVEDADES INTELIGENTES (M7-MOD: Flex-0.3 para visualización dual) 30% */}
+        <div className="flex-[0.3] min-h-[180px] flex flex-col bg-slate-50 overflow-hidden shrink-0">
           <div className="px-6 py-3 bg-white border-b border-slate-200 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-slate-900 text-amber-500 rounded-lg flex items-center justify-center shadow-md">
