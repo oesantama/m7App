@@ -138,7 +138,11 @@ const App: React.FC = () => {
     if (warningTimer) clearTimeout(warningTimer);
     if (countdownInterval) clearInterval(countdownInterval);
 
-    if (isAuthenticated) {
+    // M7 BLINDAJE: No cerrar sesión si se está operando en módulos críticos
+    const criticalTabs = ['recibido', 'recibido-manual', 'picking', 'grupo-inter-ops', 'rutas'];
+    const isInCriticalProcess = criticalTabs.includes(activeTab);
+
+    if (isAuthenticated && !isInCriticalProcess) {
       // Timer principal de 10 minutos
       inactivityTimer = setTimeout(() => {
         handleLogout(true);

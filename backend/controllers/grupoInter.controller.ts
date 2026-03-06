@@ -19,23 +19,43 @@ let visionModel = getVisionModel();
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 3) {
+async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 5) {
     for (let i = 0; i < maxRetries; i++) {
         try {
             const result = await model.generateContent(promptData);
             return result;
         } catch (error: any) {
-            const isQuotaError = error.message?.includes('429') || error.status === 429 || error.toString().includes('429');
+            const errorStr = error.toString() + (error.message || '');
+            const isQuotaError = errorStr.includes('429') || error.status === 429;
+            
             if (isQuotaError && i < maxRetries - 1) {
-                const waitTime = Math.pow(2, i) * 3000 + Math.random() * 1000;
-                sendProgress({ type: 'log', message: `⚠️ Cuota excedida (429). Reintentando en ${Math.round(waitTime/1000)}s...` });
-                await sleep(waitTime);
+                // Intentar extraer el tiempo de espera del mensaje de error
+                let waitSeconds = 0;
+                const match = errorStr.match(/retry in ([\d.]+)(s|ms)/i);
+                if (match) {
+                    waitSeconds = parseFloat(match[1]);
+                    if (match[2].toLowerCase() === 'ms') waitSeconds /= 1000;
+                    // Añadir un margen de seguridad de 2 segundos
+                    waitSeconds += 2;
+                } else {
+                    // Backoff exponencial si no hay tiempo sugerido
+                    waitSeconds = Math.pow(2, i) * 5 + Math.random() * 2;
+                }
+
+                const waitMs = Math.round(waitSeconds * 1000);
+                sendProgress({ 
+                    type: 'log', 
+                    message: `⚠️ Límite de Google (429). Esperando ${Math.round(waitSeconds)}s para continuar...`,
+                    isWaiting: true 
+                });
+                
+                await sleep(waitMs);
                 continue;
             }
             throw error;
         }
     }
-    throw new Error('Máximo de reintentos de cuota AI excedido.');
+    throw new Error('La cuota de Google AI se agotó completamente. Por favor, intenta de nuevo en unos minutos.');
 }
 
 export const uploadExcel = async (req: any, res: Response): Promise<void> => {

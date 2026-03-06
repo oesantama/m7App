@@ -66,6 +66,20 @@ const BlindCount: React.FC<BlindCountProps> = ({
   });
 
   const [inventoryObservation, setInventoryObservation] = useState(docL.inventoryNotes || '');
+  
+  // M7-MOD: Estado de Incidencias (Tabla 2)
+  const [incidents, setIncidents] = useState<{ 
+    id: string; 
+    code: string; 
+    note: string; 
+    timestamp: string; 
+    status: 'pending' | 'resolved';
+    suggestion?: string;
+  }[]>(() => {
+    const saved = localStorage.getItem(`m7_incidents_${docL.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -139,6 +153,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
       return;
     }
 
+    localStorage.setItem(`m7_offline_count_${docL.id}`, JSON.stringify(counts));
+    localStorage.setItem(`m7_incidents_${docL.id}`, JSON.stringify(incidents));
+
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
     setSyncStatus('syncing');
@@ -159,117 +176,57 @@ const BlindCount: React.FC<BlindCountProps> = ({
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [counts, itemObservations, inventoryObservation, groupedItems]);
+  }, [counts, itemObservations, inventoryObservation, groupedItems, incidents]);
 
   const processBarcode = (rawCode: string) => {
     const input = cleanSkuM7(rawCode);
-    if (!input) {
-      setScanInput('');
-      return;
-    }
+    if (!input || input.length < 3) return;
 
-    // 1. Buscar en el plan (agrupado) - PRIORIDAD M7
+    // 1. Buscar en el plan (Match Directo - TABLA 1)
     const itemInDoc = groupedItems.find(it => 
       (it.articleId?.toUpperCase() === input) || 
       (it.sku?.toUpperCase() === input)
     );
-    
-    // 2. Si es un item extra (MANUAL)
-    if (!itemInDoc && allowExtraItems) {
-        let articleMaster = (masterArticulo as Article[]).find(a => 
-          a.sku?.toUpperCase() === input || 
-          a.barcode?.toUpperCase() === input || 
-          a.id?.toUpperCase() === input
-        );
 
-        // Si no existe en maestros, lo creamos "al vuelo"
-        if (!articleMaster) {
-            const newArticle: Article = {
-                id: input, 
-                sku: input, 
-                barcode: input,
-                name: `SINCRO M7: ${input}`, 
-                clientId: docL.clientId,
-                factorInter: 1, 
-                factorStd: 1, 
-                createdBy: user.name || 'M7-SYS',
-                createdAt: new Date().toISOString(), 
-                updatedBy: user.name || 'M7-SYS',
-                updatedAt: new Date().toISOString(), 
-                statusId: 'EST-01'
-            };
-            onAddArticleToMaster(newArticle);
-            articleMaster = newArticle;
-        }
-
-        // Verificar si ya lo habíamos agregado como extra en este conteo
-        const alreadyInExtra = extraItems.find(it => it.articleId?.toUpperCase() === input || it.sku?.toUpperCase() === input);
-        
-        if (!alreadyInExtra) {
-            const newItem: DocumentLItem = {
-                articleId: articleMaster.sku || articleMaster.id,
-                sku: articleMaster.sku,
-                expectedQty: 0,
-                countedQty: 0, // Se sumará abajo
-                status: 'Pending',
-                unit: (articleMaster as any).uomStd || (articleMaster as any).uom_std || 'UND'
-            };
-            setExtraItems(prev => [...prev, newItem]);
-        }
-
-        const targetId = articleMaster.sku || articleMaster.id;
-        const newCount = (counts[targetId] || 0) + 1;
-        setCounts(prev => ({ ...prev, [targetId]: newCount }));
-        setLastScan({ 
-          article: articleMaster, 
-          message: `Detectado: ${articleMaster.name} [x${newCount}]`, 
-          status: 'success' 
-        });
-        setScanInput('');
-        return;
-    }
-
-    // 3. Item en el plan
     if (itemInDoc) {
-        let articleMaster = (masterArticulo as Article[]).find(a => 
-          a.sku?.toUpperCase() === input || 
-          a.barcode?.toUpperCase() === input ||
-          a.id?.toUpperCase() === input
-        );
-
-        if (!articleMaster) {
-          const newArticle: Article = {
-            id: itemInDoc.articleId, 
-            sku: itemInDoc.sku || itemInDoc.articleId, 
-            barcode: itemInDoc.articleId,
-            name: `SINCRO M7: ${itemInDoc.articleId}`, 
-            clientId: docL.clientId,
-            factorInter: 1, factorStd: 1, 
-            createdBy: user.name || 'M7-SYS',
-            createdAt: new Date().toISOString(), 
-            updatedBy: user.name || 'M7-SYS',
-            updatedAt: new Date().toISOString(), 
-            statusId: 'EST-01'
-          };
-          onAddArticleToMaster(newArticle);
-          articleMaster = newArticle;
-        }
-
         const targetId = itemInDoc.articleId;
         const newCount = (counts[targetId] || 0) + 1;
         setCounts(prev => ({ ...prev, [targetId]: newCount }));
         setLastScan({ 
-          article: articleMaster, 
-          message: `Detectado: ${articleMaster.name} [x${newCount}]`, 
+          article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
+          message: `Confirmado: ${targetId} [x${newCount}]`, 
           status: 'success' 
         });
         setScanInput('');
-        inputRef.current?.focus();
         return;
     }
 
-    // Si llegamos aquí y no permitimos extras
-    setLastScan({ article: null, message: `Código "${input}" fuera de plan.`, status: 'error' });
+    // 2. Si no está en plan, buscar sugerencia inteligente (Ráfagas incompletas)
+    const possibleBetterMatch = groupedItems.find(it => 
+      it.articleId?.toUpperCase().startsWith(input) || 
+      it.sku?.toUpperCase().startsWith(input)
+    );
+
+    const suggestion = possibleBetterMatch 
+        ? `¿Quiso decir ${possibleBetterMatch.articleId}? (Lectura incompleta detectada)`
+        : `Artículo fuera de plan o código desconocido.`;
+
+    // 3. Registrar en TABLA 2 (Incidencias)
+    const newIncident = {
+      id: `inc-${Date.now()}`,
+      code: input,
+      note: suggestion,
+      timestamp: new Date().toLocaleTimeString(),
+      status: 'pending' as const,
+      suggestion: possibleBetterMatch?.articleId
+    };
+
+    setIncidents(prev => [newIncident, ...prev]);
+    setLastScan({ 
+      article: null, 
+      message: `Incidencia registrada: ${input}`, 
+      status: 'error' 
+    });
     setScanInput('');
   };
 
@@ -642,6 +599,19 @@ const BlindCount: React.FC<BlindCountProps> = ({
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario M7");
     XLSX.writeFile(wb, `Inventario_${docL.externalDocId}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const handleResolveIncident = (incidentId: string, action: 'confirm' | 'delete') => {
+    const incident = incidents.find(inc => inc.id === incidentId);
+    if (!incident) return;
+
+    if (action === 'confirm') {
+      const targetCode = incident.suggestion || incident.code;
+      processBarcode(targetCode);
+      toast.success(`Artículo ${targetCode} integrado al plan.`);
+    }
+
+    setIncidents(prev => prev.filter(inc => inc.id !== incidentId));
   };
 
   const finalizeProcess = (email: string) => {
@@ -1037,6 +1007,93 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* TABLA 2: INCIDENCIAS / NOVEDADES INTELIGENTES (M7-MOD) */}
+        <div className="h-48 md:h-64 border-t-4 border-slate-100 flex flex-col bg-slate-50 overflow-hidden shrink-0">
+          <div className="px-6 py-3 bg-white border-b border-slate-200 flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-slate-900 text-amber-500 rounded-lg flex items-center justify-center shadow-md">
+                <Icons.Alert className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-tight">Incidencias y Ráfagas</h3>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Lecturas incompletas o fuera de plan</p>
+              </div>
+            </div>
+            {incidents.length > 0 && (
+              <button 
+                onClick={() => { if(confirm('¿Limpiar todas las incidencias?')) setIncidents([]); }}
+                className="text-[9px] font-black text-red-500 hover:text-red-700 uppercase tracking-widest transition-colors"
+              >
+                Limpiar Todo
+              </button>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {incidents.length > 0 ? (
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-100 text-slate-400 font-black uppercase text-[8px] tracking-[0.2em] sticky top-0 z-10">
+                  <tr>
+                    <th className="px-6 py-3">Hora</th>
+                    <th className="px-6 py-3">Código Detectado</th>
+                    <th className="px-6 py-3">Análisis M7 IQ</th>
+                    <th className="px-6 py-3 text-right pr-6">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {incidents.map(inc => (
+                    <tr key={inc.id} className="bg-white hover:bg-amber-50/30 transition-all font-bold group">
+                      <td className="px-6 py-2 text-[9px] text-slate-400">{inc.timestamp}</td>
+                      <td className="px-6 py-2">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-black uppercase">
+                          {inc.code}
+                        </span>
+                      </td>
+                      <td className="px-6 py-2">
+                        <div className="flex items-center gap-2">
+                          <Icons.Brain className="w-3 h-3 text-slate-300" />
+                          <p className={`text-[10px] uppercase tracking-tight leading-tight ${inc.suggestion ? 'text-amber-600 font-black' : 'text-slate-500'}`}>
+                            {inc.note}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-2 text-right pr-6 flex justify-end gap-2">
+                        {inc.suggestion && (
+                          <button
+                            onClick={() => handleResolveIncident(inc.id, 'confirm')}
+                            className="px-3 py-1 bg-emerald-500 text-slate-950 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-sm"
+                          >
+                            Integrar {inc.suggestion}
+                          </button>
+                        )}
+                        {!inc.suggestion && (
+                            <button
+                                onClick={() => handleResolveIncident(inc.id, 'confirm')}
+                                className="px-3 py-1 bg-blue-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-blue-400 transition-all shadow-sm"
+                            >
+                                Forzar como Extra
+                            </button>
+                        )}
+                        <button
+                          onClick={() => handleResolveIncident(inc.id, 'delete')}
+                          className="p-1.5 bg-slate-100 text-slate-400 hover:text-red-500 rounded-lg transition-all"
+                        >
+                          <Icons.Trash className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center py-10 opacity-30 grayscale">
+                <Icons.Check className="w-6 h-6 text-slate-300 mb-2" />
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Sin incidencias de ráfaga</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
