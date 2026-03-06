@@ -6,32 +6,22 @@ import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Configuración de Gemini con Inicialización Perezosa (Lazy)
-let genAIInstance: GoogleGenerativeAI | null = null;
-
-const getGenAI = () => {
-    if (!genAIInstance) {
-        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-        if (!apiKey) {
-            console.error('[OCR-NUCLEAR] CRÍTICO: No hay API Key de Gemini configurada.');
-        } else {
-            console.log(`[OCR-NUCLEAR] Client inicializado (Key: ${apiKey.substring(0, 4)}***)`);
-        }
-        genAIInstance = new GoogleGenerativeAI(apiKey);
-    }
-    return genAIInstance;
-};
-
+// Función para obtener el modelo de visión con inicialización perezosa (Lazy)
 const getVisionModel = (name?: string) => {
-    const ai = getGenAI();
-    // Gemini 2.0 Flash es el modelo recomendado para evitar errores 403 con PDFs via API Key
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+    if (!apiKey) {
+        console.error('[OCR-NUCLEAR] ERROR: No se detectó API Key en el subproceso.');
+    }
+    
+    // Inicializar el cliente cada vez o mantener uno si la clave ya está presente
+    const genAI = new GoogleGenerativeAI(apiKey);
     const modelId = name || process.env.AI_MODEL || "gemini-2.0-flash"; 
-    console.log(`[OCR-NUCLEAR] Instanciando modelo: ${modelId}`);
-    return ai.getGenerativeModel({ model: modelId });
+    console.log(`[OCR-NUCLEAR] Usando modelo: ${modelId} (Key OK: ${!!apiKey})`);
+    return genAI.getGenerativeModel({ model: modelId });
 };
 
-// Instancia inicial (se resolverá perezosamente)
-let visionModel = getVisionModel();
+// No inicializar globalmente para evitar capturar process.env vacío al arranque
+let visionModel: any = null;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -252,6 +242,11 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         sendProgress({ type: 'start', totalPages, pendingDocs: pendingDocs.length });
 
         for (let i = 0; i < totalPages; i++) {
+            // M7-NUCLEAR-FIX: Inicializar o refrescar el modelo en cada ciclo o al inicio
+            if (!visionModel) {
+                visionModel = getVisionModel();
+            }
+            
             const pageNum = i + 1;
             sendProgress({ type: 'log', message: `--- ANALIZANDO PÁGINA ${pageNum}/${totalPages} ---`, progress: Math.round((pageNum / totalPages) * 100) });
 

@@ -1,16 +1,15 @@
 
 process.env.TZ = 'America/Bogota';
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import apiRoutes from './routes/index.js';
 import { initDeliveryTables } from './controllers/dispatch.controller.js';
 import { initScheduler } from './services/scheduler.service.js';
-
-
-dotenv.config();
 
 const app = express();
 
