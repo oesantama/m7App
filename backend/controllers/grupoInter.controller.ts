@@ -6,24 +6,29 @@ import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Configuración de Gemini con Blindaje Nuclear
-const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-if (!apiKey) {
-    console.error('[OCR-NUCLEAR] ERROR: No se detectó GEMINI_API_KEY en las variables de entorno.');
-} else {
-    console.log(`[OCR-NUCLEAR] API Key detectada (Longitud: ${apiKey.length})`);
-}
+// Configuración de Gemini con Inicialización Perezosa (Lazy)
+let genAIInstance: GoogleGenerativeAI | null = null;
 
-const genAI = new GoogleGenerativeAI(apiKey);
-
-const getVisionModel = (name?: string) => {
-    // Usar modelos confirmados por el sistema para evitar 404
-    // gemini-1.5-flash es el modelo más estable para OCR masivo
-    const modelId = name || process.env.AI_MODEL || "gemini-1.5-flash";
-    console.log(`[OCR-NUCLEAR] Instanciando modelo: ${modelId}`);
-    return genAI.getGenerativeModel({ model: modelId });
+const getGenAI = () => {
+    if (!genAIInstance) {
+        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+        if (!apiKey) {
+            console.error('[OCR-NUCLEAR] CRÍTICO: No hay API Key de Gemini configurada.');
+        } else {
+            console.log(`[OCR-NUCLEAR] Client inicializado (Key: ${apiKey.substring(0, 4)}***)`);
+        }
+        genAIInstance = new GoogleGenerativeAI(apiKey);
+    }
+    return genAIInstance;
 };
 
+const getVisionModel = (name?: string) => {
+    const ai = getGenAI();
+    const modelId = name || process.env.AI_MODEL || "gemini-1.5-flash"; // gemini-1.5-flash es el más estable
+    return ai.getGenerativeModel({ model: modelId });
+};
+
+// Instancia inicial (se resolverá perezosamente)
 let visionModel = getVisionModel();
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -271,8 +276,8 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 try {
                     result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 } catch (e: any) {
-                    // Fallback a modelo estable confirmado en el sistema
-                    visionModel = getVisionModel("gemini-flash-latest");
+                    // Fallback a modelo estable confirmado en el sistema (1.5-flash es el estándar nuclear)
+                    visionModel = getVisionModel("gemini-1.5-flash");
                     result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 }
                 
