@@ -97,18 +97,15 @@ const GrupoInterView: React.FC = () => {
   const [filters, setFilters] = useState({
     status: '',
     client: '',
-    fechaCorteDesde: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // M7-EXT: Default 8 días
-    fechaCorteHasta: '',
+    fechaCorteDesde: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    fechaCorteHasta: new Date().toISOString().split('T')[0],
   });
 
   useEffect(() => {
     if (activeTab === 'gestion') {
-      const delayDebounceFn = setTimeout(() => {
-        fetchOrders(searchTerm);
-      }, 600);
-      return () => clearTimeout(delayDebounceFn);
+      fetchOrders(searchTerm);
     }
-  }, [searchTerm, activeTab, filters.status, filters.fechaCorteDesde, filters.fechaCorteHasta]);
+  }, [activeTab]);
 
   const fetchOrders = async (query = '') => {
     try {
@@ -479,19 +476,23 @@ const GrupoInterView: React.FC = () => {
                     onClick={() => fetchOrders(searchTerm)}
                     className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 text-sm"
                   >
-                    Filtrar
+                    Consultar
                   </button>
 
                   <button 
                     onClick={() => {
-                      setFilters({status: '', client: '', fechaCorteDesde: '', fechaCorteHasta: ''});
+                      setFilters({
+                        status: '', 
+                        client: '', 
+                        fechaCorteDesde: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+                        fechaCorteHasta: new Date().toISOString().split('T')[0]
+                      });
                       setSearchTerm('');
                       fetchOrders('');
                     }}
-                    className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition text-slate-400"
-                    title="Limpiar Filtros"
+                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition text-slate-500 font-bold text-sm shadow-sm"
                   >
-                    <Clock size={20} />
+                    Limpiar
                   </button>
                 </div>
               </div>
