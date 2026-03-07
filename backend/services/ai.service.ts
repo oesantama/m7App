@@ -114,33 +114,41 @@ export const aiService = {
                     
                     if (text) return text;
                 } catch (innerError: any) {
-                    lastErrorDetails = innerError.message;
-                    // Si es un error de "Method not supported", avisar pero seguir probando otros modelos
-                    if (lastErrorDetails.includes('method') || lastErrorDetails.includes('support')) {
-                        console.warn(`[M7-AI] Modelo ${config.model} no compatible con esta llave/región. Probando siguiente.`);
+                    lastErrorDetails = (innerError.message || '').toLowerCase();
+                    
+                    // Si es error de cuota (429), esperar un poco antes de rotar
+                    if (lastErrorDetails.includes('429') || lastErrorDetails.includes('quota')) {
+                        console.warn(`[M7-AI] Cuota excedida para ${config.model}. Pausa estratégica de 5s...`);
+                        await new Promise(r => setTimeout(r, 5000));
                         continue;
                     }
-                    // Si es cuota agotada para ESTE modelo, intentar el siguiente modelo antes de rotar la llave
-                    if (lastErrorDetails.includes('429') || lastErrorDetails.includes('quota')) {
-                        console.warn(`[M7-AI] Cuota excedida para ${config.model}. Intentando siguiente modelo con la misma llave.`);
-                        continue; // Intentar gemini-1.5 o pro
+
+                    if (lastErrorDetails.includes('method') || lastErrorDetails.includes('support')) {
+                        console.warn(`[M7-AI] Modelo ${config.model} no compatible. Probando siguiente.`);
+                        continue;
                     }
-                    // Si es llave inválida o error crítico de llave, salir del bucle de modelos para rotar llave
+
                     if (lastErrorDetails.includes('key')) {
-                        console.warn(`[M7-AI] Llave actual inválida: ${lastErrorDetails}`);
+                        console.warn(`[M7-AI] Llave inválida detectada.`);
                         break; 
                     }
                 }
             }
             
-            // Si salimos del bucle de modelos sin éxito, rotamos llave
+            // Si todo el pool falla (ej. OCR masivo en paralelo), pausa nuclear
+            if (attempts > 0 && (attempts % keys.length === 0)) {
+                console.log(`[M7-AI] Pool saturado. Espera nuclear de 20s...`);
+                await new Promise(r => setTimeout(r, 20000));
+            }
+
             this.rotateKey();
             attempts++;
 
         } catch (e: any) {
-            console.error(`[M7-AI] Error crítico en servicio: ${e.message}`);
+            console.error(`[M7-AI] Error en ciclo: ${e.message}`);
             this.rotateKey();
             attempts++;
+            await new Promise(r => setTimeout(r, 2000));
         }
     }
 

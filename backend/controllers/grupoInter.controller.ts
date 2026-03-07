@@ -39,61 +39,79 @@ let visionModel: any = null;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 10) {
+async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 15) {
     const keys = getAPIKeysPool();
     let localModel = model;
+    let poolTrialCount = 0; // Contador de llaves probadas en este ciclo
 
     for (let i = 0; i < maxRetries; i++) {
         try {
             const result = await localModel.generateContent(promptData);
             return result;
         } catch (error: any) {
-            const errorStr = error.toString() + (error.message || '');
-            const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.toLowerCase().includes('quota');
+            const errorStr = (error.toString() + (error.message || '')).toLowerCase();
+            const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.includes('quota');
+            const isModelError = errorStr.includes('404') || errorStr.includes('not found');
             
-            if ((isQuotaError || errorStr.includes('404')) && i < maxRetries - 1) {
-                // M7-API-POOL: Rotar a la siguiente llave si hay más disponibles
+            if ((isQuotaError || isModelError) && i < maxRetries - 1) {
+                // FASE 1: Extraer sugerencia de espera de Google (Retry Info)
+                let waitSeconds = 0;
+                const matchFull = errorStr.match(/retry in ([\d.]+)\s*(s|ms|seconds?|milliseconds?)/i);
+                
+                if (matchFull) {
+                    waitSeconds = parseFloat(matchFull[1]);
+                    if (matchFull[2].toLowerCase().startsWith('m')) waitSeconds /= 1000;
+                    waitSeconds += 3; // Margen de seguridad nuclear
+                }
+
+                // FASE 2: Rotación de Llaves
                 if (keys.length > 1) {
                     currentKeyIndex++;
+                    poolTrialCount++;
                     const nextKey = keys[currentKeyIndex % keys.length];
                     
-                    sendProgress({ type: 'log', message: `⚠️ ${errorStr.includes('404') ? 'Error de modelo' : 'Límite de cuota'}. Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}]...` });
+                    // Si ya probamos todo el pool y sigue fallando, pausa obligatoria de enfriamiento
+                    if (poolTrialCount >= keys.length) {
+                        const pauseTime = Math.max(30, waitSeconds);
+                        sendProgress({ 
+                            type: 'log', 
+                            message: `⚠️ POOL SATURADO. Pausa Nuclear de ${Math.round(pauseTime)}s para enfriar todas las llaves...`,
+                            isWaiting: true 
+                        });
+                        await sleep(pauseTime * 1000);
+                        poolTrialCount = 0; // Resetear contador tras el descanso
+                    } else {
+                        // Rotación normal con pequeña pausa para no ser agresivos
+                        const shortWait = Math.max(5, waitSeconds);
+                        sendProgress({ 
+                            type: 'log', 
+                            message: `⚠️ Cuota/Modelo. Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] (Espere ${Math.round(shortWait)}s)...` 
+                        });
+                        await sleep(shortWait * 1000);
+                    }
                     
                     localModel = getVisionModel("gemini-2.0-flash", nextKey);
-                    await sleep(1000);
                     continue;
                 }
 
-                // Si no hay más llaves o es la única, aplicar backoff normal
-                let waitSeconds = 0;
-                // Regex mejorado para capturar "54.5s", "54s", "54 seconds", "1000ms", etc.
-                const match = errorStr.match(/retry in ([\d.]+)\s*(s|ms|seconds?|milliseconds?)/i);
-                
-                if (match) {
-                    waitSeconds = parseFloat(match[1]);
-                    const unit = match[2].toLowerCase();
-                    if (unit.startsWith('m')) waitSeconds /= 1000;
-                    // Añadir un margen de seguridad más amplio (5 segundos)
-                    waitSeconds += 5;
-                } else {
-                    // Backoff exponencial más agresivo si no hay tiempo sugerido
-                    waitSeconds = Math.pow(2, i) * 10 + Math.random() * 5;
+                // FASE 3: Si es la única llave o falló la rotación, aplicar backoff progresivo
+                if (waitSeconds === 0) {
+                    waitSeconds = Math.pow(1.5, i) * 15 + Math.random() * 5;
                 }
 
-                const waitMs = Math.round(waitSeconds * 1000);
                 sendProgress({ 
                     type: 'log', 
-                    message: `⚠️ Límite de Cuota (429). Reintentando en ${Math.round(waitSeconds)}s (${i+1}/${maxRetries})...`,
+                    message: `⚠️ Reintentando en ${Math.round(waitSeconds)}s (${i+1}/${maxRetries})...`,
                     isWaiting: true 
                 });
                 
-                await sleep(waitMs);
+                await sleep(waitSeconds * 1000);
                 continue;
             }
             throw error;
         }
     }
-    throw new Error('La cuota de Google AI se agotó o el límite de tiempo fue excedido. Intenta de nuevo en unos minutos.');
+    throw new Error('Milla 7: Se agotó la cuota de Google AI tras múltiples intentos. Por favor, espere 1 minuto o revise sus API Keys.');
 }
 
 export const uploadExcel = async (req: any, res: Response): Promise<void> => {
@@ -311,16 +329,19 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 }
                 
                 const response = await result.response;
-                // Limpieza agresiva de texto para evitar ruidos de OCR
-                const rawText = response.text().trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                // Limpieza agresiva pero preservando letras si el doc las tiene (ej: PL99454)
+                const extractedText = response.text().trim().toUpperCase();
+                const cleanExtracted = extractedText.replace(/[^A-Z0-9]/g, '');
 
-                if (rawText && rawText !== "VACIO") {
+                if (cleanExtracted && cleanExtracted !== "VACIO") {
+                    let pageMatched = false;
                     for (const docNum of pendingDocs) {
-                        const cleanDocNum = docNum.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                        const cleanDocNum = docNum.replace(/[^A-Z0-9]/g, '').toUpperCase();
                         
                         // Coincidencia flexible (contiene o es contenido)
-                        if (rawText.includes(cleanDocNum) || cleanDocNum.includes(rawText)) {
-                            sendProgress({ type: 'log', message: `✅ MATCH DETECTADO: ${docNum} (Extracted: ${rawText})` });
+                        if (cleanExtracted.includes(cleanDocNum) || cleanDocNum.includes(cleanExtracted)) {
+                            pageMatched = true;
+                            sendProgress({ type: 'log', message: `✅ MATCH DETECTADO: Doc ${docNum} encontrado en Pág ${pageNum}` });
                             await pool.query(
                                 "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
                                 [base64Page, docNum]
@@ -328,6 +349,11 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                             matches++;
                         }
                     }
+                    if (!pageMatched) {
+                        sendProgress({ type: 'log', message: `🔍 Pág ${pageNum}: Extraído [${extractedText}], pero no coincide con documentos pendientes.` });
+                    }
+                } else {
+                    sendProgress({ type: 'log', message: `⚠️ Pág ${pageNum}: No se detectó número de documento legible.` });
                 }
             } catch (error: any) {
                 sendProgress({ type: 'log', message: `❌ ERROR Pág ${pageNum}: ${error.message}` });
