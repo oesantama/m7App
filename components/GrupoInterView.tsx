@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Upload, FileSpreadsheet, FileText, Search, Eye, 
   MapPin, Package, Truck, Clock, CheckCircle, 
-  AlertCircle, ChevronRight, Download, Filter, User 
+  AlertCircle, ChevronRight, Download, Filter, User,
+  Trash
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -416,67 +417,54 @@ const GrupoInterView: React.FC = () => {
         ) : (
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
             {/* Buscador y Filtros Avanzados */}
-            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/30">
-              <div className="relative flex-1 max-w-lg">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                <input 
-                  type="text" 
-                  placeholder="Documento, guía o cliente..." 
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyUp={(e) => e.key === 'Enter' && fetchOrders(searchTerm)}
-                />
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                <div className="flex flex-col">
-                   <span className="text-[10px] text-slate-400 font-bold ml-1">F. CORTE DESDE</span>
-                   <input 
-                    type="date"
-                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-sm"
-                    value={filters.fechaCorteDesde}
-                    onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})}
-                  />
+            <div className="p-8 border-b border-slate-100 bg-slate-50/30">
+              <div className="flex flex-col md:flex-row items-end justify-center gap-8">
+                {/* Rango de Fecha */}
+                <div className="flex flex-col space-y-2">
+                  <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest ml-1">Rango de Consulta Personalizado</span>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="date"
+                      className="px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-slate-600 font-bold outline-none focus:border-blue-500 shadow-sm transition-all"
+                      value={filters.fechaCorteDesde}
+                      onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})}
+                    />
+                    <div className="w-4 h-0.5 bg-slate-200" />
+                    <input 
+                      type="date"
+                      className="px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-slate-600 font-bold outline-none focus:border-blue-500 shadow-sm transition-all"
+                      value={filters.fechaCorteHasta}
+                      onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})}
+                    />
+                  </div>
                 </div>
 
-                <div className="flex flex-col">
-                   <span className="text-[10px] text-slate-400 font-bold ml-1">F. CORTE HASTA</span>
-                   <input 
-                    type="date"
-                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-sm"
-                    value={filters.fechaCorteHasta}
-                    onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})}
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-slate-400 font-bold ml-1">ESTADO</span>
-                  <select 
-                    className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-sm"
-                    value={filters.status}
-                    onChange={(e) => setFilters({...filters, status: e.target.value})}
-                  >
-                    <option value="">Todos</option>
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="Entregado">Entregado</option>
-                  </select>
-                </div>
-
-                <div className="flex items-end gap-2">
+                {/* Botones de Acción */}
+                <div className="flex items-center gap-3">
                   <button 
-                    onClick={() => handleExportExcel()}
-                    className="p-3 bg-emerald-50 text-emerald-600 rounded-xl font-bold hover:bg-emerald-100 transition shadow-sm border border-emerald-100"
-                    title="Exportar a Excel"
+                    onClick={() => {
+                      const today = new Date();
+                      const eightDaysAgo = new Date();
+                      eightDaysAgo.setDate(today.getDate() - 8);
+                      setFilters({
+                        ...filters,
+                        fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0],
+                        fechaCorteHasta: today.toISOString().split('T')[0]
+                      });
+                      toast.info('Rango ajustado a los últimos 8 días');
+                    }}
+                    className="px-6 py-3.5 bg-amber-50 text-amber-600 rounded-2xl font-black uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-100 text-[10px] flex items-center gap-2"
                   >
-                    <FileSpreadsheet size={20} />
+                    <Clock size={16} /> Últimos 8 días
                   </button>
+
+                  <div className="w-px h-10 bg-slate-200 mx-2" />
 
                   <button 
                     onClick={() => fetchOrders(searchTerm)}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 text-sm"
+                    className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95 text-[10px] flex items-center gap-2"
                   >
-                    Consultar
+                    <Search size={16} /> Consultar
                   </button>
 
                   <button 
@@ -490,9 +478,17 @@ const GrupoInterView: React.FC = () => {
                       setSearchTerm('');
                       fetchOrders('');
                     }}
-                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition text-slate-500 font-bold text-sm shadow-sm"
+                    className="px-6 py-3.5 bg-white hover:bg-slate-50 border-2 border-slate-100 rounded-2xl transition-all text-slate-400 font-black text-[10px] uppercase shadow-sm flex items-center gap-2"
                   >
-                    Limpiar
+                    <Trash size={16} /> Limpiar
+                  </button>
+
+                  <button 
+                    onClick={() => handleExportExcel()}
+                    className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl font-black hover:bg-emerald-600 hover:text-white transition-all shadow-sm border-2 border-emerald-100"
+                    title="Exportar a Excel"
+                  >
+                    <FileSpreadsheet size={20} />
                   </button>
                 </div>
               </div>
