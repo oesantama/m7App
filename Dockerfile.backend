@@ -22,16 +22,14 @@ RUN npm prune --production
 FROM node:20-bookworm-slim
 WORKDIR /app
 
-# Blindaje Nuclear: Instalar SOLO librerías de ejecución para Puppeteer y Canvas
+# Blindaje Nuclear: Instalar SOLO librerías de ejecución para Canvas (Node-Canvas)
+# Ya NO instalamos Chromium porque usamos Evolution API externa
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    ca-certificates chromium libnss3 libatk-bridge2.0-0 libxcomposite1 libxdamage1 libxrandr2 \
-    libgbm-dev libasound2 libcairo2 libjpeg62-turbo libpango-1.0-0 libpangocairo-1.0-0 libgif7 librsvg2-2 && \
+    ca-certificates libcairo2 libjpeg62-turbo libpango-1.0-0 libpangocairo-1.0-0 libgif7 librsvg2-2 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    NODE_ENV=production \
+ENV NODE_ENV=production \
     TZ=America/Bogota
 
 # Copiamos package.json por referencia
