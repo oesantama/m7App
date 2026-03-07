@@ -11,8 +11,15 @@ Write-Host "--- INICIANDO REPARACION NUCLEAR M7 ---" -ForegroundColor Cyan
 Write-Host "[1/4] Deteniendo servicios actuales..." -ForegroundColor Yellow
 docker compose down
 
-# 2. Limpiar carpetas de construccion
-Write-Host "[2/4] Limpiando carpetas de construccion locales..." -ForegroundColor Yellow
+# 2. Limpieza Segura de Docker (Caché y Objetos Huérfanos)
+Write-Host "[2/5] Liberando espacio (Caché de construcción e Imágenes)..." -ForegroundColor Yellow
+# Limpia solo el caché de construcción (seguro para datos)
+docker builder prune -af
+# Limpia imágenes que no se están usando (seguro para datos)
+docker image prune -f
+
+# 3. Limpiar carpetas de construccion
+Write-Host "[3/5] Limpiando carpetas de construccion locales..." -ForegroundColor Yellow
 if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
 if (Test-Path "dist_backend") { Remove-Item -Recurse -Force "dist_backend" }
 if (Test-Path "node_modules/.vite") { Remove-Item -Recurse -Force "node_modules/.vite" }
