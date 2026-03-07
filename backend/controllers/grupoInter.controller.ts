@@ -24,12 +24,11 @@ const getVisionModel = (modelName?: string, forceApiKey?: string) => {
         console.error('[OCR-NUCLEAR] ❌ ERROR CRÍTICO: No se detectó ninguna API Key válida en el pool.');
     }
     
-    // M7-NUCLEAR-MODEL-FIX: Normalizar identificador para evitar 404
-    let modelId = modelName || process.env.AI_MODEL || "gemini-2.0-flash"; 
-    if (modelId === "gemini-1.5-flash") modelId = "gemini-1.5-flash-latest";
+    // M7-NUCLEAR-MODEL-FORCE: Forzar 2.0 Flash ya que 1.5 está dando 404 en v1beta
+    const modelId = "gemini-2.0-flash"; 
     
     const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
-    console.log(`[OCR-NUCLEAR] 🧠 Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] | Modelo: ${modelId} | Key: ${keyForLog}`);
+    console.log(`[OCR-NUCLEAR] 🧠 Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] | Modelo forzado: ${modelId} | Key: ${keyForLog}`);
     
     const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({ model: modelId });
@@ -50,16 +49,17 @@ async function generateContentWithRetry(model: any, promptData: any, sendProgres
             return result;
         } catch (error: any) {
             const errorStr = error.toString() + (error.message || '');
+            const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.toLowerCase().includes('quota');
+            
             if ((isQuotaError || errorStr.includes('404')) && i < maxRetries - 1) {
                 // M7-API-POOL: Rotar a la siguiente llave si hay más disponibles
                 if (keys.length > 1) {
                     currentKeyIndex++;
                     const nextKey = keys[currentKeyIndex % keys.length];
-                    const nextModelId = errorStr.includes('404') ? "gemini-2.0-flash" : undefined;
                     
-                    sendProgress({ type: 'log', message: `⚠️ ${errorStr.includes('404') ? 'Modelo no encontrado' : 'Límite de cuota'}. Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}]...` });
+                    sendProgress({ type: 'log', message: `⚠️ ${errorStr.includes('404') ? 'Error de modelo' : 'Límite de cuota'}. Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}]...` });
                     
-                    localModel = getVisionModel(nextModelId, nextKey);
+                    localModel = getVisionModel("gemini-2.0-flash", nextKey);
                     await sleep(1000);
                     continue;
                 }

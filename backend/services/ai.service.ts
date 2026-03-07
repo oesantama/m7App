@@ -11,14 +11,13 @@ dotenv.config();
  * Refactorizado para máxima resiliencia y priorización de .env
  */
 
-// Llaves de respaldo (Fallbacks si la de .env falla por cuota)
-const FALLBACK_KEYS = [
-  'AIzaSyBC6ld9KnWgM-ALBudnRhGvmzSgGqQf-jc',
-  'AIzaSyDjP0a_RGCc4bSbTInqez0PteW7b4oGVJk',
-  'AIzaSyA2-8G54aO1TbTRb5gAq_vTjwUQHWU0-U4'
-];
+// Función para obtener el pool de API Keys desde el CSV (Sincronizado con Grupo Inter)
+const getAPIKeysPool = (): string[] => {
+    const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+    return rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
+};
 
-let currentKeyIndex = -1; // -1 significa usar la del .env primero
+let currentKeyIndex = 0; 
 
 // Base de Conocimiento
 const KNOWLEDGE_BASE_PATH = path.join(process.cwd(), 'ai_knowledge.json');
@@ -37,28 +36,24 @@ const getKnowledgeBase = () => {
 export const aiService = {
   
   getClient() {
-    // Intentar .env primero, luego fallbacks
-    let key = process.env.GEMINI_API_KEY;
+    const keys = getAPIKeysPool();
+    const key = keys[currentKeyIndex % keys.length];
     
-    if (currentKeyIndex >= 0) {
-        key = FALLBACK_KEYS[currentKeyIndex];
-    }
-
     if (!key) {
-        console.error("[M7-AI] CRÍTICO: No se encontró API KEY en .env ni fallbacks válidos.");
-        throw new Error("API Key faltante");
+        console.error("[M7-AI] CRÍTICO: No se encontraron API KEYS válidas en el pool.");
+        throw new Error("API Pool vacío");
     }
 
+    const keyForLog = key.substring(0, 4) + '...' + key.substring(key.length - 4);
+    console.log(`[M7-AI] 🔑 Usando Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}]: ${keyForLog}`);
+    
     return new GoogleGenerativeAI(key);
   },
 
   rotateKey() {
-    if (currentKeyIndex < FALLBACK_KEYS.length - 1) {
-        currentKeyIndex++;
-        console.log(`[M7-AI] 🔄 Rotando a llave de respaldo #${currentKeyIndex + 1}.`);
-    } else {
-        console.warn("[M7-AI] ⚠️ Todas las llaves (incluyendo fallbacks) han sido agotadas.");
-    }
+    const keys = getAPIKeysPool();
+    currentKeyIndex++;
+    console.log(`[M7-AI] 🔄 Rotando a la siguiente llave del pool [${(currentKeyIndex % keys.length) + 1}/${keys.length}].`);
   },
 
   async saveLearning(rule: string) {
@@ -69,50 +64,41 @@ export const aiService = {
   },
 
   async generateResponse(prompt: string, context?: any) {
-    let attempts = 0;
-    const maxGlobalAttempts = FALLBACK_KEYS.length + 1; 
+    const keys = getAPIKeysPool();
+    const maxGlobalAttempts = keys.length; 
     let lastErrorDetails = "";
 
     const knowledgeRules = getKnowledgeBase().map((k: any) => `- ${k.rule}`).join('\n');
 
     const systemPrompt = `
-    Eres "OrbitM7 Intelligence" (OrbitM7 IQ), el núcleo de inteligencia artificial AUTÓNOMO y REGENERATIVO de OrbitM7.
-    Tu especialidad es la optimización logística, gestión de flotas y auditoría de documentos de transporte.
+    Eres "OrbitM7 Intelligence" (OrbitM7 IQ), el asistente experto de Milla 7.
+    Tu MISIÓN es asistir EXCLUSIVAMENTE sobre el uso de la aplicación OrbitM7 y sus procesos logísticos internos.
     
-    TUS CAPACIDADES:
-    1. Aprender del usuario. Si detectas una regla implícita, propón guardarla con [[LEARN: <regla>]].
-    2. Asistir en la logística y gestión con máxima eficiencia.
-    3. Responder de forma concisa y profesional.
+    REGLAS DE ORO:
+    1. SOLO RESPONDES sobre temas de la aplicación Milla 7: Menús, submenús, procesos de inventario, despachos, auditoría, asignaciones, etc. 
+    2. Si te preguntan algo fuera de la aplicación (ej. "¿Cómo está el clima?"), responde educadamente que tu especialidad es OrbitM7.
+    3. GUÍA POR MENÚS: Indica siempre la ruta (ej: "Puedes encontrar esto en el menú Despachos > Alistado").
+    4. FOCO OPERATIVO: Explica procesos como "Recibido de Material", "Consolidación de Carga", "Planeación de Rutas" y "Gestión de Grupo Inter (OCR)".
 
-    REGLAS CRÍTICAS DE COMUNICACIÓN (HUMANIZACIÓN):
-    - NO USES IDs INTERNOS (ej. VEH-001, v-1770..., USR-05). Al usuario final NO le sirven y NO los conoce.
-    - USA SIEMPRE nombres legibles que encuentres en el contexto:
-      * Para Vehículos: Usa la placa (ej. "SPN139").
-      * Para Conductores: Usa el nombre completo y/o cédula.
-      * Para Documentos: Usa el 'externalDocId' (ej. "L010904166").
-    - Si solo tienes un ID y no el nombre, di "un vehículo asignado" o similar en lugar de mostrar el código técnico.
-    - Sé proactivo con los datos que conoces, no solo menciones que están en un objeto técnico (ej. no digas "en recentAssignments", di "en las últimas asignaciones").
+    REGLAS TÉCNICAS:
+    - NO USES IDs INTERNOS (ej. VEH-001). Usa nombres legibles (Placas, Nombres de conductores).
+    - Sé proactivo con los datos del contexto operativo.
+    - Mantén un tono profesional, experto y conciso.
 
-    BASE DE CONOCIMIENTO:
-    ${knowledgeRules}
-
-    CONTEXTO OPERATIVO:
+    CONTEXTO OPERATIVO ACTUAL:
     ${JSON.stringify(context || {}, null, 2)}
     `;
 
-    // Modelos estables de Google Gemini - Priorizando 1.5 para estabilidad de cuota
     const configurations = [
-        { model: "gemini-1.5-flash" },
-        { model: "gemini-2.0-flash" },
-        { model: "gemini-2.5-flash" },
-        { model: "models/gemini-1.5-flash" },
-        { model: "gemini-1.5-pro" }
+        { model: "gemini-2.0-flash" }
     ];
 
+    let attempts = 0;
     while (attempts < maxGlobalAttempts) {
         try {
+            const keys = getAPIKeysPool();
             const genAI = this.getClient();
-            const currentKeyLabel = currentKeyIndex === -1 ? "(.env)" : `(fallback #${currentKeyIndex + 1})`;
+            const currentKeyLabel = `(Key ${currentKeyIndex % keys.length + 1}/${keys.length})`;
 
             for (const config of configurations) {
                 try {

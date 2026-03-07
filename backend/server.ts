@@ -50,7 +50,7 @@ app.get('/health-sec', (req, res) => {
   
   res.json({ 
     status: 'UP', 
-    version: '1.9.18-NUCLEAR',
+    version: '1.9.21-STABLE',
     keys_in_pool: keys.length,
     key_lengths: keys.map(k => k.length),
     key_detected: keys.length > 0,
@@ -59,7 +59,7 @@ app.get('/health-sec', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'UP', version: '1.9.17-NUCLEAR', timestamp: new Date() });
+  res.json({ status: 'UP', version: '1.9.21-STABLE', timestamp: new Date() });
 });
 
 // Middleware de Whitelisting y Protección Global (Seguridad Arquitectónica)
@@ -74,36 +74,7 @@ app.use('/api', (req, res, next) => {
 
 // Health Check Global para Proxies (Coolify/Nginx)
 app.get('/', (req, res) => {
-  res.json({ ok: true, message: 'Orbit Kernal Operational', version: '1.9.16-NUCLEAR' });
-});
-
-// Endpoint de diagnóstico RAÍZ (Fuera de cualquier middleware de protección)
-app.get('/health-sec', (req, res) => {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-  res.json({ 
-    status: 'UP', 
-    version: '1.9.16-NUCLEAR',
-    key_detected: !!key,
-    key_length: key.length,
-    key_prefix: key.substring(0, 4) + '***',
-    env: process.env.NODE_ENV
-  });
-});
-
-app.get('/api/health-sec', (req, res) => {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-  res.json({ 
-    status: 'UP', 
-    version: '1.9.15-NUCLEAR-OCR-FIX',
-    key_detected: !!key,
-    key_length: key.length,
-    key_prefix: key.substring(0, 4) + '***',
-    env: process.env.NODE_ENV
-  });
-});
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'UP', service: 'Orbit Logistics Backend', timestamp: new Date() });
+  res.json({ ok: true, message: 'Orbit Kernal Operational', version: '1.9.21-STABLE' });
 });
 
 // Manejo Seguro de Rutas no Encontradas (Hallazgo QA: Ocultar nginx/express)
@@ -119,7 +90,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
   console.log(`[ORBIT-SYSTEM] Servidor Operacional en Puerto ${PORT}`);
-  console.log(`[ORBIT-SYSTEM] Versión: 1.9.16-NUCLEAR`);
+  console.log(`[ORBIT-SYSTEM] Versión: 1.9.21-STABLE`);
   console.log(`[ORBIT-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
   initScheduler();
@@ -142,7 +113,7 @@ app.listen(PORT, () => {
       const result = await m.restoreSystem();
       console.log(`[ORBIT-BOOT] Sistema configurado en ${Date.now() - dbStart}ms:`, result.message);
     })
-    .catch(err => {
+    .catch((err: any) => {
       console.error('[ORBIT-BOOT] ERROR CRÍTICO EN ARRANQUE:', err.message);
       if (err.stack) console.error(err.stack);
     });
