@@ -41,7 +41,7 @@ export const getUsers = async (req: Request, res: Response) => {
   }
 };
 
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 export const saveUser = async (req: Request, res: Response) => {
   const u = req.body;

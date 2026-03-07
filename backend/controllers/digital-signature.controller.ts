@@ -1,7 +1,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 export const getAllSignatures = async (req: Request, res: Response) => {
     try {

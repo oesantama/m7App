@@ -1,7 +1,7 @@
 {
   "name": "milla-siete-m7",
   "private": true,
-  "version": "1.9.52",
+  "version": "1.9.53",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,12 +15,11 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/react-signature-canvas": "^1.0.7",
     "@types/uuid": "^10.0.0",
     "axios": "^1.13.4",
-    "bcrypt": "^6.0.0",
-    "canvas": "^3.2.1",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

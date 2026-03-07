@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { signAccessToken } from '../utils/jwt.util.js';
 
 export const login = async (req: Request, res: Response) => {

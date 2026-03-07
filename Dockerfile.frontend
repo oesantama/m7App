@@ -1,20 +1,23 @@
-# Dockerfile Front - Operación RESCUE (Alpine 130MB)
+# Dockerfile Front - Operación FINAL-CHOP (Zero-Native)
 FROM node:20-alpine AS build
 WORKDIR /app
 
-# En Alpine y para React puro no necesitamos herramientas de compilación pesadas
+# En Alpine Zero-Native NO instalamos herramientas de compilación.
+# Solo ca-certificates para npm si fuera necesario.
+RUN apk add --no-cache ca-certificates
+
 COPY package*.json ./
 
-# PODA DINÁMICA & NUCLEAR RESCUE:
+# PODA DINÁMICA & NUCLEAR:
 # 1. Borramos lockfile
 # 2. Quitamos lo que NO es de React
 RUN rm -f package-lock.json && \
     node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['bcrypt','canvas','pg','express','nodemailer','multer','@google/generative-ai','node-cron','helmet','express-rate-limit','jsonwebtoken','speakeasy','qrcode-terminal','resend']; toDelete.forEach(d => { if(pkg.dependencies[d]) delete pkg.dependencies[d] }); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))" && \
     npm install --no-package-lock --legacy-peer-deps --no-audit
 
-# Build
+# Build con límite de RAM ajustado
 COPY . .
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 RUN npm run build
 
 # Producción

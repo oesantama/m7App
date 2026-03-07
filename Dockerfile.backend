@@ -1,42 +1,29 @@
-# Stage 1: Build (Alpine 130MB)
+# Stage 1: Build (Alpine Zero-Native)
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Instalar herramientas de compilación para módulos nativos (Canvas)
-RUN apk add --no-cache \
-    build-base \
-    g++ \
-    cairo-dev \
-    pango-dev \
-    libjpeg-turbo-dev \
-    giflib-dev \
-    librsvg-dev \
-    python3
+# SOLO INSTALAMOS LO ABSOLUTAMENTE ESENCIAL PARA NPM
+# Eliminamos g++, python, cairo, etc. porque ya migramos a bcryptjs y eliminamos canvas.
+RUN apk add --no-cache ca-certificates
 
 COPY package*.json ./
-RUN npm install
+# Instalación ligera sin compilación nativa
+RUN npm install --legacy-peer-deps --no-audit
 
 COPY . .
 # Compilamos el servidor con límite de RAM
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 RUN npm run build:server
 
 # Eliminamos dependencias de desarrollo
 RUN npm prune --production
 
-# Stage 2: Production (Ultra-Light Alpine)
+# Stage 2: Production (Minimal Alpine)
 FROM node:20-alpine
 WORKDIR /app
 
-# Instalar ONLY librerías de ejecución para Canvas
-RUN apk add --no-cache \
-    ca-certificates \
-    cairo \
-    pango \
-    libjpeg-turbo \
-    giflib \
-    librsvg \
-    tzdata
+# Instalación minimalista de sistema
+RUN apk add --no-cache ca-certificates tzdata
 
 ENV NODE_ENV=production \
     TZ=America/Bogota
@@ -44,7 +31,7 @@ ENV NODE_ENV=production \
 # Copiamos package.json por referencia
 COPY package*.json ./
 
-# COPIA DIRECTA: Traemos node_modules y dist_backend ya procesados
+# COPIA DIRECTA
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist_backend ./dist_backend
 COPY --from=builder /app/backend/config/keys ./backend/config/keys
