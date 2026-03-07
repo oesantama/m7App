@@ -4,3 +4,8 @@ node_modules
 .vscode
 dist
 video-processing
+.wwebjs_cache
+playwright-report
+test-results
+node_modules
+.git

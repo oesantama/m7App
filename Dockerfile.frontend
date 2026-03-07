@@ -7,7 +7,7 @@ COPY package*.json ./
 
 # PODA + INSTALL + BUILD + CLEAN en una sola capa para ahorrar el 50% de disco durante el build
 RUN rm -f package-lock.json && \
-    node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['bcrypt','canvas','pg','express','nodemailer','multer','@google/generative-ai','node-cron','helmet','express-rate-limit','jsonwebtoken','speakeasy','qrcode-terminal','resend']; toDelete.forEach(d => { if(pkg.dependencies[d]) delete pkg.dependencies[d] }); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))" && \
+    node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['bcrypt','canvas','pg','express','nodemailer','multer','node-cron','helmet','express-rate-limit','jsonwebtoken','speakeasy','qrcode-terminal','resend']; toDelete.forEach(d => { if(pkg.dependencies[d]) delete pkg.dependencies[d] }); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))" && \
     npm install --no-package-lock --legacy-peer-deps --no-audit --ignore-scripts && \
     npm cache clean --force
 

@@ -82,6 +82,11 @@ services:
       - POSTGRES_DB=m7_logistica
     volumes:
       - m7_logistica_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U m7_admin -d m7_logistica"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - m7-network
 
