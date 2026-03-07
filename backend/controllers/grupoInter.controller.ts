@@ -268,103 +268,109 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        const ordersResult = await pool.query("SELECT numero_documento FROM grupo_inter_pedidos WHERE acta_entrega_b64 IS NULL");
-        const pendingDocs = ordersResult.rows.map(r => r.numero_documento);
-
-        if (pendingDocs.length === 0) {
-            res.json({ message: 'No hay pedidos pendientes.' });
-            return;
-        }
-
         const mainPdfDoc = await PDFDocument.load(req.file.buffer);
         const totalPages = mainPdfDoc.getPageCount();
 
         res.setHeader('Content-Type', 'application/x-ndjson');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
+        const sendProgress = (msg: any) => res.write(JSON.stringify(msg) + '\n');
+        
+        sendProgress({ type: 'start', totalPages });
 
-        const sendProgress = (data: any) => res.write(JSON.stringify(data) + '\n');
-        let matches = 0;
+        const ordersResult = await pool.query("SELECT numero_documento FROM grupo_inter_pedidos WHERE estado != 'Entregado'");
+        const pendingDocs = ordersResult.rows.map(r => r.numero_documento);
 
-        sendProgress({ type: 'start', totalPages, pendingDocs: pendingDocs.length });
-
-        for (let i = 0; i < totalPages; i++) {
-            // M7-NUCLEAR-FIX: Inicializar o refrescar el modelo en cada ciclo o al inicio
-            if (!visionModel) {
-                visionModel = getVisionModel();
-            }
-            
-            const pageNum = i + 1;
-            sendProgress({ type: 'log', message: `--- ANALIZANDO PÁGINA ${pageNum}/${totalPages} ---`, progress: Math.round((pageNum / totalPages) * 100) });
-
-            const subPdf = await PDFDocument.create();
-            const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [i]);
-            subPdf.addPage(copiedPage);
-            const base64Page = await subPdf.saveAsBase64();
-            
-            try {
-                // Prompt optimizado para extracción pura de datos
-                const prompt = `Actúa como un motor OCR de alta precisión. 
-                Analiza esta imagen de una factura/remisión de transporte. 
-                Busca y extrae exclusivamente el NÚMERO DE DOCUMENTO (Factura No., Remisión No., Guía No.). 
-                Ignora fechas, valores monetarios y NITs. 
-                Si encuentras el número, responde SOLO con el número (ej: 123456). 
-                Si no hay un número de documento claro, responde "VACIO".`;
-                
-                // M7-NUCLEAR-THROTTLING: Gemini Free Tier (2.0) permite 15 RPM. 
-                // Usamos 5s (12 RPM) para seguridad + Respiro extra cada 5 páginas.
-                if (i > 0) {
-                    const delayMs = i % 5 === 0 ? 8000 : 5000;
-                    await sleep(delayMs); 
-                }
-
-                let result;
-                try {
-                    result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
-                } catch (e: any) {
-                    // Fallback dinámico entre modelos ante saturación de cuota
-                    const fallbackModel = process.env.AI_MODEL === "gemini-2.0-flash" ? "gemini-1.5-flash-latest" : "gemini-2.0-flash";
-                    visionModel = getVisionModel(fallbackModel);
-                    result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
-                }
-                
-                const response = await result.response;
-                // Limpieza agresiva pero preservando letras si el doc las tiene (ej: PL99454)
-                const extractedText = response.text().trim().toUpperCase();
-                const cleanExtracted = extractedText.replace(/[^A-Z0-9]/g, '');
-
-                if (cleanExtracted && cleanExtracted !== "VACIO") {
-                    let pageMatched = false;
-                    for (const docNum of pendingDocs) {
-                        const cleanDocNum = docNum.replace(/[^A-Z0-9]/g, '').toUpperCase();
-                        
-                        // Coincidencia flexible (contiene o es contenido)
-                        if (cleanExtracted.includes(cleanDocNum) || cleanDocNum.includes(cleanExtracted)) {
-                            pageMatched = true;
-                            sendProgress({ type: 'log', message: `✅ MATCH DETECTADO: Doc ${docNum} encontrado en Pág ${pageNum}` });
-                            await pool.query(
-                                "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
-                                [base64Page, docNum]
-                            );
-                            matches++;
-                        }
-                    }
-                    if (!pageMatched) {
-                        sendProgress({ type: 'log', message: `🔍 Pág ${pageNum}: Extraído [${extractedText}], pero no coincide con documentos pendientes.` });
-                    }
-                } else {
-                    sendProgress({ type: 'log', message: `⚠️ Pág ${pageNum}: No se detectó número de documento legible.` });
-                }
-            } catch (error: any) {
-                sendProgress({ type: 'log', message: `❌ ERROR Pág ${pageNum}: ${error.message}` });
-            }
+        if (pendingDocs.length === 0) {
+            sendProgress({ type: 'log', message: 'No hay pedidos pendientes para cruzar.' });
+            sendProgress({ type: 'end', message: 'Proceso finalizado sin registros pendientes.', matches: 0 });
+            res.end();
+            return;
         }
 
-        sendProgress({ type: 'end', message: `Completado.`, matches });
+        // M7-PARALLEL-CORE: Motor de 5 trabajadores (uno por cada llave del pool)
+        const keys = getAPIKeysPool();
+        const numWorkers = keys.length;
+        let matches = 0;
+        let processedCount = 0;
+
+        // Cola de páginas a procesar
+        const pageQueue = Array.from({ length: totalPages }, (_, i) => i);
+        
+        const worker = async (apiKey: string, workerId: number) => {
+            let visionModel = getVisionModel("gemini-2.0-flash", apiKey);
+            let lastReqTime = 0;
+            
+            while (pageQueue.length > 0) {
+                const i = pageQueue.shift();
+                if (i === undefined) break;
+
+                const pageNum = i + 1;
+                const subPdf = await PDFDocument.create();
+                const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [i]);
+                subPdf.addPage(copiedPage);
+                const base64Page = await subPdf.saveAsBase64();
+
+                try {
+                    const prompt = `Actúa como un motor OCR de alta precisión. 
+                    Analiza esta factura/remisión. 
+                    Busca y extrae exclusivamente el NÚMERO DE DOCUMENTO (Factura No., Remisión No., Guía No.). 
+                    Responde SOLO con el número (ej: 123456). 
+                    Si no hay, responde "VACIO".`;
+
+                    // Control preventivo de RPM por llave: 15 RPM = 4s/req. Usamos 4.5s por seguridad.
+                    const now = Date.now();
+                    const wait = Math.max(0, 4500 - (now - lastReqTime));
+                    if (wait > 0) await sleep(wait);
+
+                    lastReqTime = Date.now();
+
+                    const result = await generateContentWithRetry(visionModel, [
+                        { text: prompt }, 
+                        { inlineData: { data: base64Page, mimeType: "application/pdf" } }
+                    ], sendProgress);
+                    
+                    const response = await result.response;
+                    const extractedText = response.text().trim().toUpperCase();
+                    const cleanExtracted = extractedText.replace(/[^A-Z0-9]/g, '');
+
+                    if (cleanExtracted && cleanExtracted !== "VACIO") {
+                        let pageMatched = false;
+                        for (const docNum of pendingDocs) {
+                            const cleanDocNum = docNum.replace(/[^A-Z0-9]/g, '').toUpperCase();
+                            if (cleanExtracted.includes(cleanDocNum) || cleanDocNum.includes(cleanExtracted)) {
+                                pageMatched = true;
+                                sendProgress({ type: 'log', message: `✅ [W${workerId+1}] MATCH: ${docNum} en Pág ${pageNum}` });
+                                await pool.query(
+                                    "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
+                                    [base64Page, docNum]
+                                );
+                                matches++;
+                            }
+                        }
+                        if (!pageMatched) {
+                            sendProgress({ type: 'log', message: `🔍 [W${workerId+1}] Pág ${pageNum}: Extraído [${extractedText}] (Sin match)` });
+                        }
+                    } else {
+                        sendProgress({ type: 'log', message: `⚠️ [W${workerId+1}] Pág ${pageNum}: Sin datos legibles.` });
+                    }
+                } catch (error: any) {
+                    sendProgress({ type: 'log', message: `❌ [W${workerId+1}] ERROR Pág ${pageNum}: ${error.message}` });
+                } finally {
+                    processedCount++;
+                    sendProgress({ type: 'progress', page: pageNum, percent: Math.round((processedCount/totalPages)*100) });
+                }
+            }
+        };
+
+        // Lanzar todos los hilos en paralelo
+        await Promise.all(keys.map((key, index) => worker(key, index)));
+
+        sendProgress({ type: 'end', message: `Carga Masiva Completada.`, matches });
         res.end();
     } catch (error) {
-        console.error('[GRUPO-INTER] Error PDF:', error);
-        res.status(500).json({ message: 'Error interno' });
+        console.error('[GRUPO-INTER] Error Crítico de Procesamiento:', error);
+        res.status(500).json({ message: 'Error interno en el núcleo de paralelización' });
     }
 };
 
