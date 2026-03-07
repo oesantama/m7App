@@ -11,6 +11,12 @@ RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
+
+# PODA DINÁMICA: Eliminar dependencias pesadas de backend que el frontend no usa
+# Esto evita que npm intente compilar módulos como 'canvas' o 'bcrypt' que necesitan librerías de sistema.
+# Usamos un script de una línea en Node para máxima compatibilidad.
+RUN node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['bcrypt','canvas','pg','express','nodemailer','multer','@google/generative-ai','node-cron','helmet','express-rate-limit','jsonwebtoken','speakeasy','qrcode-terminal','resend']; toDelete.forEach(d => delete pkg.dependencies[d]); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))"
+
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm install --legacy-peer-deps --no-audit && npm cache clean --force
 
