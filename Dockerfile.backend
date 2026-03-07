@@ -28,7 +28,8 @@ FROM node:20-slim
 
 # Instalar dependencias para Puppeteer/Chromium (necesario para PDFs/Whatsapp)
 # Y herramientas de compilación para módulos nativos (bcrypt)
-RUN apt-get update && apt-get install -y \
+# Instalar dependencias para Puppeteer/Chromium (necesario para PDFs/Whatsapp) con reintentos
+RUN apt-get clean && (for i in 1 2 3; do apt-get update && break || sleep 5; done) && apt-get install -y \
     chromium \
     libnss3 \
     libatk-bridge2.0-0 \
