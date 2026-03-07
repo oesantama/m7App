@@ -88,8 +88,8 @@ router.use('/geocode', geocodeRoutes);
 router.use('/admin/backup', backupRoutes); // DB Backup endpoint
 router.use('/grupo-inter', grupoInterRoutes);
 router.get('/public/order-status/:orderNumber', (req: any, res: any) => {
-    // Redirigir al controlador de grupo inter para el endpoint público
-    import('../controllers/grupoInter.controller.js').then(m => m.getOrderPublic(req, res));
+    // Redirigir al controlador de grupo inter para el endpoint público seguro
+    import('../controllers/grupoInter.controller.js').then(m => m.getOrderPublicSecure(req, res));
 });
 
 

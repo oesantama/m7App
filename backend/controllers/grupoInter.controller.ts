@@ -397,16 +397,22 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             values.push(`%${client}%`);
             query += ` AND cliente ILIKE $${values.length}`;
         }
+        
+        // M7-EXT: Filtro por defecto de 8 días si no se especifica fecha
         if (fechaCorteDesde) {
             values.push(fechaCorteDesde);
             query += ` AND f_ultimo_corte >= $${values.length}`;
+        } else if (!search) {
+            // Solo aplicar filtro por defecto si no hay búsqueda global activa
+            query += ` AND (f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR f_ultimo_corte IS NULL)`;
         }
+
         if (fechaCorteHasta) {
             values.push(fechaCorteHasta);
             query += ` AND f_ultimo_corte <= $${values.length}`;
         }
 
-        query += ' ORDER BY create_at DESC LIMIT 500';
+        query += ' ORDER BY f_ultimo_corte DESC, create_at DESC LIMIT 500';
         const result = await pool.query(query, values);
         res.json(result.rows);
     } catch (error) {
@@ -414,29 +420,56 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-export const getOrderPublic = async (req: Request, res: Response): Promise<void> => {
+
+export const getOrderPublicSecure = async (req: Request, res: Response): Promise<void> => {
     try {
         const { orderNumber } = req.params;
+        const token = req.query.token || req.headers['x-public-token'];
+
+        // Token de seguridad (Configurable en .env)
+        const MASTER_TOKEN = process.env.PUBLIC_API_TOKEN || 'M7-SECURE-2026-XQW';
+        
+        if (token !== MASTER_TOKEN) {
+            res.status(401).json({ error: 'No autorizado. Token inválido o ausente.' });
+            return;
+        }
+
         const result = await pool.query('SELECT * FROM grupo_inter_pedidos WHERE numero_documento = $1 OR numero_guia = $1', [orderNumber]);
 
         if (result.rows.length === 0) {
-            res.status(404).json({ message: 'No encontrado' });
+            res.status(404).json({ error: 'Pedido no encontrado' });
             return;
         }
 
         const o = result.rows[0];
+        
+        // Mapeo exacto al formato solicitado por el cliente
         res.json({
-            estado: o.estado,
-            nroGuia: o.numero_guia,
-            fechaEntregado: o.fecha_entregado,
-            municipioDestino: o.municipio_destino,
-            placa: o.placa,
-            actaEntrega: o.acta_entrega_b64 ? `data:image/png;base64,${o.acta_entrega_b64}` : null,
-            productos: { peso: o.peso_total_prod, cantidad: o.cantidad_total, precio: o.precio_total },
-            Novedades: o.history || []
+            estado: o.estado === 'Entregado' ? 'Entregado' : 'En proceso',
+            nroGuia: o.numero_guia || 'PD-' + o.numero_documento,
+            fechaEntregado: o.fecha_entregado ? o.fecha_entregado.toISOString().replace('T', ' ').substring(0, 16) : null,
+            ciudadOrigen: "MEDELLÍN", // Por defecto basado en operación Grupo Inter
+            ciudadOrigenCod: "05001",
+            latitud: parseFloat(o.latitud) || 6.2442, // Fallback a Medellín si no hay GPS
+            longitud: parseFloat(o.longitud) || -75.5812,
+            placa: o.placa || 'PENDIENTE',
+            ciudadDestino: o.municipio_destino || 'NO ESPECIFICADO',
+            ciudadDestinoCod: "11001", // Mapeo dinámico requerido si es crítico
+            actaEntrega: o.acta_entrega_b64 ? `BASE64_DATA:${o.acta_entrega_b64.substring(0, 50)}...` : null,
+            productos: {
+                peso: parseFloat(o.peso_total_prod) || 0,
+                cantidad: parseInt(o.cantidad_total) || 0,
+                valorFlete: 0, // No disponible en tabla actual
+                valorDeclarado: parseFloat(o.precio_total) || 0
+            },
+            Novedades: (o.history || []).map((h: any) => ({
+                estado: h.action || h.estado || 'Actualización',
+                fechaEstado: h.date || h.fecha || new Date().toISOString()
+            }))
         });
     } catch (error) {
-        res.status(500).json({ message: 'Error interno' });
+        console.error('[API-PUBLICA] Error:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
 

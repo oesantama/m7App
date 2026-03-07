@@ -97,7 +97,7 @@ const GrupoInterView: React.FC = () => {
   const [filters, setFilters] = useState({
     status: '',
     client: '',
-    fechaCorteDesde: '',
+    fechaCorteDesde: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // M7-EXT: Default 8 días
     fechaCorteHasta: '',
   });
 
@@ -230,6 +230,46 @@ const GrupoInterView: React.FC = () => {
       setIsProcessing(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      if (orders.length === 0) {
+        toast.error('No hay datos para exportar');
+        return;
+      }
+
+      // Preparar datos para exportación con nombres de columna amigables
+      const exportData = orders.map(o => ({
+        'Número Documento': o.numero_documento,
+        'Número Guía': o.numero_guia || '-',
+        'Fct. Último Corte': o.f_ultimo_corte ? new Date(o.f_ultimo_corte).toLocaleDateString() : '-',
+        'NIT Cliente': o.nit,
+        'Nombre Cliente': o.cliente,
+        'Dirección': o.direccion,
+        'Municipio Destino': o.municipio_destino,
+        'Producto': o.producto,
+        'Cantidad': o.cantidad_total,
+        'Peso (Kg)': o.peso_total_prod,
+        'Precio Total': o.precio_total,
+        'Clasificación': o.clasificacion,
+        'Estado': o.estado,
+        'Fecha Entrega': o.fecha_entregado ? new Date(o.fecha_entregado).toLocaleString() : '-',
+        'Cargado Por': o.create_by || 'Sistema',
+        'Fecha Carga': new Date(o.fecha_carge).toLocaleString()
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Gestión Grupo Inter");
+      
+      const fileName = `Gestion_Grupo_Inter_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      toast.success('Excel exportado correctamente');
+    } catch (error) {
+      toast.error('Error al exportar a Excel');
     }
   };
 
@@ -427,6 +467,14 @@ const GrupoInterView: React.FC = () => {
                 </div>
 
                 <div className="flex items-end gap-2">
+                  <button 
+                    onClick={() => handleExportExcel()}
+                    className="p-3 bg-emerald-50 text-emerald-600 rounded-xl font-bold hover:bg-emerald-100 transition shadow-sm border border-emerald-100"
+                    title="Exportar a Excel"
+                  >
+                    <FileSpreadsheet size={20} />
+                  </button>
+
                   <button 
                     onClick={() => fetchOrders(searchTerm)}
                     className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 text-sm"
@@ -694,7 +742,7 @@ const GrupoInterView: React.FC = () => {
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
               <div>
                 <h2 className="text-2xl font-black text-slate-900">Detalle de Operación</h2>
-                <p className="text-slate-500 text-sm font-medium">Documento: {selectedOrder.nro_documento}</p>
+                <p className="text-slate-500 text-sm font-medium">Documento: {selectedOrder.numero_documento}</p>
               </div>
               <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400">
                 <ChevronRight size={28} className="rotate-90 md:rotate-0" />
