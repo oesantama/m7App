@@ -208,7 +208,7 @@ const Layout: React.FC<LayoutProps> = ({
           {!isCollapsed && (
             <div className="flex flex-col">
               <h1 className="font-black text-lg tracking-tighter text-white">ORBITM7</h1>
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">GLOBAL v1.9.40-API-EXT</span>
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">GLOBAL v1.9.41-API-V2</span>
             </div>
           )}
         </div>
@@ -269,7 +269,7 @@ const Layout: React.FC<LayoutProps> = ({
             <button onClick={onLogout} title="Cerrar Sesión" className="p-1.5 text-slate-500 hover:text-rose-500 z-20 relative transition-colors"><Icons.LogOut className="w-4 h-4" /></button>
           </div>
           {!isCollapsed && (
-             <p className="text-[7px] text-slate-600 font-bold uppercase text-center opacity-40">Milla 7 • Orbit v1.9.40-API-EXT</p>
+             <p className="text-[7px] text-slate-600 font-bold uppercase text-center opacity-40">Milla 7 • Orbit v1.9.41-API-V2</p>
           )}
         </div>
       </aside>

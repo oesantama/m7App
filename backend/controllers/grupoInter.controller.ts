@@ -421,6 +421,75 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
 };
 
 
+export const getOrdersPublicListSecure = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const token = req.query.token || req.headers['x-public-token'];
+        const MASTER_TOKEN = process.env.PUBLIC_API_TOKEN || 'M7-SECURE-2026-XQW';
+        
+        if (token !== MASTER_TOKEN) {
+            res.status(401).json({ error: 'No autorizado. Token inválido.' });
+            return;
+        }
+
+        const { fechaDesde, fechaHasta, estado } = req.query;
+        let query = 'SELECT * FROM grupo_inter_pedidos WHERE 1=1';
+        const values: any[] = [];
+
+        if (estado) {
+            values.push(estado);
+            query += ` AND estado = $${values.length}`;
+        }
+
+        // Lógica de fechas (Fct. Último Corte)
+        if (fechaDesde) {
+            values.push(fechaDesde);
+            query += ` AND f_ultimo_corte >= $${values.length}`;
+        }
+        if (fechaHasta) {
+            values.push(fechaHasta);
+            query += ` AND f_ultimo_corte <= $${values.length}`;
+        }
+
+        // M7-EXT: Fallback de 8 días si no hay fechas especificadas
+        if (!fechaDesde && !fechaHasta) {
+            query += ` AND (f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR f_ultimo_corte IS NULL)`;
+        }
+
+        query += ' ORDER BY f_ultimo_corte DESC, create_at DESC LIMIT 1000';
+        const result = await pool.query(query, values);
+
+        const mappedOrders = result.rows.map(o => ({
+            estado: o.estado === 'Entregado' ? 'Entregado' : 'En proceso',
+            nroGuia: o.numero_guia || 'PD-' + o.numero_documento,
+            nroPedido: o.numero_documento,
+            fechaEntregado: o.fecha_entregado ? o.fecha_entregado.toISOString().replace('T', ' ').substring(0, 16) : null,
+            fctUltimoCorte: o.f_ultimo_corte ? o.f_ultimo_corte.toISOString().split('T')[0] : null,
+            ciudadOrigen: "MEDELLÍN",
+            latitud: parseFloat(o.latitud) || 6.2442,
+            longitud: parseFloat(o.longitud) || -75.5812,
+            placa: o.placa || 'PENDIENTE',
+            ciudadDestino: o.municipio_destino || 'NO ESPECIFICADO',
+            productos: {
+                peso: parseFloat(o.peso_total_prod) || 0,
+                cantidad: parseInt(o.cantidad_total) || 0,
+                valorDeclarado: parseFloat(o.precio_total) || 0
+            },
+            Novedades: (o.history || []).map((h: any) => ({
+                estado: h.action || h.estado || 'Actualización',
+                fechaEstado: h.date || h.fecha || new Date().toISOString()
+            }))
+        }));
+
+        res.json({
+            count: mappedOrders.length,
+            orders: mappedOrders
+        });
+    } catch (error) {
+        console.error('[API-PUBLICA-LISTA] Error:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+};
+
 export const getOrderPublicSecure = async (req: Request, res: Response): Promise<void> => {
     try {
         const { orderNumber } = req.params;
