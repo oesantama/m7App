@@ -30,6 +30,7 @@
         "backend/read_*.ts",
         "backend/telemetry_*.ts",
         "backend/*.js",
-        "backend/*.cjs"
+        "backend/*.cjs",
+        "backend/list_models.ts"
     ]
 }

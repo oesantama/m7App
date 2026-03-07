@@ -16,7 +16,7 @@ async function listModels() {
     console.log(`Using API Key: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`);
 
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
+        const genAI = new GoogleGenerativeAI(apiKey) as any;
         const models = await genAI.listModels();
         console.log("--- Supported Models ---");
         for (const model of models.models) {
