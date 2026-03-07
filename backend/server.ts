@@ -50,7 +50,7 @@ app.get('/health-sec', (req, res) => {
   
   res.json({ 
     status: 'UP', 
-    version: '1.9.25-ISOLATED-CORES',
+    version: '1.9.26-LOAD-BALANCE',
     keys_in_pool: keys.length,
     key_lengths: keys.map(k => k.length),
     key_detected: keys.length > 0,

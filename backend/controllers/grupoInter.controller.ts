@@ -298,24 +298,29 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        // M7-PARALLEL-CORE: Motor de 5 trabajadores (uno por cada llave del pool)
+        // M7-LOAD-BALANCE: Opción A del Usuario
+        // División física de páginas por cada API Key del pool
         const keys = getAPIKeysPool();
-        const numWorkers = keys.length;
+        const numKeys = keys.length;
         let matches = 0;
         let processedCount = 0;
 
-        // Cola de páginas a procesar
-        const pageQueue = Array.from({ length: totalPages }, (_, i) => i);
+        // Calcular fragmentos equitativos
+        const chunkSize = Math.ceil(totalPages / numKeys);
         
-        const worker = async (apiKey: string, workerId: number) => {
-            let visionModel = getVisionModel("gemini-2.0-flash", apiKey);
-            let lastReqTime = 0;
-            const workerContext = { id: workerId, keyIndex: workerId }; // Llave privada asignada
-            
-            while (pageQueue.length > 0) {
-                const i = pageQueue.shift();
-                if (i === undefined) break;
+        const worker = async (workerId: number) => {
+            const apiKey = keys[workerId];
+            if (!apiKey) return;
 
+            let visionModel = getVisionModel("gemini-2.0-flash", apiKey);
+            const workerLabel = `[W${workerId + 1}]`;
+            const workerContext = { id: workerId, keyIndex: workerId };
+
+            // Rango de páginas asignado a este trabajador
+            const startPage = workerId * chunkSize;
+            const endPage = Math.min(startPage + chunkSize, totalPages);
+
+            for (let i = startPage; i < endPage; i++) {
                 const pageNum = i + 1;
                 const subPdf = await PDFDocument.create();
                 const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [i]);
@@ -329,17 +334,16 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                     Responde SOLO con el número (ej: 123456). 
                     Si no hay, responde "VACIO".`;
 
-                    // Control preventivo de RPM por llave: 15 RPM = 4s/req. Usamos 4.5s por seguridad.
-                    const now = Date.now();
-                    const wait = Math.max(0, 4500 - (now - lastReqTime));
-                    if (wait > 0) await sleep(wait);
+                    // M7-THROTTLING: Delay preventivo de 6s por página (10 RPM)
+                    // Garantiza que NUNCA se alcancen las 15 RPM de Google
+                    if (i > startPage) {
+                        await sleep(6100); 
+                    }
 
                     const result = await generateContentWithRetry(visionModel, [
                         { text: prompt }, 
                         { inlineData: { data: base64Page, mimeType: "application/pdf" } }
-                    ], sendProgress, 4, workerContext); // Pasar contexto aislado
-                    
-                    lastReqTime = Date.now();
+                    ], sendProgress, 3, workerContext);
                     
                     const response = await result.response;
                     const extractedText = response.text().trim().toUpperCase();
@@ -351,7 +355,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                             const cleanDocNum = docNum.replace(/[^A-Z0-9]/g, '').toUpperCase();
                             if (cleanExtracted.includes(cleanDocNum) || cleanDocNum.includes(cleanExtracted)) {
                                 pageMatched = true;
-                                sendProgress({ type: 'log', message: `✅ [W${workerId+1}] MATCH: ${docNum} en Pág ${pageNum}` });
+                                sendProgress({ type: 'log', message: `✅ ${workerLabel} MATCH: ${docNum} en Pág ${pageNum}` });
                                 await pool.query(
                                     "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
                                     [base64Page, docNum]
@@ -360,13 +364,13 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                             }
                         }
                         if (!pageMatched) {
-                            sendProgress({ type: 'log', message: `🔍 [W${workerId+1}] Pág ${pageNum}: Extraído [${extractedText}] (Sin match)` });
+                            sendProgress({ type: 'log', message: `🔍 ${workerLabel} Pág ${pageNum}: [${extractedText}] (Sin match)` });
                         }
                     } else {
-                        sendProgress({ type: 'log', message: `⚠️ [W${workerId+1}] Pág ${pageNum}: Sin datos legibles.` });
+                        sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Pág ${pageNum}: No legible.` });
                     }
                 } catch (error: any) {
-                    sendProgress({ type: 'log', message: `❌ [W${workerId+1}] ERROR Pág ${pageNum}: ${error.message}` });
+                    sendProgress({ type: 'log', message: `❌ ${workerLabel} ERROR Pág ${pageNum}: ${error.message}` });
                 } finally {
                     processedCount++;
                     sendProgress({ type: 'progress', page: pageNum, percent: Math.round((processedCount/totalPages)*100) });
@@ -374,10 +378,10 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             }
         };
 
-        // Lanzar todos los hilos en paralelo
-        await Promise.all(keys.map((key, index) => worker(key, index)));
+        // Lanzar los trabajadores en paralelo (cada uno en su franja)
+        await Promise.all(Array.from({ length: numKeys }, (_, i) => worker(i)));
 
-        sendProgress({ type: 'end', message: `Carga Masiva Completada.`, matches });
+        sendProgress({ type: 'end', message: `Procesamiento Equitativo Finalizado.`, matches });
         res.end();
     } catch (error) {
         console.error('[GRUPO-INTER] Error Crítico de Procesamiento:', error);
