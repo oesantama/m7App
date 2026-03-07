@@ -1,27 +1,25 @@
-# Dockerfile para el Frontend con Blindaje Nuclear
-FROM node:20-slim AS build
+# Dockerfile para el Frontend con Blindaje Nuclear RESOLUTE
+FROM node:20 AS build
 WORKDIR /app
 
-# Instalar dependencias mínimas para compilación node-gyp (si fuera necesario)
-RUN apt-get clean && \
-    (for i in 1 2 3 4 5; do \
-    apt-get update && \
-    apt-get install -y ca-certificates python3 make g++ && \
-    break || (echo "Apt frontend build failed, retrying in 10s ($i/5)..." && sleep 10); done) && \
-    rm -rf /var/lib/apt/lists/*
+# Instalar herramientas básicas de sistema
+RUN apt-get update && apt-get install -y ca-certificates python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 
-# PODA DINÁMICA: Eliminar dependencias pesadas de backend que el frontend no usa
-# Esto evita que npm intente compilar módulos como 'canvas' o 'bcrypt' que necesitan librerías de sistema.
-# Usamos un script de una línea en Node para máxima compatibilidad.
-RUN node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['bcrypt','canvas','pg','express','nodemailer','multer','@google/generative-ai','node-cron','helmet','express-rate-limit','jsonwebtoken','speakeasy','qrcode-terminal','resend']; toDelete.forEach(d => delete pkg.dependencies[d]); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))"
-
-ENV NODE_OPTIONS="--max-old-space-size=4096"
-RUN npm install --legacy-peer-deps --no-audit && npm cache clean --force
+# PODA DINÁMICA & NUCLEAR RESOLUTION:
+# 1. Borramos el lockfile para evitar conflictos de versiones pesadas
+# 2. Eliminamos dependencias de backend del package.json
+# 3. Instalamos de forma limpia y verbosa
+RUN rm -f package-lock.json && \
+    node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['bcrypt','canvas','pg','express','nodemailer','multer','@google/generative-ai','node-cron','helmet','express-rate-limit','jsonwebtoken','speakeasy','qrcode-terminal','resend']; toDelete.forEach(d => { if(pkg.dependencies[d]) delete pkg.dependencies[d] }); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))" && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm install --no-package-lock --legacy-peer-deps --no-audit --verbose
 
 # Build
 COPY . .
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
 # Etapa de producción
