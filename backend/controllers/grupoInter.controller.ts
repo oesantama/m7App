@@ -24,11 +24,11 @@ const getVisionModel = (modelName?: string, forceApiKey?: string) => {
         console.error('[OCR-NUCLEAR] ❌ ERROR CRÍTICO: No se detectó ninguna API Key válida en el pool.');
     }
     
-    // M7-NUCLEAR-MODEL-FORCE: Forzar 2.0 Flash ya que 1.5 está dando 404 en v1beta
-    const modelId = "gemini-2.0-flash"; 
+    // M7-DYNAMIC-MODEL: Usar .env o fallback estable
+    const modelId = modelName || process.env.AI_MODEL || "gemini-1.5-flash"; 
     
     const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
-    console.log(`[OCR-NUCLEAR] 🧠 Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] | Modelo forzado: ${modelId} | Key: ${keyForLog}`);
+    console.log(`[OCR-NUCLEAR] 🧠 Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] | Modelo: ${modelId} | Key: ${keyForLog}`);
     
     const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({ model: modelId });

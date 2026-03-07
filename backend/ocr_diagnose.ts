@@ -25,7 +25,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const getVisionModel = (modelName?: string, forceApiKey?: string) => {
     const keys = getAPIKeysPool();
     const apiKey = forceApiKey || keys[currentKeyIndex % keys.length] || '';
-    const modelId = modelName || "gemini-2.0-flash";
+    const modelId = modelName || process.env.AI_MODEL || "gemini-1.5-flash";
     const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({ model: modelId });
 };
@@ -57,7 +57,7 @@ async function generateContentWithRetry(model: any, promptData: any, maxRetries 
                     await sleep(3000);
                 }
                 
-                localModel = getVisionModel("gemini-2.0-flash", nextKey);
+                localModel = getVisionModel();
                 continue;
             }
             throw error;
@@ -81,19 +81,9 @@ async function runDiagnose() {
     const totalPages = mainPdfDoc.getPageCount();
     console.log(`[DIAGNOSE] PDF cargado: ${totalPages} páginas.`);
 
-    console.log('[DIAGNOSE] Obteniendo documentos pendientes de la DB...');
-    let pendingDocs: string[] = [];
-    try {
-        const dbRes = await pool.query("SELECT numero_documento FROM grupo_inter_pedidos WHERE estado != 'Entregado'");
-        pendingDocs = dbRes.rows.map(r => r.numero_documento);
-        console.log(`[DIAGNOSE] Documentos pendientes: ${pendingDocs.length}`);
-        if (pendingDocs.length > 0) {
-            console.log('[DIAGNOSE] Muestra:', pendingDocs.slice(0, 10).join(', '));
-        }
-    } catch (dbErr: any) {
-        console.error('[DIAGNOSE] Error DB:', dbErr.message);
-        // Continuar con lista vacía para probar solo extracción
-    }
+    console.log('[DIAGNOSE] Usando documentos de prueba (Mock) para validación autónoma...');
+    let pendingDocs: string[] = ['PL99454', 'XGD348', 'FEI123', 'TEST001'];
+    console.log(`[DIAGNOSE] Documentos a buscar: ${pendingDocs.join(', ')}`);
 
     const prompt = `Actúa como un motor OCR de alta precisión. 
     Analiza esta imagen de una factura/remisión de transporte. 
@@ -110,7 +100,7 @@ async function runDiagnose() {
         const base64Page = await subPdf.saveAsBase64();
 
         try {
-            const visionModel = getVisionModel("gemini-2.0-flash");
+            const visionModel = getVisionModel();
             const result = await generateContentWithRetry(visionModel, [
                 { text: prompt },
                 { inlineData: { data: base64Page, mimeType: "application/pdf" } }
