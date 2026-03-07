@@ -298,90 +298,79 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        // M7-LOAD-BALANCE: Opción A del Usuario
-        // División física de páginas por cada API Key del pool
+        // M7-ATOMIC-OCR: Motor Atómico de Procesamiento Completo (v1.9.30)
+        // Reducimos 50 peticiones a solo 1 (1 RPM), garantizando CERO errores de cuota.
         const keys = getAPIKeysPool();
-        const numKeys = keys.length;
-        let matches = 0;
-        let processedCount = 0;
-
-        // Calcular fragmentos equitativos
-        const chunkSize = Math.ceil(totalPages / numKeys);
+        const apiKey = keys[0]; // Usamos la primera llave disponible (o rotamos si falla)
+        let visionModel = getVisionModel("gemini-2.0-flash", apiKey);
         
-        const worker = async (workerId: number) => {
-            const apiKey = keys[workerId];
-            if (!apiKey) return;
+        sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico para ${totalPages} páginas...` });
+        
+        // El PDF completo en Base64
+        const fullPdfBase64 = req.file.buffer.toString('base64');
 
-            let visionModel = getVisionModel("gemini-2.0-flash", apiKey);
-            const workerLabel = `[W${workerId + 1}]`;
-            const workerContext = { id: workerId, keyIndex: workerId };
+        const prompt = `Actúa como un motor OCR de logística avanzada. 
+        Analiza este documento PDF completo de ${totalPages} páginas.
+        Tu tarea es identificar en qué página se encuentra cada uno de los siguientes números de documento:
+        [${pendingDocs.join(', ')}]
+        
+        REGLAS:
+        1. Escanea todas las páginas del PDF.
+        2. Para cada documento encontrado, identifica el NÚMERO DE PÁGINA (1-index).
+        3. Responde exclusivamente con un objeto JSON siguiendo este formato:
+        {"matches": [{"doc": "NUMERO_DOC", "page": NUM_PAGINA}]}
+        4. Si no encuentras ninguno, responde: {"matches": []}
+        5. No incluyas texto adicional, solo el JSON.`;
 
-            // Rango de páginas asignado a este trabajador
-            const startPage = workerId * chunkSize;
-            const endPage = Math.min(startPage + chunkSize, totalPages);
+        try {
+            const result = await generateContentWithRetry(visionModel, [
+                { text: prompt },
+                { inlineData: { data: fullPdfBase64, mimeType: "application/pdf" } }
+            ], sendProgress, 3);
 
-            for (let i = startPage; i < endPage; i++) {
-                const pageNum = i + 1;
-                const subPdf = await PDFDocument.create();
-                const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [i]);
-                subPdf.addPage(copiedPage);
-                const base64Page = await subPdf.saveAsBase64();
+            const response = await result.response;
+            const textResponse = response.text().trim();
+            
+            // Extraer JSON de la respuesta (por si Gemini incluye markdown)
+            const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error("Gemini no devolvió un formato JSON válido.");
+            
+            const data = JSON.parse(jsonMatch[0]);
+            const foundMatches = data.matches || [];
+            
+            sendProgress({ type: 'log', message: `🔍 Gemini detectó ${foundMatches.length} documentos potenciales.` });
 
-                try {
-                    const prompt = `Actúa como un motor OCR de alta precisión. 
-                    Analiza esta factura/remisión. 
-                    Busca y extrae exclusivamente el NÚMERO DE DOCUMENTO (Factura No., Remisión No., Guía No.). 
-                    Responde SOLO con el número (ej: 123456). 
-                    Si no hay, responde "VACIO".`;
+            let finalMatches = 0;
+            for (const item of foundMatches) {
+                const docNum = item.doc;
+                const pageIndex = item.page - 1; // Convertir a 0-index
 
-                    // M7-THROTTLING: Delay preventivo de 6s por página (10 RPM)
-                    // Garantiza que NUNCA se alcancen las 15 RPM de Google
-                    if (i > startPage) {
-                        await sleep(6100); 
-                    }
-
-                    const result = await generateContentWithRetry(visionModel, [
-                        { text: prompt }, 
-                        { inlineData: { data: base64Page, mimeType: "application/pdf" } }
-                    ], sendProgress, 3, workerContext);
+                if (pageIndex >= 0 && pageIndex < totalPages && pendingDocs.includes(docNum)) {
+                    sendProgress({ type: 'log', message: `✅ Validando Match: ${docNum} en Pág ${item.page}...` });
                     
-                    const response = await result.response;
-                    const extractedText = response.text().trim().toUpperCase();
-                    const cleanExtracted = extractedText.replace(/[^A-Z0-9]/g, '');
+                    // Extraer solo la página específica para guardarla como acta
+                    const subPdf = await PDFDocument.create();
+                    const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [pageIndex]);
+                    subPdf.addPage(copiedPage);
+                    const base64Page = await subPdf.saveAsBase64();
 
-                    if (cleanExtracted && cleanExtracted !== "VACIO") {
-                        let pageMatched = false;
-                        for (const docNum of pendingDocs) {
-                            const cleanDocNum = docNum.replace(/[^A-Z0-9]/g, '').toUpperCase();
-                            if (cleanExtracted.includes(cleanDocNum) || cleanDocNum.includes(cleanExtracted)) {
-                                pageMatched = true;
-                                sendProgress({ type: 'log', message: `✅ ${workerLabel} MATCH: ${docNum} en Pág ${pageNum}` });
-                                await pool.query(
-                                    "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
-                                    [base64Page, docNum]
-                                );
-                                matches++;
-                            }
-                        }
-                        if (!pageMatched) {
-                            sendProgress({ type: 'log', message: `🔍 ${workerLabel} Pág ${pageNum}: [${extractedText}] (Sin match)` });
-                        }
-                    } else {
-                        sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Pág ${pageNum}: No legible.` });
-                    }
-                } catch (error: any) {
-                    sendProgress({ type: 'log', message: `❌ ${workerLabel} ERROR Pág ${pageNum}: ${error.message}` });
-                } finally {
-                    processedCount++;
-                    sendProgress({ type: 'progress', page: pageNum, percent: Math.round((processedCount/totalPages)*100) });
+                    await pool.query(
+                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
+                        [base64Page, docNum]
+                    );
+                    finalMatches++;
+                    sendProgress({ type: 'progress', page: item.page, percent: Math.round((finalMatches/foundMatches.length)*100) });
                 }
             }
-        };
 
-        // Lanzar los trabajadores en paralelo (cada uno en su franja)
-        await Promise.all(Array.from({ length: numKeys }, (_, i) => worker(i)));
-
-        sendProgress({ type: 'end', message: `Procesamiento Equitativo Finalizado.`, matches });
+            sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches });
+            res.end();
+            return;
+        } catch (error: any) {
+            console.error('[ATOMIC-OCR] Error:', error);
+            sendProgress({ type: 'log', message: `❌ Error en el motor atómico: ${error.message}` });
+            throw error;
+        }
         res.end();
     } catch (error) {
         console.error('[GRUPO-INTER] Error Crítico de Procesamiento:', error);
