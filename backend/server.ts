@@ -45,19 +45,21 @@ app.use('/api/auth/login', loginLimiter);
 
 // Endpoint de diagnóstico RAÍZ absoluto (Omitir cualquier middleware de /api)
 app.get('/health-sec', (req, res) => {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  const keys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
+  
   res.json({ 
     status: 'UP', 
-    version: '1.9.16-NUCLEAR',
-    key_detected: !!key,
-    key_length: key.length,
-    key_prefix: key.substring(0, 4) + '***',
+    version: '1.9.17-NUCLEAR',
+    keys_in_pool: keys.length,
+    key_lengths: keys.map(k => k.length),
+    key_detected: keys.length > 0,
     env: process.env.NODE_ENV
   });
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'UP', version: '1.9.16-NUCLEAR', timestamp: new Date() });
+  res.json({ status: 'UP', version: '1.9.17-NUCLEAR', timestamp: new Date() });
 });
 
 // Middleware de Whitelisting y Protección Global (Seguridad Arquitectónica)

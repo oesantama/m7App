@@ -6,18 +6,29 @@ import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Función para obtener el pool de API Keys desde el CSV
+const getAPIKeysPool = (): string[] => {
+    const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+    return rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
+};
+
+// Variable para rastrear qué llave estamos usando (Round Robin)
+let currentKeyIndex = 0;
+
 // Función para obtener el modelo de visión con inicialización perezosa (Lazy)
-const getVisionModel = (name?: string) => {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+const getVisionModel = (modelName?: string, forceApiKey?: string) => {
+    const keys = getAPIKeysPool();
+    const apiKey = forceApiKey || keys[currentKeyIndex % keys.length] || '';
+    
     if (!apiKey) {
-        console.error('[OCR-NUCLEAR] ❌ ERROR CRÍTICO: No se detectó API Key en el subproceso.');
+        console.error('[OCR-NUCLEAR] ❌ ERROR CRÍTICO: No se detectó ninguna API Key válida en el pool.');
     } else {
-        console.log(`[OCR-NUCLEAR] ✅ Key Detectada: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)} (Len: ${apiKey.length})`);
+        const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
+        console.log(`[OCR-NUCLEAR] ✅ Usando Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}]: ${keyForLog} (Len: ${apiKey.length})`);
     }
     
-    // Inicializar el cliente cada vez o mantener uno si la clave ya está presente
     const genAI = new GoogleGenerativeAI(apiKey);
-    const modelId = name || process.env.AI_MODEL || "gemini-2.0-flash"; 
+    const modelId = modelName || process.env.AI_MODEL || "gemini-2.0-flash"; 
     console.log(`[OCR-NUCLEAR] 🧠 Instanciando modelo: ${modelId}`);
     return genAI.getGenerativeModel({ model: modelId });
 };
@@ -28,16 +39,30 @@ let visionModel: any = null;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 10) {
+    const keys = getAPIKeysPool();
+    let localModel = model;
+
     for (let i = 0; i < maxRetries; i++) {
         try {
-            const result = await model.generateContent(promptData);
+            const result = await localModel.generateContent(promptData);
             return result;
         } catch (error: any) {
             const errorStr = error.toString() + (error.message || '');
             const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.toLowerCase().includes('quota');
             
             if (isQuotaError && i < maxRetries - 1) {
-                // Intentar extraer el tiempo de espera del mensaje de error
+                // M7-API-POOL: Rotar a la siguiente llave si hay más disponibles
+                if (keys.length > 1) {
+                    currentKeyIndex++;
+                    const nextKey = keys[currentKeyIndex % keys.length];
+                    sendProgress({ type: 'log', message: `⚠️ Límite de cuota detectado. Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}]...` });
+                    localModel = getVisionModel(undefined, nextKey);
+                    // Pequeña espera para evitar spam de llaves
+                    await sleep(1000);
+                    continue;
+                }
+
+                // Si no hay más llaves o es la única, aplicar backoff normal
                 let waitSeconds = 0;
                 // Regex mejorado para capturar "54.5s", "54s", "54 seconds", "1000ms", etc.
                 const match = errorStr.match(/retry in ([\d.]+)\s*(s|ms|seconds?|milliseconds?)/i);
@@ -266,17 +291,20 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 Si encuentras el número, responde SOLO con el número (ej: 123456). 
                 Si no hay un número de documento claro, responde "VACIO".`;
                 
-                // Throttling preventivo para cuota gratuita (15 RPM)
+                // M7-NUCLEAR-THROTTLING: Gemini Free Tier (2.0) permite 15 RPM. 
+                // Usamos 5s (12 RPM) para seguridad + Respiro extra cada 5 páginas.
                 if (i > 0) {
-                    await sleep(2500); 
+                    const delayMs = i % 5 === 0 ? 8000 : 5000;
+                    await sleep(delayMs); 
                 }
 
                 let result;
                 try {
                     result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 } catch (e: any) {
-                    // Fallback a modelo de nueva generación (2.0 Flash) para máxima compatibilidad
-                    visionModel = getVisionModel("gemini-2.0-flash");
+                    // Fallback dinámico entre modelos ante saturación de cuota
+                    const fallbackModel = process.env.AI_MODEL === "gemini-2.0-flash" ? "gemini-1.5-flash-latest" : "gemini-2.0-flash";
+                    visionModel = getVisionModel(fallbackModel);
                     result = await generateContentWithRetry(visionModel, [{ text: prompt }, { inlineData: { data: base64Page, mimeType: "application/pdf" } }], sendProgress);
                 }
                 
