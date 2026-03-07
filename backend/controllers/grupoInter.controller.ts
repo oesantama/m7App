@@ -301,8 +301,9 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         // M7-ATOMIC-OCR: Motor Atómico de Procesamiento Completo (v1.9.30)
         // Reducimos 50 peticiones a solo 1 (1 RPM), garantizando CERO errores de cuota.
         const keys = getAPIKeysPool();
-        const apiKey = keys[0]; // Usamos la primera llave disponible (o rotamos si falla)
-        let visionModel = getVisionModel("gemini-2.0-flash", apiKey);
+        const apiKey = keys[0]; 
+        const modelName = process.env.AI_MODEL || "gemini-1.5-flash";
+        let visionModel = getVisionModel(modelName, apiKey);
         
         sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico para ${totalPages} páginas...` });
         
