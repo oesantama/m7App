@@ -1,33 +1,42 @@
-# Stage 1: Build & Prune (RESOLUTE)
-FROM node:20 AS builder
+# Stage 1: Build (Alpine 130MB)
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Instalar herramientas para módulos nativos (canvas, bcrypt)
-RUN apt-get update && \
-    apt-get install -y ca-certificates libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev librsvg2-dev && \
-    rm -rf /var/lib/apt/lists/*
+# Instalar herramientas de compilación para módulos nativos (Canvas)
+RUN apk add --no-cache \
+    build-base \
+    g++ \
+    cairo-dev \
+    pango-dev \
+    libjpeg-turbo-dev \
+    giflib-dev \
+    librsvg-dev \
+    python3
 
 COPY package*.json ./
 RUN npm install
 
 COPY . .
-# Compilamos el servidor con límite de RAM para estabilidad
+# Compilamos el servidor con límite de RAM
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build:server
 
 # Eliminamos dependencias de desarrollo
 RUN npm prune --production
 
-# Stage 2: Production (Ultra-Slim & Resilient)
-FROM node:20-bookworm-slim
+# Stage 2: Production (Ultra-Light Alpine)
+FROM node:20-alpine
 WORKDIR /app
 
-# Blindaje Nuclear: Instalar SOLO librerías de ejecución para Canvas (Node-Canvas)
-# Ya NO instalamos Chromium porque usamos Evolution API externa
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    ca-certificates libcairo2 libjpeg62-turbo libpango-1.0-0 libpangocairo-1.0-0 libgif7 librsvg2-2 && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Instalar ONLY librerías de ejecución para Canvas
+RUN apk add --no-cache \
+    ca-certificates \
+    cairo \
+    pango \
+    libjpeg-turbo \
+    giflib \
+    librsvg \
+    tzdata
 
 ENV NODE_ENV=production \
     TZ=America/Bogota

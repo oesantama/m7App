@@ -1,28 +1,23 @@
-# Dockerfile para el Frontend con Blindaje Nuclear RESOLUTE
-FROM node:20 AS build
+# Dockerfile Front - Operación RESCUE (Alpine 130MB)
+FROM node:20-alpine AS build
 WORKDIR /app
 
-# Instalar herramientas básicas de sistema
-RUN apt-get update && apt-get install -y ca-certificates python3 make g++ && rm -rf /var/lib/apt/lists/*
-
+# En Alpine y para React puro no necesitamos herramientas de compilación pesadas
 COPY package*.json ./
 
-# PODA DINÁMICA & NUCLEAR RESOLUTION:
-# 1. Borramos el lockfile para evitar conflictos de versiones pesadas
-# 2. Eliminamos dependencias de backend del package.json
-# 3. Instalamos de forma limpia y verbosa
+# PODA DINÁMICA & NUCLEAR RESCUE:
+# 1. Borramos lockfile
+# 2. Quitamos lo que NO es de React
 RUN rm -f package-lock.json && \
     node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['bcrypt','canvas','pg','express','nodemailer','multer','@google/generative-ai','node-cron','helmet','express-rate-limit','jsonwebtoken','speakeasy','qrcode-terminal','resend']; toDelete.forEach(d => { if(pkg.dependencies[d]) delete pkg.dependencies[d] }); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))" && \
-    npm config set fetch-retries 5 && \
-    npm config set fetch-retry-mintimeout 20000 && \
-    npm install --no-package-lock --legacy-peer-deps --no-audit --verbose
+    npm install --no-package-lock --legacy-peer-deps --no-audit
 
 # Build
 COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
-# Etapa de producción
+# Producción
 FROM nginx:alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
