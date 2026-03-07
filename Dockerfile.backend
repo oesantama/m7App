@@ -1,39 +1,33 @@
-
-# Stage 1: Build
-FROM node:20-slim AS builder
+# Stage 1: Build & Prune
+FROM node:20-bookworm AS builder
 WORKDIR /app
 
-# Instalar dependencias necesarias para compilar módulos nativos con blindaje total
+# Instalar herramientas para módulos nativos (canvas, bcrypt) - Bookworm ya trae muchas, pero aseguramos librerías de desarrollo
 RUN apt-get clean && \
-    (for i in 1 2 3 4 5; do apt-get update && apt-get install -y ca-certificates && break || (echo "Apt failed, retrying in 5s..." && sleep 5); done) && \
-    apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    libcairo2-dev \
-    libjpeg-dev \
-    libpango1.0-dev \
-    libgif-dev \
-    librsvg2-dev \
-    && rm -rf /var/lib/apt/lists/*
+    (for i in 1 2 3 4 5 6 7 8 9 10; do apt-get update && apt-get install -y ca-certificates libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev librsvg2-dev && break || (echo "Apt failed, retrying in 10s..." && sleep 10); done)
 
 COPY package*.json ./
-# Instalamos TODO para poder compilar
+# Instalamos todas las dependencias (incluyendo dev) para compilar
 RUN npm install
+
 COPY . .
-# Compilamos usando el tsconfig.server.json
+# Compilamos el servidor
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build:server
 
-# Stage 2: Production
-FROM node:20-slim
+# Eliminamos dependencias de desarrollo para dejar solo las de producción y binarios compilados
+RUN npm prune --production
 
-# Instalar dependencias para Puppeteer/Chromium (necesario para PDFs/Whatsapp)
-# Y herramientas de compilación para módulos nativos (bcrypt)
-# Instalar dependencias para Puppeteer/Chromium y módulos nativos con blindaje total
+# Stage 2: Production (Ultra-Slim & Resilient)
+FROM node:20-bookworm-slim
+WORKDIR /app
+
+# Blindaje Nuclear: Instalar SOLO librerías de ejecución para Puppeteer y Canvas
 RUN apt-get clean && \
-    (for i in 1 2 3 4 5; do apt-get update && apt-get install -y ca-certificates && break || (echo "Apt failed, retrying in 5s..." && sleep 5); done) && \
-    apt-get install -y \
+    (for i in 1 2 3 4 5 6 7 8 9 10; do \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
     chromium \
     libnss3 \
     libatk-bridge2.0-0 \
@@ -42,36 +36,29 @@ RUN apt-get clean && \
     libxrandr2 \
     libgbm-dev \
     libasound2 \
-    build-essential \
-    python3 \
     libcairo2 \
     libjpeg62-turbo \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libgif7 \
     librsvg2-2 \
-    && rm -rf /var/lib/apt/lists/*
+    && break || (echo "Apt production failed, retrying in 10s ($i/10)..." && sleep 10); done) && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    NODE_ENV=production
+    NODE_ENV=production \
+    TZ=America/Bogota
 
-WORKDIR /app
-
-# Copiamos package.json para instalar solo dependencias de producción
+# Copiamos package.json por referencia
 COPY package*.json ./
-# Usamos install en lugar de ci para mayor resiliencia con el lockfile en Docker
-RUN npm install --omit=dev
 
-# Copiamos el código compilado desde el stage 'builder'
-# La estructura en dist_backend dependerá de como tsc genere la salida.
-# Si tsconfig tiene "include": ["backend/**/*"], usualmente replica la carpeta backend dentro de dist_backend
+# COPIA DIRECTA: Traemos node_modules y dist_backend ya procesados
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist_backend ./dist_backend
 COPY --from=builder /app/backend/config/keys ./backend/config/keys
 
-
 EXPOSE 8080
 
-# Ejecutamos el servidor compilado (Javascript plano)
-# Ajustar ruta si tsc genera diferente estructura, pero por defecto debería ser así:
+# Ejecutamos con node directamente
 CMD ["node", "dist_backend/server.js"]

@@ -50,7 +50,7 @@ app.get('/health-sec', (req, res) => {
   
   res.json({ 
     status: 'UP', 
-    version: '1.9.45-TOTAL-RESILIENCE',
+    version: '1.9.46-CLEAN-BUILD',
     keys_in_pool: keys.length,
     key_lengths: keys.map(k => k.length),
     key_detected: keys.length > 0,
