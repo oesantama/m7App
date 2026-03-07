@@ -1,5 +1,5 @@
 # Dockerfile para el Frontend con Blindaje Nuclear
-FROM node:20-bookworm AS build
+FROM node:20-slim AS build
 WORKDIR /app
 
 # Instalar dependencias con 10 reintentos

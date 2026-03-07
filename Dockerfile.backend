@@ -1,5 +1,5 @@
 # Stage 1: Build & Prune
-FROM node:20-bookworm AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 
 # Instalar herramientas para módulos nativos (canvas, bcrypt) - Bookworm ya trae muchas, pero aseguramos librerías de desarrollo

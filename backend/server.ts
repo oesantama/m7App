@@ -50,7 +50,7 @@ app.get('/health-sec', (req, res) => {
   
   res.json({ 
     status: 'UP', 
-    version: '1.9.46-CLEAN-BUILD',
+    version: '1.9.47-FIX-SPACE',
     keys_in_pool: keys.length,
     key_lengths: keys.map(k => k.length),
     key_detected: keys.length > 0,
@@ -66,7 +66,7 @@ app.get('/health', (req, res) => {
 app.use('/api', (req, res, next) => {
   const publicPaths = ['/auth/login', '/health', '/', '/geocode', '/public/order-status'];
   
-  if (publicPaths.includes(req.path) || req.path.startsWith('/public/order-status')) {
+  if (publicPaths.includes(req.path) || req.path.startsWith('/public/')) {
     return next();
   }
   return authenticateToken(req, res, next);
