@@ -33,21 +33,29 @@ const getKnowledgeBase = () => {
     return [];
 };
 
+// Function to get the vision model (assuming it's defined elsewhere or will be added)
+const getVisionModel = () => {
+    // Placeholder for actual vision model retrieval logic
+    // For now, it might return a default model name or an object
+    return process.env.AI_VISION_MODEL || "gemini-pro-vision";
+};
+
 export const aiService = {
   
-  getClient() {
+  getClient(forceApiKey?: string, modelName?: string) {
     const keys = getAPIKeysPool();
-    const key = keys[currentKeyIndex % keys.length];
+    const apiKey = forceApiKey || keys[currentKeyIndex % keys.length] || '';
+    const modelId = modelName || process.env.AI_MODEL || "gemini-1.5-flash";
     
-    if (!key) {
+    if (!apiKey) {
         console.error("[M7-AI] CRÍTICO: No se encontraron API KEYS válidas en el pool.");
         throw new Error("API Pool vacío");
     }
 
-    const keyForLog = key.substring(0, 4) + '...' + key.substring(key.length - 4);
+    const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
     console.log(`[M7-AI] 🔑 Usando Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}]: ${keyForLog}`);
     
-    return new GoogleGenerativeAI(key);
+    return new GoogleGenerativeAI(apiKey);
   },
 
   rotateKey() {
@@ -57,6 +65,7 @@ export const aiService = {
   },
 
   async saveLearning(rule: string) {
+      const visionModel = getVisionModel(); // Added this line
       const knowledge = getKnowledgeBase();
       knowledge.push({ rule, date: new Date().toISOString(), approved: true });
       fs.writeFileSync(KNOWLEDGE_BASE_PATH, JSON.stringify(knowledge, null, 2));
@@ -90,7 +99,7 @@ export const aiService = {
     `;
 
     const configurations = [
-        { model: "gemini-2.0-flash" }
+        { model: process.env.AI_MODEL || "gemini-1.5-flash" }
     ];
 
     let attempts = 0;
