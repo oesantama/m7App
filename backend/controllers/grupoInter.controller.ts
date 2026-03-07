@@ -39,10 +39,11 @@ let visionModel: any = null;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function generateContentWithRetry(model: any, promptData: any, sendProgress: (msg: any) => void, maxRetries = 15) {
+async function generateContentWithRetry(model: any, promptData: any, sendProgress: Function, maxRetries = 4, workerContext?: { id: number, keyIndex: number }) {
     const keys = getAPIKeysPool();
     let localModel = model;
-    let poolTrialCount = 0; // Contador de llaves probadas en este ciclo
+    let poolTrialCount = 0;
+    const workerLabel = workerContext ? `[W${workerContext.id + 1}]` : '';
 
     for (let i = 0; i < maxRetries; i++) {
         try {
@@ -51,41 +52,52 @@ async function generateContentWithRetry(model: any, promptData: any, sendProgres
         } catch (error: any) {
             const errorStr = (error.toString() + (error.message || '')).toLowerCase();
             const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.includes('quota');
-            const isModelError = errorStr.includes('404') || errorStr.includes('not found');
             
-            if ((isQuotaError || isModelError) && i < maxRetries - 1) {
-                // FASE 1: Extraer sugerencia de espera de Google (Retry Info)
+            if (isQuotaError && i < maxRetries - 1) {
+                // FASE 1: Extraer tiempo de espera sugerido por Google
                 let waitSeconds = 0;
-                const matchFull = errorStr.match(/retry in ([\d.]+)\s*(s|ms|seconds?|milliseconds?)/i);
+                const matchFull = errorStr.match(/retry in ([\d.]+)(s|ms)/);
                 
                 if (matchFull) {
                     waitSeconds = parseFloat(matchFull[1]);
                     if (matchFull[2].toLowerCase().startsWith('m')) waitSeconds /= 1000;
-                    waitSeconds += 3; // Margen de seguridad nuclear
+                    waitSeconds += 2; // Margen de seguridad nuclear
                 }
 
-                // FASE 2: Rotación de Llaves
+                // FASE 2: Comportamiento Aislado (MODO WORKER v1.9.25)
+                if (workerContext) {
+                    // En modo trabajador, NO rotamos llaves. Esperamos sobre la nuestra.
+                    // Esto evita el "Thundering Herd" (todos volcándose sobre la misma llave siguiente).
+                    const backoff = Math.max(waitSeconds, Math.pow(2, i) * 5); // Backoff inteligente local
+                    sendProgress({ 
+                        type: 'log', 
+                        message: `⚠️ ${workerLabel} Cuota excedida. Reintentando en ${Math.round(backoff)}s sobre Key [${workerContext.keyIndex + 1}]...`,
+                        isWaiting: true 
+                    });
+                    await sleep(backoff * 1000);
+                    continue;
+                }
+
+                // FASE 3: Rotación Tradicional (Para contexto secuencial/chatbot)
                 if (keys.length > 1) {
                     currentKeyIndex++;
                     poolTrialCount++;
                     const nextKey = keys[currentKeyIndex % keys.length];
                     
-                    // Si ya probamos todo el pool y sigue fallando, pausa obligatoria de enfriamiento
                     if (poolTrialCount >= keys.length) {
                         const pauseTime = Math.max(30, waitSeconds);
                         sendProgress({ 
                             type: 'log', 
-                            message: `⚠️ POOL SATURADO. Pausa Nuclear de ${Math.round(pauseTime)}s para enfriar todas las llaves...`,
+                            message: `⚠️ POOL SATURADO. Pausa Nuclear de ${Math.round(pauseTime)}s...`,
                             isWaiting: true 
                         });
                         await sleep(pauseTime * 1000);
-                        poolTrialCount = 0; // Resetear contador tras el descanso
+                        poolTrialCount = 0;
                     } else {
-                        // Rotación normal con pequeña pausa para no ser agresivos
                         const shortWait = Math.max(5, waitSeconds);
                         sendProgress({ 
                             type: 'log', 
-                            message: `⚠️ Cuota/Modelo. Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] (Espere ${Math.round(shortWait)}s)...` 
+                            message: `⚠️ Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] (${Math.round(shortWait)}s)...` 
                         });
                         await sleep(shortWait * 1000);
                     }
@@ -94,24 +106,22 @@ async function generateContentWithRetry(model: any, promptData: any, sendProgres
                     continue;
                 }
 
-                // FASE 3: Si es la única llave o falló la rotación, aplicar backoff progresivo
+                // FASE 4: Backup Backoff
                 if (waitSeconds === 0) {
                     waitSeconds = Math.pow(1.5, i) * 15 + Math.random() * 5;
                 }
-
                 sendProgress({ 
                     type: 'log', 
-                    message: `⚠️ Reintentando en ${Math.round(waitSeconds)}s (${i+1}/${maxRetries})...`,
+                    message: `⚠️ ${workerLabel} Reintentando en ${Math.round(waitSeconds)}s...`,
                     isWaiting: true 
                 });
-                
                 await sleep(waitSeconds * 1000);
                 continue;
             }
             throw error;
         }
     }
-    throw new Error('Milla 7: Se agotó la cuota de Google AI tras múltiples intentos. Por favor, espere 1 minuto o revise sus API Keys.');
+    throw new Error(`Milla 7: ${workerLabel} Agotó cuota tras ${maxRetries} intentos.`);
 }
 
 export const uploadExcel = async (req: any, res: Response): Promise<void> => {
@@ -300,6 +310,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         const worker = async (apiKey: string, workerId: number) => {
             let visionModel = getVisionModel("gemini-2.0-flash", apiKey);
             let lastReqTime = 0;
+            const workerContext = { id: workerId, keyIndex: workerId }; // Llave privada asignada
             
             while (pageQueue.length > 0) {
                 const i = pageQueue.shift();
@@ -323,12 +334,12 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                     const wait = Math.max(0, 4500 - (now - lastReqTime));
                     if (wait > 0) await sleep(wait);
 
-                    lastReqTime = Date.now();
-
                     const result = await generateContentWithRetry(visionModel, [
                         { text: prompt }, 
                         { inlineData: { data: base64Page, mimeType: "application/pdf" } }
-                    ], sendProgress);
+                    ], sendProgress, 4, workerContext); // Pasar contexto aislado
+                    
+                    lastReqTime = Date.now();
                     
                     const response = await result.response;
                     const extractedText = response.text().trim().toUpperCase();
