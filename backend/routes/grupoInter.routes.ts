@@ -10,4 +10,7 @@ router.post('/upload-excel', upload.single('file'), grupoInterController.uploadE
 router.post('/process-pdf', upload.single('file'), grupoInterController.processPDF);
 router.get('/orders', grupoInterController.getOrders);
 
+// API Pública (WebService para Clientes Externos)
+router.get('/public/list', grupoInterController.getOrdersPublicListSecure);
+
 export default router;
