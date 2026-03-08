@@ -455,19 +455,20 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
 
         const mappedOrders = result.rows.map(o => ({
             estado: o.estado === 'Entregado' ? 'Entregado' : 'En proceso',
-            nroGuia: o.numero_guia || 'PD-' + o.numero_documento,
-            nroPedido: o.numero_documento,
+            nroGuia: o.nro_guia || o.numero_guia || 'PD-' + (o.nro_documento || o.numero_documento),
+            nroPedido: o.nro_documento || o.numero_documento,
             fechaEntregado: o.fecha_entregado ? o.fecha_entregado.toISOString().replace('T', ' ').substring(0, 16) : null,
             fctUltimoCorte: o.f_ultimo_corte ? o.f_ultimo_corte.toISOString().split('T')[0] : null,
-            ciudadOrigen: "MEDELLÍN",
+            ciudadOrigen: o.ciudad_origen || "MEDELLÍN",
             latitud: parseFloat(o.latitud) || 6.2442,
             longitud: parseFloat(o.longitud) || -75.5812,
             placa: o.placa || 'PENDIENTE',
-            ciudadDestino: o.municipio_destino || 'NO ESPECIFICADO',
+            ciudadDestino: o.ciudad_destino || o.municipio_destino || 'NO ESPECIFICADO',
+            acta_entrega_b64: o.acta_entrega_b64 || null,
             productos: {
-                peso: parseFloat(o.peso_total_prod) || 0,
-                cantidad: parseInt(o.cantidad_total) || 0,
-                valorDeclarado: parseFloat(o.precio_total) || 0
+                peso: parseFloat(o.peso) || parseFloat(o.peso_total_prod) || 0,
+                cantidad: parseInt(o.cantidad) || parseInt(o.cantidad_total) || 0,
+                valorDeclarado: parseFloat(o.valor_declarado) || parseFloat(o.precio_total) || 0
             },
             Novedades: (o.history || []).map((h: any) => ({
                 estado: h.action || h.estado || 'Actualización',
