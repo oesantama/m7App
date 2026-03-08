@@ -161,7 +161,10 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             empresa: ['EMPRESA', 'COMPAÑIA'],
             peso_total_prod: ['PESO TOTAL PROD.', 'PESO', 'PESO TOTAL'],
             f_ultimo_corte: ['F. ULTIMO CORTE', 'F ULTIMO CORTE', 'ULTIMO CORTE', 'CORTE'],
-            clasificacion: ['CLASIFICACION', 'CATEGORIA', 'TIPO']
+            clasificacion: ['CLASIFICACION', 'CATEGORIA', 'TIPO'],
+            placa: ['PLACA', 'VEHICULO'],
+            longitud: ['LONGITUD'],
+            latitud: ['LATITUD']
         };
         
         for (let i = 0; i < Math.min(rows.length, 25); i++) {
@@ -198,6 +201,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const idxPeso = getColIndex(columnAliases.peso_total_prod);
         const idxCorte = getColIndex(columnAliases.f_ultimo_corte);
         const idxClasif = getColIndex(columnAliases.clasificacion);
+        const idxPlaca = getColIndex(columnAliases.placa);
+        const idxLong = getColIndex(columnAliases.longitud);
+        const idxLat = getColIndex(columnAliases.latitud);
 
         let savedCount = 0;
         const username = req.body.username || 'System';
@@ -238,8 +244,8 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                     numero_documento, nit, cliente, direccion, notas_encabezado, 
                     municipio_destino, producto, cantidad_total, precio_total, 
                     tipo_articulo, empresa, peso_total_prod, f_ultimo_corte, 
-                    clasificacion, estado, create_by, update_by, fecha_carge
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'Pendiente', $15, $15, CURRENT_TIMESTAMP)
+                    clasificacion, placa, longitud, latitud, estado, create_by, update_by, fecha_carge
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'Pendiente', $18, $18, CURRENT_TIMESTAMP)
             `;
 
             const values = [
@@ -257,6 +263,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 parseNum(idxPeso >= 0 ? rowArr[idxPeso] : 0),
                 idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
                 idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
+                idxPlaca >= 0 ? String(rowArr[idxPlaca] || '').trim() : '',
+                parseNum(idxLong >= 0 ? rowArr[idxLong] : null),
+                parseNum(idxLat >= 0 ? rowArr[idxLat] : null),
                 username
             ];
 
