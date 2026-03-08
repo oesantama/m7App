@@ -145,10 +145,11 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 .toUpperCase();
 
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+        console.log(`[GRUPO-INTER] Filas totales detectadas: ${rows.length}`);
         
         let headerRowIndex = -1;
         const columnAliases = {
-            numero_documento: ['NUMERO DOCUMENTO', 'NRO DOCUMENTO', 'DOCUMENTO', 'REMISION'],
+            numero_documento: ['NUMERO DOCUMENTO', 'NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'PEDIDO', 'NRO PEDIDO', 'ORDEN'],
             nit: ['NIT CLIENTE', 'NIT', 'IDENTIFICACION'],
             cliente: ['NOMBRE CLIENTE', 'CLIENTE', 'RAZON SOCIAL'],
             direccion: ['DIRECCION', 'DIR'],
@@ -166,10 +167,12 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             longitud: ['LONGITUD'],
             latitud: ['LATITUD']
         };
+
+        const allIdentifyAliases = [...columnAliases.numero_documento, ...columnAliases.cliente].map(a => normalize(a));
         
         for (let i = 0; i < Math.min(rows.length, 25); i++) {
             const currentRow = (rows[i] || []).map(cell => normalize(String(cell)));
-            if (currentRow.some(cell => cell.includes('NUMERO DOCUMENTO') || cell.includes('CLIENTE'))) {
+            if (currentRow.some(cell => allIdentifyAliases.some(alias => cell.includes(alias)))) {
                 headerRowIndex = i;
                 break;
             }
@@ -184,7 +187,16 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         console.log(`[GRUPO-INTER] Cabeceras:`, headerRow);
 
         const getColIndex = (aliases: string[]) => {
-            return headerRow.findIndex(cell => aliases.some(alias => cell === normalize(alias) || cell.includes(normalize(alias))));
+            const normalizedAliases = aliases.map(a => normalize(a));
+            // Prioridad 1: Coincidencia Exacta
+            let idx = headerRow.findIndex(cell => normalizedAliases.some(alias => cell === alias));
+            if (idx >= 0) return idx;
+            // Prioridad 2: El encabezado contiene el alias (e.g. "PEDIDO" en "NRO PEDIDO")
+            // Pero evitamos falsos positivos si el alias es muy corto (como "TIPO")
+            return headerRow.findIndex(cell => normalizedAliases.some(alias => {
+                if (alias.length <= 4) return cell === alias; // Para "TIPO", "NIT", "DIR" exigimos casi exactitud
+                return cell.includes(alias);
+            }));
         };
 
         const idxDoc = getColIndex(columnAliases.numero_documento);
@@ -205,7 +217,10 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const idxLong = getColIndex(columnAliases.longitud);
         const idxLat = getColIndex(columnAliases.latitud);
 
+        console.log(`[GRUPO-INTER] Índices detectados: Doc=${idxDoc}, Cliente=${idxClient}, Prod=${idxProd}, Placa=${idxPlaca}`);
+
         let savedCount = 0;
+        let duplicateCount = 0;
         const username = req.body.username || 'System';
 
         const parseNum = (val: any) => {
@@ -230,6 +245,10 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             const numero_documento = idxDoc >= 0 ? String(rowArr[idxDoc] || '').trim() : '';
             const producto = idxProd >= 0 ? String(rowArr[idxProd] || '').trim() : 'GENERAL';
             
+            if (i < headerRowIndex + 5) {
+                console.log(`[GRUPO-INTER] Fila ${i}: Doc='${numero_documento}', Cliente='${idxClient >= 0 ? rowArr[idxClient] : 'N/A'}'`);
+            }
+
             if (!numero_documento) continue;
 
             const exists = await pool.query(
@@ -237,7 +256,10 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 [numero_documento, producto]
             );
 
-            if (exists.rows.length > 0) continue; 
+            if (exists.rows.length > 0) {
+                duplicateCount++;
+                continue; 
+            }
 
             const query = `
                 INSERT INTO grupo_inter_pedidos (
@@ -273,7 +295,11 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             savedCount++;
         }
 
-        res.json({ message: `Excel procesado: ${savedCount} registros nuevos`, count: savedCount });
+        res.json({ 
+            message: `Excel procesado: ${savedCount} registros nuevos`, 
+            count: savedCount, 
+            duplicates: duplicateCount 
+        });
     } catch (error) {
         console.error('[GRUPO-INTER] Error al subir Excel:', error);
         res.status(500).json({ message: 'Error interno al procesar el Excel' });
