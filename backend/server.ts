@@ -17,9 +17,21 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Middlewares de Seguridad Crítica (Hallazgos QA)
-app.use(helmet()); // Oculta X-Powered-By y agrega cabeceras de seguridad
+app.use(helmet({
+  contentSecurityPolicy: false, // Permitir iframes y scripts en el manual si es necesario
+})); 
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
+
+// Servir archivos estáticos públicos (Manual Técnico, logos, etc.)
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '..');
+
+// Servir la carpeta public desde la raíz del proyecto
+app.use(express.static(path.join(projectRoot, 'public')));
 
 // Limitador de Intentos de Login (Hallazgo QA) 15 peticiones por 15 min por IP
 const loginLimiter = rateLimit({
