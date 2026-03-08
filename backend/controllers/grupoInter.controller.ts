@@ -158,11 +158,11 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             producto: ['PRODUCTO', 'ARTICULO', 'ITEM'],
             cantidad_total: ['CANTIDAD TOTAL', 'CANTIDAD', 'TOTAL'],
             precio_total: ['PRECIO TOTAL', 'PRECIO', 'VALOR'],
-            tipo_articulo: ['TIPO ARTICULO', 'TIPO_ARTICULO', 'CATEGORIA ARTICULO'],
+            tipo_articulo: ['TIPO ARTICULO', 'TIPO_ART_INTER', 'CATEGORIA ARTICULO'],
             empresa: ['EMPRESA', 'COMPAÑIA'],
             peso_total_prod: ['PESO TOTAL PROD.', 'PESO', 'PESO TOTAL'],
             f_ultimo_corte: ['F. ULTIMO CORTE', 'F ULTIMO CORTE', 'ULTIMO CORTE', 'CORTE'],
-            clasificacion: ['CLASIFICACION', 'CATEGORIA', 'TIPO'],
+            clasificacion: ['CLASIFICACION', 'CATEGORIA'], 
             placa: ['PLACA', 'VEHICULO'],
             longitud: ['LONGITUD'],
             latitud: ['LATITUD']
@@ -246,7 +246,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             const producto = idxProd >= 0 ? String(rowArr[idxProd] || '').trim() : 'GENERAL';
             
             if (i < headerRowIndex + 5) {
-                console.log(`[GRUPO-INTER] Fila ${i}: Doc='${numero_documento}', Cliente='${idxClient >= 0 ? rowArr[idxClient] : 'N/A'}'`);
+                console.log(`[GRUPO-INTER] Fila ${i}: Doc='${numero_documento}', Cliente='${idxClient >= 0 ? rowArr[idxClient] : 'N/A'}', Clasif='${idxClasif >= 0 ? rowArr[idxClasif] : 'N/A'}'`);
             }
 
             if (!numero_documento) continue;
