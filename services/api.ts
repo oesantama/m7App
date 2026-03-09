@@ -620,6 +620,15 @@ export const api = {
       headers: {} // fetchJson manejará el token
     });
   },
+  uploadGrupoInterManifestExcel: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchJson(`${API_URL}/grupo-inter/upload-manifest-excel`, {
+      method: 'POST',
+      body: formData,
+      headers: {}
+    });
+  },
   updateGrupoInterStatus: (id: string, data: { estado: string, observacion?: string, usuario: string }) => fetchJson(`${API_URL}/grupo-inter/status/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

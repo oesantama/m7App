@@ -327,6 +327,128 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
     }
 };
 
+export const uploadManifestExcel = async (req: Request, res: Response): Promise<void> => {
+    try {
+        if (!req.file) {
+            res.status(400).json({ message: 'No se ha subido ningún archivo' });
+            return;
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        if (rows.length < 2) {
+            res.status(400).json({ message: 'El archivo está vacío' });
+            return;
+        }
+
+        const normalize = (val: string) => val.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+        
+        // Buscar encabezados
+        let headerRowIndex = -1;
+        const aliases = {
+            doc: ['DOCUMENTO', 'REMISION', 'PLANILLA', 'PEDIDO', 'NRO DOCUMENTO', 'ORDEN'],
+            manifiesto: ['MANIFIESTO', 'NRO MANIFIESTO'],
+            planilla: ['NUMERO DE PLANILLA', 'PLANILLA', 'NRO PLANILLA'],
+            fecha: ['FECHA DE VIAJE', 'FECHA VIAJE', 'FECHA'],
+            ruta: ['RUTA', 'DESTINO', 'VÍA'],
+            placa: ['PLACA', 'VEHICULO'],
+            flete: ['VALOR FLETE', 'FLETE', 'VALOR'],
+            factura: ['NO. FACTURA M7', 'FACTURA M7', 'FACTURA', 'NRO FACTURA']
+        };
+
+        const identifyAliases = [...aliases.doc, ...aliases.manifiesto].map(a => normalize(a));
+        for (let i = 0; i < Math.min(rows.length, 25); i++) {
+            const currentRow = (rows[i] || []).map(cell => normalize(String(cell)));
+            if (currentRow.some(cell => identifyAliases.some(alias => cell.includes(alias)))) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+
+        if (headerRowIndex === -1) {
+            res.status(400).json({ message: 'Formato complementario no reconocido. Faltan encabezados (Manifiesto, Planilla, etc.)' });
+            return;
+        }
+
+        const headerRow = (rows[headerRowIndex] || []).map(cell => normalize(String(cell)));
+        const getColIndex = (list: string[]) => {
+            const normalized = list.map(a => normalize(a));
+            return headerRow.findIndex(cell => normalized.some(alias => cell === alias || cell.includes(alias)));
+        };
+
+        const idxDoc = getColIndex(aliases.doc);
+        const idxMan = getColIndex(aliases.manifiesto);
+        const idxPlan = getColIndex(aliases.planilla);
+        const idxFecha = getColIndex(aliases.fecha);
+        const idxRuta = getColIndex(aliases.ruta);
+        const idxPlaca = getColIndex(aliases.placa);
+        const idxFlete = getColIndex(aliases.flete);
+        const idxFact = getColIndex(aliases.factura);
+
+        if (idxDoc === -1) {
+            res.status(400).json({ message: 'No se encontró la columna de referencia (Documento/Remisión)' });
+            return;
+        }
+
+        let updatedCount = 0;
+        const parseNum = (val: any) => {
+            if (val === undefined || val === null || val === '') return 0;
+            const clean = String(val).replace(/[^0-9.,-]/g, '').replace(',', '.');
+            return parseFloat(clean) || 0;
+        };
+
+        const parseExcelDate = (val: any) => {
+            if (!val) return null;
+            try {
+                if (typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
+                const d = new Date(val);
+                return isNaN(d.getTime()) ? null : d;
+            } catch (e) { return null; }
+        };
+
+        for (let i = headerRowIndex + 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || !row[idxDoc]) continue;
+
+            const doc = String(row[idxDoc]).trim();
+            const manifiesto = idxMan >= 0 ? String(row[idxMan] || '').trim() : '';
+            const planilla = idxPlan >= 0 ? String(row[idxPlan] || '').trim() : '';
+            const fecha = idxFecha >= 0 ? parseExcelDate(row[idxFecha]) : null;
+            const ruta = idxRuta >= 0 ? String(row[idxRuta] || '').trim() : '';
+            const placa = idxPlaca >= 0 ? String(row[idxPlaca] || '').trim() : '';
+            const flete = idxFlete >= 0 ? parseNum(row[idxFlete]) : 0;
+            const factura = idxFact >= 0 ? String(row[idxFact] || '').trim() : '';
+
+            const result = await pool.query(`
+                UPDATE grupo_inter_pedidos 
+                SET manifiesto = $1, 
+                    numero_planilla = $2, 
+                    fecha_viaje = $3, 
+                    ruta = $4, 
+                    placa = COALESCE(NULLIF($5, ''), placa), 
+                    valor_flete = $6, 
+                    no_factura_m7 = $7,
+                    update_at = CURRENT_TIMESTAMP
+                WHERE numero_documento = $8
+                RETURNING id
+            `, [manifiesto, planilla, fecha, ruta, placa, flete, factura, doc]);
+
+            if (result.rowCount && result.rowCount > 0) {
+                updatedCount++;
+            }
+        }
+
+        res.json({ message: `Carga complementaria finalizada. Se actualizaron ${updatedCount} registros.`, count: updatedCount });
+
+    } catch (error) {
+        console.error('[GRUPO-INTER] Error en carga complementaria:', error);
+        res.status(500).json({ message: 'Error interno al procesar el segundo archivo' });
+    }
+};
+
 export const processPDF = async (req: any, res: Response): Promise<void> => {
     try {
         if (!req.file) {
