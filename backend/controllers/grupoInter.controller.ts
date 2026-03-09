@@ -18,9 +18,36 @@ const ensureSchema = async () => {
     if (schemaChecked) return;
     try {
         await pool.query(`
+            -- Columnas base para pedidos
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_by TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS numero_planilla TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS fecha_viaje TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS no_factura_m7 TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS valor_flete NUMERIC(15,2) DEFAULT 0;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS placa TEXT;
+
+            -- Tabla de Novedades
+            CREATE TABLE IF NOT EXISTS grupo_inter_novedades (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
+                tipo TEXT NOT NULL,
+                observacion TEXT,
+                fecha TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                usuario TEXT
+            );
+
+            -- Tabla de Reajustes
+            CREATE TABLE IF NOT EXISTS grupo_inter_reajustes (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
+                numero_documento TEXT,
+                valor NUMERIC(15,2),
+                notas TEXT,
+                fecha TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                usuario TEXT
+            );
         `);
         schemaChecked = true;
     } catch (e) {
@@ -451,6 +478,11 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
                 updatedCount++;
             }
         }
+    } catch (error) {
+        console.error('[GRUPO-INTER] Error en carga complementaria:', error);
+        res.status(500).json({ message: 'Error interno al procesar el segundo archivo' });
+    }
+};
 
 // --- NOVEDADES ---
 export const getNovedades = async (req: Request, res: Response): Promise<void> => {
@@ -500,11 +532,6 @@ export const addReajuste = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
-    } catch (error) {
-        console.error('[GRUPO-INTER] Error en carga complementaria:', error);
-        res.status(500).json({ message: 'Error interno al procesar el segundo archivo' });
-    }
-};
 
 export const processPDF = async (req: any, res: Response): Promise<void> => {
     try {
