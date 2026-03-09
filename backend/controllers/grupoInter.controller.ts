@@ -12,6 +12,22 @@ const getAPIKeysPool = (): string[] => {
     return rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
 };
 
+// Variable para el pool de base de datos garantizando columnas base
+let schemaChecked = false;
+const ensureSchema = async () => {
+    if (schemaChecked) return;
+    try {
+        await pool.query(`
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_by TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+        `);
+        schemaChecked = true;
+    } catch (e) {
+        console.error('[GRUPO-INTER] Error al normalizar esquema:', e);
+    }
+};
+
 // Variable para rastrear qué llave estamos usando (Round Robin)
 let currentKeyIndex = 0;
 
@@ -126,6 +142,7 @@ async function generateContentWithRetry(model: any, promptData: any, sendProgres
 
 export const uploadExcel = async (req: any, res: Response): Promise<void> => {
     try {
+        await ensureSchema();
         if (!req.file) {
             res.status(400).json({ message: 'No se subió ningún archivo' });
             return;
@@ -252,37 +269,59 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
 
             if (!numero_documento) continue;
 
-            // 1. Manejo de Cabecera (UPSERT)
-            const queryHeader = `
-                INSERT INTO grupo_inter_pedidos (
-                    numero_documento, nit, cliente, direccion, notas_encabezado, 
-                    municipio_destino, empresa, f_ultimo_corte, 
-                    clasificacion, placa, longitud, latitud, estado, create_by, update_by, fecha_carge
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Pendiente', $13, $13, CURRENT_TIMESTAMP)
-                ON CONFLICT (numero_documento) DO UPDATE SET
-                    update_by = EXCLUDED.update_by,
-                    update_at = CURRENT_TIMESTAMP
-                RETURNING id;
-            `;
-
-            const valuesHeader = [
-                numero_documento,
-                idxNit >= 0 ? String(rowArr[idxNit] || '').trim() : '',
-                idxClient >= 0 ? String(rowArr[idxClient] || '').trim() : '',
-                idxDir >= 0 ? String(rowArr[idxDir] || '').trim() : '',
-                idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
-                idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
-                idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
-                idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
-                idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
-                idxPlaca >= 0 ? String(rowArr[idxPlaca] || '').trim() : '',
-                parseNum(idxLong >= 0 ? rowArr[idxLong] : null),
-                parseNum(idxLat >= 0 ? rowArr[idxLat] : null),
-                username
-            ];
-
-            const headerRes = await pool.query(queryHeader, valuesHeader);
-            const pedidoId = headerRes.rows[0].id;
+            // 1. Manejo de Cabecera (Búsqueda y Actualización/Inserción)
+            let pedidoId: number;
+            const existingRes = await pool.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [numero_documento]);
+            
+            if (existingRes.rows.length > 0) {
+                pedidoId = existingRes.rows[0].id;
+                await pool.query(`
+                    UPDATE grupo_inter_pedidos SET
+                        nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5, 
+                        municipio_destino = $6, empresa = $7, f_ultimo_corte = $8, 
+                        clasificacion = $9, placa = $10, longitud = $11, latitud = $12,
+                        update_by = $13, update_at = CURRENT_TIMESTAMP
+                    WHERE id = $1;
+                `, [
+                    pedidoId,
+                    idxNit >= 0 ? String(rowArr[idxNit] || '').trim() : '',
+                    idxClient >= 0 ? String(rowArr[idxClient] || '').trim() : '',
+                    idxDir >= 0 ? String(rowArr[idxDir] || '').trim() : '',
+                    idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
+                    idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
+                    idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
+                    idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
+                    idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
+                    idxPlaca >= 0 ? String(rowArr[idxPlaca] || '').trim() : '',
+                    parseNum(idxLong >= 0 ? rowArr[idxLong] : null),
+                    parseNum(idxLat >= 0 ? rowArr[idxLat] : null),
+                    username
+                ]);
+            } else {
+                const insertRes = await pool.query(`
+                    INSERT INTO grupo_inter_pedidos (
+                        numero_documento, nit, cliente, direccion, notas_encabezado, 
+                        municipio_destino, empresa, f_ultimo_corte, 
+                        clasificacion, placa, longitud, latitud, estado, create_by, update_by, fecha_carge
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Pendiente', $13, $13, CURRENT_TIMESTAMP)
+                    RETURNING id;
+                `, [
+                    numero_documento,
+                    idxNit >= 0 ? String(rowArr[idxNit] || '').trim() : '',
+                    idxClient >= 0 ? String(rowArr[idxClient] || '').trim() : '',
+                    idxDir >= 0 ? String(rowArr[idxDir] || '').trim() : '',
+                    idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
+                    idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
+                    idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
+                    idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
+                    idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
+                    idxPlaca >= 0 ? String(rowArr[idxPlaca] || '').trim() : '',
+                    parseNum(idxLong >= 0 ? rowArr[idxLong] : null),
+                    parseNum(idxLat >= 0 ? rowArr[idxLat] : null),
+                    username
+                ]);
+                pedidoId = insertRes.rows[0].id;
+            }
             savedCount++;
 
             // 1.5 Registro de histórico inicial (Pendiente) si es nuevo o no tiene histórico
