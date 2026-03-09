@@ -18,15 +18,30 @@ const ensureSchema = async () => {
     if (schemaChecked) return;
     try {
         await pool.query(`
-            -- Columnas base para pedidos
-            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+            -- Normalización de timestamps y limpieza
+            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS created_at;
+            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS history;
+            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS producto;
+            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS tipo_articulo;
+            
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS create_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_at TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE grupo_inter_pedidos ALTER COLUMN update_at DROP DEFAULT;
+            
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_by TEXT;
-            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS numero_planilla TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS fecha_viaje TIMESTAMP WITH TIME ZONE;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS no_factura_m7 TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS valor_flete NUMERIC(15,2) DEFAULT 0;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS placa TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS direccion TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS notas_encabezado TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS f_ultimo_corte TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS clasificacion TEXT;
+            -- Totales existentes (asegurar)
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS cantidad NUMERIC DEFAULT 0;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS valor_declarado NUMERIC DEFAULT 0;
 
             -- Tabla de Novedades
             CREATE TABLE IF NOT EXISTS grupo_inter_novedades (
@@ -189,12 +204,12 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             numero_documento: ['NUMERO DOCUMENTO', 'NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'PEDIDO', 'NRO PEDIDO', 'ORDEN'],
             nit: ['NIT CLIENTE', 'NIT', 'IDENTIFICACION'],
             cliente: ['NOMBRE CLIENTE', 'CLIENTE', 'RAZON SOCIAL'],
-            direccion: ['DIRECCION', 'DIRECCION ENTREGA'],
-            notas_encabezado: ['NOTAS', 'OBSERVACIONES'],
+            direccion: ['DIRECCION', 'DIRECCION ENTREGA', 'DIR'],
+            notas_encabezado: ['NOTAS', 'OBSERVACIONES', 'OBS'],
             municipio_destino: ['MUNICIPIO', 'CIUDAD', 'DESTINO'],
             producto: ['PRODUCTO', 'ARTICULO', 'DESCRIPCION'],
             cantidad_total: ['CANTIDAD', 'CANT'],
-            precio_total: ['PRECIO TOTAL', 'VALOR TOTAL', 'TOTAL', 'SUBTOTAL'],
+            precio_total: ['PRECIO TOTAL', 'VALOR TOTAL', 'TOTAL', 'SUBTOTAL', 'VALOR DECLARADO'],
             tipo_articulo: ['TIPO ARTICULO', 'CATEGORIA'],
             empresa: ['EMPRESA', 'UNIDAD NEGOCIO'],
             peso_total_prod: ['PESO', 'KILOS'],
@@ -292,7 +307,8 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                             nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5, 
                             municipio_destino = $6, empresa = $7, f_ultimo_corte = $8, 
                             clasificacion = $9, placa = $10, valor_flete = $11, numero_planilla = $12,
-                            update_by = $13, update_at = CURRENT_TIMESTAMP
+                            peso = $13, cantidad = $14, valor_declarado = $15,
+                            update_by = $16, update_at = CURRENT_TIMESTAMP
                         WHERE id = $1;
                     `, [
                         pedidoId,
@@ -307,6 +323,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         placa,
                         fleteProporcional,
                         planilla || '',
+                        idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
+                        idxCant >= 0 ? parseNum(rowArr[idxCant]) : 0,
+                        idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0,
                         username
                     ]);
                 } else {
@@ -314,8 +333,10 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         INSERT INTO grupo_inter_pedidos (
                             numero_documento, nit, cliente, direccion, notas_encabezado, 
                             municipio_destino, empresa, f_ultimo_corte, 
-                            clasificacion, placa, valor_flete, numero_planilla, estado, create_by, update_by, fecha_carge
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Pendiente', $13, $13, CURRENT_TIMESTAMP)
+                            clasificacion, placa, valor_flete, numero_planilla, 
+                            peso, cantidad, valor_declarado,
+                            estado, create_by, fecha_carge
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP)
                         RETURNING id;
                     `, [
                         doc,
@@ -330,6 +351,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         placa,
                         fleteProporcional,
                         planilla || '',
+                        idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
+                        idxCant >= 0 ? parseNum(rowArr[idxCant]) : 0,
+                        idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0,
                         username
                     ]);
                     pedidoId = insertRes.rows[0].id;
