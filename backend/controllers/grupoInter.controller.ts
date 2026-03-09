@@ -453,7 +453,7 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
         }
 
 // --- NOVEDADES ---
-const getNovedades = async (req: Request, res: Response): Promise<void> => {
+export const getNovedades = async (req: Request, res: Response): Promise<void> => {
     try {
         const { pedido_id } = req.params;
         const result = await pool.query('SELECT * FROM grupo_inter_novedades WHERE pedido_id = $1 ORDER BY fecha DESC', [pedido_id]);
@@ -463,7 +463,7 @@ const getNovedades = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-const addNovedad = async (req: Request, res: Response): Promise<void> => {
+export const addNovedad = async (req: Request, res: Response): Promise<void> => {
     try {
         const { pedido_id, tipo, observacion, usuario } = req.body;
         await pool.query(
@@ -477,7 +477,7 @@ const addNovedad = async (req: Request, res: Response): Promise<void> => {
 };
 
 // --- REAJUSTES ---
-const getReajustes = async (req: Request, res: Response): Promise<void> => {
+export const getReajustes = async (req: Request, res: Response): Promise<void> => {
     try {
         const { pedido_id } = req.params;
         const result = await pool.query('SELECT * FROM grupo_inter_reajustes WHERE pedido_id = $1 ORDER BY fecha DESC', [pedido_id]);
@@ -487,7 +487,7 @@ const getReajustes = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
-const addReajuste = async (req: Request, res: Response): Promise<void> => {
+export const addReajuste = async (req: Request, res: Response): Promise<void> => {
     try {
         const { pedido_id, numero_documento, valor, notas, usuario } = req.body;
         await pool.query(
@@ -677,27 +677,13 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 500';
         const result = await pool.query(query, values);
         res.json(result.rows);
+    } catch (error) {
         res.status(500).json({ message: 'Error al obtener pedidos' });
     }
 };
 
-// --- EXPORTACIÓN FINAL UNIFICADA ---
-export {
-    ensureSchema,
-    uploadExcel,
-    uploadManifestExcel,
-    processPDF,
-    getOrders,
-    updateStatus,
-    getOrderDetails,
-    getNovedades,
-    addNovedad,
-    getReajustes,
-    addReajuste,
-    getOrdersPublicListSecure
-};
-
-const getOrdersPublicListSecure = async (req: Request, res: Response): Promise<void> => {
+// --- EXPORTACIÓN PÚBLICA ---
+export const getOrdersPublicListSecure = async (req: Request, res: Response): Promise<void> => {
     try {
         const token = req.query.token || req.headers['x-public-token'];
         const MASTER_TOKEN = process.env.PUBLIC_API_TOKEN || 'M7-SECURE-2026-XQW';
