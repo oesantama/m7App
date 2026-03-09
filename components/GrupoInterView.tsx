@@ -38,6 +38,8 @@ interface Order {
   fecha_entregado: string | null;
   fecha_carge: string;
   create_at: string;
+  create_by?: string;
+  update_at?: string;
 }
 
 const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
@@ -95,8 +97,10 @@ const GrupoInterView: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchOrders(searchTerm);
-  }, [filters]);
+    if (activeTab === 'gestion') {
+      fetchOrders(searchTerm);
+    }
+  }, [activeTab, filters]);
 
   const fetchOrders = async (query = '') => {
     try {
@@ -153,13 +157,17 @@ const GrupoInterView: React.FC = () => {
     try {
       setLoading(true);
       const res = await api.uploadGrupoInterExcel(excelFile, user?.name || 'System');
-      toast.success(res.message || 'Excel procesado con éxito');
+      if (res.duplicates > 0) {
+        toast.warning(`Sincronizado: ${res.count} nuevos. Se omitieron ${res.duplicates} duplicados.`);
+      } else {
+        toast.success(res.message || 'Excel procesado con éxito');
+      }
       setExcelFile(null);
       setPreviewData([]);
       setShowPreviewModal(false);
       fetchOrders(searchTerm);
     } catch (error: any) {
-      toast.error(error.message || 'Error al subir Excel');
+      toast.error(error.message || error.error || 'Error al subir Excel');
     } finally {
       setLoading(false);
     }
@@ -243,6 +251,36 @@ const GrupoInterView: React.FC = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    try {
+      if (orders.length === 0) {
+        toast.error('No hay datos para exportar');
+        return;
+      }
+      const exportData = orders.map(o => ({
+        'Número Documento': o.numero_documento,
+        'Número Guía': o.numero_guia || '-',
+        'Fct. Último Corte': o.f_ultimo_corte ? new Date(o.f_ultimo_corte).toLocaleDateString() : '-',
+        'NIT Cliente': o.nit,
+        'Nombre Cliente': o.cliente,
+        'Dirección': o.direccion,
+        'Municipio Destino': o.municipio_destino,
+        'Manual': o.producto,
+        'Clasificación': o.clasificacion,
+        'Estado': o.estado,
+        'Fecha Carga': new Date(o.fecha_carge).toLocaleString()
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Gestión Grupo Inter");
+      XLSX.writeFile(wb, `Grupo_Inter_Gestion_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success('Excel exportado correctamente');
+    } catch (error) {
+      toast.error('Error al exportar');
+    }
+  };
+
   const openDetail = async (order: Order) => {
     setSelectedOrder(order);
     setShowDetailModal(true);
@@ -285,7 +323,7 @@ const GrupoInterView: React.FC = () => {
   ) || [];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 font-sans">
+    <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
@@ -368,8 +406,8 @@ const GrupoInterView: React.FC = () => {
           </div>
         ) : (
           <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-            <div className="p-8 border-b border-slate-100 bg-slate-50/30 flex flex-col md:flex-row gap-6 items-end">
-              <div className="flex-1 flex gap-4 w-full">
+            <div className="p-8 border-b border-slate-100 bg-slate-50/30 flex flex-col md:flex-row gap-6 items-end justify-between">
+              <div className="flex-1 flex flex-col md:flex-row gap-4 w-full items-end">
                 <div className="flex-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Rango de Consulta</label>
                   <div className="flex gap-2 bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
@@ -377,12 +415,46 @@ const GrupoInterView: React.FC = () => {
                     <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none" value={filters.fechaCorteHasta} onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})} />
                   </div>
                 </div>
-                <div className="w-64 relative group">
+
+                <button 
+                  onClick={() => {
+                    const today = new Date();
+                    const eightDaysAgo = new Date();
+                    eightDaysAgo.setDate(today.getDate() - 8);
+                    setFilters({
+                      ...filters,
+                      fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0],
+                      fechaCorteHasta: today.toISOString().split('T')[0]
+                    });
+                  }}
+                  className="px-6 py-3.5 bg-amber-50 text-amber-600 rounded-2xl text-[10px] font-black flex items-center gap-2 hover:bg-amber-100 transition-all border border-amber-100/50 uppercase tracking-widest"
+                >
+                  <Clock size={16} /> ÚLTIMOS 8 DÍAS
+                </button>
+
+                <div className="w-full md:w-64 relative group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="text" placeholder="Búsqueda..." className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)} />
+                  <input 
+                    type="text" 
+                    placeholder="Búsqueda global..." 
+                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)} 
+                  />
                 </div>
               </div>
-              <button onClick={() => fetchOrders(searchTerm)} className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-lg shadow-slate-200">Consultar</button>
+
+              <div className="flex gap-3">
+                <button onClick={() => fetchOrders(searchTerm)} className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-lg shadow-slate-200 active:scale-95">Consultar</button>
+                <button 
+                    onClick={() => handleExportExcel()}
+                    className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl font-black hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+                    title="Exportar a Excel"
+                  >
+                    <FileSpreadsheet size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -390,21 +462,23 @@ const GrupoInterView: React.FC = () => {
                 <thead className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 tracking-wider border-b">
                   <tr>
                     <th className="px-6 py-4">Documento</th>
+                    <th className="px-6 py-4">Fct. Último C.</th>
                     <th className="px-6 py-4">Cliente / NIT</th>
-                    <th className="px-6 py-4">Municipio / Destino</th>
+                    <th className="px-6 py-4">Dirección / Destino</th>
                     <th className="px-6 py-4">Estado</th>
                     <th className="px-6 py-4 text-right">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50 text-xs">
+                <tbody className="divide-y divide-slate-50 text-xs text-slate-600">
                   {loading ? (
-                    <tr><td colSpan={5} className="py-20 text-center text-slate-400 font-medium">Buscando datos en Orbit...</td></tr>
+                    <tr><td colSpan={6} className="py-20 text-center text-slate-400 font-medium">Sincronizando con Orbit...</td></tr>
                   ) : orders.length === 0 ? (
-                    <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-medium">Sin registros encontrados</td></tr>
+                    <tr><td colSpan={6} className="py-20 text-center text-slate-300 font-medium">Sin registros encontrados</td></tr>
                   ) : (
                     orders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => (
                       <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 font-bold text-slate-900">{order.numero_documento}</td>
+                        <td className="px-6 py-4 font-medium">{order.f_ultimo_corte ? new Date(order.f_ultimo_corte).toLocaleDateString() : '-'}</td>
                         <td className="px-6 py-4">
                            <div className="flex flex-col">
                              <span className="font-bold text-slate-800">{order.cliente}</span>
@@ -413,7 +487,7 @@ const GrupoInterView: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                            <div className="flex flex-col">
-                             <span className="text-slate-600 font-medium truncate max-w-[180px]">{order.direccion}</span>
+                             <span className="text-slate-600 font-medium truncate max-w-[200px]">{order.direccion === ' ' ? '' : order.direccion}</span>
                              <span className="text-[10px] text-blue-500 font-black tracking-tight">{order.municipio_destino}</span>
                            </div>
                         </td>
@@ -423,7 +497,20 @@ const GrupoInterView: React.FC = () => {
                           }`}>{order.estado || 'Pendiente'}</span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button onClick={() => openDetail(order)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition shadow-sm"><Eye size={16} /></button>
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={() => openDetail(order)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition shadow-sm" title="Ver Detalle"><Eye size={18} /></button>
+                            <button 
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  setNewStatus({ estado: order.estado || '', observacion: '' });
+                                  setShowStatusModal(true);
+                                }}
+                                className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all shadow-sm"
+                                title="Cambiar Estado"
+                              >
+                                <Clock size={18} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -432,7 +519,24 @@ const GrupoInterView: React.FC = () => {
               </table>
             </div>
             
-            <div className="p-6 bg-slate-50 flex items-center justify-between border-t">
+            <div className="p-6 bg-slate-50 flex items-center justify-between border-t gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                  <span className="text-sm text-slate-500 font-medium">Mostrar</span>
+                  <select 
+                    className="p-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value={5}>5 registros</option>
+                    <option value={10}>10 registros</option>
+                    <option value={20}>20 registros</option>
+                    <option value={50}>50 registros</option>
+                    <option value={10000}>Todos</option>
+                  </select>
+                </div>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
                 Página {currentPage} de {Math.ceil(orders.length / itemsPerPage)}
               </div>
@@ -503,22 +607,26 @@ const GrupoInterView: React.FC = () => {
                              </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-50 font-medium">
-                             {filteredItems.slice((currentPageItems-1)*itemsPerPageModal, currentPageItems*itemsPerPageModal).map((item, i) => (
-                               <tr key={i}>
-                                 <td className="px-4 py-2 text-blue-600 font-bold">{item.remision || '-'}</td>
-                                 <td className="px-4 py-2">{item.producto}</td>
-                                 <td className="px-4 py-2">{item.cantidad}</td>
-                                 <td className="px-4 py-2 font-bold">{item.peso_prod} Kg</td>
-                               </tr>
-                             ))}
+                             {filteredItems.length > 0 ? (
+                               filteredItems.slice((currentPageItems-1)*itemsPerPageModal, currentPageItems*itemsPerPageModal).map((item, i) => (
+                                <tr key={i}>
+                                  <td className="px-4 py-2 text-blue-600 font-bold">{item.remision || '-'}</td>
+                                  <td className="px-4 py-2">{item.producto}</td>
+                                  <td className="px-4 py-2">{item.cantidad}</td>
+                                  <td className="px-4 py-2 font-bold">{item.peso_prod} Kg</td>
+                                </tr>
+                              ))
+                             ) : (
+                               <tr><td colSpan={4} className="py-20 text-center text-slate-300">Sin productos</td></tr>
+                             )}
                            </tbody>
                         </table>
                       </div>
                       <div className="p-3 bg-slate-50 border-t flex justify-between items-center">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Item {currentPageItems} de {Math.ceil(filteredItems.length / itemsPerPageModal)}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">Item {filteredItems.length > 0 ? currentPageItems : 0} de {Math.ceil(filteredItems.length / itemsPerPageModal)}</span>
                         <div className="flex gap-2">
-                          <button disabled={currentPageItems === 1} onClick={() => setCurrentPageItems(p => p - 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30"><ChevronRight size={12} className="rotate-180"/></button>
-                          <button disabled={currentPageItems >= Math.ceil(filteredItems.length / itemsPerPageModal)} onClick={() => setCurrentPageItems(p => p + 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30"><ChevronRight size={12}/></button>
+                          <button disabled={currentPageItems === 1} onClick={() => setCurrentPageItems(p => p - 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30 hover:bg-slate-100"><ChevronRight size={12} className="rotate-180"/></button>
+                          <button disabled={currentPageItems >= Math.ceil(filteredItems.length / itemsPerPageModal)} onClick={() => setCurrentPageItems(p => p + 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30 hover:bg-slate-100"><ChevronRight size={12}/></button>
                         </div>
                       </div>
                    </div>
@@ -536,22 +644,26 @@ const GrupoInterView: React.FC = () => {
                              </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-50 font-medium">
-                             {(orderDetails?.history || []).slice((currentPageHistorico-1)*itemsPerPageModal, currentPageHistorico*itemsPerPageModal).map((log, i) => (
-                               <tr key={i}>
-                                 <td className="px-4 py-2 whitespace-nowrap">{new Date(log.fecha || log.update_at).toLocaleString()}</td>
-                                 <td className="px-4 py-2"><span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">{log.estado || log.new_status}</span></td>
-                                 <td className="px-4 py-2 italic text-slate-400">{log.observacion || '-'}</td>
-                                 <td className="px-4 py-2 font-bold">{log.usuario || log.update_by}</td>
-                               </tr>
-                             ))}
+                             {orderDetails?.history && orderDetails.history.length > 0 ? (
+                               orderDetails.history.slice((currentPageHistorico-1)*itemsPerPageModal, currentPageHistorico*itemsPerPageModal).map((log, i) => (
+                                <tr key={i}>
+                                  <td className="px-4 py-2 whitespace-nowrap">{new Date(log.fecha || log.update_at).toLocaleString()}</td>
+                                  <td className="px-4 py-2"><span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">{log.estado || log.new_status}</span></td>
+                                  <td className="px-4 py-2 italic text-slate-400 max-w-[150px] truncate">{log.observacion || '-'}</td>
+                                  <td className="px-4 py-2 font-bold">{log.usuario || log.update_by}</td>
+                                </tr>
+                              ))
+                             ) : (
+                               <tr><td colSpan={4} className="py-20 text-center text-slate-300">Sin historial registrado</td></tr>
+                             )}
                            </tbody>
                         </table>
                       </div>
                       <div className="p-3 bg-slate-50 border-t flex justify-between items-center">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Pág {currentPageHistorico} de {Math.ceil((orderDetails?.history || []).length / itemsPerPageModal)}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">Pág {orderDetails?.history ? currentPageHistorico : 0} de {Math.ceil((orderDetails?.history || []).length / itemsPerPageModal)}</span>
                         <div className="flex gap-2">
-                          <button disabled={currentPageHistorico === 1} onClick={() => setCurrentPageHistorico(p => p - 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30"><ChevronRight size={12} className="rotate-180"/></button>
-                          <button disabled={currentPageHistorico >= Math.ceil((orderDetails?.history || []).length / itemsPerPageModal)} onClick={() => setCurrentPageHistorico(p => p + 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30"><ChevronRight size={12}/></button>
+                          <button disabled={currentPageHistorico === 1} onClick={() => setCurrentPageHistorico(p => p - 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30 hover:bg-slate-100"><ChevronRight size={12} className="rotate-180"/></button>
+                          <button disabled={currentPageHistorico >= Math.ceil((orderDetails?.history || []).length / itemsPerPageModal)} onClick={() => setCurrentPageHistorico(p => p + 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30 hover:bg-slate-100"><ChevronRight size={12}/></button>
                         </div>
                       </div>
                    </div>
@@ -576,6 +688,7 @@ const GrupoInterView: React.FC = () => {
                     <option value="En Ruta">En Ruta</option>
                     <option value="Entregado">Entregado</option>
                     <option value="Novedad">Novedad</option>
+                    <option value="Devolución">Devolución</option>
                   </select>
                 </div>
                 <div>
@@ -595,25 +708,27 @@ const GrupoInterView: React.FC = () => {
       {showPreviewModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
            <div className="bg-white w-[95vw] max-w-7xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-              <div className="p-6 border-b flex justify-between items-center">
+              <div className="p-6 border-b flex justify-between items-center px-8">
                  <h2 className="text-2xl font-black text-slate-900">Previsualización Carga 1 (Pedidos)</h2>
                  <button onClick={() => setShowPreviewModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24}/></button>
               </div>
-              <div className="flex-1 overflow-auto bg-slate-50 p-4">
-                 <table className="w-full text-[10px] text-left">
-                    <thead className="bg-slate-200 sticky top-0 font-black uppercase text-slate-600 border-b">
-                       <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-2 px-3">{k}</th>)}</tr>
+              <div className="flex-1 overflow-auto bg-slate-50 p-6">
+                 <table className="w-full text-[10px] text-left border-collapse bg-white rounded-xl overflow-hidden shadow-sm">
+                    <thead className="bg-slate-100 sticky top-0 font-black uppercase text-slate-600 border-b">
+                       <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-3 px-4 whitespace-nowrap">{k}</th>)}</tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200">
+                    <tbody className="divide-y divide-slate-100">
                        {previewData.slice(0, 100).map((r, i) => (
-                         <tr key={i} className="hover:bg-white transition-colors">{Object.values(r).map((v:any, j) => <td key={j} className="p-2 px-3 text-slate-500 truncate max-w-[150px]">{String(v)}</td>)}</tr>
+                         <tr key={i} className="hover:bg-blue-50/30 transition-colors">
+                           {Object.values(r).map((v:any, j) => <td key={j} className="p-3 px-4 text-slate-500 truncate max-w-[200px]">{String(v)}</td>)}
+                         </tr>
                        ))}
                     </tbody>
                  </table>
               </div>
-              <div className="p-6 bg-white border-t flex justify-end gap-4">
-                 <button onClick={() => setShowPreviewModal(false)} className="px-8 py-3 border border-slate-100 rounded-xl font-bold text-slate-400 hover:bg-slate-50">Cancelar</button>
-                 <button onClick={handleExcelUpload} disabled={loading} className="px-12 py-3 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-xl shadow-emerald-100">Confirmar Carga</button>
+              <div className="p-6 bg-white border-t flex justify-end gap-4 px-8">
+                 <button onClick={() => setShowPreviewModal(false)} className="px-8 py-3 border border-slate-200 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition">Cancelar</button>
+                 <button onClick={handleExcelUpload} disabled={loading} className="px-12 py-3 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-xl shadow-emerald-100 active:scale-95 disabled:opacity-50">{loading ? 'Procesando...' : 'Confirmar Carga'}</button>
               </div>
            </div>
         </div>
@@ -623,25 +738,27 @@ const GrupoInterView: React.FC = () => {
       {showManifestPreview && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
            <div className="bg-white w-[95vw] max-w-7xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-              <div className="p-6 border-b flex justify-between items-center">
+              <div className="p-6 border-b flex justify-between items-center px-8">
                  <h2 className="text-2xl font-black text-slate-900">Previsualización Carga 2 (Logística)</h2>
                  <button onClick={() => setShowManifestPreview(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24}/></button>
               </div>
-              <div className="flex-1 overflow-auto bg-slate-50 p-4">
-                 <table className="w-full text-[10px] text-left">
-                    <thead className="bg-slate-200 sticky top-0 font-black uppercase text-slate-600 border-b">
-                       <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-2 px-3">{k}</th>)}</tr>
+              <div className="flex-1 overflow-auto bg-slate-50 p-6">
+                 <table className="w-full text-[10px] text-left border-collapse bg-white rounded-xl overflow-hidden shadow-sm">
+                    <thead className="bg-slate-100 sticky top-0 font-black uppercase text-slate-600 border-b">
+                       <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-3 px-4 whitespace-nowrap">{k}</th>)}</tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200">
+                    <tbody className="divide-y divide-slate-100">
                        {previewData.slice(0, 100).map((r, i) => (
-                         <tr key={i} className="hover:bg-white transition-colors">{Object.values(r).map((v:any, j) => <td key={j} className="p-2 px-3 text-slate-500 truncate max-w-[150px]">{String(v)}</td>)}</tr>
+                         <tr key={i} className="hover:bg-blue-50/30 transition-colors">
+                           {Object.values(r).map((v:any, j) => <td key={j} className="p-3 px-4 text-slate-500 truncate max-w-[200px]">{String(v)}</td>)}
+                         </tr>
                        ))}
                     </tbody>
                  </table>
               </div>
-              <div className="p-6 bg-white border-t flex justify-end gap-4">
-                 <button onClick={() => setShowManifestPreview(false)} className="px-8 py-3 border border-slate-100 rounded-xl font-bold text-slate-400 hover:bg-slate-50">Cancelar</button>
-                 <button onClick={handleManifestUpload} disabled={loading} className="px-12 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-xl shadow-blue-100">Actualizar Logística</button>
+              <div className="p-6 bg-white border-t flex justify-end gap-4 px-8">
+                 <button onClick={() => setShowManifestPreview(false)} className="px-8 py-3 border border-slate-200 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition">Cancelar</button>
+                 <button onClick={handleManifestUpload} disabled={loading} className="px-12 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50">{loading ? 'Actualizando...' : 'Actualizar Logística'}</button>
               </div>
            </div>
         </div>
@@ -660,13 +777,13 @@ const GrupoInterView: React.FC = () => {
                  <p>Para cargar correctamente, su archivo Excel debe tener los siguientes encabezados en la primera fila:</p>
                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 font-mono text-[10px] leading-6">
                     {showGuideModal === 'operacion' ? (
-                       <span className="text-emerald-600 font-bold underline">NUMERO DOCUMENTO, NIT CLIENTE, CLIENTE, PRODUCTO, CANTIDAD, PESO</span>
+                       <span className="text-emerald-600 font-bold underline uppercase">NUMERO DOCUMENTO, NIT CLIENTE, CLIENTE, PRODUCTO, CANTIDAD, PESO</span>
                     ) : (
-                       <span className="text-blue-600 font-bold underline">DOCUMENTO, MANIFIESTO, PLANILLA, RUTA, FLETE</span>
+                       <span className="text-blue-600 font-bold underline uppercase">DOCUMENTO, MANIFIESTO, PLANILLA, RUTA, FLETE</span>
                     )}
                  </div>
                  <p className="italic text-amber-600 font-bold">* El sistema buscará coincidencias exactas por "NUMERO DOCUMENTO" o "DOCUMENTO".</p>
-                 <button onClick={() => setShowGuideModal(null)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest mt-4">Entendido</button>
+                 <button onClick={() => setShowGuideModal(null)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest mt-4 hover:bg-blue-600 transition shadow-xl shadow-blue-100">Entendido</button>
               </div>
            </div>
         </div>
