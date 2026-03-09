@@ -13,6 +13,12 @@ router.get('/orders', grupoInterController.getOrders);
 router.put('/status/:id', grupoInterController.updateStatus);
 router.get('/details/:id', grupoInterController.getOrderDetails);
 
+// Novedades y Reajustes
+router.get('/novedades/:pedido_id', grupoInterController.getNovedades);
+router.post('/novedades', grupoInterController.addNovedad);
+router.get('/reajustes/:pedido_id', grupoInterController.getReajustes);
+router.post('/reajustes', grupoInterController.addReajuste);
+
 // API Pública (WebService para Clientes Externos)
 router.get('/public/list', grupoInterController.getOrdersPublicListSecure);
 

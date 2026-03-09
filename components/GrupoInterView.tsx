@@ -66,6 +66,7 @@ const GrupoInterView: React.FC = () => {
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [manifestFile, setManifestFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [uploadExtra, setUploadExtra] = useState({ placa: '', fleteTotal: '', planilla: '' });
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showManifestPreview, setShowManifestPreview] = useState(false);
@@ -101,6 +102,11 @@ const GrupoInterView: React.FC = () => {
       fetchOrders(searchTerm);
     }
   }, [activeTab, filters]);
+
+  useEffect(() => {
+    // Solo carga inicial si el usuario lo desea, pero según la solicitud, solo al presionar botones.
+    // Dejamos vacío para que sea manual.
+  }, []);
 
   const fetchOrders = async (query = '') => {
     try {
@@ -153,10 +159,14 @@ const GrupoInterView: React.FC = () => {
   };
 
   const handleExcelUpload = async () => {
-    if (!excelFile) return;
     try {
+      if (!excelFile) return;
+      if (!uploadExtra.placa || !uploadExtra.fleteTotal) {
+        toast.error('Placa y Flete Total son obligatorios');
+        return;
+      }
       setLoading(true);
-      const res = await api.uploadGrupoInterExcel(excelFile, user?.name || 'System');
+      const res = await api.uploadGrupoInterExcel(excelFile, user?.name || 'Admin', uploadExtra);
       if (res.duplicates > 0) {
         toast.warning(`Sincronizado: ${res.count} nuevos. Se omitieron ${res.duplicates} duplicados.`);
       } else {
@@ -352,10 +362,10 @@ const GrupoInterView: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8 flex flex-col transform transition hover:scale-[1.01]">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><FileSpreadsheet size={24} /></div>
-                  <h3 className="text-xl font-bold text-slate-800">Carga Operación</h3>
+                  <h3 className="text-xl font-bold text-slate-800">Carga valorizados</h3>
                 </div>
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Excel 1 (Pedidos)</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Excel 1 (valorizados)</span>
                   <button onClick={() => setShowGuideModal('operacion')} className="text-[10px] font-black text-blue-600 hover:underline flex items-center gap-1">
                     <AlertCircle size={12} /> VER FORMATO
                   </button>
@@ -709,7 +719,7 @@ const GrupoInterView: React.FC = () => {
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
            <div className="bg-white w-[95vw] max-w-7xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
               <div className="p-6 border-b flex justify-between items-center px-8">
-                 <h2 className="text-2xl font-black text-slate-900">Previsualización Carga 1 (Pedidos)</h2>
+                 <h2 className="text-2xl font-black text-slate-900">Previsualización Carga 1 (valorizados)</h2>
                  <button onClick={() => setShowPreviewModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24}/></button>
               </div>
               <div className="flex-1 overflow-auto bg-slate-50 p-6">
@@ -726,6 +736,39 @@ const GrupoInterView: React.FC = () => {
                     </tbody>
                  </table>
               </div>
+              <div className="p-6 bg-slate-50 border-t border-b grid grid-cols-1 md:grid-cols-3 gap-6 px-10">
+                 <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Placa Vehículo *</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej: XYZ-123" 
+                      className="p-3 bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+                      value={uploadExtra.placa}
+                      onChange={(e) => setUploadExtra(prev => ({ ...prev, placa: e.target.value.toUpperCase() }))}
+                    />
+                 </div>
+                 <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Flete Total *</label>
+                    <input 
+                      type="number" 
+                      placeholder="Ej: 1500000" 
+                      className="p-3 bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={uploadExtra.fleteTotal}
+                      onChange={(e) => setUploadExtra(prev => ({ ...prev, fleteTotal: e.target.value }))}
+                    />
+                 </div>
+                 <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Número de Planilla</label>
+                    <input 
+                      type="text" 
+                      placeholder="Opcional..." 
+                      className="p-3 bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={uploadExtra.planilla}
+                      onChange={(e) => setUploadExtra(prev => ({ ...prev, planilla: e.target.value }))}
+                    />
+                 </div>
+              </div>
+
               <div className="p-6 bg-white border-t flex justify-end gap-4 px-8">
                  <button onClick={() => setShowPreviewModal(false)} className="px-8 py-3 border border-slate-200 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition">Cancelar</button>
                  <button onClick={handleExcelUpload} disabled={loading} className="px-12 py-3 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-xl shadow-emerald-100 active:scale-95 disabled:opacity-50">{loading ? 'Procesando...' : 'Confirmar Carga'}</button>

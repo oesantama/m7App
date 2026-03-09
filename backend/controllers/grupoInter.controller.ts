@@ -148,75 +148,55 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
+        const { placa, fleteTotal, planilla } = req.body;
+        const fleteTotalNum = parseFloat(fleteTotal) || 0;
+
         const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        const normalize = (str: string) => 
-            String(str || '')
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-zA-Z0-9 ]/g, " ")
-                .replace(/\s+/g, " ")
-                .trim()
-                .toUpperCase();
-
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-        console.log(`[GRUPO-INTER] Filas totales detectadas: ${rows.length}`);
         
         let headerRowIndex = -1;
         const columnAliases = {
             numero_documento: ['NUMERO DOCUMENTO', 'NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'PEDIDO', 'NRO PEDIDO', 'ORDEN'],
             nit: ['NIT CLIENTE', 'NIT', 'IDENTIFICACION'],
             cliente: ['NOMBRE CLIENTE', 'CLIENTE', 'RAZON SOCIAL'],
-            direccion: ['DIRECCION', 'DIR'],
-            notas_encabezado: ['NOTA ENCABEZADO', 'NOTAS', 'OBSERVACIONES'],
-            municipio_destino: ['MUNICIPIO DESTINO', 'CIUDAD DESTINO', 'CIUDAD', 'DESTINO', 'DESTINO FINAL'],
-            producto: ['PRODUCTO', 'ARTICULO', 'ITEM'],
-            cantidad_total: ['CANTIDAD TOTAL', 'CANTIDAD', 'TOTAL'],
-            precio_total: ['PRECIO TOTAL', 'PRECIO', 'VALOR'],
-            tipo_articulo: ['TIPO ARTICULO', 'TIPO_ART_INTER', 'CATEGORIA ARTICULO'],
-            empresa: ['EMPRESA', 'COMPAÑIA'],
-            peso_total_prod: ['PESO TOTAL PROD.', 'PESO', 'PESO TOTAL'],
-            f_ultimo_corte: ['F. ULTIMO CORTE', 'F ULTIMO CORTE', 'ULTIMO CORTE', 'CORTE'],
-            clasificacion: ['CLASIFICACION', 'CATEGORIA'], 
-            placa: ['PLACA', 'VEHICULO'],
-            longitud: ['LONGITUD'],
-            latitud: ['LATITUD']
+            direccion: ['DIRECCION', 'DIRECCION ENTREGA'],
+            notas_encabezado: ['NOTAS', 'OBSERVACIONES'],
+            municipio_destino: ['MUNICIPIO', 'CIUDAD', 'DESTINO'],
+            producto: ['PRODUCTO', 'ARTICULO', 'DESCRIPCION'],
+            cantidad_total: ['CANTIDAD', 'CANT'],
+            precio_total: ['PRECIO TOTAL', 'VALOR TOTAL', 'TOTAL', 'SUBTOTAL'],
+            tipo_articulo: ['TIPO ARTICULO', 'CATEGORIA'],
+            empresa: ['EMPRESA', 'UNIDAD NEGOCIO'],
+            peso_total_prod: ['PESO', 'KILOS'],
+            f_ultimo_corte: ['FECHA CORTE', 'FCT. ULTIMO CORTE'],
+            clasificacion: ['CLASIFICACION', 'ABC']
         };
 
-        const allIdentifyAliases = [...columnAliases.numero_documento, ...columnAliases.cliente].map(a => normalize(a));
-        
+        const identifyAliases = [...columnAliases.numero_documento, ...columnAliases.cliente].map(a => a.toUpperCase());
         for (let i = 0; i < Math.min(rows.length, 25); i++) {
-            const currentRow = (rows[i] || []).map(cell => normalize(String(cell)));
-            if (currentRow.some(cell => allIdentifyAliases.some(alias => cell.includes(alias)))) {
+            const currentRow = (rows[i] || []).map(cell => String(cell || '').toUpperCase());
+            if (currentRow.some(cell => identifyAliases.some(alias => cell.includes(alias)))) {
                 headerRowIndex = i;
                 break;
             }
         }
 
         if (headerRowIndex === -1) {
-            res.status(400).json({ message: 'El formato no es el indicado (no se encontraron encabezados)' });
+            res.status(400).json({ message: 'No se detectaron los encabezados en el Excel.' });
             return;
         }
 
-        const headerRow = (rows[headerRowIndex] || []).map(cell => normalize(String(cell)));
-        console.log(`[GRUPO-INTER] Cabeceras:`, headerRow);
-
-        const getColIndex = (aliases: string[]) => {
-            const normalizedAliases = aliases.map(a => normalize(a));
-            // Prioridad 1: Coincidencia Exacta
-            let idx = headerRow.findIndex(cell => normalizedAliases.some(alias => cell === alias));
-            if (idx >= 0) return idx;
-            // Prioridad 2: El encabezado contiene el alias (e.g. "PEDIDO" en "NRO PEDIDO")
-            // Pero evitamos falsos positivos si el alias es muy corto (como "TIPO")
-            return headerRow.findIndex(cell => normalizedAliases.some(alias => {
-                if (alias.length <= 4) return cell === alias; // Para "TIPO", "NIT", "DIR" exigimos casi exactitud
-                return cell.includes(alias);
-            }));
+        const headerRow = (rows[headerRowIndex] || []).map(cell => String(cell || '').toUpperCase().trim());
+        const getColIndex = (list: string[]) => {
+            return headerRow.findIndex(cell => list.some(alias => cell === alias || cell.includes(alias)));
         };
 
         const idxDoc = getColIndex(columnAliases.numero_documento);
+        const idxPrice = getColIndex(columnAliases.precio_total);
+        // ... otros índices ...
         const idxNit = getColIndex(columnAliases.nit);
         const idxClient = getColIndex(columnAliases.cliente);
         const idxDir = getColIndex(columnAliases.direccion);
@@ -224,22 +204,11 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const idxDest = getColIndex(columnAliases.municipio_destino);
         const idxProd = getColIndex(columnAliases.producto);
         const idxCant = getColIndex(columnAliases.cantidad_total);
-        const idxPrecio = getColIndex(columnAliases.precio_total);
         const idxTipo = getColIndex(columnAliases.tipo_articulo);
         const idxEmpresa = getColIndex(columnAliases.empresa);
         const idxPeso = getColIndex(columnAliases.peso_total_prod);
         const idxCorte = getColIndex(columnAliases.f_ultimo_corte);
         const idxClasif = getColIndex(columnAliases.clasificacion);
-        const idxPlaca = getColIndex(columnAliases.placa);
-        const idxLong = getColIndex(columnAliases.longitud);
-        const idxLat = getColIndex(columnAliases.latitud);
-
-        console.log(`[GRUPO-INTER] Índices detectados: Doc=${idxDoc}, Cliente=${idxClient}, Prod=${idxProd}, Placa=${idxPlaca}`);
-
-        let savedCount = 0;
-        let itemsCount = 0;
-        let duplicateCount = 0;
-        const username = req.body.username || 'System';
 
         const parseNum = (val: any) => {
             if (val === undefined || val === null || val === '') return 0;
@@ -256,110 +225,113 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             } catch (e) { return null; }
         };
 
+        // 🟢 FASE 1: Calcular Precio Total del Batch para prorrata
+        let totalBatchPrice = 0;
+        const docsPriceMap: Record<string, number> = {};
+        const rowsToProcess: any[] = [];
+
         for (let i = headerRowIndex + 1; i < rows.length; i++) {
             const rowArr = rows[i];
-            if (!rowArr || rowArr.length === 0) continue; 
-
-            const numero_documento = idxDoc >= 0 ? String(rowArr[idxDoc] || '').trim() : '';
-            const producto = idxProd >= 0 ? String(rowArr[idxProd] || '').trim() : 'GENERAL';
+            if (!rowArr || rowArr.length === 0) continue;
+            const doc = idxDoc >= 0 ? String(rowArr[idxDoc] || '').trim() : '';
+            if (!doc) continue;
             
-            if (i < headerRowIndex + 5) {
-                console.log(`[GRUPO-INTER] Fila ${i}: Doc='${numero_documento}', Cliente='${idxClient >= 0 ? rowArr[idxClient] : 'N/A'}', Clasif='${idxClasif >= 0 ? rowArr[idxClasif] : 'N/A'}'`);
-            }
-
-            if (!numero_documento) continue;
-
-            // 1. Manejo de Cabecera (Búsqueda y Actualización/Inserción)
-            let pedidoId: number;
-            const existingRes = await pool.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [numero_documento]);
-            
-            if (existingRes.rows.length > 0) {
-                pedidoId = existingRes.rows[0].id;
-                await pool.query(`
-                    UPDATE grupo_inter_pedidos SET
-                        nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5, 
-                        municipio_destino = $6, empresa = $7, f_ultimo_corte = $8, 
-                        clasificacion = $9, placa = $10, longitud = $11, latitud = $12,
-                        update_by = $13, update_at = CURRENT_TIMESTAMP
-                    WHERE id = $1;
-                `, [
-                    pedidoId,
-                    idxNit >= 0 ? String(rowArr[idxNit] || '').trim() : '',
-                    idxClient >= 0 ? String(rowArr[idxClient] || '').trim() : '',
-                    idxDir >= 0 ? String(rowArr[idxDir] || '').trim() : '',
-                    idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
-                    idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
-                    idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
-                    idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
-                    idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
-                    idxPlaca >= 0 ? String(rowArr[idxPlaca] || '').trim() : '',
-                    parseNum(idxLong >= 0 ? rowArr[idxLong] : null),
-                    parseNum(idxLat >= 0 ? rowArr[idxLat] : null),
-                    username
-                ]);
-            } else {
-                const insertRes = await pool.query(`
-                    INSERT INTO grupo_inter_pedidos (
-                        numero_documento, nit, cliente, direccion, notas_encabezado, 
-                        municipio_destino, empresa, f_ultimo_corte, 
-                        clasificacion, placa, longitud, latitud, estado, create_by, update_by, fecha_carge
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Pendiente', $13, $13, CURRENT_TIMESTAMP)
-                    RETURNING id;
-                `, [
-                    numero_documento,
-                    idxNit >= 0 ? String(rowArr[idxNit] || '').trim() : '',
-                    idxClient >= 0 ? String(rowArr[idxClient] || '').trim() : '',
-                    idxDir >= 0 ? String(rowArr[idxDir] || '').trim() : '',
-                    idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
-                    idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
-                    idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
-                    idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
-                    idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
-                    idxPlaca >= 0 ? String(rowArr[idxPlaca] || '').trim() : '',
-                    parseNum(idxLong >= 0 ? rowArr[idxLong] : null),
-                    parseNum(idxLat >= 0 ? rowArr[idxLat] : null),
-                    username
-                ]);
-                pedidoId = insertRes.rows[0].id;
-            }
-            savedCount++;
-
-            // 1.5 Registro de histórico inicial (Pendiente) si es nuevo o no tiene histórico
-            await pool.query(`
-                INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario)
-                SELECT $1, 'Pendiente', 'Carga inicial desde Excel', $2
-                WHERE NOT EXISTS (SELECT 1 FROM grupo_inter_pedidos_historico WHERE pedido_id = $1)
-            `, [pedidoId, username]);
-
-            // 2. Manejo de Item (Detalle)
-            const queryItem = `
-                INSERT INTO grupo_inter_pedidos_items (
-                    pedido_id, producto, cantidad, precio, peso, tipo_articulo
-                ) VALUES ($1, $2, $3, $4, $5, $6)
-            `;
-            
-            const valuesItem = [
-                pedidoId,
-                producto,
-                parseNum(idxCant >= 0 ? rowArr[idxCant] : 0),
-                parseNum(idxPrecio >= 0 ? rowArr[idxPrecio] : 0),
-                parseNum(idxPeso >= 0 ? rowArr[idxPeso] : 0),
-                idxTipo >= 0 ? String(rowArr[idxTipo] || '').trim() : ''
-            ];
-
-            await pool.query(queryItem, valuesItem);
-            itemsCount++;
-
-            // 3. Registrar en Histórico (Solo si es nuevo o según lógica)
-            // Para evitar saturación, solo si el pedido acaba de crearse o si queremos loguear cada carga
+            const price = idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0;
+            totalBatchPrice += price;
+            docsPriceMap[doc] = (docsPriceMap[doc] || 0) + price;
+            rowsToProcess.push({ rowIndex: i, rowArr, doc, price });
         }
 
-        res.json({ 
-            message: `Excel procesado: ${savedCount} facturas actualizadas/creadas con ${itemsCount} items totales`, 
-            count: savedCount,
-            itemsCount: itemsCount,
-            duplicates: duplicateCount 
-        });
+        // 🟠 FASE 2: Procesar cada factura con su flete porcentual
+        let savedCount = 0;
+        const processedDocs = new Set<string>();
+        const username = req.body.username || 'System';
+
+        for (const item of rowsToProcess) {
+            const { doc, rowArr } = item;
+            
+            if (!processedDocs.has(doc)) {
+                const docTotal = docsPriceMap[doc] || 0;
+                // Regla de 3 para el flete: (FleteTotal * PrecioFactura) / PrecioTotalBatch
+                const fleteProporcional = totalBatchPrice > 0 ? (fleteTotalNum * docTotal) / totalBatchPrice : 0;
+
+                const existingRes = await pool.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [doc]);
+                let pedidoId: number;
+
+                if (existingRes.rows.length > 0) {
+                    pedidoId = existingRes.rows[0].id;
+                    await pool.query(`
+                        UPDATE grupo_inter_pedidos SET
+                            nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5, 
+                            municipio_destino = $6, empresa = $7, f_ultimo_corte = $8, 
+                            clasificacion = $9, placa = $10, valor_flete = $11, numero_planilla = $12,
+                            update_by = $13, update_at = CURRENT_TIMESTAMP
+                        WHERE id = $1;
+                    `, [
+                        pedidoId,
+                        idxNit >= 0 ? String(rowArr[idxNit] || '').trim() : '',
+                        idxClient >= 0 ? String(rowArr[idxClient] || '').trim() : '',
+                        idxDir >= 0 ? String(rowArr[idxDir] || '').trim() : '',
+                        idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
+                        idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
+                        idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
+                        idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
+                        idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
+                        placa,
+                        fleteProporcional,
+                        planilla || '',
+                        username
+                    ]);
+                } else {
+                    const insertRes = await pool.query(`
+                        INSERT INTO grupo_inter_pedidos (
+                            numero_documento, nit, cliente, direccion, notas_encabezado, 
+                            municipio_destino, empresa, f_ultimo_corte, 
+                            clasificacion, placa, valor_flete, numero_planilla, estado, create_by, update_by, fecha_carge
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Pendiente', $13, $13, CURRENT_TIMESTAMP)
+                        RETURNING id;
+                    `, [
+                        doc,
+                        idxNit >= 0 ? String(rowArr[idxNit] || '').trim() : '',
+                        idxClient >= 0 ? String(rowArr[idxClient] || '').trim() : '',
+                        idxDir >= 0 ? String(rowArr[idxDir] || '').trim() : '',
+                        idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
+                        idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
+                        idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
+                        idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
+                        idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
+                        placa,
+                        fleteProporcional,
+                        planilla || '',
+                        username
+                    ]);
+                    pedidoId = insertRes.rows[0].id;
+
+                    await pool.query(`
+                        INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario)
+                        VALUES ($1, 'Pendiente', 'Carga inicial valorizada', $2)
+                    `, [pedidoId, username]);
+                }
+                processedDocs.add(doc);
+                savedCount++;
+            }
+
+            // Insertar items siempre
+            const pedidoIdForItems = (await pool.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [doc])).rows[0].id;
+            await pool.query(`
+                INSERT INTO grupo_inter_pedidos_items (pedido_id, producto, cantidad, precio, peso, tipo_articulo)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            `, [
+                pedidoIdForItems,
+                idxProd >= 0 ? String(rowArr[idxProd] || '').trim() : 'GENERAL',
+                parseNum(idxCant >= 0 ? rowArr[idxCant] : 0),
+                parseNum(idxPrice >= 0 ? rowArr[idxPrice] : 0),
+                parseNum(idxPeso >= 0 ? rowArr[idxPeso] : 0),
+                idxTipo >= 0 ? String(rowArr[idxTipo] || '').trim() : ''
+            ]);
+        }
+
+        res.json({ message: `Excel procesado: ${savedCount} facturas sincronizadas. Flete total distribuido: $${fleteTotalNum.toLocaleString()}`, count: savedCount });
     } catch (error) {
         console.error('[GRUPO-INTER] Error al subir Excel:', error);
         res.status(500).json({ message: 'Error interno al procesar el Excel' });
@@ -480,7 +452,53 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
             }
         }
 
-        res.json({ message: `Carga complementaria finalizada. Se actualizaron ${updatedCount} registros.`, count: updatedCount });
+// --- NOVEDADES ---
+const getNovedades = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pedido_id } = req.params;
+        const result = await pool.query('SELECT * FROM grupo_inter_novedades WHERE pedido_id = $1 ORDER BY fecha DESC', [pedido_id]);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener novedades' });
+    }
+};
+
+const addNovedad = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pedido_id, tipo, observacion, usuario } = req.body;
+        await pool.query(
+            'INSERT INTO grupo_inter_novedades (pedido_id, tipo, observacion, usuario) VALUES ($1, $2, $3, $4)',
+            [pedido_id, tipo, observacion, usuario]
+        );
+        res.json({ message: 'Novedad registrada' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al registrar novedad' });
+    }
+};
+
+// --- REAJUSTES ---
+const getReajustes = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pedido_id } = req.params;
+        const result = await pool.query('SELECT * FROM grupo_inter_reajustes WHERE pedido_id = $1 ORDER BY fecha DESC', [pedido_id]);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener reajustes' });
+    }
+};
+
+const addReajuste = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pedido_id, numero_documento, valor, notas, usuario } = req.body;
+        await pool.query(
+            'INSERT INTO grupo_inter_reajustes (pedido_id, numero_documento, valor, notas, usuario) VALUES ($1, $2, $3, $4, $5)',
+            [pedido_id, numero_documento, valor, notas, usuario]
+        );
+        res.json({ message: 'Reajuste registrado' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al registrar reajuste' });
+    }
+};
 
     } catch (error) {
         console.error('[GRUPO-INTER] Error en carga complementaria:', error);
@@ -659,13 +677,27 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 500';
         const result = await pool.query(query, values);
         res.json(result.rows);
-    } catch (error) {
         res.status(500).json({ message: 'Error al obtener pedidos' });
     }
 };
 
+// --- EXPORTACIÓN FINAL UNIFICADA ---
+export {
+    ensureSchema,
+    uploadExcel,
+    uploadManifestExcel,
+    processPDF,
+    getOrders,
+    updateStatus,
+    getOrderDetails,
+    getNovedades,
+    addNovedad,
+    getReajustes,
+    addReajuste,
+    getOrdersPublicListSecure
+};
 
-export const getOrdersPublicListSecure = async (req: Request, res: Response): Promise<void> => {
+const getOrdersPublicListSecure = async (req: Request, res: Response): Promise<void> => {
     try {
         const token = req.query.token || req.headers['x-public-token'];
         const MASTER_TOKEN = process.env.PUBLIC_API_TOKEN || 'M7-SECURE-2026-XQW';

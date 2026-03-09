@@ -610,16 +610,34 @@ export const api = {
     const qs = new URLSearchParams(params as any).toString();
     return fetchJson(`${API_URL}/grupo-inter/orders${qs ? `?${qs}` : ''}`);
   },
-  uploadGrupoInterExcel: (file: File, username: string) => {
+  uploadGrupoInterExcel: (file: File, username: string, extra: { placa: string, fleteTotal: string, planilla?: string }) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('username', username);
+    formData.append('placa', extra.placa);
+    formData.append('fleteTotal', extra.fleteTotal);
+    if (extra.planilla) formData.append('planilla', extra.planilla);
+    
     return fetchJson(`${API_URL}/grupo-inter/upload-excel`, {
       method: 'POST',
       body: formData,
-      headers: {} // fetchJson manejará el token
+      headers: {} 
     });
   },
+
+  // Novedades y Reajustes
+  getGrupoInterNovedades: (pedidoId: string) => fetchJson(`${API_URL}/grupo-inter/novedades/${pedidoId}`),
+  addGrupoInterNovedad: (data: { pedido_id: number, tipo: string, observacion: string, usuario: string }) => fetchJson(`${API_URL}/grupo-inter/novedades`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  getGrupoInterReajustes: (pedidoId: string) => fetchJson(`${API_URL}/grupo-inter/reajustes/${pedidoId}`),
+  addGrupoInterReajuste: (data: { pedido_id: number, numero_documento: string, valor: number, notas: string, usuario: string }) => fetchJson(`${API_URL}/grupo-inter/reajustes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
   uploadGrupoInterManifestExcel: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
