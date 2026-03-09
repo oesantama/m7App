@@ -261,7 +261,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Pendiente', $13, $13, CURRENT_TIMESTAMP)
                 ON CONFLICT (numero_documento) DO UPDATE SET
                     update_by = EXCLUDED.update_by,
-                    updated_at = CURRENT_TIMESTAMP
+                    update_at = CURRENT_TIMESTAMP
                 RETURNING id;
             `;
 
@@ -405,7 +405,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                     const base64Page = await subPdf.saveAsBase64();
 
                     await pool.query(
-                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', updated_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
+                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
                         [base64Page, docNum]
                     );
 
@@ -587,7 +587,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
         }
 
         await pool.query(
-            "UPDATE grupo_inter_pedidos SET estado = $1, updated_at = CURRENT_TIMESTAMP, update_by = $2 WHERE id = $3",
+            "UPDATE grupo_inter_pedidos SET estado = $1, update_at = CURRENT_TIMESTAMP, update_by = $2 WHERE id = $3",
             [estado, usuario || 'System', id]
         );
 

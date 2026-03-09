@@ -462,28 +462,41 @@ const GrupoInterView: React.FC = () => {
             {/* Buscador y Filtros Avanzados */}
             <div className="p-8 border-b border-slate-100 bg-slate-50/30">
               <div className="flex flex-col md:flex-row items-end justify-center gap-8">
-                {/* Rango de Fecha */}
-                <div className="flex flex-col space-y-2">
-                  <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest ml-1">Rango de Consulta Personalizado</span>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="date"
-                      className="px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-slate-600 font-bold outline-none focus:border-blue-500 shadow-sm transition-all"
-                      value={filters.fechaCorteDesde}
-                      onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})}
-                    />
-                    <div className="w-4 h-0.5 bg-slate-200" />
-                    <input 
-                      type="date"
-                      className="px-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-slate-600 font-bold outline-none focus:border-blue-500 shadow-sm transition-all"
-                      value={filters.fechaCorteHasta}
-                      onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})}
-                    />
+                {/* Filtros de Fecha */}
+                <div className="flex-1 flex flex-col md:flex-row items-end gap-4">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Rango de Consulta Personalizado</label>
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
+                      <input 
+                        type="date" 
+                        className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-slate-600 p-2"
+                        value={filters.fechaCorteDesde}
+                        onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})}
+                      />
+                      <div className="h-4 w-px bg-slate-100"></div>
+                      <input 
+                        type="date" 
+                        className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-slate-600 p-2"
+                        value={filters.fechaCorteHasta}
+                        onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Botones de Acción */}
-                <div className="flex items-center gap-3">
+                  {/* Buscador Global Restaurado */}
+                  <div className="w-full md:w-64">
+                    <div className="relative group">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+                      <input 
+                        type="text" 
+                        placeholder="Búsqueda global..." 
+                        className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-bold shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <button 
                     onClick={() => {
                       const today = new Date();
@@ -496,13 +509,15 @@ const GrupoInterView: React.FC = () => {
                       });
                       toast.info('Rango ajustado a los últimos 8 días');
                     }}
-                    className="px-6 py-3.5 bg-amber-50 text-amber-600 rounded-2xl font-black uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-100 text-[10px] flex items-center gap-2"
+                    className="px-6 py-3.5 bg-amber-50 text-amber-600 rounded-2xl text-xs font-black flex items-center gap-2 hover:bg-amber-100 transition-all border border-amber-100/50"
                   >
-                    <Clock size={16} /> Últimos 8 días
+                    <Clock size={16} />
+                    ÚLTIMOS 8 DÍAS
                   </button>
+                </div>
 
-                  <div className="w-px h-10 bg-slate-200 mx-2" />
-
+                {/* Botones de Acción */}
+                <div className="flex items-center gap-3">
                   <button 
                     onClick={() => fetchOrders(searchTerm)}
                     className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95 text-[10px] flex items-center gap-2"
@@ -594,12 +609,26 @@ const GrupoInterView: React.FC = () => {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-right">
-                            <button 
-                              onClick={() => openDetail(order)}
-                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-xl transition-all transform active:scale-95"
-                            >
-                              <Eye size={20} />
-                            </button>
+                            <div className="flex gap-2 justify-end">
+                              <button 
+                                onClick={() => openDetail(order)}
+                                className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                                title="Ver Detalle"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  setNewStatus({ estado: order.estado || '', observacion: '' });
+                                  setShowStatusModal(true);
+                                }}
+                                className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all shadow-sm"
+                                title="Cambiar Estado"
+                              >
+                                <Clock size={18} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -791,32 +820,77 @@ const GrupoInterView: React.FC = () => {
             
             <div className="overflow-y-auto p-8">
               <div className="space-y-8">
-                {/* Grilla de Detalles */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <DetailItem icon={<Package size={18} />} label="Producto" value={selectedOrder.producto} />
-                  <DetailItem icon={<User size={18} />} label="Nombre Cliente" value={selectedOrder.cliente} />
-                  <DetailItem icon={<FileText size={18} />} label="NIT Cliente" value={selectedOrder.nit} />
-                  <DetailItem icon={<MapPin size={18} />} label="Dirección" value={selectedOrder.direccion} />
-                  <DetailItem icon={<Truck size={18} />} label="Municipio Destino" value={selectedOrder.municipio_destino} />
-                  <DetailItem icon={<Filter size={18} />} label="Tipo Artículo" value={selectedOrder.tipo_articulo} />
-                  <DetailItem icon={<AlertCircle size={18} />} label="Empresa" value={selectedOrder.empresa} />
-                  <DetailItem icon={<AlertCircle size={18} />} label="Clasificación" value={selectedOrder.clasificacion} />
-                  <DetailItem icon={<Clock size={18} />} label="Fecha Carga" value={new Date(selectedOrder.fecha_carge).toLocaleString()} />
+                {/* Info Grid (Removido campo Producto redundante) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <User size={14} className="text-blue-500" />
+                      Nombre Cliente
+                    </div>
+                    <p className="text-sm font-black text-slate-900 leading-tight">{selectedOrder.cliente}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <FileText size={14} className="text-blue-500" />
+                      Nit Cliente
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{selectedOrder.nit || 'NO REGISTRA'}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <MapPin size={14} className="text-blue-500" />
+                      Dirección
+                    </div>
+                    <p className="text-sm font-black text-slate-900 leading-tight">{selectedOrder.direccion}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <Truck size={14} className="text-blue-500" />
+                      Municipio Destino
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{selectedOrder.municipio_destino}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <Filter size={14} className="text-blue-500" />
+                      Tipo Artículo
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{selectedOrder.tipo_articulo}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <Clock size={14} className="text-blue-500" />
+                      Fecha Carga
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{new Date(selectedOrder.fecha_carge || selectedOrder.create_at).toLocaleString()}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <AlertCircle size={14} className="text-blue-500" />
+                      Empresa
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{selectedOrder.empresa}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <AlertCircle size={14} className="text-blue-500" />
+                      Clasificación
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{selectedOrder.clasificacion || 'N/A'}</p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <MetricBox label="Cantidad Total" value={String(orderDetails?.items.reduce((acc, curr) => acc + Number(curr.cantidad), 0) || selectedOrder.cantidad_total || 0)} />
                   <MetricBox label="Peso Total" value={`${orderDetails?.items.reduce((acc, curr) => acc + Number(curr.peso), 0) || selectedOrder.peso_total_prod || 0} Kg`} />
                   <MetricBox label="Precio Total" value={`$ ${new Intl.NumberFormat().format(orderDetails?.items.reduce((acc, curr) => acc + Number(curr.precio), 0) || selectedOrder.precio_total || 0)}`} />
-                  <div className="flex flex-col gap-2">
-                    <MetricBox label="Estado Actual" value={selectedOrder.estado} />
-                    <button 
-                      onClick={() => setShowStatusModal(true)}
-                      className="text-[10px] font-black uppercase text-blue-600 hover:text-blue-700 underline text-left px-4"
-                    >
-                      Cambiar Estado
-                    </button>
-                  </div>
                 </div>
 
                 {/* Tabla de Productos Normalizada con Búsqueda */}
