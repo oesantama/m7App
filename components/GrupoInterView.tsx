@@ -3,7 +3,7 @@ import {
   Upload, FileSpreadsheet, FileText, Search, Eye, 
   MapPin, Package, Truck, Clock, CheckCircle, 
   AlertCircle, ChevronRight, Download, Filter, User,
-  Trash
+  Trash, X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -18,12 +18,14 @@ interface Order {
   direccion: string;
   notas_encabezado: string;
   municipio_destino: string;
-  producto: string;
-  cantidad_total: number;
-  precio_total: number;
-  tipo_articulo: string;
+  // Estos campos se mantendrán para compatibilidad visual en la tabla, pero se cargarán del detalle
+  producto?: string;
+  cantidad_total?: number;
+  precio_total?: number;
+  tipo_articulo?: string;
+  peso_total_prod?: number;
+  
   empresa: string;
-  peso_total_prod: number;
   f_ultimo_corte: string | null;
   clasificacion: string;
   numero_guia: string;
@@ -31,7 +33,9 @@ interface Order {
   longitud: string;
   placa: string;
   estado: string;
-  history: any[];
+  history: any[]; // Historial legacy (JSONB)
+  items?: any[]; // Detalle de productos normalizado
+  historico?: any[]; // Historial de estados normalizado
   fecha_entregado: string | null;
   fecha_carge: string;
   acta_entrega_b64: string | null;
@@ -64,7 +68,11 @@ const GrupoInterView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orderDetails, setOrderDetails] = useState<{items: any[], history: any[]} | null>(null);
+  const [productSearch, setProductSearch] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [newStatus, setNewStatus] = useState({ estado: '', observacion: '' });
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<any[]>([]);
@@ -271,9 +279,44 @@ const GrupoInterView: React.FC = () => {
     }
   };
 
-  const openDetail = (order: Order) => {
+  const openDetail = async (order: Order) => {
     setSelectedOrder(order);
     setShowDetailModal(true);
+    setOrderDetails(null); 
+    setProductSearch(''); // Resetear búsqueda de productos
+    
+    try {
+      const details = await api.getGrupoInterDetails(order.id.toString());
+      setOrderDetails(details);
+    } catch (error) {
+      console.error('Error al cargar detalles:', error);
+      toast.error('No se pudieron cargar los detalles del pedido');
+    }
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!selectedOrder || !newStatus.estado) return;
+    
+    try {
+      setLoading(true);
+      await api.updateGrupoInterStatus(selectedOrder.id.toString(), {
+        ...newStatus,
+        usuario: user?.name || 'System'
+      });
+      
+      toast.success('Estado actualizado correctamente');
+      setShowStatusModal(false);
+      setNewStatus({ estado: '', observacion: '' });
+      
+      // Recargar detalles y lista
+      const details = await api.getGrupoInterDetails(selectedOrder.id.toString());
+      setOrderDetails(details);
+      fetchOrders(searchTerm);
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar estado');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -741,8 +784,8 @@ const GrupoInterView: React.FC = () => {
                 <h2 className="text-2xl font-black text-slate-900">Detalle de Operación</h2>
                 <p className="text-slate-500 text-sm font-medium">Documento: {selectedOrder.numero_documento}</p>
               </div>
-              <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400">
-                <ChevronRight size={28} className="rotate-90 md:rotate-0" />
+              <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-rose-100 rounded-full transition-all text-slate-400 hover:text-rose-600">
+                <X size={24} />
               </button>
             </div>
             
@@ -762,45 +805,128 @@ const GrupoInterView: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <MetricBox label="Cantidad" value={String(selectedOrder.cantidad_total)} />
-                  <MetricBox label="Peso Total" value={`${selectedOrder.peso_total_prod} Kg`} />
-                  <MetricBox label="Precio Total" value={`$ ${new Intl.NumberFormat().format(selectedOrder.precio_total)}`} />
-                  <MetricBox label="Estado" value={selectedOrder.estado} />
+                  <MetricBox label="Cantidad Total" value={String(orderDetails?.items.reduce((acc, curr) => acc + Number(curr.cantidad), 0) || selectedOrder.cantidad_total || 0)} />
+                  <MetricBox label="Peso Total" value={`${orderDetails?.items.reduce((acc, curr) => acc + Number(curr.peso), 0) || selectedOrder.peso_total_prod || 0} Kg`} />
+                  <MetricBox label="Precio Total" value={`$ ${new Intl.NumberFormat().format(orderDetails?.items.reduce((acc, curr) => acc + Number(curr.precio), 0) || selectedOrder.precio_total || 0)}`} />
+                  <div className="flex flex-col gap-2">
+                    <MetricBox label="Estado Actual" value={selectedOrder.estado} />
+                    <button 
+                      onClick={() => setShowStatusModal(true)}
+                      className="text-[10px] font-black uppercase text-blue-600 hover:text-blue-700 underline text-left px-4"
+                    >
+                      Cambiar Estado
+                    </button>
+                  </div>
                 </div>
 
-                {/* Historial de Trazabilidad */}
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                  <h3 className="text-sm font-black text-slate-900 mb-4 flex items-center gap-2">
-                    <Clock size={16} className="text-blue-500" />
-                    HISTORIAL DE TRAZABILIDAD
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 border-b border-slate-200 pb-2">
-                      <div className="flex items-center gap-4">
-                        <span>CREADO: {new Date(selectedOrder.create_at).toLocaleString()}</span>
-                        <span>POR: {selectedOrder.create_by || 'SISTEMA'}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span>ULT. ACTUALIZACIÓN: {new Date(selectedOrder.update_at).toLocaleString()}</span>
-                        <span>POR: {selectedOrder.update_by || 'SISTEMA'}</span>
-                      </div>
+                {/* Tabla de Productos Normalizada con Búsqueda */}
+                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                  <div className="p-4 border-b border-slate-50 bg-slate-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                      <Package size={14} className="text-blue-500" />
+                      DETALLE DE PRODUCTOS
+                    </h3>
+                    <div className="relative w-full md:w-64">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                      <input 
+                        type="text" 
+                        placeholder="Buscar producto..." 
+                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                      />
                     </div>
-
-                    {selectedOrder.history && selectedOrder.history.length > 0 ? (
-                      <div className="space-y-3">
-                        {selectedOrder.history.map((h: any, idx: number) => (
-                          <div key={idx} className="flex gap-4 p-3 bg-white border border-slate-100 rounded-xl shadow-sm italic text-xs">
-                            <span className="text-slate-400 font-bold w-32">{new Date(h.date || h.fecha).toLocaleString()}</span>
-                            <span className="text-slate-600">{h.action || h.novedad}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200">
-                        <p className="text-slate-400 text-sm font-medium italic">No hay novedades registradas en el historial</p>
-                      </div>
-                    )}
                   </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[11px]">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+                          <th className="px-4 py-2">PRODUCTO</th>
+                          <th className="px-4 py-2">CANTIDAD</th>
+                          <th className="px-4 py-2">PESO</th>
+                          <th className="px-4 py-2">PRECIO</th>
+                          <th className="px-4 py-2">TIPO</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {orderDetails ? orderDetails.items
+                          .filter(item => item.producto.toLowerCase().includes(productSearch.toLowerCase()))
+                          .map((item, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-2 text-slate-700 font-semibold">{item.producto}</td>
+                            <td className="px-4 py-2 text-slate-600 font-bold">{item.cantidad}</td>
+                            <td className="px-4 py-2 text-slate-600">{item.peso} Kg</td>
+                            <td className="px-4 py-2 text-slate-600 font-medium">$ {new Intl.NumberFormat().format(item.precio)}</td>
+                            <td className="px-4 py-2">
+                              <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[9px] font-black uppercase">
+                                {item.tipo_articulo}
+                              </span>
+                            </td>
+                          </tr>
+                        )) : (
+                          <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">Cargando productos...</td></tr>
+                        )}
+                        {orderDetails && orderDetails.items.filter(item => item.producto.toLowerCase().includes(productSearch.toLowerCase())).length === 0 && (
+                          <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">No se encontraron productos coincidentes</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Historial de Trazabilidad en Tabla */}
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                  <h3 className="text-[10px] font-black text-slate-900 mb-4 flex items-center gap-2 uppercase tracking-widest">
+                    <Clock size={16} className="text-blue-500" />
+                    Historial de Trazabilidad
+                  </h3>
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <table className="w-full text-left text-[10px]">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-400 font-black uppercase border-b border-slate-200">
+                          <th className="px-4 py-2">Fecha / Hora</th>
+                          <th className="px-4 py-2">Estado</th>
+                          <th className="px-4 py-2">Observación</th>
+                          <th className="px-4 py-2">Usuario</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {orderDetails && orderDetails.history && orderDetails.history.length > 0 ? (
+                          orderDetails.history.map((h: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 text-slate-400 font-bold whitespace-nowrap">
+                                {new Date(h.fecha).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-0.5 rounded-full font-black uppercase text-[9px] ${
+                                  h.estado === 'Entregado' ? 'bg-emerald-100 text-emerald-700' :
+                                  h.estado === 'Novedad' ? 'bg-rose-100 text-rose-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {h.estado}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600 font-medium">{h.observacion}</td>
+                              <td className="px-4 py-3 text-slate-400 font-bold">{h.usuario}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-8 text-center text-slate-400 italic">
+                              No hay registros en el historial normalizado
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Historial Legacy (Solo si existe) */}
+                  {selectedOrder.history && selectedOrder.history.length > 0 && (
+                    <div className="mt-4 opacity-60">
+                      <p className="text-[9px] font-bold text-slate-400 mb-2 uppercase tracking-tighter italic">* Contiene registros previos a la normalización</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Acta de Entrega */}
@@ -894,6 +1020,60 @@ const GrupoInterView: React.FC = () => {
                     Cerrar
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cambio de Estado */}
+      {showStatusModal && selectedOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowStatusModal(false)}></div>
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-8 animate-in fade-in zoom-in duration-300">
+            <h2 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tight">Actualizar Estado Pedido</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Nuevo Estado</label>
+                <select 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                  value={newStatus.estado}
+                  onChange={(e) => setNewStatus({...newStatus, estado: e.target.value})}
+                >
+                  <option value="">Seleccione un estado...</option>
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="En Ruta">En Ruta</option>
+                  <option value="Entregado">Entregado</option>
+                  <option value="Novedad">Novedad</option>
+                  <option value="Devolución">Devolución</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Observación / Nota</label>
+                <textarea 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium h-24 resize-none"
+                  placeholder="Escriba aquí el motivo del cambio..."
+                  value={newStatus.observacion}
+                  onChange={(e) => setNewStatus({...newStatus, observacion: e.target.value})}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={() => setShowStatusModal(false)}
+                  className="flex-1 py-3 border border-slate-200 text-slate-500 rounded-xl font-bold hover:bg-slate-50 transition"
+                >
+                  Cerrar
+                </button>
+                <button 
+                  onClick={handleStatusUpdate}
+                  disabled={loading || !newStatus.estado}
+                  className="flex-[2] py-3 bg-blue-600 text-white rounded-xl font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition disabled:opacity-50"
+                >
+                  {loading ? 'Actualizando...' : 'Confirmar Cambio'}
+                </button>
               </div>
             </div>
           </div>

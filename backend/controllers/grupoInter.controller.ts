@@ -220,6 +220,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         console.log(`[GRUPO-INTER] Índices detectados: Doc=${idxDoc}, Cliente=${idxClient}, Prod=${idxProd}, Placa=${idxPlaca}`);
 
         let savedCount = 0;
+        let itemsCount = 0;
         let duplicateCount = 0;
         const username = req.body.username || 'System';
 
@@ -251,38 +252,27 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
 
             if (!numero_documento) continue;
 
-            const exists = await pool.query(
-                'SELECT 1 FROM grupo_inter_pedidos WHERE numero_documento = $1 AND producto = $2',
-                [numero_documento, producto]
-            );
-
-            if (exists.rows.length > 0) {
-                duplicateCount++;
-                continue; 
-            }
-
-            const query = `
+            // 1. Manejo de Cabecera (UPSERT)
+            const queryHeader = `
                 INSERT INTO grupo_inter_pedidos (
                     numero_documento, nit, cliente, direccion, notas_encabezado, 
-                    municipio_destino, producto, cantidad_total, precio_total, 
-                    tipo_articulo, empresa, peso_total_prod, f_ultimo_corte, 
+                    municipio_destino, empresa, f_ultimo_corte, 
                     clasificacion, placa, longitud, latitud, estado, create_by, update_by, fecha_carge
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'Pendiente', $18, $18, CURRENT_TIMESTAMP)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Pendiente', $13, $13, CURRENT_TIMESTAMP)
+                ON CONFLICT (numero_documento) DO UPDATE SET
+                    update_by = EXCLUDED.update_by,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id;
             `;
 
-            const values = [
+            const valuesHeader = [
                 numero_documento,
                 idxNit >= 0 ? String(rowArr[idxNit] || '').trim() : '',
                 idxClient >= 0 ? String(rowArr[idxClient] || '').trim() : '',
                 idxDir >= 0 ? String(rowArr[idxDir] || '').trim() : '',
                 idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
                 idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
-                producto,
-                parseNum(idxCant >= 0 ? rowArr[idxCant] : 0),
-                parseNum(idxPrecio >= 0 ? rowArr[idxPrecio] : 0),
-                idxTipo >= 0 ? String(rowArr[idxTipo] || '').trim() : '',
                 idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
-                parseNum(idxPeso >= 0 ? rowArr[idxPeso] : 0),
                 idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
                 idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
                 idxPlaca >= 0 ? String(rowArr[idxPlaca] || '').trim() : '',
@@ -291,13 +281,37 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 username
             ];
 
-            await pool.query(query, values);
+            const headerRes = await pool.query(queryHeader, valuesHeader);
+            const pedidoId = headerRes.rows[0].id;
             savedCount++;
+
+            // 2. Manejo de Item (Detalle)
+            const queryItem = `
+                INSERT INTO grupo_inter_pedidos_items (
+                    pedido_id, producto, cantidad, precio, peso, tipo_articulo
+                ) VALUES ($1, $2, $3, $4, $5, $6)
+            `;
+            
+            const valuesItem = [
+                pedidoId,
+                producto,
+                parseNum(idxCant >= 0 ? rowArr[idxCant] : 0),
+                parseNum(idxPrecio >= 0 ? rowArr[idxPrecio] : 0),
+                parseNum(idxPeso >= 0 ? rowArr[idxPeso] : 0),
+                idxTipo >= 0 ? String(rowArr[idxTipo] || '').trim() : ''
+            ];
+
+            await pool.query(queryItem, valuesItem);
+            itemsCount++;
+
+            // 3. Registrar en Histórico (Solo si es nuevo o según lógica)
+            // Para evitar saturación, solo si el pedido acaba de crearse o si queremos loguear cada carga
         }
 
         res.json({ 
-            message: `Excel procesado: ${savedCount} registros nuevos`, 
-            count: savedCount, 
+            message: `Excel procesado: ${savedCount} facturas actualizadas/creadas con ${itemsCount} items totales`, 
+            count: savedCount,
+            itemsCount: itemsCount,
             duplicates: duplicateCount 
         });
     } catch (error) {
@@ -391,9 +405,18 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                     const base64Page = await subPdf.saveAsBase64();
 
                     await pool.query(
-                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
+                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', updated_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
                         [base64Page, docNum]
                     );
+
+                    // Registrar en histórico
+                    const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [docNum]);
+                    if (pedRes.rows.length > 0) {
+                        await pool.query(
+                            "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', 'PDF Procesado Automáticamente', 'System OCR')",
+                            [pedRes.rows[0].id]
+                        );
+                    }
                     finalMatches++;
                     sendProgress({ type: 'progress', page: item.page, percent: Math.round((finalMatches/foundMatches.length)*100) });
                 }
@@ -417,37 +440,53 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 export const getOrders = async (req: Request, res: Response): Promise<void> => {
     try {
         const { search, status, client, fechaCorteDesde, fechaCorteHasta } = req.query;
-        let query = 'SELECT * FROM grupo_inter_pedidos WHERE 1=1';
+        let query = `
+            SELECT 
+                p.*,
+                (SELECT string_agg(DISTINCT i.producto, ', ') FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as producto,
+                (SELECT SUM(i.cantidad) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as cantidad_total,
+                (SELECT SUM(i.precio) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as precio_total,
+                (SELECT SUM(i.peso) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as peso_total_prod,
+                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id = p.id) as historico
+            FROM grupo_inter_pedidos p
+            WHERE 1=1
+        `;
         const values: any[] = [];
+        let paramIdx = 1;
 
         if (search) {
+            query += ` AND (p.numero_documento ILIKE $${paramIdx} OR p.cliente ILIKE $${paramIdx})`;
             values.push(`%${search}%`);
-            query += ` AND (numero_documento ILIKE $${values.length} OR cliente ILIKE $${values.length})`;
+            paramIdx++;
         }
         if (status) {
+            query += ` AND p.estado = $${paramIdx}`;
             values.push(status);
-            query += ` AND estado = $${values.length}`;
+            paramIdx++;
         }
         if (client) {
+            query += ` AND p.cliente ILIKE $${paramIdx}`;
             values.push(`%${client}%`);
-            query += ` AND cliente ILIKE $${values.length}`;
+            paramIdx++;
         }
         
         // M7-EXT: Filtro por defecto de 8 días si no se especifica fecha
         if (fechaCorteDesde) {
+            query += ` AND p.f_ultimo_corte >= $${paramIdx}`;
             values.push(fechaCorteDesde);
-            query += ` AND f_ultimo_corte >= $${values.length}`;
+            paramIdx++;
         } else if (!search) {
             // Solo aplicar filtro por defecto si no hay búsqueda global activa
-            query += ` AND (f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR f_ultimo_corte IS NULL)`;
+            query += ` AND (p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`;
         }
 
         if (fechaCorteHasta) {
+            query += ` AND p.f_ultimo_corte <= $${paramIdx}`;
             values.push(fechaCorteHasta);
-            query += ` AND f_ultimo_corte <= $${values.length}`;
+            paramIdx++;
         }
 
-        query += ' ORDER BY f_ultimo_corte DESC, create_at DESC LIMIT 500';
+        query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 500';
         const result = await pool.query(query, values);
         res.json(result.rows);
     } catch (error) {
@@ -467,45 +506,61 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
         }
 
         const { fechaDesde, fechaHasta } = req.query;
-        let query = 'SELECT * FROM grupo_inter_pedidos WHERE 1=1';
+        let query = `
+            SELECT 
+                p.*,
+                (SELECT string_agg(DISTINCT i.producto, ', ') FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as producto,
+                (SELECT SUM(i.cantidad) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as cantidad_total,
+                (SELECT SUM(i.precio) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as precio_total,
+                (SELECT SUM(i.peso) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as peso_total_prod,
+                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id = p.id) as historico
+            FROM grupo_inter_pedidos p
+            WHERE 1=1
+        `;
         const values: any[] = [];
+        let paramIdx = 1;
 
         // Lógica de fechas (Fct. Último Corte)
         if (fechaDesde) {
+            query += ` AND p.f_ultimo_corte >= $${paramIdx}`;
             values.push(fechaDesde);
-            query += ` AND f_ultimo_corte >= $${values.length}`;
+            paramIdx++;
         }
         if (fechaHasta) {
+            query += ` AND p.f_ultimo_corte <= $${paramIdx}`;
             values.push(fechaHasta);
-            query += ` AND f_ultimo_corte <= $${values.length}`;
+            paramIdx++;
         }
 
         // M7-EXT: Fallback de 8 días si no hay fechas especificadas
         if (!fechaDesde && !fechaHasta) {
-            query += ` AND (f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR f_ultimo_corte IS NULL)`;
+            query += ` AND (p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`;
         }
 
-        query += ' ORDER BY f_ultimo_corte DESC, create_at DESC LIMIT 1000';
+        query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 1000';
         const result = await pool.query(query, values);
 
         const mappedOrders = result.rows.map(o => ({
-            estado: o.estado === 'Entregado' ? 'Entregado' : 'En proceso',
+            id: o.id,
+            estado: o.estado === 'Entregado' ? 'Entregado' : (o.estado || 'En proceso'),
             nroGuia: o.nro_guia || o.numero_guia || 'PD-' + (o.nro_documento || o.numero_documento),
             nroPedido: o.nro_documento || o.numero_documento,
             fechaEntregado: o.fecha_entregado ? o.fecha_entregado.toISOString().replace('T', ' ').substring(0, 16) : null,
-            fctUltimoCorte: o.f_ultimo_corte ? o.f_ultimo_corte.toISOString().split('T')[0] : null,
+            fctUltimoCorte: o.f_ultimo_corte ? (typeof o.f_ultimo_corte === 'string' ? o.f_ultimo_corte.split('T')[0] : o.f_ultimo_corte.toISOString().split('T')[0]) : null,
             ciudadOrigen: o.ciudad_origen || "MEDELLÍN",
             latitud: parseFloat(o.latitud) || 6.2442,
             longitud: parseFloat(o.longitud) || -75.5812,
             placa: o.placa || 'PENDIENTE',
-            ciudadDestino: o.ciudad_destino || o.municipio_destino || 'NO ESPECIFICADO',
+            cliente: o.cliente,
+            direccion: o.direccion,
+            municipio_destino: o.municipio_destino || o.ciudad_destino,
             acta_entrega_b64: o.acta_entrega_b64 || null,
-            productos: {
+            productos: (o.items || []).length > 0 ? o.items : {
                 peso: parseFloat(o.peso) || parseFloat(o.peso_total_prod) || 0,
                 cantidad: parseInt(o.cantidad) || parseInt(o.cantidad_total) || 0,
                 valorDeclarado: parseFloat(o.valor_declarado) || parseFloat(o.precio_total) || 0
             },
-            Novedades: (o.history || []).map((h: any) => ({
+            Novedades: (o.historico || []).length > 0 ? o.historico : (o.history || []).map((h: any) => ({
                 estado: h.action || h.estado || 'Actualización',
                 fechaEstado: h.date || h.fecha || new Date().toISOString()
             }))
@@ -520,4 +575,48 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
+
+export const updateStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { estado, observacion, usuario } = req.body;
+
+        if (!estado) {
+            res.status(400).json({ message: 'El estado es requerido' });
+            return;
+        }
+
+        await pool.query(
+            "UPDATE grupo_inter_pedidos SET estado = $1, updated_at = CURRENT_TIMESTAMP, update_by = $2 WHERE id = $3",
+            [estado, usuario || 'System', id]
+        );
+
+        await pool.query(
+            "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, $2, $3, $4)",
+            [id, estado, observacion || 'Actualización manual', usuario || 'System']
+        );
+
+        res.json({ message: 'Estado actualizado correctamente' });
+    } catch (error) {
+        console.error('[GRUPO-INTER] Error al actualizar estado:', error);
+        res.status(500).json({ message: 'Error al actualizar el estado' });
+    }
+};
+
+export const getOrderDetails = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        
+        const itemsRes = await pool.query("SELECT * FROM grupo_inter_pedidos_items WHERE pedido_id = $1", [id]);
+        const historyRes = await pool.query("SELECT * FROM grupo_inter_pedidos_historico WHERE pedido_id = $1 ORDER BY fecha DESC", [id]);
+
+        res.json({
+            items: itemsRes.rows,
+            history: historyRes.rows
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener detalles del pedido' });
+    }
+};
+
 

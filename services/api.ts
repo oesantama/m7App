@@ -620,6 +620,12 @@ export const api = {
       headers: {} // fetchJson manejará el token
     });
   },
+  updateGrupoInterStatus: (id: string, data: { estado: string, observacion?: string, usuario: string }) => fetchJson(`${API_URL}/grupo-inter/status/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  getGrupoInterDetails: (id: string) => fetchJson(`${API_URL}/grupo-inter/details/${id}?_t=${Date.now()}`),
   processGrupoInterPDF: async (file: File, onProgress: (data: any) => void) => {
     const formData = new FormData();
     formData.append('file', file);
