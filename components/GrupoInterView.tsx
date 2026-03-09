@@ -85,6 +85,11 @@ const GrupoInterView: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
+  // Paginación en Modal Detalle
+  const [currentPageItems, setCurrentPageItems] = useState(1);
+  const [currentPageHistorico, setCurrentPageHistorico] = useState(1);
+  const itemsPerPageModal = 5;
+  
   // Estados de Progreso y Diagnóstico
   const [uploadProgress, setUploadProgress] = useState(0);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
@@ -283,7 +288,9 @@ const GrupoInterView: React.FC = () => {
     setSelectedOrder(order);
     setShowDetailModal(true);
     setOrderDetails(null); 
-    setProductSearch(''); // Resetear búsqueda de productos
+    setProductSearch('');
+    setCurrentPageItems(1);
+    setCurrentPageHistorico(1);
     
     try {
       const details = await api.getGrupoInterDetails(order.id.toString());
@@ -885,6 +892,7 @@ const GrupoInterView: React.FC = () => {
                     </div>
                     <p className="text-sm font-black text-slate-900">{selectedOrder.clasificacion || 'N/A'}</p>
                   </div>
+
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -925,6 +933,7 @@ const GrupoInterView: React.FC = () => {
                       <tbody className="divide-y divide-slate-50">
                         {orderDetails ? orderDetails.items
                           .filter(item => item.producto.toLowerCase().includes(productSearch.toLowerCase()))
+                          .slice((currentPageItems - 1) * itemsPerPageModal, currentPageItems * itemsPerPageModal)
                           .map((item, idx) => (
                           <tr key={idx} className="hover:bg-slate-50/50">
                             <td className="px-4 py-2 text-slate-700 font-semibold">{item.producto}</td>
@@ -946,6 +955,29 @@ const GrupoInterView: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Paginación de Productos */}
+                  {orderDetails && orderDetails.items.filter(item => item.producto.toLowerCase().includes(productSearch.toLowerCase())).length > itemsPerPageModal && (
+                    <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[10px]">
+                      <button 
+                        disabled={currentPageItems === 1}
+                        onClick={() => setCurrentPageItems(prev => prev - 1)}
+                        className="p-1 px-3 font-bold text-blue-600 disabled:text-slate-300"
+                      >
+                        ANTERIOR
+                      </button>
+                      <span className="text-slate-400 font-black tracking-widest">
+                        PÁGINA {currentPageItems} DE {Math.ceil(orderDetails.items.filter(item => item.producto.toLowerCase().includes(productSearch.toLowerCase())).length / itemsPerPageModal)}
+                      </span>
+                      <button 
+                        disabled={currentPageItems >= Math.ceil(orderDetails.items.filter(item => item.producto.toLowerCase().includes(productSearch.toLowerCase())).length / itemsPerPageModal)}
+                        onClick={() => setCurrentPageItems(prev => prev + 1)}
+                        className="p-1 px-3 font-bold text-blue-600 disabled:text-slate-300"
+                      >
+                        SIGUIENTE
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Historial de Trazabilidad en Tabla */}
@@ -966,7 +998,9 @@ const GrupoInterView: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {orderDetails && orderDetails.history && orderDetails.history.length > 0 ? (
-                          orderDetails.history.map((h: any, idx: number) => (
+                          orderDetails.history
+                            .slice((currentPageHistorico - 1) * itemsPerPageModal, currentPageHistorico * itemsPerPageModal)
+                            .map((h: any, idx: number) => (
                             <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-4 py-3 text-slate-400 font-bold whitespace-nowrap">
                                 {new Date(h.fecha).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
@@ -994,6 +1028,27 @@ const GrupoInterView: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Paginación de Historial */}
+                  {orderDetails && orderDetails.history && orderDetails.history.length > itemsPerPageModal && (
+                    <div className="mt-2 flex justify-between items-center text-[9px] font-black uppercase text-slate-400">
+                       <button 
+                        disabled={currentPageHistorico === 1}
+                        onClick={() => setCurrentPageHistorico(prev => prev - 1)}
+                        className="p-1 px-3 text-blue-600 disabled:text-slate-300"
+                      >
+                        Anterior
+                      </button>
+                      <span>Página {currentPageHistorico} de {Math.ceil(orderDetails.history.length / itemsPerPageModal)}</span>
+                      <button 
+                        disabled={currentPageHistorico >= Math.ceil(orderDetails.history.length / itemsPerPageModal)}
+                        onClick={() => setCurrentPageHistorico(prev => prev + 1)}
+                        className="p-1 px-3 text-blue-600 disabled:text-slate-300"
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  )}
 
                   {/* Historial Legacy (Solo si existe) */}
                   {selectedOrder.history && selectedOrder.history.length > 0 && (

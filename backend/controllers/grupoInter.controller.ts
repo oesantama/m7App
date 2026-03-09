@@ -285,6 +285,13 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             const pedidoId = headerRes.rows[0].id;
             savedCount++;
 
+            // 1.5 Registro de histórico inicial (Pendiente) si es nuevo o no tiene histórico
+            await pool.query(`
+                INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario)
+                SELECT $1, 'Pendiente', 'Carga inicial desde Excel', $2
+                WHERE NOT EXISTS (SELECT 1 FROM grupo_inter_pedidos_historico WHERE pedido_id = $1)
+            `, [pedidoId, username]);
+
             // 2. Manejo de Item (Detalle)
             const queryItem = `
                 INSERT INTO grupo_inter_pedidos_items (
@@ -470,20 +477,22 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             paramIdx++;
         }
         
-        // M7-EXT: Filtro por defecto de 8 días si no se especifica fecha
-        if (fechaCorteDesde) {
-            query += ` AND p.f_ultimo_corte >= $${paramIdx}`;
-            values.push(fechaCorteDesde);
-            paramIdx++;
-        } else if (!search) {
-            // Solo aplicar filtro por defecto si no hay búsqueda global activa
-            query += ` AND (p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`;
-        }
+        // M7-EXT: Filtro de fecha (Solo si no hay búsqueda global activa)
+        if (!search) {
+            if (fechaCorteDesde) {
+                query += ` AND p.f_ultimo_corte >= $${paramIdx}`;
+                values.push(fechaCorteDesde);
+                paramIdx++;
+            } else {
+                // Filtro por defecto de 8 días si no hay nada
+                query += ` AND (p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`;
+            }
 
-        if (fechaCorteHasta) {
-            query += ` AND p.f_ultimo_corte <= $${paramIdx}`;
-            values.push(fechaCorteHasta);
-            paramIdx++;
+            if (fechaCorteHasta) {
+                query += ` AND p.f_ultimo_corte <= $${paramIdx}`;
+                values.push(fechaCorteHasta);
+                paramIdx++;
+            }
         }
 
         query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 500';
