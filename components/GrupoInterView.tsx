@@ -94,6 +94,8 @@ const GrupoInterView: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState("Iniciando...");
   const [isFinished, setIsFinished] = useState(false);
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
 
   const { user } = useAppStore();
 
@@ -697,22 +699,42 @@ const GrupoInterView: React.FC = () => {
                     <p className="text-slate-400 text-sm font-medium">Información centralizada del despacho</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {(selectedOrder as any).acta_entrega_b64 && (
-                    <button 
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = (selectedOrder as any).acta_entrega_b64;
-                        link.download = `Acta_Entrega_${selectedOrder.numero_documento}.pdf`;
-                        link.click();
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-emerald-100 transition shadow-sm"
-                    >
-                      <Download size={14} /> Acta de Entrega
-                    </button>
-                  )}
-                  <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24} /></button>
-                </div>
+                  <div className="flex items-center gap-2">
+                    {(selectedOrder as any).acta_entrega_b64 && (
+                      <>
+                        <button 
+                          onClick={() => {
+                            let b64 = (selectedOrder as any).acta_entrega_b64;
+                            if (!b64.startsWith('data:application/pdf;base64,')) {
+                              b64 = `data:application/pdf;base64,${b64}`;
+                            }
+                            setPdfPreviewUrl(b64);
+                            setShowPdfModal(true);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-blue-100 transition shadow-sm"
+                        >
+                          <Eye size={14} /> Ver Acta
+                        </button>
+                        <button 
+                          onClick={() => {
+                            let b64 = (selectedOrder as any).acta_entrega_b64;
+                            // Asegurar prefijo para que el navegador lo identifique correctamente
+                            if (!b64.startsWith('data:application/pdf;base64,')) {
+                              b64 = `data:application/pdf;base64,${b64}`;
+                            }
+                            const link = document.createElement('a');
+                            link.href = b64;
+                            link.download = `Acta_Entrega_${selectedOrder.numero_documento}.pdf`;
+                            link.click();
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-emerald-100 transition shadow-sm"
+                        >
+                          <Download size={14} /> Descargar
+                        </button>
+                      </>
+                    )}
+                    <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24} /></button>
+                  </div>
              </div>
 
              <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-8">
@@ -1125,6 +1147,36 @@ const GrupoInterView: React.FC = () => {
                 </div>
              </div>
           </div>
+        </div>
+      )}
+      {/* Modal Visualizador PDF */}
+      {showPdfModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+           <div className="bg-white w-[90vw] h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+              <div className="p-6 border-b flex justify-between items-center px-8 bg-white">
+                 <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><FileText size={20} /></div>
+                    <h2 className="text-xl font-black text-slate-900 uppercase">Visualizador de Acta</h2>
+                 </div>
+                 <div className="flex items-center gap-4">
+                    <a 
+                      href={pdfPreviewUrl} 
+                      download={`Acta_Entrega_${selectedOrder?.numero_documento}.pdf`}
+                      className="px-6 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition shadow-lg shadow-emerald-200"
+                    >
+                      Descargar PDF
+                    </a>
+                    <button onClick={() => setShowPdfModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24}/></button>
+                 </div>
+              </div>
+              <div className="flex-1 bg-slate-200 p-4">
+                 <iframe 
+                    src={pdfPreviewUrl} 
+                    className="w-full h-full rounded-2xl border-none shadow-inner"
+                    title="Previsualización de PDF"
+                 />
+              </div>
+           </div>
         </div>
       )}
     </div>

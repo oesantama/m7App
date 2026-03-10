@@ -663,7 +663,8 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                     const subPdf = await PDFDocument.create();
                     const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [pageIndex]);
                     subPdf.addPage(copiedPage);
-                    const base64Page = await subPdf.saveAsBase64();
+                    const rawBase64 = await subPdf.saveAsBase64();
+                    const base64Page = `data:application/pdf;base64,${rawBase64}`;
 
                     const username = req.body.username || 'System OCR';
 
