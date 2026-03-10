@@ -706,11 +706,11 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         let query = `
             SELECT 
                 p.*,
-                (SELECT string_agg(DISTINCT i.producto, ', ') FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as producto,
+                (SELECT string_agg(DISTINCT i.producto, ', ') FROM grupo_inter_pedidos_items i WHERE i.pedido_id::TEXT = p.id::TEXT) as producto,
                 
                 
                 
-                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id = p.id) as historico
+                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id::TEXT = p.id::TEXT) as historico
             FROM grupo_inter_pedidos p
             WHERE 1=1
         `;
@@ -779,18 +779,18 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
                     'observacion', n.observacion,
                     'fecha', n.fecha,
                     'usuario', n.usuario
-                ) ORDER BY n.fecha DESC) FROM grupo_inter_novedades n WHERE n.pedido_id = p.id) as novedades_arr,
+                ) ORDER BY n.fecha DESC) FROM grupo_inter_novedades n WHERE n.pedido_id::TEXT = p.id::TEXT) as novedades_arr,
                 
                 (SELECT json_agg(json_build_object(
                     'valor', r.valor,
                     'notas', r.notas,
                     'fecha', r.fecha,
                     'usuario', r.usuario
-                ) ORDER BY r.fecha DESC) FROM grupo_inter_reajustes r WHERE r.pedido_id = p.id) as reajustes_arr,
+                ) ORDER BY r.fecha DESC) FROM grupo_inter_reajustes r WHERE r.pedido_id::TEXT = p.id::TEXT) as reajustes_arr,
 
-                (SELECT json_agg(i ORDER BY i.id ASC) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as items_arr,
+                (SELECT json_agg(i ORDER BY i.id ASC) FROM grupo_inter_pedidos_items i WHERE i.pedido_id::TEXT = p.id::TEXT) as items_arr,
                 
-                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id = p.id) as historico_arr
+                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id::TEXT = p.id::TEXT) as historico_arr
             FROM grupo_inter_pedidos p
             WHERE 1=1
         `;
