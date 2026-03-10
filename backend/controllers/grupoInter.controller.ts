@@ -279,6 +279,13 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             return parseFloat(clean) || 0;
         };
 
+        const parseCoord = (val: any) => {
+            if (val === undefined || val === null || val === '' || val === ' ') return null;
+            const clean = String(val).replace(/[^0-9.,-]/g, '').replace(',', '.');
+            const num = parseFloat(clean);
+            return isNaN(num) ? null : num;
+        };
+
         const parseExcelDate = (val: any) => {
             if (!val) return null;
             try {
@@ -487,6 +494,13 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
             return parseFloat(clean) || 0;
         };
 
+        const parseCoord = (val: any) => {
+            if (val === undefined || val === null || val === '' || val === ' ') return null;
+            const clean = String(val).replace(/[^0-9.,-]/g, '').replace(',', '.');
+            const num = parseFloat(clean);
+            return isNaN(num) ? null : num;
+        };
+
         const parseExcelDate = (val: any) => {
             if (!val) return null;
             try {
@@ -509,8 +523,8 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
             const flete = idxFlete >= 0 ? parseNum(row[idxFlete]) : 0;
             const factura = idxFact >= 0 ? String(row[idxFact] || '').trim() : '';
 
-            const latitud = idxLat >= 0 ? parseNum(row[idxLat]) : null;
-            const longitud = idxLon >= 0 ? parseNum(row[idxLon]) : null;
+            const latitud = idxLat >= 0 ? parseCoord(row[idxLat]) : null;
+            const longitud = idxLon >= 0 ? parseCoord(row[idxLon]) : null;
 
             const result = await pool.query(`
                 UPDATE grupo_inter_pedidos 
@@ -730,36 +744,55 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
             return;
         }
 
-        const { fechaDesde, fechaHasta } = req.query;
+        const { fechaDesde, fechaHasta, nroDocumento } = req.query;
         let query = `
             SELECT 
                 p.*,
-                (SELECT string_agg(DISTINCT i.producto, ', ') FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as producto,
+                (SELECT json_agg(json_build_object(
+                    'tipo', n.tipo,
+                    'observacion', n.observacion,
+                    'fecha', n.fecha,
+                    'usuario', n.usuario
+                ) ORDER BY n.fecha DESC) FROM grupo_inter_novedades n WHERE n.pedido_id = p.id) as novedades_arr,
                 
+                (SELECT json_agg(json_build_object(
+                    'valor', r.valor,
+                    'notas', r.notas,
+                    'fecha', r.fecha,
+                    'usuario', r.usuario
+                ) ORDER BY r.fecha DESC) FROM grupo_inter_reajustes r WHERE r.pedido_id = p.id) as reajustes_arr,
+
+                (SELECT json_agg(i ORDER BY i.id ASC) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as items_arr,
                 
-                
-                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id = p.id) as historico
+                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id = p.id) as historico_arr
             FROM grupo_inter_pedidos p
             WHERE 1=1
         `;
         const values: any[] = [];
         let paramIdx = 1;
 
-        // Lógica de fechas (Fct. Último Corte)
-        if (fechaDesde) {
-            query += ` AND p.f_ultimo_corte >= $${paramIdx}`;
-            values.push(fechaDesde);
+        // Filtro por Número de Documento (Prioritario)
+        if (nroDocumento) {
+            query += ` AND (p.numero_documento = $${paramIdx} OR p.nro_documento = $${paramIdx})`;
+            values.push(nroDocumento);
             paramIdx++;
-        }
-        if (fechaHasta) {
-            query += ` AND p.f_ultimo_corte <= $${paramIdx}`;
-            values.push(fechaHasta);
-            paramIdx++;
-        }
+        } else {
+            // Lógica de fechas (Fct. Último Corte) solo si no se busca por documento
+            if (fechaDesde) {
+                query += ` AND p.f_ultimo_corte >= $${paramIdx}`;
+                values.push(fechaDesde);
+                paramIdx++;
+            }
+            if (fechaHasta) {
+                query += ` AND p.f_ultimo_corte <= $${paramIdx}`;
+                values.push(fechaHasta);
+                paramIdx++;
+            }
 
-        // M7-EXT: Fallback de 8 días si no hay fechas especificadas
-        if (!fechaDesde && !fechaHasta) {
-            query += ` AND (p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`;
+            // M7-EXT: Fallback de 8 días si no hay filtros especificados
+            if (!fechaDesde && !fechaHasta) {
+                query += ` AND (p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`;
+            }
         }
 
         query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 1000';
@@ -780,15 +813,18 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
             direccion: o.direccion,
             municipio_destino: o.municipio_destino || o.ciudad_destino,
             acta_entrega_b64: o.acta_entrega_b64 || null,
-            productos: (o.items || []).length > 0 ? o.items : {
+            valorFlete: Math.round(parseFloat(o.valor_flete) || 0),
+            productos: (o.items_arr || []).length > 0 ? o.items_arr : {
                 peso: parseFloat(o.peso_total_prod) || 0,
                 cantidad: parseInt(o.cantidad_total) || 0,
                 valorDeclarado: parseFloat(o.precio_total) || 0
             },
-            Novedades: (o.historico || []).length > 0 ? o.historico : (o.history || []).map((h: any) => ({
-                estado: h.action || h.estado || 'Actualización',
-                fechaEstado: h.date || h.fecha || new Date().toISOString()
-            }))
+            novedades: o.novedades_arr || [],
+            reajustes: o.reajustes_arr || [],
+            historicos: o.historico_arr || [],
+            // Mantenemos Novedades (con mayúscula) por retrocompatibilidad si es necesario, 
+            // mapeando el histórico como antes si no hay novedades
+            Novedades: (o.historico_arr || []).length > 0 ? o.historico_arr : []
         }));
 
         res.json({

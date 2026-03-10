@@ -657,6 +657,17 @@ export const api = {
     const formData = new FormData();
     formData.append('file', file);
     
+    // Adjuntamos el usuario actual para auditoría (update_by)
+    const sessionStr = localStorage.getItem('m7_user_session');
+    let username = 'System OCR';
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        username = session.name || session.user?.name || 'Admin';
+      } catch (e) {}
+    }
+    formData.append('username', username);
+
     // Obtenemos el token manualmente para el fetch directo
     const token = localStorage.getItem('token') || 
                   localStorage.getItem('m7_token') || 

@@ -47,7 +47,7 @@ const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string
   <div className="flex items-start gap-3">
     <div className={`mt-1 ${light ? 'text-blue-300' : 'text-blue-500'}`}>{icon}</div>
     <div className="flex flex-col">
-      <span className={`text-[10px] uppercase font-black tracking-widest ${light ? 'text-slate-400' : 'text-slate-400'}`}>{label}</span>
+      <span className={`text-[10px] uppercase font-black tracking-widest ${light ? 'text-white/70' : 'text-slate-400'}`}>{label}</span>
       <span className={`font-bold ${light ? 'text-white' : 'text-slate-900'} leading-tight`}>{value || '-'}</span>
     </div>
   </div>
@@ -388,6 +388,8 @@ const GrupoInterView: React.FC = () => {
       setShowReajusteModal(false);
       const details = await api.getGrupoInterDetails(selectedOrder.id.toString());
       setOrderDetails(details);
+      // Sincronización reactiva del flete total
+      fetchOrders(searchTerm);
     } catch (error: any) {
       toast.error(error.message || 'Error al registrar reajuste');
     } finally {
@@ -403,33 +405,24 @@ const GrupoInterView: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
       {/* Overlay de Carga con Barra de Progreso */}
-      {isProcessing && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-500">
+      {(loading || isProcessing) && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center max-w-sm w-full border border-white/20">
-            <div className="relative w-24 h-24 mb-6">
-              <div className="absolute inset-0 border-4 border-blue-50 rounded-full"></div>
-              <div 
-                className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"
-                style={{ animationDuration: '1.5s' }}
-              ></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xl font-black text-blue-600">{uploadProgress}%</span>
+            <div className="relative w-16 h-16 mb-6">
+              <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+            </div>
+            <h3 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-tight text-center">
+              {isProcessing ? (processingStatus || 'Analizando PDF...') : 'Sincronizando...'}
+            </h3>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center px-4">
+              Por favor espere mientras el núcleo de M7 procesa su información
+            </p>
+            {isProcessing && (
+              <div className="w-full mt-6 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
               </div>
-            </div>
-            
-            <h3 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-tight">{processingStatus}</h3>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8 text-center px-4">Por favor no cierre la ventana mientras sincronizamos con el núcleo</p>
-            
-            <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-2 shadow-inner">
-              <div 
-                className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-500 ease-out shadow-lg"
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between w-full text-[10px] font-black text-slate-400 uppercase">
-              <span>Progreso</span>
-              <span>{uploadProgress}%</span>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -721,12 +714,23 @@ const GrupoInterView: React.FC = () => {
                       <DetailItem icon={<FileText size={14}/>} label="Precio Total" value={`$${(selectedOrder.precio_total || 0).toLocaleString()}`} />
                    </div>
                    <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-2xl shadow-slate-200 flex flex-col gap-4">
-                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Resumen de Gestión</h4>
-                      <DetailItem icon={<CheckCircle size={14}/>} label="Estado" value={selectedOrder.estado || 'Pendiente'} />
-                      <DetailItem icon={<FileSpreadsheet size={14}/>} label="Flete Prop." value={`$${(selectedOrder.valor_flete || 0).toLocaleString()}`} />
-                      <div className="mt-2 text-[10px] font-medium text-slate-400 italic">
-                        {selectedOrder.notas_encabezado && <p className="line-clamp-2">"{selectedOrder.notas_encabezado}"</p>}
-                      </div>
+                      <h4 className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">Resumen de Gestión</h4>
+                      <DetailItem icon={<CheckCircle size={14}/>} label="Estado" value={selectedOrder.estado || 'Pendiente'} light={true} />
+                       <DetailItem icon={<FileSpreadsheet size={14}/>} label="flete inicial" value={`$${Math.round(selectedOrder.valor_flete || 0).toLocaleString()}`} light={true} />
+                       {orderDetails?.reajustes && orderDetails.reajustes.length > 0 && (
+                         <DetailItem 
+                           icon={<FileText size={14}/>} 
+                           label="flete total" 
+                            value={`${Math.round(Number(selectedOrder.valor_flete || 0) + (orderDetails?.reajustes || []).reduce((acc: number, r: any) => acc + (Number(r.valor) || 0), 0)).toLocaleString()}`}
+                           light={true} 
+                         />
+                       )}
+                       <div className="mt-2 flex flex-col gap-1">
+                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">NOTAS ENCABEZADO:</span>
+                         <div className="text-[10px] font-medium text-slate-200 italic">
+                           {selectedOrder.notas_encabezado ? <p className="line-clamp-2">"{selectedOrder.notas_encabezado}"</p> : <p className="text-slate-500">Sin notas</p>}
+                         </div>
+                       </div>
                    </div>
                 </div>
 

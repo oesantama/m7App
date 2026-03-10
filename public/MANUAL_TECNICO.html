@@ -186,7 +186,7 @@
       <section>
         <h2>2. Consulta de Pedidos</h2>
         <p>
-          El WebService expone un punto de enlace único para la descarga de información logística bajo dos modalidades de filtrado temporal.
+          El WebService expone un punto de enlace único para la descarga de información logística bajo tres modalidades de filtrado.
         </p>
         <p style="margin-bottom: 1rem">
           <span class="badge badge-get">GET</span>
@@ -203,16 +203,27 @@
         </div>
 
         <div class="card" style="border-left-color: #3b82f6">
-          <p><strong>Modalidad 2: Consulta Histórica (Últimos 8 Días)</strong></p>
+          <p><strong>Modalidad 2: Consulta por Número de Documento</strong></p>
           <p>
-            Si se omite el rango de fechas, el sistema entrega automáticamente
+            Permite obtener directamente la información de un documento específico (Factura). 
+            Esta consulta <strong>no tiene restricción de fecha</strong>.
+          </p>
+          <p style="margin-top: 0.75rem"><strong>Ejemplo de Petición URL:</strong></p>
+          <div class="endpoint-container">
+            GET https://orbitm7.m7apps.com/api/grupo-inter/public/list?token=M7-SECURE-2026-XQW&nroDocumento=FI100020
+          </div>
+        </div>
+
+        <div class="card" style="border-left-color: #94a3b8; opacity: 0.8;">
+          <p><strong>Modalidad 3: Consulta Histórica (Últimos 8 Días)</strong></p>
+          <p>
+            Si se omiten los filtros anteriores, el sistema entrega automáticamente
             los registros de los últimos 8 días calendario.
           </p>
           <p style="margin-top: 0.75rem"><strong>Ejemplo de Petición URL:</strong></p>
           <div class="endpoint-container">
             GET https://orbitm7.m7apps.com/api/grupo-inter/public/list?token=M7-SECURE-2026-XQW
           </div>
-          <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #64748b;"><em>Recomendado para sincronizaciones diarias y automáticas.</em></p>
         </div>
       </section>
 
@@ -237,14 +248,18 @@
       "placa": "XYZ-123",
       "ciudadDestino": "Bogotá",
       "acta_entrega_b64": "JVBERi0xLjQKJ...",
-      "productos": {
-        "peso": 25.5,
-        "cantidad": 10,
-        "valorDeclarado": 2000000.0
-      },
-      "Novedades": [
-        { "estado": "En tránsito", "fechaEstado": "2026-02-10T08:00:00" },
-        { "estado": "Entregado", "fechaEstado": "2026-02-13T14:30:00" }
+      "valorFlete": 45000,
+      "productos": [
+        { "producto": "CEMENTO GRIS", "cantidad": 10, "peso": 500 }
+      ],
+      "novedades": [
+        { "tipo": "ENTREGA", "observacion": "Entregado a portería", "fecha": "2026-02-13T14:30:00" }
+      ],
+      "reajustes": [
+        { "valor": 5000, "notas": "Ajuste por combustible", "fecha": "2026-02-12T10:00:00" }
+      ],
+      "historicos": [
+        { "estado": "En tránsito", "fecha": "2026-02-10T08:00:00" }
       ]
     }
   ]
