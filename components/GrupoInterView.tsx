@@ -40,6 +40,7 @@ interface Order {
   create_at: string;
   create_by?: string;
   update_at?: string;
+  valor_flete?: number;
 }
 
 const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
@@ -58,11 +59,12 @@ const GrupoInterView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [orderDetails, setOrderDetails] = useState<{items: any[], history: any[]} | null>(null);
+  const [orderDetails, setOrderDetails] = useState<{items: any[], history: any[], novedades?: any[], reajustes?: any[]} | null>(null);
   const [productSearch, setProductSearch] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [newStatus, setNewStatus] = useState({ estado: '', observacion: '' });
+  const [modalTab, setModalTab] = useState<'items' | 'historico' | 'novedades' | 'reajustes'>('items');
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [manifestFile, setManifestFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -327,6 +329,55 @@ const GrupoInterView: React.FC = () => {
     }
   };
 
+  const handleAddNovedad = async () => {
+    if (!selectedOrder) return;
+    const novedad = window.prompt('Ingrese la observación de la novedad:');
+    if (!novedad) return;
+    try {
+      setLoading(true);
+      await api.addGrupoInterNovedad({
+        pedido_id: selectedOrder.id,
+        tipo: 'NOVEDAD',
+        observacion: novedad,
+        usuario: user?.name || 'System'
+      });
+      toast.success('Novedad registrada');
+      const details = await api.getGrupoInterDetails(selectedOrder.id.toString());
+      setOrderDetails(details);
+    } catch (error: any) {
+      toast.error(error.message || 'Error al registrar novedad');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddReajuste = async () => {
+    if (!selectedOrder) return;
+    const valorStr = window.prompt('Ingrese el valor del reajuste:');
+    if (!valorStr) return;
+    const valor = parseFloat(valorStr);
+    if (isNaN(valor)) return toast.error('Valor inválido');
+    
+    const notas = window.prompt('Ingrese notas del reajuste:');
+    try {
+      setLoading(true);
+      await api.addGrupoInterReajuste({
+        pedido_id: selectedOrder.id,
+        numero_documento: selectedOrder.numero_documento,
+        valor,
+        notas: notas || '',
+        usuario: user?.name || 'System'
+      });
+      toast.success('Reajuste registrado');
+      const details = await api.getGrupoInterDetails(selectedOrder.id.toString());
+      setOrderDetails(details);
+    } catch (error: any) {
+      toast.error(error.message || 'Error al registrar reajuste');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredItems = orderDetails?.items.filter(item => 
     item.producto.toLowerCase().includes(productSearch.toLowerCase()) ||
     item.remision?.toLowerCase().includes(productSearch.toLowerCase())
@@ -477,8 +528,7 @@ const GrupoInterView: React.FC = () => {
                     <th className="px-6 py-4">Cant. Total</th>
                     <th className="px-6 py-4">Precio Total</th>
                     <th className="px-6 py-4">Peso Total</th>
-                    <th className="px-6 py-4">Dirección / Destino</th>
-                    <th className="px-6 py-4">Estado</th>
+                    <th className="px-6 py-4">Última Novedad</th>
                     <th className="px-6 py-4 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -502,15 +552,17 @@ const GrupoInterView: React.FC = () => {
                         <td className="px-6 py-4 font-bold text-slate-400">${(order.precio_total || 0).toLocaleString()}</td>
                         <td className="px-6 py-4 font-bold text-slate-400">{order.peso_total_prod || 0} Kg</td>
                         <td className="px-6 py-4">
-                           <div className="flex flex-col">
-                             <span className="text-slate-600 font-medium truncate max-w-[200px]">{order.direccion === ' ' ? '' : order.direccion}</span>
-                             <span className="text-[10px] text-blue-500 font-black tracking-tight">{order.municipio_destino}</span>
+                           <div className="flex flex-col min-w-[150px]">
+                             <span className="text-[10px] font-black text-blue-600 uppercase mb-1">
+                               {order.historico && order.historico.length > 0 ? order.historico[0].estado : order.estado || 'PENDIENTE'}
+                             </span>
+                             <span className="text-[10px] text-slate-400 font-bold leading-tight line-clamp-2">
+                               {order.historico && order.historico.length > 0 ? order.historico[0].observacion : '-'}
+                             </span>
+                             <span className="text-[9px] text-slate-300 font-black mt-1">
+                               {order.historico && order.historico.length > 0 ? new Date(order.historico[0].fecha).toLocaleString() : ''}
+                             </span>
                            </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                            order.estado === 'Entregado' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
-                          }`}>{order.estado || 'Pendiente'}</span>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex gap-2 justify-end">
@@ -581,107 +633,173 @@ const GrupoInterView: React.FC = () => {
                 <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24} /></button>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-12 gap-8">
-                <div className="md:col-span-4 space-y-6">
-                   <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Datos del Cliente</h4>
-                      <div className="space-y-4">
-                        <DetailItem icon={<User size={14}/>} label="Cliente" value={selectedOrder.cliente} />
-                        <DetailItem icon={<MapPin size={14}/>} label="Dirección" value={selectedOrder.direccion} />
-                        <DetailItem icon={<MapPin size={14}/>} label="Destino" value={selectedOrder.municipio_destino} />
+             <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-8">
+                {/* Encabezado de Datos Detallado */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                   <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-4">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cliente & Destino</h4>
+                      <DetailItem icon={<User size={14}/>} label="Cliente" value={selectedOrder.cliente} />
+                      <DetailItem icon={<MapPin size={14}/>} label="Dirección" value={selectedOrder.direccion} />
+                      <DetailItem icon={<MapPin size={14}/>} label="Ciudad" value={selectedOrder.municipio_destino} />
+                   </div>
+                   <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-4">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Logística Operativa</h4>
+                      <DetailItem icon={<Truck size={14}/>} label="Placa" value={selectedOrder.placa || '-'} />
+                      <DetailItem icon={<Clock size={14}/>} label="Último Corte" value={selectedOrder.f_ultimo_corte ? new Date(selectedOrder.f_ultimo_corte).toLocaleDateString() : '-'} />
+                      <DetailItem icon={<Filter size={14}/>} label="Clasificación" value={selectedOrder.clasificacion || '-'} />
+                   </div>
+                   <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-4">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Totales Valorizados</h4>
+                      <DetailItem icon={<Package size={14}/>} label="Cantidad Total" value={String(selectedOrder.cantidad_total || 0)} />
+                      <DetailItem icon={<Download size={14}/>} label="Peso Total" value={`${selectedOrder.peso_total_prod || 0} Kg`} />
+                      <DetailItem icon={<FileText size={14}/>} label="Precio Total" value={`$${(selectedOrder.precio_total || 0).toLocaleString()}`} />
+                   </div>
+                   <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-2xl shadow-slate-200 flex flex-col gap-4">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Resumen de Gestión</h4>
+                      <DetailItem icon={<CheckCircle size={14}/>} label="Estado" value={selectedOrder.estado || 'Pendiente'} />
+                      <DetailItem icon={<FileSpreadsheet size={14}/>} label="Flete Prop." value={`$${(selectedOrder.valor_flete || 0).toLocaleString()}`} />
+                      <div className="mt-2 text-[10px] font-medium text-slate-400 italic">
+                        {selectedOrder.notas_encabezado && <p className="line-clamp-2">"{selectedOrder.notas_encabezado}"</p>}
                       </div>
                    </div>
-                   <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-100/50">
-                      <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4">Información Logística</h4>
-                      <div className="space-y-4">
-                        <DetailItem icon={<Truck size={14}/>} label="Manifiesto" value={selectedOrder.manifiesto || 'Pendiente'} />
-                        <DetailItem icon={<Clock size={14}/>} label="Planilla" value={selectedOrder.planilla || 'Pendiente'} />
-                        <DetailItem icon={<Package size={14}/>} label="Ruta" value={selectedOrder.ruta || 'Sin asignar'} />
-                        <DetailItem icon={<Download size={14}/>} label="Flete" value={selectedOrder.flete ? `$${selectedOrder.flete.toLocaleString()}` : '0'} />
-                      </div>
-                   </div>
-                   <button onClick={() => setShowStatusModal(true)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-600 transition shadow-xl">Actualizar Estado</button>
                 </div>
 
-                <div className="md:col-span-8 flex flex-col gap-8">
-                   <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1">
-                      <div className="p-4 bg-slate-50 flex justify-between items-center">
-                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Productos y Remisiones</h4>
-                        <div className="relative">
-                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                          <input type="text" placeholder="Filtrar..." className="pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[10px] outline-none" value={productSearch} onChange={e => setProductSearch(e.target.value)} />
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto h-[250px]">
-                        <table className="w-full text-[10px]">
-                           <thead className="bg-slate-50 text-slate-400 font-bold border-b">
-                             <tr>
-                               <th className="px-4 py-2">Remisión</th>
-                               <th className="px-4 py-2">Producto</th>
-                               <th className="px-4 py-2">Cant</th>
-                               <th className="px-4 py-2">Peso</th>
-                             </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-50 font-medium">
-                             {filteredItems.length > 0 ? (
-                               filteredItems.slice((currentPageItems-1)*itemsPerPageModal, currentPageItems*itemsPerPageModal).map((item, i) => (
-                                <tr key={i}>
-                                  <td className="px-4 py-2 text-blue-600 font-bold">{item.remision || '-'}</td>
-                                  <td className="px-4 py-2">{item.producto}</td>
-                                  <td className="px-4 py-2">{item.cantidad}</td>
-                                  <td className="px-4 py-2 font-bold">{item.peso_prod} Kg</td>
-                                </tr>
-                              ))
-                             ) : (
-                               <tr><td colSpan={4} className="py-20 text-center text-slate-300">Sin productos</td></tr>
-                             )}
-                           </tbody>
-                        </table>
-                      </div>
-                      <div className="p-3 bg-slate-50 border-t flex justify-between items-center">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Item {filteredItems.length > 0 ? currentPageItems : 0} de {Math.ceil(filteredItems.length / itemsPerPageModal)}</span>
-                        <div className="flex gap-2">
-                          <button disabled={currentPageItems === 1} onClick={() => setCurrentPageItems(p => p - 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30 hover:bg-slate-100"><ChevronRight size={12} className="rotate-180"/></button>
-                          <button disabled={currentPageItems >= Math.ceil(filteredItems.length / itemsPerPageModal)} onClick={() => setCurrentPageItems(p => p + 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30 hover:bg-slate-100"><ChevronRight size={12}/></button>
-                        </div>
-                      </div>
+                {/* Sistema de Pestañas dinámicas */}
+                <div className="flex-1 flex flex-col">
+                   <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit mb-6">
+                      {[
+                        { id: 'items', label: 'Items', icon: <Package size={14}/> },
+                        { id: 'historico', label: 'Histórico', icon: <Clock size={14}/> },
+                        { id: 'novedades', label: 'Novedades', icon: <AlertCircle size={14}/> },
+                        { id: 'reajustes', label: 'Reajustes', icon: <FileText size={14}/> }
+                      ].map(tab => (
+                        <button 
+                          key={tab.id}
+                          onClick={() => setModalTab(tab.id as any)}
+                          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                            modalTab === tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                          }`}
+                        >
+                          {tab.icon} {tab.label}
+                        </button>
+                      ))}
                    </div>
 
-                   <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1">
-                      <div className="p-4 bg-slate-50 font-black text-[10px] text-slate-500 uppercase tracking-widest">Historial de Trazabilidad</div>
-                      <div className="overflow-x-auto h-[200px]">
-                        <table className="w-full text-[10px]">
-                           <thead className="bg-slate-50 text-slate-400 font-bold border-b">
-                             <tr>
-                               <th className="px-4 py-2">Fecha</th>
-                               <th className="px-4 py-2">Estado</th>
-                               <th className="px-4 py-2">Obs</th>
-                               <th className="px-4 py-2">Usuario</th>
-                             </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-50 font-medium">
-                             {orderDetails?.history && orderDetails.history.length > 0 ? (
-                               orderDetails.history.slice((currentPageHistorico-1)*itemsPerPageModal, currentPageHistorico*itemsPerPageModal).map((log, i) => (
-                                <tr key={i}>
-                                  <td className="px-4 py-2 whitespace-nowrap">{new Date(log.fecha || log.update_at).toLocaleString()}</td>
-                                  <td className="px-4 py-2"><span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">{log.estado || log.new_status}</span></td>
-                                  <td className="px-4 py-2 italic text-slate-400 max-w-[150px] truncate">{log.observacion || '-'}</td>
-                                  <td className="px-4 py-2 font-bold">{log.usuario || log.update_by}</td>
-                                </tr>
-                              ))
-                             ) : (
-                               <tr><td colSpan={4} className="py-20 text-center text-slate-300">Sin historial registrado</td></tr>
-                             )}
-                           </tbody>
+                   <div className="flex-1 bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm min-h-[400px]">
+                      {modalTab === 'items' && (
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b">
+                            <tr>
+                              <th className="px-6 py-4">Producto / Descripción</th>
+                              <th className="px-6 py-4">Tipo Artículo</th>
+                              <th className="px-6 py-4 text-center">Cant</th>
+                              <th className="px-6 py-4 text-right">Peso</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50 font-bold text-slate-600">
+                            {orderDetails?.items && orderDetails.items.length > 0 ? orderDetails.items.map((item: any, i: number) => (
+                              <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-6 py-4 text-slate-900">{item.producto}</td>
+                                <td className="px-6 py-4">
+                                  <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] uppercase font-black">{item.tipo_articulo || '-'}</span>
+                                </td>
+                                <td className="px-6 py-4 text-center">{item.cantidad}</td>
+                                <td className="px-6 py-4 text-right">{item.peso || item.peso_prod} Kg</td>
+                              </tr>
+                            )) : (
+                              <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-medium italic">
+                                {loading ? 'Cargando productos...' : 'No hay productos registrados'}
+                              </td></tr>
+                            )}
+                          </tbody>
                         </table>
-                      </div>
-                      <div className="p-3 bg-slate-50 border-t flex justify-between items-center">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Pág {orderDetails?.history ? currentPageHistorico : 0} de {Math.ceil((orderDetails?.history || []).length / itemsPerPageModal)}</span>
-                        <div className="flex gap-2">
-                          <button disabled={currentPageHistorico === 1} onClick={() => setCurrentPageHistorico(p => p - 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30 hover:bg-slate-100"><ChevronRight size={12} className="rotate-180"/></button>
-                          <button disabled={currentPageHistorico >= Math.ceil((orderDetails?.history || []).length / itemsPerPageModal)} onClick={() => setCurrentPageHistorico(p => p + 1)} className="p-1 px-2 bg-white border rounded shadow-sm disabled:opacity-30 hover:bg-slate-100"><ChevronRight size={12}/></button>
+                      )}
+
+                      {modalTab === 'historico' && (
+                        <div className="p-6 space-y-4">
+                           {orderDetails?.history && orderDetails.history.length > 0 ? orderDetails.history.map((h: any, i: number) => (
+                              <div key={i} className="flex gap-4 items-start bg-slate-50/50 p-5 rounded-3xl border border-slate-100 relative overflow-hidden">
+                                 <div className="w-1.5 bg-blue-600 absolute left-0 top-0 bottom-0"></div>
+                                 <div className="p-3 bg-white text-blue-600 rounded-2xl shadow-sm"><Clock size={18}/></div>
+                                 <div className="flex-1">
+                                    <div className="flex justify-between items-center mb-1">
+                                       <span className="font-black text-xs uppercase text-slate-900 tracking-tight">{h.estado || h.new_status}</span>
+                                       <span className="text-[10px] text-slate-400 font-bold">{new Date(h.fecha || h.update_at).toLocaleString()}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 font-medium">{h.observacion || '(Sin observación)'}</p>
+                                    <div className="mt-3 flex items-center gap-2">
+                                       <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center text-[8px] font-black text-blue-600">
+                                         {(h.usuario || h.update_by || '?')?.substring(0,1).toUpperCase()}
+                                       </div>
+                                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{h.usuario || h.update_by}</span>
+                                    </div>
+                                 </div>
+                              </div>
+                           )) : (
+                             <div className="py-20 text-center text-slate-300 font-medium italic">
+                               {loading ? 'Cargando historial...' : 'Historial vacío'}
+                             </div>
+                           )}
                         </div>
-                      </div>
+                      )}
+
+                      {modalTab === 'novedades' && (
+                        <div className="flex flex-col h-full bg-slate-50/30">
+                           <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Trazabilidad de Novedades</h3>
+                              <button onClick={handleAddNovedad} className="px-4 py-2 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-amber-600 transition shadow-lg shadow-amber-200">Reportar Nueva</button>
+                           </div>
+                           <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                              {orderDetails?.novedades && orderDetails.novedades.length > 0 ? orderDetails.novedades.map((n: any, i: number) => (
+                                 <div key={i} className="flex gap-4 items-start bg-white p-5 rounded-3xl border border-slate-100 relative shadow-sm">
+                                    <div className="p-2.5 bg-amber-50 text-amber-500 rounded-2xl"><AlertCircle size={16}/></div>
+                                    <div className="flex-1">
+                                       <div className="flex justify-between items-center mb-1">
+                                          <span className="font-black text-[10px] uppercase text-slate-900 tracking-tight">{n.tipo}</span>
+                                          <span className="text-[9px] text-slate-400 font-bold">{new Date(n.fecha).toLocaleString()}</span>
+                                       </div>
+                                       <p className="text-xs text-slate-500 font-medium">{n.observacion}</p>
+                                       <div className="mt-2 text-[9px] font-black text-slate-300 uppercase italic">Reportado por: {n.usuario}</div>
+                                    </div>
+                                 </div>
+                              )) : (
+                                <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                                   <div className="p-4 bg-slate-100 text-slate-300 rounded-full mb-4"><AlertCircle size={32}/></div>
+                                   <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">No hay novedades registradas</p>
+                                </div>
+                              )}
+                           </div>
+                        </div>
+                      )}
+
+                      {modalTab === 'reajustes' && (
+                        <div className="flex flex-col h-full bg-slate-50/30">
+                           <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Validación de Reajustes</h3>
+                              <button onClick={handleAddReajuste} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">Nuevo Reajuste</button>
+                           </div>
+                           <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                              {orderDetails?.reajustes && orderDetails.reajustes.length > 0 ? orderDetails.reajustes.map((r: any, i: number) => (
+                                 <div key={i} className="flex gap-4 items-start bg-white p-5 rounded-3xl border border-slate-100 relative shadow-sm">
+                                    <div className="p-2.5 bg-emerald-50 text-emerald-500 rounded-2xl"><FileSpreadsheet size={16}/></div>
+                                    <div className="flex-1">
+                                       <div className="flex justify-between items-center mb-1">
+                                          <span className="font-black text-xs text-emerald-600 tracking-tight">${parseFloat(r.valor).toLocaleString()}</span>
+                                          <span className="text-[9px] text-slate-400 font-bold">{new Date(r.fecha).toLocaleString()}</span>
+                                       </div>
+                                       <p className="text-xs text-slate-500 font-medium italic">{r.notas || '(Sin notas)'}</p>
+                                       <div className="mt-2 text-[9px] font-black text-slate-300 uppercase italic">Validado por: {r.usuario}</div>
+                                    </div>
+                                 </div>
+                              )) : (
+                                <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                                   <div className="p-4 bg-slate-100 text-slate-300 rounded-full mb-4"><FileSpreadsheet size={32}/></div>
+                                   <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">No hay reajustes aplicados</p>
+                                </div>
+                              )}
+                           </div>
+                        </div>
+                      )}
                    </div>
                 </div>
              </div>

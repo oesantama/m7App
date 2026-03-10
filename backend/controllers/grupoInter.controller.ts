@@ -73,6 +73,9 @@ const ensureSchema = async () => {
                 fecha TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 usuario TEXT
             );
+
+            -- Asegurar tipo_articulo en items
+            ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS tipo_articulo TEXT;
         `);
         schemaChecked = true;
     } catch (e) {
@@ -220,11 +223,11 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             producto: ['PRODUCTO', 'ARTICULO', 'DESCRIPCION'],
             cantidad_total: ['CANTIDAD', 'CANT'],
             precio_total: ['PRECIO TOTAL', 'VALOR TOTAL', 'TOTAL', 'SUBTOTAL', 'VALOR DECLARADO'],
-            tipo_articulo: ['TIPO ARTICULO', 'CATEGORIA', 'TIPO_ARTICULO'],
+            tipo_articulo: ['TIPO ARTICULO', 'CATEGORIA', 'TIPO_ARTICULO', 'TIPO', 'ARTICULO_TIPO'],
             empresa: ['EMPRESA', 'UNIDAD NEGOCIO'],
             peso_total_prod: ['PESO', 'KILOS'],
             f_ultimo_corte: ['FECHA CORTE', 'FCT. ULTIMO CORTE', 'FECHA DE CORTE', 'FC CORTE', 'ULTIMO CORTE', 'FECHA_CORTE'],
-            clasificacion: ['CLASIFICACION', 'ABC', 'TIPO PEDIDO', 'SEGMENTO']
+            clasificacion: ['CLASIFICACION', 'ABC', 'TIPO PEDIDO', 'SEGMENTO', 'CLASIFICACIÓN']
         };
 
         const identifyAliases = [...columnAliases.numero_documento, ...columnAliases.cliente].map(a => a.toUpperCase());
@@ -522,53 +525,7 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
     }
 };
 
-// --- NOVEDADES ---
-export const getNovedades = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { pedido_id } = req.params;
-        const result = await pool.query('SELECT * FROM grupo_inter_novedades WHERE pedido_id = $1 ORDER BY fecha DESC', [pedido_id]);
-        res.json(result.rows);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al obtener novedades' });
-    }
-};
 
-export const addNovedad = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { pedido_id, tipo, observacion, usuario } = req.body;
-        await pool.query(
-            'INSERT INTO grupo_inter_novedades (pedido_id, tipo, observacion, usuario) VALUES ($1, $2, $3, $4)',
-            [pedido_id, tipo, observacion, usuario]
-        );
-        res.json({ message: 'Novedad registrada' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error al registrar novedad' });
-    }
-};
-
-// --- REAJUSTES ---
-export const getReajustes = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { pedido_id } = req.params;
-        const result = await pool.query('SELECT * FROM grupo_inter_reajustes WHERE pedido_id = $1 ORDER BY fecha DESC', [pedido_id]);
-        res.json(result.rows);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al obtener reajustes' });
-    }
-};
-
-export const addReajuste = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { pedido_id, numero_documento, valor, notas, usuario } = req.body;
-        await pool.query(
-            'INSERT INTO grupo_inter_reajustes (pedido_id, numero_documento, valor, notas, usuario) VALUES ($1, $2, $3, $4, $5)',
-            [pedido_id, numero_documento, valor, notas, usuario]
-        );
-        res.json({ message: 'Reajuste registrado' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error al registrar reajuste' });
-    }
-};
 
 
 export const processPDF = async (req: any, res: Response): Promise<void> => {
@@ -862,14 +819,64 @@ export const getOrderDetails = async (req: Request, res: Response): Promise<void
         
         const itemsRes = await pool.query("SELECT * FROM grupo_inter_pedidos_items WHERE pedido_id = $1", [id]);
         const historyRes = await pool.query("SELECT * FROM grupo_inter_pedidos_historico WHERE pedido_id = $1 ORDER BY fecha DESC", [id]);
+        const novedadesRes = await pool.query("SELECT * FROM grupo_inter_novedades WHERE pedido_id = $1 ORDER BY fecha DESC", [id]);
+        const reajustesRes = await pool.query("SELECT * FROM grupo_inter_reajustes WHERE pedido_id = $1 ORDER BY fecha DESC", [id]);
 
         res.json({
             items: itemsRes.rows,
-            history: historyRes.rows
+            history: historyRes.rows,
+            novedades: novedadesRes.rows,
+            reajustes: reajustesRes.rows
         });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener detalles del pedido' });
     }
 };
+export const getNovedades = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pedido_id } = req.params;
+        const result = await pool.query("SELECT * FROM grupo_inter_novedades WHERE pedido_id = $1 ORDER BY fecha DESC", [pedido_id]);
+        res.json(result.rows || []);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener novedades' });
+    }
+};
 
+export const addNovedad = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pedido_id, novedad, usuario } = req.body;
+        await pool.query(
+            "INSERT INTO grupo_inter_novedades (pedido_id, tipo, observacion, usuario) VALUES ($1, 'NOVEDAD', $2, $3)",
+            [pedido_id, novedad, usuario || 'System']
+        );
+        res.json({ message: 'Novedad registrada con éxito' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al registrar novedad' });
+    }
+};
 
+export const getReajustes = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pedido_id } = req.params;
+        const result = await pool.query("SELECT * FROM grupo_inter_reajustes WHERE pedido_id = $1 ORDER BY fecha DESC", [pedido_id]);
+        res.json(result.rows || []);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener reajustes' });
+    }
+};
+
+export const addReajuste = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { pedido_id, valor, notas, usuario } = req.body;
+        const pedidoRes = await pool.query("SELECT numero_documento FROM grupo_inter_pedidos WHERE id = $1", [pedido_id]);
+        const doc = pedidoRes.rows[0]?.numero_documento || 'N/A';
+        
+        await pool.query(
+            "INSERT INTO grupo_inter_reajustes (pedido_id, numero_documento, valor, notas, usuario) VALUES ($1, $2, $3, $4, $5)",
+            [pedido_id, doc, valor, notas, usuario || 'System']
+        );
+        res.json({ message: 'Reajuste registrado con éxito' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al registrar reajuste' });
+    }
+};
