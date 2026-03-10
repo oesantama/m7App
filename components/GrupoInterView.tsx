@@ -93,6 +93,7 @@ const GrupoInterView: React.FC = () => {
   const [showDebug, setShowDebug] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState("Iniciando...");
+  const [isFinished, setIsFinished] = useState(false);
 
   const { user } = useAppStore();
 
@@ -257,7 +258,8 @@ const GrupoInterView: React.FC = () => {
           if (data.progress) setUploadProgress(data.progress);
         } else if (data.type === 'end') {
           setUploadProgress(100);
-          setProcessingStatus(`Completado: ${data.matches} coincidencias.`);
+          setProcessingStatus(`COMPLETADO: ${data.matches} COINCIDENCIAS.`);
+          setIsFinished(true); // Marcamos el fin del proceso
           toast.success(`Se encontraron ${data.matches} coincidencias.`);
         }
       });
@@ -408,24 +410,45 @@ const GrupoInterView: React.FC = () => {
       {(loading || isProcessing) && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center max-w-sm w-full border border-white/20">
-            <div className="relative w-16 h-16 mb-6">
-              <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-            </div>
+            {!isFinished && (
+              <div className="relative w-16 h-16 mb-6">
+                <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+              </div>
+            )}
+            {isFinished && (
+              <div className="p-4 bg-emerald-100 text-emerald-600 rounded-full mb-6">
+                <CheckCircle size={40} />
+              </div>
+            )}
             <h3 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-tight text-center">
               {isProcessing ? (processingStatus || 'Analizando PDF...') : 'Sincronizando...'}
             </h3>
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center px-4">
               Por favor espere mientras el núcleo de M7 procesa su información
             </p>
-            {isProcessing && (
+            {isProcessing && !isFinished && (
               <div className="w-full mt-6 h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
               </div>
             )}
+            
+            {isFinished && (
+              <button 
+                onClick={() => {
+                  setIsProcessing(false);
+                  setIsFinished(false);
+                  fetchOrders(searchTerm);
+                }}
+                className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-xl shadow-blue-100 active:scale-95"
+              >
+                Aceptar / Cerrar
+              </button>
+            )}
           </div>
         </div>
       )}
+
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
