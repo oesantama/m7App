@@ -78,7 +78,29 @@ const ensureSchema = async () => {
                 usuario TEXT
             );
 
-            -- Asegurar tipo_articulo en items
+            -- Tabla de Items (NECESARIO PARA EL SERVER)
+            CREATE TABLE IF NOT EXISTS grupo_inter_pedidos_items (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
+                guia TEXT,
+                cantidad INTEGER,
+                producto TEXT,
+                tipo_articulo TEXT,
+                peso NUMERIC(10,2),
+                valor_declarado NUMERIC(15,2)
+            );
+
+            -- Tabla de Histórico (NECESARIO PARA EL SERVER)
+            CREATE TABLE IF NOT EXISTS grupo_inter_pedidos_historico (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
+                estado TEXT,
+                observacion TEXT,
+                fecha TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                usuario TEXT
+            );
+
+            -- Asegurar tipo_articulo en items si la tabla ya existía
             ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS tipo_articulo TEXT;
         `);
         schemaChecked = true;
