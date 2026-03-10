@@ -78,7 +78,7 @@ const ensureSchema = async () => {
                 usuario TEXT
             );
 
-            -- Tabla de Items (NECESARIO PARA EL SERVER)
+            -- Tabla de Items (NECESARIO PARA EL SERVER) - Asegurar todas las columnas de Imagen 2 e Imagen 3
             CREATE TABLE IF NOT EXISTS grupo_inter_pedidos_items (
                 id SERIAL PRIMARY KEY,
                 pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
@@ -87,7 +87,8 @@ const ensureSchema = async () => {
                 producto TEXT,
                 tipo_articulo TEXT,
                 peso NUMERIC(10,2),
-                valor_declarado NUMERIC(15,2)
+                valor_declarado NUMERIC(15,2),
+                precio NUMERIC(15,2) DEFAULT 0
             );
 
             -- Tabla de Histórico (NECESARIO PARA EL SERVER)
@@ -100,8 +101,11 @@ const ensureSchema = async () => {
                 usuario TEXT
             );
 
-            -- Asegurar tipo_articulo en items si la tabla ya existía
+            -- Asegurar columnas si las tablas ya existían
             ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS tipo_articulo TEXT;
+            ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS precio NUMERIC(15,2) DEFAULT 0;
+            ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS guia TEXT;
+            ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS producto TEXT;
         `);
         schemaChecked = true;
     } catch (e) {
