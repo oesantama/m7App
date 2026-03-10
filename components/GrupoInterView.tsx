@@ -43,12 +43,12 @@ interface Order {
   valor_flete?: number;
 }
 
-const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
+const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string; light?: boolean }> = ({ icon, label, value, light }) => (
   <div className="flex items-start gap-3">
-    <div className="mt-1 text-blue-500">{icon}</div>
+    <div className={`mt-1 ${light ? 'text-blue-400' : 'text-blue-500'}`}>{icon}</div>
     <div className="flex flex-col">
-      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{label}</span>
-      <span className="text-slate-900 font-semibold">{value || '-'}</span>
+      <span className={`text-[10px] uppercase font-bold tracking-wider ${light ? 'text-slate-500' : 'text-slate-400'}`}>{label}</span>
+      <span className={`font-semibold ${light ? 'text-white' : 'text-slate-900'}`}>{value || '-'}</span>
     </div>
   </div>
 );
@@ -100,10 +100,11 @@ const GrupoInterView: React.FC = () => {
   });
 
   useEffect(() => {
-    if (activeTab === 'gestion') {
-      fetchOrders(searchTerm);
+    // Solo carga inicial o cambio de pestaña, pero quitamos filters de la dependencia
+    if (activeTab === 'gestion' && orders.length === 0) {
+      // Opcional: cargar algo por defecto o dejar vacío hasta que den clic
     }
-  }, [activeTab, filters]);
+  }, [activeTab]);
 
   useEffect(() => {
     // Solo carga inicial si el usuario lo desea, pero según la solicitud, solo al presionar botones.
@@ -120,7 +121,10 @@ const GrupoInterView: React.FC = () => {
       if (filters.fechaCorteHasta) params.fechaCorteHasta = filters.fechaCorteHasta;
       
       const data = await api.getGrupoInterOrders(params);
-      setOrders(data);
+      if (data && data.length === 0) {
+        toast.info('No se encontraron registros para los filtros aplicados');
+      }
+      setOrders(data || []);
       setCurrentPage(1);
     } catch (error: any) {
       toast.error(error.message || 'Error al cargar pedidos');
@@ -482,11 +486,14 @@ const GrupoInterView: React.FC = () => {
                     const today = new Date();
                     const eightDaysAgo = new Date();
                     eightDaysAgo.setDate(today.getDate() - 8);
-                    setFilters({
+                    const newFilters = {
                       ...filters,
                       fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0],
                       fechaCorteHasta: today.toISOString().split('T')[0]
-                    });
+                    };
+                    setFilters(newFilters);
+                    // Ejecutamos inmediatamente con los nuevos filtros
+                    setTimeout(() => fetchOrders(searchTerm), 0);
                   }}
                   className="px-6 py-3.5 bg-amber-50 text-amber-600 rounded-2xl text-[10px] font-black flex items-center gap-2 hover:bg-amber-100 transition-all border border-amber-100/50 uppercase tracking-widest"
                 >
@@ -630,12 +637,27 @@ const GrupoInterView: React.FC = () => {
                     <p className="text-slate-400 text-sm font-medium">Información centralizada del despacho</p>
                   </div>
                 </div>
-                <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24} /></button>
+                <div className="flex items-center gap-2">
+                  {(selectedOrder as any).acta_entrega_b64 && (
+                    <button 
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = (selectedOrder as any).acta_entrega_b64;
+                        link.download = `Acta_Entrega_${selectedOrder.numero_documento}.pdf`;
+                        link.click();
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-emerald-100 transition shadow-sm"
+                    >
+                      <Download size={14} /> Acta de Entrega
+                    </button>
+                  )}
+                  <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24} /></button>
+                </div>
              </div>
 
              <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-8">
                 {/* Encabezado de Datos Detallado */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                    <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-4">
                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cliente & Destino</h4>
                       <DetailItem icon={<User size={14}/>} label="Cliente" value={selectedOrder.cliente} />
