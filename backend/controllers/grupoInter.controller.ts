@@ -18,16 +18,21 @@ const ensureSchema = async () => {
     if (schemaChecked) return;
     try {
         await pool.query(`
-            -- Normalización de timestamps y limpieza
+            -- Normalización de timestamps y limpieza radical de duplicados
             ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS created_at;
             ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS history;
             ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS producto;
             ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS tipo_articulo;
+            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS peso;
+            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS cantidad;
+            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS valor_declarado;
             
+            -- Asegurar columnas con nombres exactos solicitados
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS create_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_at TIMESTAMP WITH TIME ZONE;
             ALTER TABLE grupo_inter_pedidos ALTER COLUMN update_at DROP DEFAULT;
             
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS create_by TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_by TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS numero_planilla TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS fecha_viaje TIMESTAMP WITH TIME ZONE;
@@ -38,10 +43,15 @@ const ensureSchema = async () => {
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS notas_encabezado TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS f_ultimo_corte TIMESTAMP WITH TIME ZONE;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS clasificacion TEXT;
-            -- Totales existentes (asegurar)
-            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;
-            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS cantidad NUMERIC DEFAULT 0;
-            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS valor_declarado NUMERIC DEFAULT 0;
+            
+            -- Totales con nombres de Imagen 3 e Imagen 7
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS cantidad_total NUMERIC DEFAULT 0;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS precio_total NUMERIC DEFAULT 0;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS peso_total_prod NUMERIC DEFAULT 0;
+            
+            -- Parche agresivo para create_at nulo (M7-LEGACY-FIX)
+            UPDATE grupo_inter_pedidos SET create_at = CURRENT_TIMESTAMP WHERE create_at IS NULL;
+            UPDATE grupo_inter_pedidos SET create_at = fecha_carge WHERE create_at IS NULL AND fecha_carge IS NOT NULL;
 
             -- Tabla de Novedades
             CREATE TABLE IF NOT EXISTS grupo_inter_novedades (
@@ -213,8 +223,8 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             tipo_articulo: ['TIPO ARTICULO', 'CATEGORIA'],
             empresa: ['EMPRESA', 'UNIDAD NEGOCIO'],
             peso_total_prod: ['PESO', 'KILOS'],
-            f_ultimo_corte: ['FECHA CORTE', 'FCT. ULTIMO CORTE'],
-            clasificacion: ['CLASIFICACION', 'ABC']
+            f_ultimo_corte: ['FECHA CORTE', 'FCT. ULTIMO CORTE', 'FECHA DE CORTE', 'FC CORTE', 'ULTIMO CORTE', 'FECHA_CORTE'],
+            clasificacion: ['CLASIFICACION', 'ABC', 'TIPO PEDIDO', 'SEGMENTO']
         };
 
         const identifyAliases = [...columnAliases.numero_documento, ...columnAliases.cliente].map(a => a.toUpperCase());
@@ -233,7 +243,11 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
 
         const headerRow = (rows[headerRowIndex] || []).map(cell => String(cell || '').toUpperCase().trim());
         const getColIndex = (list: string[]) => {
-            return headerRow.findIndex(cell => list.some(alias => cell === alias || cell.includes(alias)));
+            // Primero buscar coincidencia exacta
+            const exact = headerRow.findIndex(cell => list.some(alias => cell === alias));
+            if (exact >= 0) return exact;
+            // Luego coincidencia parcial (si no hay exacta)
+            return headerRow.findIndex(cell => list.some(alias => cell.includes(alias)));
         };
 
         const idxDoc = getColIndex(columnAliases.numero_documento);
@@ -307,7 +321,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                             nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5, 
                             municipio_destino = $6, empresa = $7, f_ultimo_corte = $8, 
                             clasificacion = $9, placa = $10, valor_flete = $11, numero_planilla = $12,
-                            peso = $13, cantidad = $14, valor_declarado = $15,
+                            cantidad_total = $13, precio_total = $14, peso_total_prod = $15,
                             update_by = $16, update_at = CURRENT_TIMESTAMP
                         WHERE id = $1;
                     `, [
@@ -323,9 +337,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         placa,
                         fleteProporcional,
                         planilla || '',
-                        idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
                         idxCant >= 0 ? parseNum(rowArr[idxCant]) : 0,
                         idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0,
+                        idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
                         username
                     ]);
                 } else {
@@ -334,9 +348,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                             numero_documento, nit, cliente, direccion, notas_encabezado, 
                             municipio_destino, empresa, f_ultimo_corte, 
                             clasificacion, placa, valor_flete, numero_planilla, 
-                            peso, cantidad, valor_declarado,
-                            estado, create_by, fecha_carge
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP)
+                            cantidad_total, precio_total, peso_total_prod,
+                            estado, create_by, create_at, fecha_carge
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         RETURNING id;
                     `, [
                         doc,
@@ -351,9 +365,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         placa,
                         fleteProporcional,
                         planilla || '',
-                        idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
                         idxCant >= 0 ? parseNum(rowArr[idxCant]) : 0,
                         idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0,
+                        idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
                         username
                     ]);
                     pedidoId = insertRes.rows[0].id;
@@ -681,9 +695,9 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             SELECT 
                 p.*,
                 (SELECT string_agg(DISTINCT i.producto, ', ') FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as producto,
-                (SELECT SUM(i.cantidad) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as cantidad_total,
-                (SELECT SUM(i.precio) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as precio_total,
-                (SELECT SUM(i.peso) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as peso_total_prod,
+                
+                
+                
                 (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id = p.id) as historico
             FROM grupo_inter_pedidos p
             WHERE 1=1
@@ -749,9 +763,9 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
             SELECT 
                 p.*,
                 (SELECT string_agg(DISTINCT i.producto, ', ') FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as producto,
-                (SELECT SUM(i.cantidad) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as cantidad_total,
-                (SELECT SUM(i.precio) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as precio_total,
-                (SELECT SUM(i.peso) FROM grupo_inter_pedidos_items i WHERE i.pedido_id = p.id) as peso_total_prod,
+                
+                
+                
                 (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id = p.id) as historico
             FROM grupo_inter_pedidos p
             WHERE 1=1
@@ -795,9 +809,9 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
             municipio_destino: o.municipio_destino || o.ciudad_destino,
             acta_entrega_b64: o.acta_entrega_b64 || null,
             productos: (o.items || []).length > 0 ? o.items : {
-                peso: parseFloat(o.peso) || parseFloat(o.peso_total_prod) || 0,
-                cantidad: parseInt(o.cantidad) || parseInt(o.cantidad_total) || 0,
-                valorDeclarado: parseFloat(o.valor_declarado) || parseFloat(o.precio_total) || 0
+                peso: parseFloat(o.peso_total_prod) || 0,
+                cantidad: parseInt(o.cantidad_total) || 0,
+                valorDeclarado: parseFloat(o.precio_total) || 0
             },
             Novedades: (o.historico || []).length > 0 ? o.historico : (o.history || []).map((h: any) => ({
                 estado: h.action || h.estado || 'Actualización',

@@ -474,6 +474,9 @@ const GrupoInterView: React.FC = () => {
                     <th className="px-6 py-4">Documento</th>
                     <th className="px-6 py-4">Fct. Último C.</th>
                     <th className="px-6 py-4">Cliente / NIT</th>
+                    <th className="px-6 py-4">Cant. Total</th>
+                    <th className="px-6 py-4">Precio Total</th>
+                    <th className="px-6 py-4">Peso Total</th>
                     <th className="px-6 py-4">Dirección / Destino</th>
                     <th className="px-6 py-4">Estado</th>
                     <th className="px-6 py-4 text-right">Acciones</th>
@@ -481,9 +484,9 @@ const GrupoInterView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-xs text-slate-600">
                   {loading ? (
-                    <tr><td colSpan={6} className="py-20 text-center text-slate-400 font-medium">Sincronizando con Orbit...</td></tr>
+                    <tr><td colSpan={9} className="py-20 text-center text-slate-400 font-medium">Sincronizando con Orbit...</td></tr>
                   ) : orders.length === 0 ? (
-                    <tr><td colSpan={6} className="py-20 text-center text-slate-300 font-medium">Sin registros encontrados</td></tr>
+                    <tr><td colSpan={9} className="py-20 text-center text-slate-300 font-medium">Sin registros encontrados</td></tr>
                   ) : (
                     orders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => (
                       <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
@@ -495,6 +498,9 @@ const GrupoInterView: React.FC = () => {
                              <span className="text-[10px] text-slate-400 font-bold">{order.nit}</span>
                            </div>
                         </td>
+                        <td className="px-6 py-4 font-bold text-slate-400">{order.cantidad_total || 0}</td>
+                        <td className="px-6 py-4 font-bold text-slate-400">${(order.precio_total || 0).toLocaleString()}</td>
+                        <td className="px-6 py-4 font-bold text-slate-400">{order.peso_total_prod || 0} Kg</td>
                         <td className="px-6 py-4">
                            <div className="flex flex-col">
                              <span className="text-slate-600 font-medium truncate max-w-[200px]">{order.direccion === ' ' ? '' : order.direccion}</span>
