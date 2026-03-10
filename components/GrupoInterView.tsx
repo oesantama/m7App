@@ -45,10 +45,10 @@ interface Order {
 
 const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string; light?: boolean }> = ({ icon, label, value, light }) => (
   <div className="flex items-start gap-3">
-    <div className={`mt-1 ${light ? 'text-blue-400' : 'text-blue-500'}`}>{icon}</div>
+    <div className={`mt-1 ${light ? 'text-blue-300' : 'text-blue-500'}`}>{icon}</div>
     <div className="flex flex-col">
-      <span className={`text-[10px] uppercase font-bold tracking-wider ${light ? 'text-slate-500' : 'text-slate-400'}`}>{label}</span>
-      <span className={`font-semibold ${light ? 'text-white' : 'text-slate-900'}`}>{value || '-'}</span>
+      <span className={`text-[10px] uppercase font-black tracking-widest ${light ? 'text-slate-400' : 'text-slate-400'}`}>{label}</span>
+      <span className={`font-bold ${light ? 'text-white' : 'text-slate-900'} leading-tight`}>{value || '-'}</span>
     </div>
   </div>
 );
@@ -63,7 +63,11 @@ const GrupoInterView: React.FC = () => {
   const [productSearch, setProductSearch] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showNovedadModal, setShowNovedadModal] = useState(false);
+  const [showReajusteModal, setShowReajusteModal] = useState(false);
   const [newStatus, setNewStatus] = useState({ estado: '', observacion: '' });
+  const [newNovedad, setNewNovedad] = useState({ observacion: '' });
+  const [newReajuste, setNewReajuste] = useState({ valor: '', notas: '' });
   const [modalTab, setModalTab] = useState<'items' | 'historico' | 'novedades' | 'reajustes'>('items');
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [manifestFile, setManifestFile] = useState<File | null>(null);
@@ -335,17 +339,22 @@ const GrupoInterView: React.FC = () => {
 
   const handleAddNovedad = async () => {
     if (!selectedOrder) return;
-    const novedad = window.prompt('Ingrese la observación de la novedad:');
-    if (!novedad) return;
+    setNewNovedad({ observacion: '' });
+    setShowNovedadModal(true);
+  };
+
+  const confirmAddNovedad = async () => {
+    if (!selectedOrder || !newNovedad.observacion) return;
     try {
       setLoading(true);
       await api.addGrupoInterNovedad({
         pedido_id: selectedOrder.id,
         tipo: 'NOVEDAD',
-        observacion: novedad,
+        observacion: newNovedad.observacion,
         usuario: user?.name || 'System'
       });
       toast.success('Novedad registrada');
+      setShowNovedadModal(false);
       const details = await api.getGrupoInterDetails(selectedOrder.id.toString());
       setOrderDetails(details);
     } catch (error: any) {
@@ -357,22 +366,26 @@ const GrupoInterView: React.FC = () => {
 
   const handleAddReajuste = async () => {
     if (!selectedOrder) return;
-    const valorStr = window.prompt('Ingrese el valor del reajuste:');
-    if (!valorStr) return;
-    const valor = parseFloat(valorStr);
+    setNewReajuste({ valor: '', notas: '' });
+    setShowReajusteModal(true);
+  };
+
+  const confirmAddReajuste = async () => {
+    if (!selectedOrder || !newReajuste.valor) return;
+    const valor = parseFloat(newReajuste.valor);
     if (isNaN(valor)) return toast.error('Valor inválido');
     
-    const notas = window.prompt('Ingrese notas del reajuste:');
     try {
       setLoading(true);
       await api.addGrupoInterReajuste({
         pedido_id: selectedOrder.id,
         numero_documento: selectedOrder.numero_documento,
         valor,
-        notas: notas || '',
+        notas: newReajuste.notas || '',
         usuario: user?.name || 'System'
       });
       toast.success('Reajuste registrado');
+      setShowReajusteModal(false);
       const details = await api.getGrupoInterDetails(selectedOrder.id.toString());
       setOrderDetails(details);
     } catch (error: any) {
@@ -389,6 +402,37 @@ const GrupoInterView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
+      {/* Overlay de Carga con Barra de Progreso */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-500">
+          <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center max-w-sm w-full border border-white/20">
+            <div className="relative w-24 h-24 mb-6">
+              <div className="absolute inset-0 border-4 border-blue-50 rounded-full"></div>
+              <div 
+                className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"
+                style={{ animationDuration: '1.5s' }}
+              ></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xl font-black text-blue-600">{uploadProgress}%</span>
+              </div>
+            </div>
+            
+            <h3 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-tight">{processingStatus}</h3>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8 text-center px-4">Por favor no cierre la ventana mientras sincronizamos con el núcleo</p>
+            
+            <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-2 shadow-inner">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-500 ease-out shadow-lg"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between w-full text-[10px] font-black text-slate-400 uppercase">
+              <span>Progreso</span>
+              <span>{uploadProgress}%</span>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
@@ -975,6 +1019,85 @@ const GrupoInterView: React.FC = () => {
                  <button onClick={() => setShowGuideModal(null)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest mt-4 hover:bg-blue-600 transition shadow-xl shadow-blue-100">Entendido</button>
               </div>
            </div>
+        </div>
+      )}
+      {/* Modal Nueva Novedad */}
+      {showNovedadModal && selectedOrder && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowNovedadModal(false)}></div>
+          <div className="relative bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in duration-300 border border-amber-100">
+             <div className="flex items-center gap-3 mb-6">
+                <div className="p-2.5 bg-amber-50 text-amber-500 rounded-2xl"><AlertCircle size={20}/></div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Reportar Novedad</h3>
+             </div>
+             <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Observación de la Novedad</label>
+                  <textarea 
+                    autoFocus
+                    value={newNovedad.observacion} 
+                    onChange={e => setNewNovedad({observacion: e.target.value})} 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm h-32 resize-none focus:ring-2 focus:ring-amber-500 transition-all font-medium" 
+                    placeholder="Describa la novedad ocurrida..." 
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                   <button onClick={() => setShowNovedadModal(false)} className="flex-1 py-3 border border-slate-100 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition uppercase text-[10px] tracking-widest">Cancelar</button>
+                   <button 
+                    onClick={confirmAddNovedad} 
+                    disabled={loading || !newNovedad.observacion} 
+                    className="flex-2 py-3 bg-amber-500 text-white rounded-xl font-black hover:bg-amber-600 transition disabled:opacity-50 uppercase text-[10px] tracking-widest shadow-lg shadow-amber-100"
+                   >
+                     {loading ? 'ENVIANDO...' : 'REGISTRAR'}
+                   </button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nuevo Reajuste */}
+      {showReajusteModal && selectedOrder && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowReajusteModal(false)}></div>
+          <div className="relative bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in duration-300 border border-emerald-100">
+             <div className="flex items-center gap-3 mb-6">
+                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl"><FileSpreadsheet size={20}/></div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Nuevo Reajuste</h3>
+             </div>
+             <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Valor del Reajuste ($)</label>
+                  <input 
+                    type="number"
+                    autoFocus
+                    value={newReajuste.valor} 
+                    onChange={e => setNewReajuste({...newReajuste, valor: e.target.value})} 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold focus:ring-2 focus:ring-emerald-500 transition-all" 
+                    placeholder="0.00" 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Notas / Justificación</label>
+                  <textarea 
+                    value={newReajuste.notas} 
+                    onChange={e => setNewReajuste({...newReajuste, notas: e.target.value})} 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm h-24 resize-none focus:ring-2 focus:ring-emerald-500 transition-all font-medium" 
+                    placeholder="Escriba el motivo del reajuste..." 
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                   <button onClick={() => setShowReajusteModal(false)} className="flex-1 py-3 border border-slate-100 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition uppercase text-[10px] tracking-widest">Cancelar</button>
+                   <button 
+                    onClick={confirmAddReajuste} 
+                    disabled={loading || !newReajuste.valor} 
+                    className="flex-2 py-3 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition disabled:opacity-50 uppercase text-[10px] tracking-widest shadow-lg shadow-emerald-100"
+                   >
+                     {loading ? 'ENVIANDO...' : 'APLICAR'}
+                   </button>
+                </div>
+             </div>
+          </div>
         </div>
       )}
     </div>

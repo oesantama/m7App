@@ -46,13 +46,15 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'training_courses': ['category_id', 'title', 'description', 'cover_image', 'level', 'status_id', 'created_at'],
   'training_lessons': ['course_id', 'title', 'content', 'video_url', 'resource_url', 'order', 'created_at'],
   'user_training_progress': ['user_id', 'lesson_id', 'status', 'finished_at', 'updated_at'],
-  'grupo_inter_pedidos': ['numero_documento', 'nit', 'cliente', 'direccion', 'notas_encabezado', 'municipio_destino', 'producto', 'cantidad_total', 'precio_total', 'tipo_articulo', 'empresa', 'peso_total_prod', 'f_ultimo_corte', 'clasificacion', 'numero_guia', 'latitud', 'longitud', 'placa', 'estado', 'history', 'fecha_entregado', 'fecha_carge', 'acta_entrega_b64', 'create_at', 'create_by', 'update_at', 'update_by'],
+  'grupo_inter_pedidos': ['numero_documento', 'nit', 'cliente', 'direccion', 'notas_encabezado', 'municipio_destino', 'producto', 'cantidad_total', 'precio_total', 'tipo_articulo', 'empresa', 'peso_total_prod', 'f_ultimo_corte', 'clasificacion', 'numero_guia', 'latitud', 'longitud', 'placa', 'estado', 'history', 'fecha_entregado', 'fecha_carge', 'acta_entrega_b64', 'create_at', 'create_by', 'update_at', 'update_by', 'valor_flete', 'numero_planilla', 'fecha_viaje', 'no_factura_m7'],
+  'grupo_inter_novedades': ['pedido_id', 'tipo', 'observacion', 'fecha', 'usuario'],
+  'grupo_inter_reajustes': ['pedido_id', 'numero_documento', 'valor', 'notas', 'fecha', 'usuario'],
   'document_l_payments': ['document_id', 'invoice', 'client_ref', 'un_code', 'metodo_pago', 'vmetodo', 'user_id', 'processed_at']
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
