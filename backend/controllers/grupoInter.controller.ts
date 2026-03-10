@@ -43,6 +43,10 @@ const ensureSchema = async () => {
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS notas_encabezado TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS f_ultimo_corte TIMESTAMP WITH TIME ZONE;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS clasificacion TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS numero_guia TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS latitud NUMERIC;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS longitud NUMERIC;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS ruta TEXT;
             
             -- Totales con nombres de Imagen 3 e Imagen 7
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS cantidad_total NUMERIC DEFAULT 0;
@@ -435,7 +439,9 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
             ruta: ['RUTA', 'DESTINO', 'VÍA'],
             placa: ['PLACA', 'VEHICULO'],
             flete: ['VALOR FLETE', 'FLETE', 'VALOR'],
-            factura: ['NO. FACTURA M7', 'FACTURA M7', 'FACTURA', 'NRO FACTURA']
+            factura: ['NO. FACTURA M7', 'FACTURA M7', 'FACTURA', 'NRO FACTURA'],
+            latitud: ['LATITUD', 'LAT', 'COORDINADA Y'],
+            longitud: ['LONGITUD', 'LON', 'COORDINADA X', 'LNG']
         };
 
         const identifyAliases = [...aliases.doc, ...aliases.manifiesto].map(a => normalize(a));
@@ -466,6 +472,8 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
         const idxPlaca = getColIndex(aliases.placa);
         const idxFlete = getColIndex(aliases.flete);
         const idxFact = getColIndex(aliases.factura);
+        const idxLat = getColIndex(aliases.latitud);
+        const idxLon = getColIndex(aliases.longitud);
 
         if (idxDoc === -1) {
             res.status(400).json({ message: 'No se encontró la columna de referencia (Documento/Remisión)' });
@@ -501,19 +509,24 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
             const flete = idxFlete >= 0 ? parseNum(row[idxFlete]) : 0;
             const factura = idxFact >= 0 ? String(row[idxFact] || '').trim() : '';
 
+            const latitud = idxLat >= 0 ? parseNum(row[idxLat]) : null;
+            const longitud = idxLon >= 0 ? parseNum(row[idxLon]) : null;
+
             const result = await pool.query(`
                 UPDATE grupo_inter_pedidos 
-                SET manifiesto = $1, 
+                SET numero_guia = $1, 
                     numero_planilla = $2, 
                     fecha_viaje = $3, 
                     ruta = $4, 
                     placa = COALESCE(NULLIF($5, ''), placa), 
                     valor_flete = $6, 
                     no_factura_m7 = $7,
+                    latitud = COALESCE($8, latitud),
+                    longitud = COALESCE($9, longitud),
                     update_at = CURRENT_TIMESTAMP
-                WHERE numero_documento = $8
+                WHERE numero_documento = $10
                 RETURNING id
-            `, [manifiesto, planilla, fecha, ruta, placa, flete, factura, doc]);
+            `, [manifiesto, planilla, fecha, ruta, placa, flete, factura, latitud, longitud, doc]);
 
             if (result.rowCount && result.rowCount > 0) {
                 updatedCount++;
@@ -612,9 +625,11 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                     subPdf.addPage(copiedPage);
                     const base64Page = await subPdf.saveAsBase64();
 
+                    const username = req.body.username || 'System OCR';
+
                     await pool.query(
-                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $2",
-                        [base64Page, docNum]
+                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
+                        [base64Page, username, docNum]
                     );
 
                     // Registrar en histórico
