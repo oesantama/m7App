@@ -57,6 +57,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [modalSearch, setModalSearch] = useState('');
   const [modalPage, setModalPage] = useState(1);
   const [modalPageSize, setModalPageSize] = useState<number | 'all'>(10);
+  
+  // Nuevo Estado: Cambio Rápido de Documento
+  const [docToChangeStatus, setDocToChangeStatus] = useState<DocumentL | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // States for Document L Payment Upload
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -150,6 +155,27 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       p.actions.includes('delete')
     );
   }, [user]);
+  
+  const handleUpdateStatus = () => {
+    if (!docToChangeStatus || !selectedStatus) return;
+    setIsUpdatingStatus(true);
+    api.updateDocumentStatus(docToChangeStatus.id, selectedStatus, user.name)
+      .then(res => {
+        if (res.success) {
+          const updatedDocs = documents.map(d => d.id === docToChangeStatus.id ? { ...d, status: selectedStatus as DocStatus, updatedAt: new Date().toISOString() } : d);
+          onDocumentsChange(updatedDocs);
+          toast.success(`Estado guardado`);
+          setDocToChangeStatus(null);
+        } else {
+          toast.error('Error al actualizar: ' + (res.error || "Desconocido"));
+        }
+      }).catch(err => {
+        console.error(err);
+        toast.error('Error de red al actualizar estado');
+      }).finally(() => {
+        setIsUpdatingStatus(false);
+      });
+  };
 
   const paginatedPending = useMemo(() => {
     if (pendingPageSize === 'all') return pendingDocs;
@@ -668,8 +694,21 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                            <div className="space-y-2 mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
                               <p><span className="text-slate-900">UN ORIG:</span> {doc.codplan || 'S/I'}</p>
                               <p><span className="text-slate-900">PLACA:</span> {doc.vehicleData}</p>
-                              <p><span className="text-slate-900">CARGUE:</span> {new Date(doc.createdAt).toLocaleDateString()}</p>
-                              <p><span className="text-slate-900">ESTADO:</span> {doc.status}</p>
+                              <p>
+                                <span className="text-slate-900">CARGUE:</span> 
+                                {(doc.createdAt || (doc as any).created_at) ? new Date(doc.createdAt || (doc as any).created_at).toLocaleDateString() : 'SIN FECHA'}
+                              </p>
+                              <div className="flex justify-between items-center group/status">
+                                  <p><span className="text-slate-900">ESTADO:</span> {doc.status}</p>
+                                  {(doc.status === DocStatus.PENDING || doc.status === 'Pendiente') && (
+                                     <button 
+                                       onClick={(e) => { e.stopPropagation(); setDocToChangeStatus(doc); setSelectedStatus(doc.status || ''); }}
+                                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-blue-500 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all shadow-sm opacity-0 group-hover/status:opacity-100"
+                                     >
+                                        <Icons.RefreshCw className="w-2.5 h-2.5" /> ESTADO
+                                     </button>
+                                  )}
+                              </div>
                            </div>
                             <div className="mt-6 pt-6 border-t border-slate-50 flex gap-2">
                                 <button 
@@ -798,14 +837,56 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       </div>
 
       {showPaymentModal && paymentTarget && (
-        <ProcessPaymentLModal 
+        <ProcessPaymentLModal
           document={paymentTarget}
           userId={user.id}
-          onClose={() => { setShowPaymentModal(false); setPaymentTarget(null); }}
-          onSuccess={() => { if (onRefresh) onRefresh(); }}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+            onRefresh && onRefresh();
+          }}
         />
       )}
 
+      {/* DIÁLOGO CAMBIO ESTADO */}
+      {docToChangeStatus && (
+        <div className="fixed inset-0 z-[600] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
+          <div className="bg-white w-full max-w-sm rounded-[3.5rem] p-12 text-center space-y-8 shadow-2xl border border-white/5">
+            <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-[1.5rem] mx-auto flex items-center justify-center shadow-inner mb-4">
+              <Icons.RefreshCw className="w-8 h-8" />
+            </div>
+
+            <div>
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Cambiar Estado</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Doc L: {docToChangeStatus.externalDocId}</p>
+            </div>
+
+            <div className="text-left space-y-2">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Seleccione Nuevo Estado:</label>
+              <select
+                value={selectedStatus}
+                onChange={e => setSelectedStatus(e.target.value)}
+                className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-xs uppercase outline-none focus:border-blue-500 transition-all text-slate-900"
+              >
+                {masterEstados.map(est => (
+                  <option key={est.id} value={est.name}>{est.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={handleUpdateStatus}
+                disabled={isUpdatingStatus || !selectedStatus || selectedStatus === docToChangeStatus.status}
+                className="w-full py-4 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-blue-500 shadow-xl transition-all disabled:opacity-20 active:scale-95 flex items-center justify-center gap-2"
+              >
+                {isUpdatingStatus ? <Icons.RefreshCw className="w-4 h-4 animate-spin" /> : <Icons.Check className="w-4 h-4" />} Actualizar
+              </button>
+              <button onClick={() => setDocToChangeStatus(null)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* MODAL DE ERROR PREMIUM M7 */}
       {syncError && (
         <div className="fixed inset-0 z-[1000] bg-slate-950/98 backdrop-blur-2xl flex items-center justify-center p-4 md:p-6 animate-in fade-in zoom-in-95 duration-500">
@@ -815,7 +896,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                      <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-red-600 shadow-2xl scale-100 md:scale-110 shrink-0"><Icons.Alert className="w-6 h-6 md:w-8 md:h-8" /></div>
                      <div>
                        <h3 className="text-xl md:text-4xl font-black uppercase tracking-tighter leading-none">{syncError.title}</h3>
-                       <p className="text-[9px] md:text-[10px] font-black text-red-100 uppercase tracking-widest mt-1 md:mt-2 bg-red-800/30 px-3 py-1 rounded-full inline-block">CONFLICTO OPERATIVO CRÃTICO</p>
+                       <p className="text-[9px] md:text-[10px] font-black text-red-100 uppercase tracking-widest mt-1 md:mt-2 bg-red-800/30 px-3 py-1 rounded-full inline-block">CONFLICTO OPERATIVO CRÍTICO</p>
                      </div>
                   </div>
                   <button onClick={() => setSyncError(null)} className="p-2 hover:bg-white/20 rounded-xl transition-all" title="Cerrar"><Icons.X className="w-6 h-6 md:w-8 md:h-8" /></button>
@@ -824,7 +905,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                   <div className="max-w-4xl space-y-6 md:space-y-10">
                     <p className="text-slate-900 font-black text-2xl md:text-5xl leading-tight uppercase tracking-tight">{syncError.message}</p>
                     <div className="h-1.5 md:h-2 w-24 md:w-40 bg-red-600 mx-auto rounded-full"></div>
-                    <p className="text-slate-400 font-bold text-sm md:text-xl uppercase tracking-[0.2em] md:tracking-[0.3em]">SISTEMA DE SEGURIDAD M7 GESTIÓN LOGÃSTICA</p>
+                    <p className="text-slate-400 font-bold text-sm md:text-xl uppercase tracking-[0.2em] md:tracking-[0.3em]">SISTEMA DE SEGURIDAD M7 GESTIÓN LOGÍSTICA</p>
                   </div>
                   
                   {syncError.duplicates.length > 0 && (

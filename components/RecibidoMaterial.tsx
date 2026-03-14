@@ -40,6 +40,11 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [isSyncingPartial, setIsSyncingPartial] = useState(false);
   const [isSyncingFinal, setIsSyncingFinal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Nuevo Estado: Cambio Rápido de Documento
+  const [docToChangeStatus, setDocToChangeStatus] = useState<DocumentL | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const pendingRecibo = useMemo(() =>
     documents.filter(d => 
@@ -309,7 +314,26 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
       });
   };
 
-
+  const handleUpdateStatus = () => {
+    if (!docToChangeStatus || !selectedStatus) return;
+    setIsUpdatingStatus(true);
+    api.updateDocumentStatus(docToChangeStatus.id, selectedStatus, user.name)
+      .then(res => {
+        if (res.success) {
+          const updatedDocs = documents.map(d => d.id === docToChangeStatus.id ? { ...d, status: selectedStatus as DocStatus, updatedAt: new Date().toISOString() } : d);
+          onUpdateDocuments(updatedDocs);
+          toast.success(`Estado actualizado a ${selectedStatus}`);
+          setDocToChangeStatus(null);
+        } else {
+          toast.error('Error al actualizar: ' + (res.error || "Desconocido"));
+        }
+      }).catch(err => {
+        console.error(err);
+        toast.error('Error de red al actualizar estado');
+      }).finally(() => {
+        setIsUpdatingStatus(false);
+      });
+  };
 
   return (
     <div className="animate-in fade-in duration-700 h-full flex flex-col overflow-hidden max-h-screen">
@@ -410,10 +434,20 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                           MODO MANUAL
                         </span>
                       )}
+                      
+                      {String(doc.status).toUpperCase() === DocStatus.PENDING.toUpperCase() && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setDocToChangeStatus(doc); setSelectedStatus(doc.status || ''); }}
+                            className="flex items-center gap-1.5 px-3 py-1 bg-white text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-200 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all shadow-sm group"
+                          >
+                             <Icons.RefreshCw className="w-3 h-3 group-hover:animate-spin" /> ESTADO
+                          </button>
+                      )}
+                      
                       <p className="text-[9px] text-slate-400 font-black uppercase mt-1 tracking-widest">
                         {doc.inventoryDate && !isNaN(new Date(doc.inventoryDate).getTime()) 
                           ? new Date(doc.inventoryDate).toLocaleDateString() + ' ' + new Date(doc.inventoryDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                          : (doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : 'SIN FECHA')}
+                          : ((doc.createdAt || (doc as any).created_at) ? new Date(doc.createdAt || (doc as any).created_at).toLocaleDateString() : 'SIN FECHA')}
                       </p>
                     </div>
                   </div>
@@ -567,6 +601,46 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
               </button>
               <button onClick={() => setShowResendDialog(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Cancelar</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* DIÁLOGO CAMBIO ESTADO */}
+      {docToChangeStatus && (
+        <div className="fixed inset-0 z-[600] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
+          <div className="bg-white w-full max-w-sm rounded-[3.5rem] p-12 text-center space-y-8 shadow-2xl border border-white/5">
+             <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-[1.5rem] mx-auto flex items-center justify-center shadow-inner mb-4">
+                <Icons.RefreshCw className="w-8 h-8" />
+             </div>
+             
+             <div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Cambiar Estado</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Doc L: {docToChangeStatus.externalDocId}</p>
+             </div>
+
+             <div className="text-left space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Seleccione Nuevo Estado:</label>
+                <select 
+                   value={selectedStatus}
+                   onChange={e => setSelectedStatus(e.target.value)}
+                   className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-xs uppercase outline-none focus:border-blue-500 transition-all text-slate-900"
+                >
+                   {masterEstados.map(est => (
+                      <option key={est.id} value={est.name}>{est.name}</option>
+                   ))}
+                </select>
+             </div>
+
+             <div className="flex flex-col gap-4">
+                <button
+                  onClick={handleUpdateStatus}
+                  disabled={isUpdatingStatus || !selectedStatus || selectedStatus === docToChangeStatus.status}
+                  className="w-full py-4 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-blue-500 shadow-xl transition-all disabled:opacity-20 active:scale-95 flex items-center justify-center gap-2"
+                >
+                  {isUpdatingStatus ? <Icons.RefreshCw className="w-4 h-4 animate-spin" /> : <Icons.Check className="w-4 h-4" />} Actualizar
+                </button>
+                <button onClick={() => setDocToChangeStatus(null)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Cancelar</button>
+             </div>
           </div>
         </div>
       )}

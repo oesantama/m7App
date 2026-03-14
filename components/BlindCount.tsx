@@ -81,12 +81,25 @@ const BlindCount: React.FC<BlindCountProps> = ({
     code: string; 
     note: string; 
     timestamp: string; 
+    createdAt: number;
     status: 'pending' | 'resolved';
     suggestion?: string;
   }[]>(() => {
     const saved = localStorage.getItem(`m7_incidents_${docL.id}`);
-    return saved ? JSON.parse(saved) : [];
+    const parsed = saved ? JSON.parse(saved) : [];
+    // Migración retro-compatible para createdAt
+    return parsed.map((p: any) => ({...p, createdAt: p.createdAt || Date.now()}));
   });
+
+  // M7 AI BRAIN: Memoria Auto-Regenerativa (Aprendizaje por Operador)
+  const [aiBrain, setAiBrain] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('m7_ai_brain_relations');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // M7 V12 BACKGROUND WORKER: Cola virtual para procesos pesados de escáner.
+  const scanQueue = useRef<string[]>([]);
+  const isQueueProcessing = useRef(false);
 
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -95,8 +108,10 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [mismatchIds, setMismatchIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [validationAttempts, setValidationAttempts] = useState(0);
-  const [lastScan, setLastScan] = useState<{ article: Article | null, message: string, status: 'success' | 'error' | 'new' } | null>(null);
+  const [lastScan, setLastScan] = useState<{ id?: number; article: Article | null, message: string, status: 'success' | 'error' | 'new', qty?: number } | null>(null);
+  const [lastScannedAt, setLastScannedAt] = useState<Record<string, number>>({}); // M7 V15b: Timeline de escaneos
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showClearIncidentsDialog, setShowClearIncidentsDialog] = useState(false);
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -133,6 +148,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const isLoaded = useRef(false);
   const ignoreScan = useRef(false); // Ref para ignorar basura del scanner
+  const lastValidScanAt = useRef<number>(0); // M7 V15: Control de Ventana de Tiempo Lógico
 
   // AGRUPACIÓN DE ITEMS POR SKU (VISTA GENERAL)
   const groupedItems = useMemo(() => {
@@ -198,100 +214,295 @@ const BlindCount: React.FC<BlindCountProps> = ({
     };
   }, [counts, itemObservations, inventoryObservation, groupedItems, incidents]);
 
+  // M7 V12 BACKGROUND WORKER LOGIC
+  const processNextInQueue = () => {
+      if (scanQueue.current.length === 0) {
+          isQueueProcessing.current = false;
+          return;
+      }
+      
+      isQueueProcessing.current = true;
+      const nextBatch = scanQueue.current.shift(); // Saca el primero de la fila global
+      
+      if (nextBatch) {
+         // El worker procesa la pesada Anti-concatenación de ese batch específico aislado
+         let buffer = nextBatch;
+         let foundTokens: string[] = [];
+         
+         if (buffer.length > 15) { 
+             const planIds = groupedItems.map(it => it.articleId.toUpperCase()).sort((a,b) => b.length - a.length);
+             let keepSearching = true;
+             while(keepSearching && buffer.length > 0) {
+                 let matchedPrefix = false;
+                 for(const id of planIds) {
+                     if(buffer.startsWith(id)) {
+                         foundTokens.push(id);
+                         buffer = buffer.substring(id.length).trim();
+                         matchedPrefix = true;
+                         break;
+                     }
+                 }
+                 if (!matchedPrefix) {
+                     // M7 FIX: Intentar detectar si el remanente es un solo código desconocido pistoleado "N" veces repetidas (Ej. A020384626A020384626)
+                     const repeatMatch = buffer.match(/^(.+?)\1+$/);
+                     if (repeatMatch && repeatMatch[1].length >= 3) {
+                         const repeatedPattern = repeatMatch[1];
+                         const times = buffer.length / repeatedPattern.length;
+                         if (Number.isInteger(times)) {
+                             for (let i=0; i<times; i++) foundTokens.push(repeatedPattern);
+                             buffer = "";
+                             matchedPrefix = true;
+                         }
+                     }
+                     if (!matchedPrefix) {
+                         keepSearching = false; 
+                     }
+                 }
+             }
+         }
+
+         if (foundTokens.length > 1 && buffer.length === 0) {
+             foundTokens.forEach(token => processBarcode(token)); // Procesar múltiple
+         } else {
+             processBarcode(nextBatch); // Procesar simple o IA
+         }
+      }
+
+      // Procesar el siguiente en 5 milisegundos asíncronamente (evita bloquear render main thread)
+      setTimeout(() => {
+          processNextInQueue();
+      }, 5);
+  };
+
+  const enqueueScan = (rawString: string) => {
+      scanQueue.current.push(rawString);
+      if (!isQueueProcessing.current) {
+          processNextInQueue();
+      }
+  };
+
+  const handleBingoEffects = () => {
+      lastValidScanAt.current = Date.now();
+      
+      // M7 V15: Retrospective Garbage Collection
+      // Si tuvimos incidencias fallidas hace menos de 800ms, seguro son prefijos basura
+      // de la misma estampa que mandó el hardware antes de mandar el código limpio.
+      setIncidents(prev => {
+          const now = Date.now();
+          const toKeep = prev.filter(inc => (now - inc.createdAt) > 800);
+          const toAutoIgnore = prev.filter(inc => (now - inc.createdAt) <= 800);
+          
+          if (toAutoIgnore.length > 0) {
+              const newBrainUpdates: Record<string, string> = {};
+              toAutoIgnore.forEach(inc => {
+                  if (inc.code) newBrainUpdates[inc.code] = '*IGNORE*';
+              });
+              setAiBrain(prevBrain => {
+                 const nextBrain = { ...prevBrain, ...newBrainUpdates };
+                 localStorage.setItem('m7_ai_brain_relations', JSON.stringify(nextBrain));
+                 return nextBrain;
+              });
+          }
+          return toKeep;
+      });
+  };
+
   const processBarcode = (rawCode: string) => {
     const input = cleanSkuM7(rawCode);
     if (!input || input.length < 3) return;
 
-    // 1. Buscar en el plan (Match Directo - TABLA 1)
-    const itemInDoc = groupedItems.find(it => 
-      (it.articleId?.toUpperCase() === input) || 
-      (it.sku?.toUpperCase() === input)
-    );
+    // === M7 AI BRAIN: Verificar memoria auto-regenerativa primero ===
+    // Si la lectura "sucia" (ej: D403199:BL:1) ya fue aprendida, la traducimos al SKU real (D403199).
+    const translatedInput = aiBrain[input] || input;
 
-    if (itemInDoc) {
-        const targetId = itemInDoc.articleId;
-        const newCount = (counts[targetId] || 0) + 1;
-        setCounts(prev => ({ ...prev, [targetId]: newCount }));
-        setLastScan({ 
-          article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
-          message: `Confirmado: ${targetId} [x${newCount}]`, 
-          status: 'success' 
-        });
+    // M7 V14 AI FILTER: Silenciador de Basura
+    if (translatedInput === '*IGNORE*') {
+        // En lugar de alertar y sobrescribir el éxito, lo bloqueamos y retornamos en silencio
+        // para proteger el mensaje visual previo del trabajador.
         setScanInput('');
         return;
     }
 
-    // 2. Si no está en plan, buscar sugerencia inteligente (Ráfagas incompletas)
+    // 1. Buscar en el plan (Match Directo - TABLA 1)
+    const itemInDoc = groupedItems.find(it => 
+      (it.articleId?.toUpperCase() === translatedInput) || 
+      (it.sku?.toUpperCase() === translatedInput)
+    );
+
+    if (itemInDoc) {
+        const targetId = itemInDoc.articleId;
+        setCounts(prev => {
+          const newQty = (prev[targetId] || 0) + 1;
+          setLastScan({ 
+            id: Math.random(),
+            article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
+            message: aiBrain[input] ? `✅ IA (${targetId})` : `✅ CONFIRMADO (${targetId})`, 
+            status: 'success',
+            qty: newQty
+          });
+          return { ...prev, [targetId]: newQty };
+        });
+        setLastScannedAt(prev => ({ ...prev, [targetId]: Date.now() }));
+        handleBingoEffects();
+        setScanInput(''); // Limpiar para el siguiente de inmediato
+        return; // Salir aquí para éxito
+    }
+
+    // === 2. HEURÍSTICA M7 V10 (Descomposición Inteligente en Vuelo) ===
+    // Si llegó hasta aquí, no está en el plan y no fue corregido antes.
+    // Ajover envía basura como: D403199:BL:1:A010236539:8573516 o D403199ÑBLÑ1Ñ...
+    
+    // Tratamos de desglosar agresivamente el código por los separadores comunes detectados.
+    const aggressiveDelimiters = /([:|Ñ+\-#;]|BL)/i;
+    const heuristicalParts = input.split(aggressiveDelimiters).map(p => p.trim()).filter(p => p.length >= 3);
+
+    // Iteramos por las piezas extraídas (ej de 'D403199:BL:1' -> ['D403199', '1'])
+    for (const part of heuristicalParts) {
+      const heuristicMatch = groupedItems.find(it => 
+        (it.articleId?.toUpperCase() === part) || 
+        (it.sku?.toUpperCase() === part)
+      );
+
+      if (heuristicMatch) {
+         // ¡BINGO! La heurística encontró el código enterrado en la basura.
+         const targetId = heuristicMatch.articleId;
+         // FIX: Previene State batching bug
+         setCounts(prev => {
+           const newQty = (prev[targetId] || 0) + 1;
+           setLastScan({ 
+              id: Math.random(),
+              article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
+              message: `🤖 DESCOMPUESTO (${targetId})`, 
+              status: 'success',
+              qty: newQty
+           });
+           return { ...prev, [targetId]: newQty };
+         });
+         setLastScannedAt(prev => ({ ...prev, [targetId]: Date.now() }));
+         
+         // Inmediatamente alimentamos el Cerebro Auto-Regenerador para el futuro
+         const newBrain = { ...aiBrain, [input]: targetId };
+         setAiBrain(newBrain);
+         localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+
+         setLastScan({ 
+            id: Math.random(),
+            article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
+            message: `🤖 DESCOMPUESTO (${targetId}) [+1]`, 
+            status: 'success' 
+         });
+         handleBingoEffects();
+         setScanInput('');
+         return;
+      }
+    }
+
+
+    // === 3. M7 V14 DEEP SEARCH ===
+    // Si el string es largo (ej. concatenado) buscamos si contiene algún SKU válido en su interior
+    if (input.length >= 6) {
+        // Ordenamos los del plan del más largo al más corto para evitar falsos positivos
+        const planIds = groupedItems.map(it => it.articleId.toUpperCase()).sort((a,b) => b.length - a.length);
+        for (const id of planIds) {
+            // Solo buscar SKUs de longitud decente para evitar matches erróneos
+            if (id.length >= 4 && input.includes(id)) {
+                const targetId = id;
+                setCounts(prev => {
+                  const newQty = (prev[targetId] || 0) + 1;
+                  setLastScan({ 
+                      id: Math.random(),
+                      article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
+                      message: `🤖 DEEP EXTRACT (${targetId})`, 
+                      status: 'success',
+                      qty: newQty
+                  });
+                  return { ...prev, [targetId]: newQty };
+                });
+                setLastScannedAt(prev => ({ ...prev, [targetId]: Date.now() }));
+                
+                // Enseñar al cerebro que este código gigante significa 'targetId'
+                const newBrain = { ...aiBrain, [input]: targetId };
+                setAiBrain(newBrain);
+                localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+
+                handleBingoEffects();
+                setScanInput('');
+                return; 
+            }
+        }
+    }
+
+    // 4. Si no está en plan ni la heurística lo salvó, buscar sugerencia suave para Incidencias (StartsWith)
     const possibleBetterMatch = groupedItems.find(it => 
-      it.articleId?.toUpperCase().startsWith(input) || 
-      it.sku?.toUpperCase().startsWith(input)
+      it.articleId?.toUpperCase().startsWith(translatedInput) || 
+      it.sku?.toUpperCase().startsWith(translatedInput)
     );
 
     const suggestion = possibleBetterMatch 
-        ? `¿Quiso decir ${possibleBetterMatch.articleId}? (Lectura incompleta detectada)`
+        ? `¿Quiso decir ${possibleBetterMatch.articleId}? (Lectura incompleta)`
         : `Artículo fuera de plan o código desconocido.`;
 
-    // 3. Registrar en TABLA 2 (Incidencias)
+    // M7 V15 FUTURE FILTER (Post-Context Filter):
+    // Si entró un código basura menos de 800ms DESPUES de un escaneo válido (ej: lote adyacente),
+    // se descarta silenciosamente para que NO sobreescriba en UI la alerta de "Último Escaneado".
+    if (Date.now() - lastValidScanAt.current <= 800) {
+        const newBrain = { ...aiBrain, [input]: '*IGNORE*' };
+        setAiBrain(newBrain);
+        localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+        setScanInput('');
+        return; 
+    }
+
+    // 4. Registrar en TABLA 2 (Incidencias)
     const newIncident = {
       id: `inc-${Date.now()}`,
-      code: input,
+      code: input, // Guardamos la ráfaga pura como error.
       note: suggestion,
       timestamp: new Date().toLocaleTimeString(),
+      createdAt: Date.now(), // Para la V15 (Retro-GC)
       status: 'pending' as const,
       suggestion: possibleBetterMatch?.articleId
     };
 
     setIncidents(prev => [newIncident, ...prev]);
     setLastScan({ 
+      id: Math.random(),
       article: null, 
-      message: `Incidencia registrada: ${input}`, 
+      message: `🚫 INCIDENCIA O FUERA DE PLAN`, 
       status: 'error' 
     });
-    setScanInput('');
+    setScanInput(''); // Limpiar input para el próximo
   };
 
-  // Manejo inteligente del input para ignorar basura post-Ñ
+  // M7 FAST SCANNER: Manejo de entrada Ultra Liviano
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase();
+    setScanInput(val);
 
     if (processingTimer.current) {
       clearTimeout(processingTimer.current);
       processingTimer.current = null;
     }
 
-    if (ignoreScan.current) {
-      setScanInput('');
-      return;
-    }
-
-    // M7 REVOLUTION V9: Integridad Total
-    // Solo disparamos el match automático si vemos un indicio de "basura de hardware"
-    const scannerGarbageRegex = /(:|Ñ|S4:)/i;
+    const scannerGarbageRegex = /([:Ñ\t\n\r]|S4:)/i;
     const match = val.match(scannerGarbageRegex);
 
     if (match) {
-      setScanInput(val);
-
-      // Esperamos 80ms para recibir la ráfaga completa
-      processingTimer.current = setTimeout(() => {
-          const cleanedInput = cleanSkuM7(val);
-          
-          if (cleanedInput.length >= 3) {
-            // PROCESAMIENTO ÚNICO: Pasamos a processBarcode que decidirá si va a Tabla 1 o Tabla 2
-            processBarcode(cleanedInput);
-            
-            // Bloqueo temporal para ignorar el resto de la ráfaga de basura
-            ignoreScan.current = true;
-            setTimeout(() => {
-              ignoreScan.current = false;
-              setScanInput('');
-            }, 400);
-          }
-          processingTimer.current = null;
-      }, 80); 
-
+        // Ejecución inmediata, enviar a la cola virtual
+        const cleanedInput = cleanSkuM7(val);
+        if (cleanedInput.length >= 3) {
+          enqueueScan(cleanedInput);
+        }
+        setScanInput(''); 
     } else {
-      setScanInput(val);
+        // Debounce ultrafast para recolectar el string y empujarlo a la cola
+        processingTimer.current = setTimeout(() => {
+          const cleanedInput = cleanSkuM7(val);
+          if (cleanedInput.length >= 3) {
+             enqueueScan(cleanedInput);
+          }
+          setScanInput(''); // Siempre despejar el input para liberar la pistola físicamente
+        }, 60); 
     }
   };
 
@@ -555,11 +766,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
     XLSX.writeFile(wb, `Inventario_${docL.externalDocId}_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const handleResolveIncident = (incidentId: string, action: 'confirm' | 'delete') => {
+  const handleResolveIncident = (incidentId: string, action: 'confirm' | 'delete' | 'ignore') => {
     const incident = incidents.find(inc => inc.id === incidentId);
     if (!incident) return;
 
-    if (action === 'confirm') {
+    if (action === 'ignore' && incident.code) {
+        const newBrain = { ...aiBrain, [incident.code]: '*IGNORE*' };
+        setAiBrain(newBrain);
+        localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+        toast.success('Regla de IA guardada', { description: `El sistema ignorará silenciosamente esta ráfaga de basura.` });
+    } else if (action === 'confirm') {
       const targetCode = cleanSkuM7(incident.suggestion || incident.code);
       
       // M7-FIX: Verificar si ya existe en el plan (incluyendo extras anteriores)
@@ -591,6 +807,15 @@ const BlindCount: React.FC<BlindCountProps> = ({
       } else {
         processBarcode(targetCode);
         toast.success(`Artículo ${targetCode} integrado al plan.`);
+      }
+
+      // M7 AI BRAIN - APRENDIZAJE: Vinculamos para siempre la basura (code) a su equivalente limpio o forzado (targetCode)
+      // Solo si la ráfaga incidente era diferente a la conclusión forzada y existía.
+      if (incident.code && incident.code !== targetCode) {
+         const newBrain = { ...aiBrain, [incident.code]: targetCode };
+         setAiBrain(newBrain);
+         localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+         toast.success('M7 AI Memoria Actualizada', { description: `Ráfaga configurada para procesarse automáticamente en el futuro.` });
       }
     }
 
@@ -625,7 +850,18 @@ const BlindCount: React.FC<BlindCountProps> = ({
   };
 
   const filteredItems = useMemo(() => {
-    let list = groupedItems;
+    let list = [...groupedItems]; // M7-MOD: clonar antes de ordenar
+
+    // M7 V15b: Orden Dinámico (Last-Scanned Primero)
+    // Si el operador acaba de escanear algo, ese artículo debería saltar al tope de la lista.
+    list.sort((a, b) => {
+        const timeA = lastScannedAt[a.articleId] || 0;
+        const timeB = lastScannedAt[b.articleId] || 0;
+        
+        // Mantener agrupaciones preexistentes pero dar precedencia alta a lo recién modificado
+        if (timeA !== timeB) return timeB - timeA;
+        return 0; // Orden original si ninguno fue escaneado hoy
+    });
 
     if (validationAttempts === 0) {
       // Fase 1: Solo mostramos lo que se ha escaneado
@@ -745,23 +981,43 @@ const BlindCount: React.FC<BlindCountProps> = ({
             </div>
           </div>
 
-          {/* SCANNER EN HEADER (FOTO 1 - BACKGROUND BLANCO) */}
-          <form onSubmit={handleScan} className="relative group w-48 md:w-64">
-            <input
-              ref={inputRef}
-              type="text"
-              value={scanInput}
-              onChange={handleInputChange}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={() => setIsInputFocused(false)}
-              placeholder="ESCANEAR SKU..."
-              autoFocus
-              className="w-full pl-4 pr-10 py-2.5 bg-white border border-white/20 rounded-xl text-slate-900 font-black uppercase text-sm outline-none focus:border-emerald-500 transition-all placeholder:text-slate-300 shadow-sm"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none">
-              <Icons.Scan className="w-4 h-4" />
-            </div>
-          </form>
+          {/* SCANNER EN HEADER E INDICADOR DE ÚLTIMO ESCANEADO */}
+          <div className="flex flex-col gap-1 w-48 md:w-64">
+            <form onSubmit={handleScan} className="relative group w-full">
+              <input
+                ref={inputRef}
+                type="text"
+                value={scanInput}
+                onChange={handleInputChange}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
+                placeholder="ESCANEAR SKU..."
+                autoFocus
+                className="w-full pl-4 pr-10 py-2.5 bg-white border border-white/20 rounded-xl text-slate-900 font-black uppercase text-sm outline-none focus:border-emerald-500 transition-all placeholder:text-slate-300 shadow-sm"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none">
+                <Icons.Scan className="w-4 h-4" />
+              </div>
+            </form>
+            {lastScan && (
+              <div 
+                key={lastScan.id} 
+                className={`w-full px-4 py-2 flex items-center justify-between gap-3 mt-2 rounded-xl border-b-4 shadow-sm text-xs font-black uppercase tracking-widest shrink-0 animate-in slide-in-from-top-1 fade-in duration-300 ${
+                  lastScan.status === 'success' ? 'bg-emerald-100 text-emerald-800 border-emerald-500' : 'bg-rose-100 text-rose-800 border-rose-500'
+                }`}
+              >
+                <div className="flex flex-col min-w-0 flex-1">
+                   <span className="truncate">{lastScan.message}</span>
+                </div>
+                {lastScan.qty !== undefined && (
+                   <div className="flex flex-col items-center justify-center pl-3 border-l-2 border-emerald-200 shrink-0">
+                       <span className="text-[8px] text-emerald-600 font-extrabold uppercase leading-none">Total</span>
+                       <span className="text-xl font-black text-emerald-900 leading-none">{lastScan.qty}</span>
+                   </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-col items-end mr-4">
             <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Total Unidades</span>
@@ -903,13 +1159,15 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 <Icons.Alert className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-[12px] font-black text-slate-900 uppercase tracking-tighter">Incidencias</h4>
+                <h4 className="text-[12px] font-black text-slate-900 uppercase tracking-tighter">
+                  Incidencias {incidents.length > 0 && <span className="text-amber-500 ml-1">({incidents.length})</span>}
+                </h4>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Captura de ráfagas</p>
               </div>
             </div>
             {incidents.length > 0 && (
               <button 
-                onClick={() => { if(confirm('¿Limpiar incidencias?')) setIncidents([]); }} 
+                onClick={() => setShowClearIncidentsDialog(true)} 
                 className="text-[9px] font-black text-red-500 uppercase tracking-widest"
               >
                 Limpiar
@@ -948,12 +1206,21 @@ const BlindCount: React.FC<BlindCountProps> = ({
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleResolveIncident(inc.id, 'confirm')}
-                        className="w-full py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all shadow-lg active:scale-95 shadow-blue-600/20"
-                      >
-                        {inc.suggestion ? `Sugerir ${inc.suggestion}` : 'Forzar como Extra'}
-                      </button>
+                      <div className="flex items-center gap-2 w-full">
+                        <button
+                          onClick={() => handleResolveIncident(inc.id, 'ignore')}
+                          className="w-1/3 py-3 bg-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-300 transition-all shadow-sm active:scale-95"
+                          title="Enseñar a la IA a ignorar permanentemente esta ráfaga"
+                        >
+                          Basura
+                        </button>
+                        <button
+                          onClick={() => handleResolveIncident(inc.id, 'confirm')}
+                          className="w-2/3 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all shadow-lg active:scale-95 shadow-blue-600/20"
+                        >
+                          {inc.suggestion ? `Sugerir ${inc.suggestion}` : 'Forzar como Extra'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -967,6 +1234,38 @@ const BlindCount: React.FC<BlindCountProps> = ({
           </div>
         </div>
       </div>
+
+      {/* DIÁLOGO DE LIMPIAR INCIDENCIAS M7 */}
+      {showClearIncidentsDialog && (
+        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in-95">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 text-center space-y-6 shadow-2xl border border-white/5">
+            <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg">
+              <Icons.Trash className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">¿Limpiar incidencias?</h3>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Se eliminará el registro actual de ráfagas desconocidas visualizadas en pantalla.</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setIncidents([]);
+                  setShowClearIncidentsDialog(false);
+                }}
+                className="w-full py-4 bg-rose-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-rose-400 transition-all active:scale-95"
+              >
+                Sí, limpiar registro
+              </button>
+              <button 
+                onClick={() => setShowClearIncidentsDialog(false)} 
+                className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors py-2"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DIÁLOGO DE CONFIRMACIÓN M7 */}
       {showConfirmDialog && (

@@ -8,9 +8,9 @@
 export const cleanSkuM7 = (raw: string): string => {
   if (!raw) return '';
 
-  let code = raw.trim().toUpperCase().replace(/'/g, '-');
+  let code = raw.trim().toUpperCase();
 
-  // 1. Eliminar prefijos de hardware conocidos
+  // 1. Eliminar prefijos de hardware conocidos (siempre al inicio)
   const knownPrefixes = ['S4:', 'ID:', 'SKU:'];
   for (const prefix of knownPrefixes) {
     if (code.startsWith(prefix)) {
@@ -18,17 +18,16 @@ export const cleanSkuM7 = (raw: string): string => {
     }
   }
 
-  // 2. Identificar delimitadores comunes de metadatos
-  // Ñ es común en teclados configurados como ES pero con hardware EN
-  const delimiters = [':', 'Ñ', '|', '+', '#', ';'];
-  
-  for (const delimiter of delimiters) {
-    if (code.includes(delimiter)) {
-      // Tomamos solo la primera parte
-      code = code.split(delimiter)[0];
-    }
-  }
+  // 2. Limpiar sufijos basura comunes generados por lectores mal configurados
+  // Ñ suele ser un ENTER en teclado ES con input EN.
+  // : suele ser TAB o delimitador final.
+  // \t, \n son obvios.
+  // M7 FAST SCAN: Solo cortamos desde el PRIMER caracter de basura detectado al FINAL de la cadena útil
+  const garbageRegex = /([:Ñ\t\n\r]|S4:).*$/;
+  code = code.replace(garbageRegex, '');
 
   // 3. Limpieza final de espacios o caracteres no deseados en los extremos
+  // IMPORTANTE: Ya no dividimos por '+' o '-' o '|' indiscriminadamente
+  // porque podrían ser parte del SKU real.
   return code.trim();
 };
