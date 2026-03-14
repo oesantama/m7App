@@ -19,7 +19,7 @@ export const getNovedades = async (req: Request, res: Response) => {
                 TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT))) OR
                 TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.barcode AS TEXT)))
             )
-            WHERE n.document_id = $1
+            WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '48 hours'
             ORDER BY n.created_at DESC
         `, [docId]);
         res.json(result.rows);
@@ -82,7 +82,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
                 TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT))) OR
                 TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.barcode AS TEXT)))
             )
-            WHERE n.document_id = $1
+            WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '48 hours'
             ORDER BY n.created_at ASC
         `, [docId]);
         const news = newsRes.rows;
