@@ -337,7 +337,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
           setLastScan({ 
             id: Math.random(),
             article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
-            message: aiBrain[input] ? `✅ IA (${targetId})` : `✅ CONFIRMADO (${targetId})`, 
+            message: targetId, 
             status: 'success',
             qty: newQty
           });
@@ -373,7 +373,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
            setLastScan({ 
               id: Math.random(),
               article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
-              message: `🤖 DESCOMPUESTO (${targetId})`, 
+              message: targetId, 
               status: 'success',
               qty: newQty
            });
@@ -413,7 +413,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                   setLastScan({ 
                       id: Math.random(),
                       article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
-                      message: `🤖 DEEP EXTRACT (${targetId})`, 
+                      message: targetId, 
                       status: 'success',
                       qty: newQty
                   });
@@ -482,6 +482,18 @@ const BlindCount: React.FC<BlindCountProps> = ({
         // Lo encolamos dinámicamente con retardo para que la UI lo asimile antes de evaluarlo.
         setTimeout(() => enqueueScan(inMaster.sku || inMaster.id), 100);
         return; // Detenemos aquí. El procesador diferido sumará +1 como si existiese en Plan.
+    }
+
+    // M7 V15d: FILTRO DURO "SOLO LETRAS".
+    // El 99% de las incidencias inútiles u olvidadas son códigos numéricos puramente (basura del empaque).
+    // Si la lectura NO empieza por una letra (A-Z), se descarta en total silencio.
+    if (!/^[a-zA-Z]/i.test(input)) {
+        // Enseñar al bot para que lo descarte más rápido todavía la prox. vez (Caché O(1))
+        const newBrain = { ...aiBrain, [input]: '*IGNORE*' };
+        setAiBrain(newBrain);
+        localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+        setScanInput('');
+        return;
     }
 
     // 4. Registrar en TABLA 2 (Incidencias)
@@ -904,9 +916,13 @@ const BlindCount: React.FC<BlindCountProps> = ({
         const timeA = lastScannedAt[a.articleId] || 0;
         const timeB = lastScannedAt[b.articleId] || 0;
         
-        // Mantener agrupaciones preexistentes pero dar precedencia alta a lo recién modificado
+        // Empujar los no escaneados al fondo absoluto
+        if (timeA > 0 && timeB === 0) return -1;
+        if (timeB > 0 && timeA === 0) return 1;
+
+        // Si ambos han sido escaneados, prioriza el delta más reciente
         if (timeA !== timeB) return timeB - timeA;
-        return 0; // Orden original si ninguno fue escaneado hoy
+        return 0; // Orden original si interactuaron al mismo tiempo (imposible) o ninguno
     });
 
     if (validationAttempts === 0) {
@@ -1048,17 +1064,17 @@ const BlindCount: React.FC<BlindCountProps> = ({
             {lastScan && (
               <div 
                 key={lastScan.id} 
-                className={`w-full px-4 py-2 flex items-center justify-between gap-3 mt-2 rounded-xl border-b-4 shadow-sm text-xs font-black uppercase tracking-widest shrink-0 animate-in slide-in-from-top-1 fade-in duration-300 ${
-                  lastScan.status === 'success' ? 'bg-emerald-100 text-emerald-800 border-emerald-500' : 'bg-rose-100 text-rose-800 border-rose-500'
+                className={`w-full px-4 flex items-center justify-between gap-3 mt-2 rounded-xl shadow-md shrink-0 animate-in slide-in-from-top-2 fade-in duration-300 ${
+                  lastScan.status === 'success' ? 'bg-[#e0f2fe] border-l-4 border-blue-400' : 'bg-rose-100 border-l-4 border-rose-500'
                 }`}
               >
-                <div className="flex flex-col min-w-0 flex-1">
-                   <span className="truncate">{lastScan.message}</span>
+                <div className="flex flex-col min-w-0 flex-1 py-1">
+                   <span className={`text-[17px] md:text-[22px] font-black uppercase tracking-tighter truncate ${lastScan.status === 'success' ? 'text-blue-900' : 'text-rose-900'}`}>{lastScan.message}</span>
                 </div>
                 {lastScan.qty !== undefined && (
-                   <div className="flex flex-col items-center justify-center pl-3 border-l-2 border-emerald-200 shrink-0">
-                       <span className="text-[8px] text-emerald-600 font-extrabold uppercase leading-none">Total</span>
-                       <span className="text-xl font-black text-emerald-900 leading-none">{lastScan.qty}</span>
+                   <div className="flex flex-col items-center py-1 justify-center pl-3 border-l-2 border-white/40 shrink-0">
+                       <span className={`text-[8px] font-extrabold uppercase leading-none opacity-60 ${lastScan.status === 'success' ? 'text-blue-900' : 'text-rose-900'}`}>Total</span>
+                       <span className={`text-2xl font-black leading-none ${lastScan.status === 'success' ? 'text-blue-700' : 'text-rose-700'}`}>{lastScan.qty}</span>
                    </div>
                 )}
               </div>
@@ -1133,9 +1149,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
                                      (lastScannedAt[it.articleId] && Object.values(lastScannedAt).sort((a,b)=>b-a)[0] === lastScannedAt[it.articleId]);
 
                     return (
-                      <tr key={it.articleId} className={`hover:bg-slate-50 transition-all font-bold 
+                      <tr key={it.articleId} className={`hover:bg-slate-50 transition-all duration-500 font-bold 
                         ${validationAttempts === 1 ? 'bg-red-50/10' : ''} 
-                        ${isLatest ? 'bg-emerald-50/40 outline outline-2 outline-emerald-400/30 shadow-inner' : ''}
+                        ${isLatest ? 'bg-[#dbeafe] text-blue-950 outline outline-[3px] outline-blue-400 scale-[1.01] shadow-lg relative z-10' : ''}
                       `}>
                         <td className="px-6 py-2 border-r border-slate-50">
                           <div className="flex flex-col">

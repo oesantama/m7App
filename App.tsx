@@ -211,7 +211,7 @@ const App: React.FC = () => {
       window.removeEventListener('keydown', resetInactivityTimer);
       window.removeEventListener('click', resetInactivityTimer);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, activeTab]);
 
   useEffect(() => {
 
