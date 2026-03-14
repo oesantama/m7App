@@ -84,6 +84,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     createdAt: number;
     status: 'pending' | 'resolved';
     suggestion?: string;
+    qty?: number;
   }[]>(() => {
     const saved = localStorage.getItem(`m7_incidents_${docL.id}`);
     const parsed = saved ? JSON.parse(saved) : [];
@@ -453,6 +454,36 @@ const BlindCount: React.FC<BlindCountProps> = ({
         return; 
     }
 
+    // === M7 V15c: AUTO PROCESAR EXTRAS DESDE MAESTRO ===
+    // Si la lectura no está en el plan actual (groupedItems) pero SÍ es un artículo real de base de datos
+    // Lo anexamos dinámicamente como "Extra" para evitar engrosar innecesariamente las incidencias.
+    const inMaster = (masterArticulo as Article[]).find(a => (a.id && a.id.toUpperCase() === input) || (a.sku && a.sku.toUpperCase() === input));
+    if (inMaster) {
+        const newExtra = {
+          articleId: inMaster.id,
+          sku: inMaster.sku || inMaster.id,
+          ['articleName' as any]: inMaster.name || `EXTRA ${inMaster.id}`,
+          expectedQty: 0,
+          count1: 0,
+          countedQty: 0,
+          unit: 'UND',
+          id: `extra-${Date.now()}`,
+          status: 'pending' as DocStatus,
+          isExtra: true
+        } as unknown as DocumentLItem;
+
+        // Lo inyectamos silenciosamente a la malla de items.
+        setExtraItems(prev => {
+            // Verificar duplicados preventivo
+            if (prev.some(it => it.articleId === inMaster.id)) return prev;
+            return [...prev, newExtra];
+        });
+        
+        // Lo encolamos dinámicamente con retardo para que la UI lo asimile antes de evaluarlo.
+        setTimeout(() => enqueueScan(inMaster.sku || inMaster.id), 100);
+        return; // Detenemos aquí. El procesador diferido sumará +1 como si existiese en Plan.
+    }
+
     // 4. Registrar en TABLA 2 (Incidencias)
     const newIncident = {
       id: `inc-${Date.now()}`,
@@ -461,10 +492,25 @@ const BlindCount: React.FC<BlindCountProps> = ({
       timestamp: new Date().toLocaleTimeString(),
       createdAt: Date.now(), // Para la V15 (Retro-GC)
       status: 'pending' as const,
-      suggestion: possibleBetterMatch?.articleId
+      suggestion: possibleBetterMatch?.articleId,
+      qty: 1
     };
 
-    setIncidents(prev => [newIncident, ...prev]);
+    setIncidents(prev => {
+        // M7 V15c: AGRUPAR INCIDENCIAS IDÉNTICAS PARA EVITAR SPAM EN TABLET
+        const existingCodeIndex = prev.findIndex(inc => inc.code === input);
+        if (existingCodeIndex !== -1) {
+             const copy = [...prev];
+             copy[existingCodeIndex] = { 
+                 ...copy[existingCodeIndex], 
+                 qty: (copy[existingCodeIndex].qty || 1) + 1,
+                 timestamp: new Date().toLocaleTimeString(),
+                 createdAt: Date.now() // Refresca su timeline
+             };
+             return copy;
+        }
+        return [newIncident, ...prev];
+    });
     setLastScan({ 
       id: Math.random(),
       article: null, 
@@ -896,7 +942,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
       });
     }
     return list;
-  }, [groupedItems, tableSearch, validationAttempts, counts, mismatchIds, sortConfig]);
+  }, [groupedItems, tableSearch, validationAttempts, counts, mismatchIds, sortConfig, lastScannedAt]);
 
   const totalPages = useMemo(() => {
     if (rowsPerPage === 'all') return 1;
@@ -1083,8 +1129,14 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {paginatedItems.map(it => {
                     const currentCount = counts[it.articleId] || 0;
+                    const isLatest = lastScan?.article?.id === it.articleId || lastScan?.article?.sku === it.articleId || 
+                                     (lastScannedAt[it.articleId] && Object.values(lastScannedAt).sort((a,b)=>b-a)[0] === lastScannedAt[it.articleId]);
+
                     return (
-                      <tr key={it.articleId} className={`hover:bg-slate-50 transition-all font-bold ${validationAttempts === 1 ? 'bg-red-50/10' : ''}`}>
+                      <tr key={it.articleId} className={`hover:bg-slate-50 transition-all font-bold 
+                        ${validationAttempts === 1 ? 'bg-red-50/10' : ''} 
+                        ${isLatest ? 'bg-emerald-50/40 outline outline-2 outline-emerald-400/30 shadow-inner' : ''}
+                      `}>
                         <td className="px-6 py-2 border-r border-slate-50">
                           <div className="flex flex-col">
                             <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest w-fit mb-0.5 ${ (it as any).isExtra ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'}`}>
@@ -1152,7 +1204,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
         </div>
 
         {/* TABLA 2: INCIDENCIAS / NOVEDADES (DERECHA / ABAJO) - M7-MOD: Ancho reducido para priorizar el plan */}
-        <div className="lg:w-[320px] flex flex-col min-h-[250px] lg:min-h-0 bg-slate-50 overflow-hidden shrink-0">
+        <div className="w-full lg:w-[320px] h-[350px] lg:h-auto flex flex-col bg-slate-50 overflow-hidden shrink-0 border-t-8 lg:border-t-0 border-slate-100 shadow-inner lg:shadow-none">
           <div className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-slate-900 text-amber-500 rounded-xl flex items-center justify-center shadow-md">
@@ -1186,8 +1238,13 @@ const BlindCount: React.FC<BlindCountProps> = ({
                     </div>
                     <div className="p-4 flex flex-col gap-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase shadow-md truncate flex-1">
-                          {inc.code}
+                        <span className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase shadow-md truncate flex-1 flex items-center justify-between">
+                          <span>{inc.code}</span>
+                          {(inc.qty || 1) > 1 && (
+                              <span className="bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded text-[8px] tracking-widest leading-none">
+                                  x{inc.qty}
+                              </span>
+                          )}
                         </span>
                         <button
                          onClick={() => handleResolveIncident(inc.id, 'delete')}
