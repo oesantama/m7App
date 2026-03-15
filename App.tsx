@@ -125,38 +125,9 @@ const App: React.FC = () => {
 
   const { refreshAppData } = useAppData();
 
-  // Timeout - 10 Minutos (600,000 ms)
-  const TIMEOUT_MS = 10 * 60 * 1000;
-  const WARNING_MS = 1 * 60 * 1000; // Aviso 1 minuto antes
-  let inactivityTimer: any;
-  let warningTimer: any;
-  let countdownInterval: any;
-
+  // Eliminado: Timeout de Inactividad (Solicitud del Usuario V16)
   const resetInactivityTimer = () => {
-    setShowTimeoutWarning(false);
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-    if (warningTimer) clearTimeout(warningTimer);
-    if (countdownInterval) clearInterval(countdownInterval);
-
-    // M7 BLINDAJE: No cerrar sesión si se está operando en módulos críticos
-    const criticalTabs = ['recibido', 'recibido-manual', 'picking', 'grupo-inter-ops', 'rutas'];
-    const isInCriticalProcess = criticalTabs.includes(activeTab);
-
-    if (isAuthenticated && !isInCriticalProcess) {
-      // Timer principal de 10 minutos
-      inactivityTimer = setTimeout(() => {
-        handleLogout(true);
-      }, TIMEOUT_MS);
-
-      // Timer de aviso a los 9 minutos
-      warningTimer = setTimeout(() => {
-        setShowTimeoutWarning(true);
-        setTimeLeft(60);
-        countdownInterval = setInterval(() => {
-          decrementTimeLeft(); // Usa helper del store
-        }, 1000);
-      }, TIMEOUT_MS - WARNING_MS);
-    }
+     setShowTimeoutWarning(false);
   };
 
   // ============ PORTAL ROUTING ============
@@ -198,18 +169,9 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('orbit-auth-failed', handleAuthFailure);
-    window.addEventListener('mousemove', resetInactivityTimer);
-    window.addEventListener('keydown', resetInactivityTimer);
-    window.addEventListener('click', resetInactivityTimer);
-
-    resetInactivityTimer(); // Iniciar timer
 
     return () => {
-      if (inactivityTimer) clearTimeout(inactivityTimer);
       window.removeEventListener('orbit-auth-failed', handleAuthFailure);
-      window.removeEventListener('mousemove', resetInactivityTimer);
-      window.removeEventListener('keydown', resetInactivityTimer);
-      window.removeEventListener('click', resetInactivityTimer);
     };
   }, [isAuthenticated, activeTab]);
 

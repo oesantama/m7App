@@ -45,6 +45,12 @@ const BlindCount: React.FC<BlindCountProps> = ({
   }, [extraItems, docL.id]);
   // ESTADOS DE INVENTARIO M7
   const [counts, setCounts] = useState<{ [articleId: string]: number }>(() => {
+    // M7 V16 FIX: Prevenir "Ghost Deletion" hidratando primero desde LocalStorage antes que de la base de datos (Cloud)
+    const saved = localStorage.getItem(`m7_offline_count_${docL.id}`);
+    if (saved) {
+       try { return JSON.parse(saved); } catch (e) { console.warn('Error parseando caché offline', e); }
+    }
+    
     const initial: { [id: string]: number } = {};
     docL.items.forEach(it => {
       // Priorizar countedQty del servidor (Cloud)
@@ -150,6 +156,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const isLoaded = useRef(false);
   const ignoreScan = useRef(false); // Ref para ignorar basura del scanner
   const lastValidScanAt = useRef<number>(0); // M7 V15: Control de Ventana de Tiempo Lógico
+  const tableContainerRef = useRef<HTMLDivElement>(null); // M7 V16: Ref para scroll automático
 
   // AGRUPACIÓN DE ITEMS POR SKU (VISTA GENERAL)
   const groupedItems = useMemo(() => {
@@ -285,6 +292,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const handleBingoEffects = () => {
       lastValidScanAt.current = Date.now();
       
+      // M7 V16: Scroll al tope de la tabla para ver el registro TOP 1 inyectado
+      if (tableContainerRef.current) {
+         tableContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
       // M7 V15: Retrospective Garbage Collection
       // Si tuvimos incidencias fallidas hace menos de 800ms, seguro son prefijos basura
       // de la misma estampa que mandó el hardware antes de mandar el código limpio.
@@ -309,8 +321,15 @@ const BlindCount: React.FC<BlindCountProps> = ({
   };
 
   const processBarcode = (rawCode: string) => {
-    const input = cleanSkuM7(rawCode);
+    let input = cleanSkuM7(rawCode);
     if (!input || input.length < 3) return;
+
+    // === M7 V16 DYNAMIC SPLIT (FAST-TRACK) ===
+    // Optimización ultra agresiva de latencia: Si detectamos ":", sabemos que ajover inyecta el SKU seguido de ":".
+    // Esto borra la necesidad de iterar sobre expresiones regulares complejas o búsquedas profundas.
+    if (input.includes(':')) {
+       input = input.split(':')[0].trim();
+    }
 
     // === M7 AI BRAIN: Verificar memoria auto-regenerativa primero ===
     // Si la lectura "sucia" (ej: D403199:BL:1) ya fue aprendida, la traducimos al SKU real (D403199).
@@ -345,6 +364,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
         });
         setLastScannedAt(prev => ({ ...prev, [targetId]: Date.now() }));
         handleBingoEffects();
+        setCurrentPage(1); // M7 V16: Auto-Scroll Dinámica Tabla a la Página 1 para visibilizar el Último Escaneado en el top
         setScanInput(''); // Limpiar para el siguiente de inmediato
         return; // Salir aquí para éxito
     }
@@ -393,6 +413,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
             status: 'success' 
          });
          handleBingoEffects();
+         setCurrentPage(1); // M7 V16: Auto-Focus
          setScanInput('');
          return;
       }
@@ -427,6 +448,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
 
                 handleBingoEffects();
+                setCurrentPage(1); // M7 V16: Auto-Focus
                 setScanInput('');
                 return; 
             }
@@ -908,23 +930,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
   };
 
   const filteredItems = useMemo(() => {
-    let list = [...groupedItems]; // M7-MOD: clonar antes de ordenar
-
-    // M7 V15b: Orden Dinámico (Last-Scanned Primero)
-    // Si el operador acaba de escanear algo, ese artículo debería saltar al tope de la lista.
-    list.sort((a, b) => {
-        const timeA = lastScannedAt[a.articleId] || 0;
-        const timeB = lastScannedAt[b.articleId] || 0;
-        
-        // Empujar los no escaneados al fondo absoluto
-        if (timeA > 0 && timeB === 0) return -1;
-        if (timeB > 0 && timeA === 0) return 1;
-
-        // Si ambos han sido escaneados, prioriza el delta más reciente
-        if (timeA !== timeB) return timeB - timeA;
-        return 0; // Orden original si interactuaron al mismo tiempo (imposible) o ninguno
-    });
-
+    // 1. FILTRADO INICIAL (Fases y Búsqueda)
+    let list: DocumentLItem[] = [];
+    
     if (validationAttempts === 0) {
       // Fase 1: Solo mostramos lo que se ha escaneado
       list = groupedItems.filter(it => (counts[it.articleId] || 0) > 0);
@@ -942,21 +950,33 @@ const BlindCount: React.FC<BlindCountProps> = ({
       );
     }
 
-    if (sortConfig) {
-      list.sort((a, b) => {
-        const aVal = (a as any)[sortConfig.key] || '';
-        const bVal = (b as any)[sortConfig.key] || '';
+    // 2. ORDENAMIENTO (Prioridad M7: Escaneo Reciente > Sort Manual)
+    // El último pistoleado SIEMPRE debe estar arriba para eficiencia en tablet
+    list.sort((a, b) => {
+        // M7 V16 ULTRA-PRIORITY: El que tenga el timestamp más joven gana siempre
+        const timeA = lastScannedAt[a.articleId] || 0;
+        const timeB = lastScannedAt[b.articleId] || 0;
 
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+        // Si uno es más reciente que el otro, ponerlo de primero
+        if (timeA !== timeB) return timeB - timeA;
+
+        // Si ninguno tiene timestamp o son iguales, aplicamos el sort manual si existe
+        if (sortConfig) {
+            const aVal = (a as any)[sortConfig.key] || '';
+            const bVal = (b as any)[sortConfig.key] || '';
+
+            if (typeof aVal === 'number' && typeof bVal === 'number') {
+              return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+            }
+            const aStr = String(aVal).toLowerCase();
+            const bStr = String(bVal).toLowerCase();
+            if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
         }
-        const aStr = String(aVal).toLowerCase();
-        const bStr = String(bVal).toLowerCase();
-        if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
+
         return 0;
-      });
-    }
+    });
+
     return list;
   }, [groupedItems, tableSearch, validationAttempts, counts, mismatchIds, sortConfig, lastScannedAt]);
 
@@ -1132,7 +1152,10 @@ const BlindCount: React.FC<BlindCountProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar">
+            <div 
+              ref={tableContainerRef}
+              className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar"
+            >
               <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[8px] sticky top-0 z-20 shadow-sm">
                   <tr>
