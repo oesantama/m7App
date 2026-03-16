@@ -1094,3 +1094,64 @@ export const createManualDocument = async (req: Request, res: Response) => {
     client.release();
   }
 };
+
+// ═══════════════════════════════════════════════════════════
+// LOG DE EXISTENCIAS — Consulta de inventario_clientes
+// ═══════════════════════════════════════════════════════════
+export const getInventoryLog = async (req: Request, res: Response) => {
+  try {
+    const { clientId, articleId, search } = req.query;
+    const user = (req as any).user;
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+
+    const params: any[] = [];
+    let whereClause = 'WHERE 1=1';
+
+    // Filtrar por cliente autorizado si no es super admin
+    if (!isSuper) {
+      const allowedIds = user?.client_ids || [];
+      params.push(allowedIds);
+      whereClause += ` AND ic.client_id = ANY($${params.length}::text[])`;
+    }
+
+    if (clientId) {
+      params.push(clientId);
+      whereClause += ` AND ic.client_id = $${params.length}`;
+    }
+
+    if (articleId) {
+      params.push(articleId);
+      whereClause += ` AND ic.article_id = $${params.length}`;
+    }
+
+    if (search) {
+      params.push(`%${search}%`);
+      whereClause += ` AND (ic.article_id ILIKE $${params.length} OR a.name ILIKE $${params.length} OR c.name ILIKE $${params.length} OR ic.batch ILIKE $${params.length})`;
+    }
+
+    const query = `
+      SELECT
+        ic.client_id    AS "clientId",
+        c.name          AS "clientName",
+        ic.article_id   AS "articleId",
+        a.name          AS "articleName",
+        ic.batch,
+        ic.quantity,
+        ic.last_user    AS "lastUser",
+        ic.last_updated AS "lastUpdated"
+      FROM inventario_clientes ic
+      LEFT JOIN clients c  ON ic.client_id  = c.id
+      LEFT JOIN articles a ON ic.article_id = a.id
+      ${whereClause}
+      ORDER BY ic.last_updated DESC
+      LIMIT 1000
+    `;
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[M7-INV-LOG-ERR]', err.message);
+    res.status(500).json({ error: 'Error al obtener log de existencias', details: err.message });
+  }
+};
+

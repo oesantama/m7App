@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment } from '../controllers/document.controller.js';
+import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog } from '../controllers/document.controller.js';
 
 import { requirePermission } from '../middleware/auth.middleware.js';
 
@@ -36,6 +36,18 @@ router.patch('/status/:id', requireAuditEdit, updateStatus);
 router.delete('/:id', requirePermission('DOCUMENTOS_L', 'delete'), deleteDocument);
 router.post('/sync-inventory', requireAuditEdit, syncInventory);
 router.post('/resend-notification', requireAuditEdit, resendInventoryNotification);
+
+// Log de Existencias — inventario_clientes acumulado por cliente/artículo
+router.get('/inventory-log', (req, res, next) => {
+  const user = (req as any).user;
+  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const hasPerm = user?.permissions?.some((p: any) =>
+    (p.module === 'PAG-16' || p.module === 'PAG-17' || p.module === 'PAG-01') &&
+    p.actions.includes('view')
+  );
+  if (isSuper || hasPerm) return next();
+  res.status(403).json({ success: false, error: 'Permiso insuficiente para ver existencias' });
+}, getInventoryLog);
 router.get('/invoices', (req, res, next) => {
   const user = (req as any).user;
   const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';

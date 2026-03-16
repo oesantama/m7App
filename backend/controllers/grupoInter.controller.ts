@@ -17,21 +17,11 @@ let schemaChecked = false;
 const ensureSchema = async () => {
     if (schemaChecked) return;
     try {
+        // [M7-FIX] SOLO ADD IF NOT EXISTS — NUNCA DROP para proteger datos de producción
         await pool.query(`
-            -- Normalización de timestamps y limpieza radical de duplicados
-            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS created_at;
-            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS history;
-            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS producto;
-            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS tipo_articulo;
-            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS peso;
-            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS cantidad;
-            ALTER TABLE grupo_inter_pedidos DROP COLUMN IF EXISTS valor_declarado;
-            
-            -- Asegurar columnas con nombres exactos solicitados
+            -- Asegurar columnas con nombres exactos (idempotente y seguro)
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS create_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_at TIMESTAMP WITH TIME ZONE;
-            ALTER TABLE grupo_inter_pedidos ALTER COLUMN update_at DROP DEFAULT;
-            
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS create_by TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS update_by TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS numero_planilla TEXT;
@@ -47,17 +37,20 @@ const ensureSchema = async () => {
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS latitud NUMERIC;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS longitud NUMERIC;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS ruta TEXT;
-            
-            -- Totales con nombres de Imagen 3 e Imagen 7
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS cantidad_total NUMERIC DEFAULT 0;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS precio_total NUMERIC DEFAULT 0;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS peso_total_prod NUMERIC DEFAULT 0;
-            
-            -- Parche agresivo para create_at nulo (M7-LEGACY-FIX)
-            UPDATE grupo_inter_pedidos SET create_at = CURRENT_TIMESTAMP WHERE create_at IS NULL;
-            UPDATE grupo_inter_pedidos SET create_at = fecha_carge WHERE create_at IS NULL AND fecha_carge IS NOT NULL;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS acta_entrega_b64 TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS fecha_entregado TIMESTAMP WITH TIME ZONE;
+        `);
 
-            -- Tabla de Novedades
+        // Parche para create_at nulo — seguro porque no borra datos
+        await pool.query(`
+            UPDATE grupo_inter_pedidos SET create_at = CURRENT_TIMESTAMP WHERE create_at IS NULL;
+        `);
+
+        // Tablas auxiliares (CREATE IF NOT EXISTS es idempotente)
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS grupo_inter_novedades (
                 id SERIAL PRIMARY KEY,
                 pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
@@ -67,7 +60,6 @@ const ensureSchema = async () => {
                 usuario TEXT
             );
 
-            -- Tabla de Reajustes
             CREATE TABLE IF NOT EXISTS grupo_inter_reajustes (
                 id SERIAL PRIMARY KEY,
                 pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
@@ -78,7 +70,6 @@ const ensureSchema = async () => {
                 usuario TEXT
             );
 
-            -- Tabla de Items (NECESARIO PARA EL SERVER) - Asegurar todas las columnas de Imagen 2 e Imagen 3
             CREATE TABLE IF NOT EXISTS grupo_inter_pedidos_items (
                 id SERIAL PRIMARY KEY,
                 pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
@@ -91,7 +82,6 @@ const ensureSchema = async () => {
                 precio NUMERIC(15,2) DEFAULT 0
             );
 
-            -- Tabla de Histórico (NECESARIO PARA EL SERVER)
             CREATE TABLE IF NOT EXISTS grupo_inter_pedidos_historico (
                 id SERIAL PRIMARY KEY,
                 pedido_id INTEGER REFERENCES grupo_inter_pedidos(id) ON DELETE CASCADE,
@@ -100,13 +90,16 @@ const ensureSchema = async () => {
                 fecha TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 usuario TEXT
             );
+        `);
 
-            -- Asegurar columnas si las tablas ya existían
+        // Columnas adicionales en tablas auxiliares (idempotente)
+        await pool.query(`
             ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS tipo_articulo TEXT;
             ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS precio NUMERIC(15,2) DEFAULT 0;
             ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS guia TEXT;
             ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS producto TEXT;
         `);
+
         schemaChecked = true;
     } catch (e) {
         console.error('[GRUPO-INTER] Error al normalizar esquema:', e);
