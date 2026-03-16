@@ -336,27 +336,51 @@ const BlindCount: React.FC<BlindCountProps> = ({
     const translatedInput = aiBrain[input] || input;
 
     // M7 V14 AI FILTER: Silenciador de Basura
-    if (translatedInput === '*IGNORE*') {
-        // En lugar de alertar y sobrescribir el éxito, lo bloqueamos y retornamos en silencio
-        // para proteger el mensaje visual previo del trabajador.
-        setScanInput('');
-        return;
+    if (translatedInput === '*IGNORE*' || translatedInput.startsWith('A02')) {
+        // M7 V16.3: Auto-recuperación de SKUs "baneados" por error en ráfagas rápidas
+        const isActuallyValid = groupedItems.some(it => it.articleId?.toUpperCase() === input || it.sku?.toUpperCase() === input) ||
+                                (masterArticulo as Article[]).some(a => (a.id && a.id.toUpperCase() === input) || (a.sku && a.sku.toUpperCase() === input) || (a.barcode && a.barcode === input));
+        
+        if (isActuallyValid && translatedInput === '*IGNORE*') {
+            // El cerebro se equivocó por una ráfaga previa. Lo "desbaneamos" en caliente.
+            const nextBrain = { ...aiBrain };
+            delete nextBrain[input];
+            setAiBrain(nextBrain);
+            localStorage.setItem('m7_ai_brain_relations', JSON.stringify(nextBrain));
+            // Dejamos que continúe el flujo para procesar la lectura ahora limpia
+        } else {
+            // Es OP real o basura real confirmada
+            setScanInput('');
+            return;
+        }
     }
 
     // 1. Buscar en el plan (Match Directo - TABLA 1)
+    const master = (masterArticulo as Article[]).find(m => 
+        (m.id && m.id.toUpperCase() === translatedInput) || 
+        (m.sku && m.sku.toUpperCase() === translatedInput) || 
+        (m.barcode && m.barcode === translatedInput)
+    );
+
     const itemInDoc = groupedItems.find(it => 
       (it.articleId?.toUpperCase() === translatedInput) || 
-      (it.sku?.toUpperCase() === translatedInput)
+      (it.sku?.toUpperCase() === translatedInput) ||
+      (master && master.id === it.articleId)
     );
 
     if (itemInDoc) {
         const targetId = itemInDoc.articleId;
+        
+        // M7 V16.4: Inteligencia de Factores - Si el artículo tiene un factor > 1, asumimos que el código representa ese bulto/caja
+        const factor = master ? (master.factorInter || master.factorStd || 1) : 1;
+        const qtyToAdd = factor > 1 ? factor : 1;
+
         setCounts(prev => {
-          const newQty = (prev[targetId] || 0) + 1;
+          const newQty = (prev[targetId] || 0) + qtyToAdd;
           setLastScan({ 
             id: Math.random(),
-            article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
-            message: targetId, 
+            article: master || null, 
+            message: qtyToAdd > 1 ? `${targetId} [CAJA +${qtyToAdd}]` : targetId, 
             status: 'success',
             qty: newQty
           });
@@ -364,9 +388,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
         });
         setLastScannedAt(prev => ({ ...prev, [targetId]: Date.now() }));
         handleBingoEffects();
-        setCurrentPage(1); // M7 V16: Auto-Scroll Dinámica Tabla a la Página 1 para visibilizar el Último Escaneado en el top
-        setScanInput(''); // Limpiar para el siguiente de inmediato
-        return; // Salir aquí para éxito
+        setCurrentPage(1); 
+        setScanInput(''); 
+        return; 
     }
 
     // === 2. HEURÍSTICA M7 V10 (Descomposición Inteligente en Vuelo) ===
@@ -466,9 +490,12 @@ const BlindCount: React.FC<BlindCountProps> = ({
         : `Artículo fuera de plan o código desconocido.`;
 
     // M7 V15 FUTURE FILTER (Post-Context Filter):
-    // Si entró un código basura menos de 800ms DESPUES de un escaneo válido (ej: lote adyacente),
-    // se descarta silenciosamente para que NO sobreescriba en UI la alerta de "Último Escaneado".
-    if (Date.now() - lastValidScanAt.current <= 800) {
+    // Solo aplicar el filtro de "basura rápida" si el código NO ES un producto conocido (Plan o Maestra)
+    const isKnownProduct = groupedItems.some(it => it.articleId?.toUpperCase() === input || it.sku?.toUpperCase() === input) ||
+                           (masterArticulo as Article[]).some(a => (a.id && a.id.toUpperCase() === input) || (a.sku && a.sku.toUpperCase() === input) || (a.barcode && a.barcode === input));
+    
+    if (!isKnownProduct && Date.now() - lastValidScanAt.current <= 800) {
+        // Silenciador de ráfagas para códigos desconocidos (ej: lotes)
         const newBrain = { ...aiBrain, [input]: '*IGNORE*' };
         setAiBrain(newBrain);
         localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
@@ -479,8 +506,15 @@ const BlindCount: React.FC<BlindCountProps> = ({
     // === M7 V15c: AUTO PROCESAR EXTRAS DESDE MAESTRO ===
     // Si la lectura no está en el plan actual (groupedItems) pero SÍ es un artículo real de base de datos
     // Lo anexamos dinámicamente como "Extra" para evitar engrosar innecesariamente las incidencias.
-    const inMaster = (masterArticulo as Article[]).find(a => (a.id && a.id.toUpperCase() === input) || (a.sku && a.sku.toUpperCase() === input));
+    const inMaster = (masterArticulo as Article[]).find(a => 
+        (a.id && a.id.toUpperCase() === input) || 
+        (a.sku && a.sku.toUpperCase() === input) ||
+        (a.barcode && a.barcode === input)
+    );
     if (inMaster) {
+        const factor = inMaster.factorInter || inMaster.factorStd || 1;
+        const autoQty = factor > 1 ? factor : 1;
+        
         const newExtra = {
           articleId: inMaster.id,
           sku: inMaster.sku || inMaster.id,
@@ -488,7 +522,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
           expectedQty: 0,
           count1: 0,
           countedQty: 0,
-          unit: 'UND',
+          unit: inMaster.factorInter > 1 ? 'CJ' : 'UND', // Sugerencia de unidad basada en factor
           id: `extra-${Date.now()}`,
           status: 'pending' as DocStatus,
           isExtra: true
@@ -496,20 +530,23 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
         // Lo inyectamos silenciosamente a la malla de items.
         setExtraItems(prev => {
-            // Verificar duplicados preventivo
             if (prev.some(it => it.articleId === inMaster.id)) return prev;
             return [...prev, newExtra];
         });
         
-        // Lo encolamos dinámicamente con retardo para que la UI lo asimile antes de evaluarlo.
-        setTimeout(() => enqueueScan(inMaster.sku || inMaster.id), 100);
-        return; // Detenemos aquí. El procesador diferido sumará +1 como si existiese en Plan.
+        // M7 V16.2: Encolar la cantidad real detectada (si es caja, sumar el factor)
+        setTimeout(() => {
+            for(let i=0; i<autoQty; i++) {
+                enqueueScan(inMaster.sku || inMaster.id);
+            }
+        }, 100);
+        return; 
     }
 
     // M7 V15d: FILTRO DURO "SOLO LETRAS".
     // El 99% de las incidencias inútiles u olvidadas son códigos numéricos puramente (basura del empaque).
-    // Si la lectura NO empieza por una letra (A-Z), se descarta en total silencio.
-    if (!/^[a-zA-Z]/i.test(input)) {
+    // Si la lectura NO empieza por una letra (A-Z) Y NO es un barcode válido en maestra, se descarta.
+    if (!/^[a-zA-Z]/i.test(input) && !inMaster) {
         // Enseñar al bot para que lo descarte más rápido todavía la prox. vez (Caché O(1))
         const newBrain = { ...aiBrain, [input]: '*IGNORE*' };
         setAiBrain(newBrain);
@@ -1202,9 +1239,23 @@ const BlindCount: React.FC<BlindCountProps> = ({
                         </td>
                         <td className="px-4 py-2 text-right pr-6 flex justify-end items-center h-full gap-2">
                           <button 
+                            onClick={() => handleOpenTransaction(it.articleId, 'CONVERT')} 
+                            className="w-9 h-9 bg-emerald-600 text-white rounded-xl shadow-lg flex items-center justify-center hover:bg-emerald-500 active:scale-95 transition-all border border-emerald-400/50 shadow-emerald-500/20"
+                            title="DESGLOSAR / CONVERTIR"
+                          >
+                            <Icons.Maximize2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleOpenTransaction(it.articleId, 'REVERSE')} 
+                            className="w-9 h-9 bg-amber-600 text-white rounded-xl shadow-lg flex items-center justify-center hover:bg-amber-500 active:scale-95 transition-all border border-amber-400/50 shadow-amber-500/20"
+                            title="AGRUPAR / REVERSAR"
+                          >
+                            <Icons.Minimize2 className="w-4 h-4" />
+                          </button>
+                          <button 
                             onClick={() => handleSubtract(it.articleId)} 
                             disabled={currentCount === 0} 
-                            className="w-9 h-9 bg-red-600 text-white rounded-xl shadow-lg disabled:opacity-20 flex items-center justify-center font-black text-sm hover:bg-red-700 active:scale-95 transition-all border border-red-500/50"
+                            className="w-9 h-9 bg-red-600 text-white rounded-xl shadow-lg disabled:opacity-20 flex items-center justify-center font-black text-sm hover:bg-red-700 active:scale-95 transition-all border border-red-500/50 ml-2"
                           >
                             -1
                           </button>
@@ -1433,15 +1484,15 @@ const BlindCount: React.FC<BlindCountProps> = ({
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 text-center shadow-2xl border border-white/10 relative overflow-hidden">
              
              {/* Header Dinámico */}
-             <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${unitTransaction.type === 'CONVERT' ? 'from-blue-500 to-indigo-500' : 'from-amber-500 to-orange-500'}`}></div>
-             
-             <div className={`w-16 h-16 rounded-3xl mx-auto flex items-center justify-center shadow-lg mb-6 ${unitTransaction.type === 'CONVERT' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
-                {unitTransaction.type === 'CONVERT' ? <Icons.RefreshCw className="w-8 h-8" /> : <Icons.RotateCcw className="w-8 h-8" />}
-             </div>
+              <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${unitTransaction.type === 'CONVERT' ? 'from-emerald-500 to-teal-500' : 'from-amber-500 to-orange-500'}`}></div>
+              
+              <div className={`w-16 h-16 rounded-3xl mx-auto flex items-center justify-center shadow-lg mb-6 ${unitTransaction.type === 'CONVERT' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                 {unitTransaction.type === 'CONVERT' ? <Icons.Maximize2 className="w-8 h-8" /> : <Icons.Minimize2 className="w-8 h-8" />}
+              </div>
 
-             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-1">
-                {unitTransaction.type === 'CONVERT' ? 'Convertir Unidades' : 'Reversar Unidades'}
-             </h3>
+              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-1">
+                 {unitTransaction.type === 'CONVERT' ? 'Desglosar / Convertir' : 'Agrupar / Reversar'}
+              </h3>
              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-8">
                 Artículo: {unitTransaction.articleId} | Actual: {unitTransaction.currentQty}
              </p>

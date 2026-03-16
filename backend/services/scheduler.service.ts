@@ -12,14 +12,14 @@ export const initScheduler = () => {
     // Símbolo Cron: minuto hora día mes día-semana
     cron.schedule('0 1 * * *', async () => {
         const startTime = Date.now();
-        console.log('[M7-SCHEDULER] Iniciando limpieza de novedades de más de 48 horas...');
+        console.log('[M7-SCHEDULER] Iniciando limpieza de novedades de más de 30 horas...');
 
         try {
-            // Borramos los registros de inventory_news que tengan más de 48 horas
+            // Borramos los registros de inventory_news que tengan más de 30 horas
             // Esto también borra las fotos (Base64) al estar en la misma tabla.
             const result = await pool.query(`
                 DELETE FROM inventory_news 
-                WHERE created_at < NOW() - INTERVAL '48 hours'
+                WHERE created_at < NOW() - INTERVAL '30 hours'
             `);
 
             const duration = Date.now() - startTime;

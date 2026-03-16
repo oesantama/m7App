@@ -76,12 +76,11 @@ const App: React.FC = () => {
     assignments,
     routes,
     waStatus,
+    needsWelcomeRedirect,
     isRestoring,
     isLoading,
-    showTimeoutWarning,
-    timeLeft,
-    modules,
     pages,
+    modules,
 
     // Acciones
     setUser,
@@ -99,9 +98,6 @@ const App: React.FC = () => {
     setWaStatus,
     setIsRestoring,
     setIsLoading,
-    setShowTimeoutWarning,
-    setTimeLeft,
-    decrementTimeLeft,
 
     // Helpers
     updateMasterData,
@@ -125,10 +121,6 @@ const App: React.FC = () => {
 
   const { refreshAppData } = useAppData();
 
-  // Eliminado: Timeout de Inactividad (Solicitud del Usuario V16)
-  const resetInactivityTimer = () => {
-     setShowTimeoutWarning(false);
-  };
 
   // ============ PORTAL ROUTING ============
   const [activeRoutes, setActiveRoutes] = useState<any[]>([]); // Estado para rutas activas

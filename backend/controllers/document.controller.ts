@@ -18,6 +18,7 @@ export const getDocuments = async (req: Request, res: Response) => {
       picker_user as "pickerUser",
       deliverer_user as "delivererUser",
       receiver_user as "receiverUser",
+      d.created_at as "createdAt",
       (SELECT COUNT(*) FROM document_l_payments p WHERE p.document_id = d.id) as "paymentsCount",
       (SELECT json_agg(item_with_payment) FROM (
         SELECT i.*, 
@@ -32,6 +33,7 @@ export const getDocuments = async (req: Request, res: Response) => {
         LEFT JOIN document_consolidated_items c ON i.document_id = c.document_id AND TRIM(UPPER(i.article_id)) = TRIM(UPPER(c.article_id))
         WHERE i.document_id = d.id
       ) item_with_payment) as items,
+      (SELECT COUNT(*) FROM inventory_news n WHERE n.document_id = d.id AND n.created_at >= NOW() - INTERVAL '30 hours') as "newsCount",
       (SELECT json_agg(item_mapped) FROM (
         SELECT article_id as "articleId", expected_qty as "expectedQty", count_1 as "count1", count_2 as "count2", 
                picked_qty as "pickedQty", dispatched_qty as "dispatchedQty", inventory_observation as "inventoryObservation"
@@ -145,7 +147,7 @@ export const syncInventory = async (req: Request, res: Response) => {
         expected_qty = EXCLUDED.expected_qty,
         inventory_user = EXCLUDED.inventory_user,
         inventory_observation = EXCLUDED.inventory_observation
-      `, [docId, sku, Number(skuAggregates[sku].count1 || 0), Number(skuAggregates[sku].count2 || 0), user, skuAggregates[sku].observation || notes || '', expectedQty]);
+      `, [String(docId), String(sku), Number(skuAggregates[sku].count1 || 0), Number(skuAggregates[sku].count2 || 0), user, skuAggregates[sku].observation || notes || '', expectedQty]);
 
       if (!isPartial) {
         await client.query(`
@@ -167,35 +169,38 @@ export const syncInventory = async (req: Request, res: Response) => {
     for (const item of items) {
       const artId = (item.articleId || item.article_id || '').trim().toUpperCase();
       if (!artId) continue;
+      const inv = (item.invoice || 'S/I');
 
       // [M7-PATCH] Estrategia SELECT -> UPDATE/INSERT para evitar error de constraint único
+      // Ahora incluimos el invoice para ser más específicos y evitar colisiones
       const checkItem = await client.query(
-        'SELECT id FROM document_items WHERE document_id = $1 AND article_id = $2 LIMIT 1',
-        [docId, artId]
+        'SELECT id FROM document_items WHERE document_id = $1 AND article_id = $2 AND (invoice = $3 OR invoice = \'S/I\') LIMIT 1',
+        [docId, artId, inv]
       );
 
       if (checkItem.rowCount && checkItem.rowCount > 0) {
         await client.query(`
           UPDATE document_items SET
             notes = $1, batch = $2, count_1 = $3, count_2 = $4
-          WHERE document_id = $5 AND article_id = $6
+          WHERE id = $5
         `, [
           item.inventoryNote || item.notes || '',
           item.batch || 'S/L',
           Number(item.count1 || 0),
           Number(item.count2 || item.countedQty || 0),
-          docId, artId
+          checkItem.rows[0].id
         ]);
       } else {
         await client.query(`
           INSERT INTO document_items (document_id, article_id, notes, batch, count_1, count_2, expected_qty, invoice)
-          VALUES ($1, $2, $3, $4, $5, $6, 0, 'S/I')
+          VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
         `, [
           docId, artId,
           item.inventoryNote || item.notes || '',
           item.batch || 'S/L',
           Number(item.count1 || 0),
-          Number(item.count2 || item.countedQty || 0)
+          Number(item.count2 || item.countedQty || 0),
+          inv
         ]);
       }
     }

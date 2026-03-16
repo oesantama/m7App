@@ -20,7 +20,7 @@ export interface TokenPayload {
 export const signAccessToken = (payload: TokenPayload): string => {
     return sign(payload, PRIVATE_KEY, {
         algorithm: 'RS256',
-        expiresIn: '2h' // Expiración de 2 horas para el token de acceso
+        expiresIn: '365d' // Expiración extendida a 365 días por solicitud de Oscar
     });
 };
 

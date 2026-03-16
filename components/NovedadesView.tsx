@@ -23,9 +23,10 @@ interface NovedadesViewProps {
     user: User;
     masterArticulo: MasterRecord[];
     masterNotificaciones: MasterRecord[];
+    onRefresh?: () => void;
 }
 
-const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterArticulo, masterNotificaciones }) => {
+const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterArticulo, masterNotificaciones, onRefresh }) => {
     const [selectedDoc, setSelectedDoc] = useState<DocumentL | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [articleSearch, setArticleSearch] = useState('');
@@ -56,7 +57,12 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                 s === DocStatus.COUNTING.toUpperCase() ||
                 s === DocStatus.INVENTORED.toUpperCase();
             
-            return matchStatus && d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase());
+            const search = searchTerm.toLowerCase();
+            const matchSearch = 
+                d.externalDocId.toLowerCase().includes(search) ||
+                (d.vehicleData || '').toLowerCase().includes(search);
+            
+            return matchStatus && matchSearch;
         });
     }, [documents, searchTerm]);
 
@@ -172,9 +178,11 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                 setObservation('');
                 setPhotos([]);
                 setArticleSearch('');
-                // Reload news
+                // Reload news for current doc
                 const updated = await api.getNovedades(selectedDoc.id);
                 setNovedades(updated);
+                // NOTIFY PARENT TO REFRESH LIST
+                if (onRefresh) onRefresh();
             }
         } catch (err: any) {
             toast.error(err.message || "Error al guardar novedad", { id: saveToast });
@@ -522,11 +530,18 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     return (
         <div className="p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
             <div className="max-w-4xl mx-auto w-full flex flex-col h-full space-y-4 animate-in fade-in duration-500">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg"><Icons.Alert className="w-5 h-5" /></div>
-                    <div>
-                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Gestión de Novedades</h2>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Auditoría de averías y faltantes</p>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-2xl border border-white/10 ring-4 ring-slate-900/5 animate-pulse-slow">
+                            <Icons.Alert className="w-6 h-6 text-emerald-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Gestión de Novedades</h2>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                                {filteredDocs.length} documentos encontrados
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -542,27 +557,73 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                         />
                     </div>
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
-                        {filteredDocs.map(doc => (
-                            <button
-                                key={doc.id}
-                                onClick={() => handleSelectDoc(doc)}
-                                className="w-full p-4 bg-white hover:bg-slate-50 border border-slate-100 rounded-xl text-left transition-all group flex items-center justify-between gap-4 shadow-sm hover:shadow-md"
-                            >
-                                <div className="min-w-0">
-                                    <p className="text-[9px] font-black text-blue-600 uppercase mb-0.5">{doc.externalDocId}</p>
-                                    <p className="text-base font-black text-slate-900 uppercase tracking-tighter truncate">{doc.vehicleData || 'SIN PLACA'}</p>
-                                    <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">{doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : 'FECHA S/A'}</p>
-                                </div>
-                                <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-600/10 transition-all shrink-0 border border-slate-100">
-                                    <Icons.ChevronRight className="w-5 h-5" />
-                                </div>
-                            </button>
-                        ))}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-5 pr-3 pb-10">
+                        {filteredDocs.map(doc => {
+                            const nCounts = Number((doc as any).newsCount || 0);
+                            const displayDate = doc.createdAt || doc.inventoryDate || (doc as any).receivingDate || doc.updatedAt;
+                            
+                            return (
+                                <button
+                                    key={doc.id}
+                                    onClick={() => handleSelectDoc(doc)}
+                                    className="w-full bg-white hover:bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] text-left transition-all group flex items-center gap-6 p-7 shadow-lg hover:shadow-2xl hover:-translate-y-2 border-l-[12px] border-l-slate-200 hover:border-l-blue-600 duration-500 relative overflow-hidden"
+                                >
+                                    {/* Glassmorphism accent */}
+                                    <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl -mr-24 -mt-24 group-hover:bg-blue-600/20 transition-all duration-700"></div>
+
+                                    <div className="w-20 h-20 bg-slate-900 rounded-[2rem] flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform duration-500 shrink-0 shadow-2xl relative z-10">
+                                        <Icons.Package className="w-10 h-10" />
+                                        {nCounts > 0 && (
+                                            <div className="absolute -top-2 -right-2 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-black border-4 border-white shadow-lg animate-bounce-subtle">
+                                                {nCounts}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1 space-y-2 relative z-10">
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-[11px] font-black text-blue-600 bg-blue-100/50 px-4 py-1.5 rounded-full uppercase tracking-widest border border-blue-200">
+                                                {doc.externalDocId}
+                                            </span>
+                                            <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widesto border ${
+                                                doc.status === DocStatus.INVENTORED ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+                                            }`}>
+                                                {doc.status}
+                                            </div>
+                                        </div>
+                                        
+                                        <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter truncate leading-none group-hover:text-blue-900 transition-colors">
+                                            {doc.vehicleData || 'SIN PLACA REGISTRADA'}
+                                        </h3>
+
+                                        <div className="flex items-center gap-6 pt-1">
+                                            <div className="flex items-center gap-2 text-slate-400">
+                                                <Icons.History className="w-4 h-4" />
+                                                <p className="text-[11px] font-black uppercase tracking-widest">
+                                                    {displayDate ? 
+                                                        new Date(displayDate).toLocaleString('es-CO', { 
+                                                            day: '2-digit', month: 'long', year: 'numeric',
+                                                            hour: '2-digit', minute: '2-digit', hour12: true
+                                                        }) 
+                                                        : 'FECHA NO DISPONIBLE EN SISTEMA'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-slate-200 group-hover:text-blue-600 group-hover:bg-blue-100/50 transition-all shrink-0 border-2 border-transparent group-hover:border-blue-200">
+                                        <Icons.ChevronRight className="w-10 h-10 group-hover:translate-x-1 transition-transform" />
+                                    </div>
+                                </button>
+                            );
+                        })}
                         {filteredDocs.length === 0 && (
-                            <div className="h-full flex flex-col items-center justify-center text-center opacity-20 py-20">
-                                <Icons.Package className="w-20 h-20 mb-4" />
-                                <p className="font-black uppercase text-xs">No se encontraron documentos</p>
+                            <div className="h-full flex flex-col items-center justify-center text-center opacity-30 py-32 space-y-4">
+                                <Icons.Package className="w-24 h-24 text-slate-300" />
+                                <div className="space-y-1">
+                                    <p className="font-black uppercase text-xl text-slate-900">Sin correspondencias</p>
+                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No hay documentos con ese criterio</p>
+                                </div>
                             </div>
                         )}
                     </div>

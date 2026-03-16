@@ -551,6 +551,14 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
               user={user} 
               masterArticulo={masterArticulo} 
               masterNotificaciones={masterNotificaciones} 
+              onRefresh={async () => {
+                try {
+                  const res = await api.getDocuments();
+                  onUpdateDocuments(res);
+                } catch (e) {
+                  console.error("Error al refrescar documentos:", e);
+                }
+              }}
             />
           </div>
         ) : (

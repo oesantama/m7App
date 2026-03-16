@@ -21,9 +21,11 @@ export const cleanSkuM7 = (raw: string): string => {
   // 2. Limpiar sufijos basura comunes generados por lectores mal configurados
   // Ñ suele ser un ENTER en teclado ES con input EN.
   // : suele ser TAB o delimitador final.
-  // \t, \n son obvios.
+  // GS1/EAN: Limpieza de prefijo (01) al inicio
+  if (code.startsWith('(01)')) code = code.substring(4);
+  
   // M7 FAST SCAN: Solo cortamos desde el PRIMER caracter de basura detectado al FINAL de la cadena útil
-  const garbageRegex = /([:Ñ\t\n\r]|S4:).*$/;
+  const garbageRegex = /[:Ñ\t\n\r].*$/;
   code = code.replace(garbageRegex, '');
 
   // 3. Limpieza final de espacios o caracteres no deseados en los extremos

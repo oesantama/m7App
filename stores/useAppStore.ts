@@ -28,8 +28,6 @@ interface AppState {
   
   // ============ ESTADO UI ============
   waStatus: 'CONNECTED' | 'DISCONNECTED';
-  showTimeoutWarning: boolean;
-  timeLeft: number;
   needsWelcomeRedirect: boolean;
   
   // ============ ACCIONES DE AUTENTICACIÓN ============
@@ -73,9 +71,6 @@ interface AppState {
   
   // ============ ACCIONES DE UI ============
   setWaStatus: (status: 'CONNECTED' | 'DISCONNECTED') => void;
-  setShowTimeoutWarning: (value: boolean) => void;
-  setTimeLeft: (value: number) => void;
-  decrementTimeLeft: () => void;
   
   // ============ HELPERS ============
   updateMasterData: (updates: Partial<{ [key in MasterCategory]?: MasterRecord[] }>) => void;
@@ -126,8 +121,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   routes: [],
   
   waStatus: 'DISCONNECTED',
-  showTimeoutWarning: false,
-  timeLeft: 60,
   needsWelcomeRedirect: false,
   
   // ============ IMPLEMENTACIÓN DE ACCIONES ============
@@ -210,9 +203,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   // UI
   setWaStatus: (status) => set({ waStatus: status }),
-  setShowTimeoutWarning: (value) => set({ showTimeoutWarning: value }),
-  setTimeLeft: (value) => set({ timeLeft: value }),
-  decrementTimeLeft: () => set((state) => ({ timeLeft: state.timeLeft > 0 ? state.timeLeft - 1 : 0 })),
   
   // Helper para actualizar allMasterData con merge
   updateMasterData: (updates: Partial<{ [key in MasterCategory]?: MasterRecord[] }>) => set((state) => ({
