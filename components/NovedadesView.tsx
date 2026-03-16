@@ -49,6 +49,11 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     const filteredDocs = useMemo(() => {
+        const now = new Date();
+        const twoDaysAgo = new Date(now);
+        twoDaysAgo.setDate(now.getDate() - 2);
+        twoDaysAgo.setHours(0, 0, 0, 0); // Inicio del día hace 2 días
+
         return documents.filter(d => {
             const s = String(d.status || '').toUpperCase();
             // M7 FIX: Permitir ver documentos en Pendiente, En Conteo e Inventariado (Auditados)
@@ -61,8 +66,13 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
             const matchSearch = 
                 d.externalDocId.toLowerCase().includes(search) ||
                 (d.vehicleData || '').toLowerCase().includes(search);
+
+            // M7 V16.5: Filtro de fecha (Hoy + 2 días atrás)
+            const displayDateStr = d.createdAt || d.inventoryDate || (d as any).receivingDate || d.updatedAt;
+            const displayDate = displayDateStr ? new Date(displayDateStr) : null;
+            const matchDate = displayDate ? displayDate >= twoDaysAgo : true; // Si no hay fecha, lo mostramos por seguridad
             
-            return matchStatus && matchSearch;
+            return matchStatus && matchSearch && matchDate;
         });
     }, [documents, searchTerm]);
 
@@ -527,9 +537,8 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
         );
     }
 
-    return (
         <div className="p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
-            <div className="max-w-4xl mx-auto w-full flex flex-col h-full space-y-4 animate-in fade-in duration-500">
+            <div className="max-w-full mx-auto w-full flex flex-col h-full space-y-4 animate-in fade-in duration-500">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-2xl border border-white/10 ring-4 ring-slate-900/5 animate-pulse-slow">
@@ -557,7 +566,8 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                         />
                     </div>
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-5 pr-3 pb-10">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-3 pb-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredDocs.map(doc => {
                             const nCounts = Number((doc as any).newsCount || 0);
                             const displayDate = doc.createdAt || doc.inventoryDate || (doc as any).receivingDate || doc.updatedAt;
@@ -566,57 +576,56 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                 <button
                                     key={doc.id}
                                     onClick={() => handleSelectDoc(doc)}
-                                    className="w-full bg-white hover:bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] text-left transition-all group flex items-center gap-6 p-7 shadow-lg hover:shadow-2xl hover:-translate-y-2 border-l-[12px] border-l-slate-200 hover:border-l-blue-600 duration-500 relative overflow-hidden"
+                                    className="w-full bg-white hover:bg-slate-50 border-2 border-slate-100 rounded-3xl text-left transition-all group flex items-center gap-4 p-5 shadow-md hover:shadow-xl hover:-translate-y-1 border-l-[8px] border-l-slate-200 hover:border-l-blue-600 duration-500 relative overflow-hidden"
                                 >
                                     {/* Glassmorphism accent */}
-                                    <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl -mr-24 -mt-24 group-hover:bg-blue-600/20 transition-all duration-700"></div>
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-600/20 transition-all duration-700"></div>
 
-                                    <div className="w-20 h-20 bg-slate-900 rounded-[2rem] flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform duration-500 shrink-0 shadow-2xl relative z-10">
-                                        <Icons.Package className="w-10 h-10" />
+                                    <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform duration-500 shrink-0 shadow-xl relative z-10">
+                                        <Icons.Package className="w-7 h-7" />
                                         {nCounts > 0 && (
-                                            <div className="absolute -top-2 -right-2 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-black border-4 border-white shadow-lg animate-bounce-subtle">
+                                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black border-2 border-white shadow-lg animate-bounce-subtle">
                                                 {nCounts}
                                             </div>
                                         )}
                                     </div>
 
-                                    <div className="min-w-0 flex-1 space-y-2 relative z-10">
-                                        <div className="flex items-center gap-4">
-                                            <span className="text-[11px] font-black text-blue-600 bg-blue-100/50 px-4 py-1.5 rounded-full uppercase tracking-widest border border-blue-200">
+                                    <div className="min-w-0 flex-1 space-y-1 relative z-10">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-black text-blue-600 bg-blue-100/50 px-2.5 py-1 rounded-full uppercase tracking-widest border border-blue-200 truncate">
                                                 {doc.externalDocId}
                                             </span>
-                                            <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widesto border ${
+                                            <div className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border shrink-0 ${
                                                 doc.status === DocStatus.INVENTORED ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
                                             }`}>
                                                 {doc.status}
                                             </div>
                                         </div>
                                         
-                                        <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter truncate leading-none group-hover:text-blue-900 transition-colors">
-                                            {doc.vehicleData || 'SIN PLACA REGISTRADA'}
+                                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter truncate leading-tight group-hover:text-blue-900 transition-colors">
+                                            {doc.vehicleData || 'SIN PLACA'}
                                         </h3>
 
-                                        <div className="flex items-center gap-6 pt-1">
-                                            <div className="flex items-center gap-2 text-slate-400">
-                                                <Icons.History className="w-4 h-4" />
-                                                <p className="text-[11px] font-black uppercase tracking-widest">
-                                                    {displayDate ? 
-                                                        new Date(displayDate).toLocaleString('es-CO', { 
-                                                            day: '2-digit', month: 'long', year: 'numeric',
-                                                            hour: '2-digit', minute: '2-digit', hour12: true
-                                                        }) 
-                                                        : 'FECHA NO DISPONIBLE EN SISTEMA'}
-                                                </p>
-                                            </div>
+                                        <div className="flex items-center gap-2 pt-0.5">
+                                            <Icons.History className="w-3 h-3 text-slate-400" />
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">
+                                                {displayDate ? 
+                                                    new Date(displayDate).toLocaleString('es-CO', { 
+                                                        day: '2-digit', month: 'short', year: 'numeric',
+                                                        hour: '2-digit', minute: '2-digit', hour12: true
+                                                    }) 
+                                                    : 'S/A'}
+                                            </p>
                                         </div>
                                     </div>
 
-                                    <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-slate-200 group-hover:text-blue-600 group-hover:bg-blue-100/50 transition-all shrink-0 border-2 border-transparent group-hover:border-blue-200">
-                                        <Icons.ChevronRight className="w-10 h-10 group-hover:translate-x-1 transition-transform" />
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-200 group-hover:text-blue-600 group-hover:bg-blue-100/50 transition-all shrink-0 border-2 border-transparent group-hover:border-blue-200">
+                                        <Icons.ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                                     </div>
                                 </button>
                             );
                         })}
+                        </div>
                         {filteredDocs.length === 0 && (
                             <div className="h-full flex flex-col items-center justify-center text-center opacity-30 py-32 space-y-4">
                                 <Icons.Package className="w-24 h-24 text-slate-300" />
