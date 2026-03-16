@@ -48,13 +48,18 @@ const BlindCount: React.FC<BlindCountProps> = ({
     // M7 V16 FIX: Prevenir "Ghost Deletion" hidratando primero desde LocalStorage antes que de la base de datos (Cloud)
     const saved = localStorage.getItem(`m7_offline_count_${docL.id}`);
     if (saved) {
-       try { return JSON.parse(saved); } catch (e) { console.warn('Error parseando caché offline', e); }
+       try { 
+         const parsed = JSON.parse(saved);
+         // M7 V17 FIX: Asegurar que todos los valores sean Números para evitar concatenación en Android
+         const numericOnly: { [id: string]: number } = {};
+         Object.keys(parsed).forEach(k => { numericOnly[k] = Number(parsed[k]); });
+         return numericOnly;
+       } catch (e) { console.warn('Error parseando caché offline', e); }
     }
     
     const initial: { [id: string]: number } = {};
     docL.items.forEach(it => {
-      // Priorizar countedQty del servidor (Cloud)
-      if ((it.countedQty || 0) > 0) initial[it.articleId] = it.countedQty;
+      if ((it.countedQty || 0) > 0) initial[it.articleId] = Number(it.countedQty);
     });
     return initial;
   });
@@ -212,10 +217,10 @@ const BlindCount: React.FC<BlindCountProps> = ({
         inventoryNote: itemObservations[it.articleId] || '',
       }));
 
-      onPartialSave(finalItems, inventoryObservation);
+    onPartialSave(finalItems, inventoryObservation);
       setSyncStatus('synced');
       setLastSyncTime(new Date());
-    }, 2000); // 2 segundos de debounce
+    }, 5000); // M7 V17: Aumentado a 5 segundos para priorizar ráfaga de escaneo sin bloqueos
 
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -283,7 +288,18 @@ const BlindCount: React.FC<BlindCountProps> = ({
   };
 
   const enqueueScan = (rawString: string) => {
-      scanQueue.current.push(rawString);
+      // M7 V17 STITCHING LOGIC: Si el código no tiene ':' y no es un SKU directo, lo acumulamos
+      const cleanInput = cleanSkuM7(rawString);
+      
+      // Si el código contiene ':' procesamos de inmediato (es una ráfaga completa o final de ráfaga)
+      if (rawString.includes(':')) {
+          scanQueue.current.push(rawString);
+      } else {
+          // Si no tiene ':', es un fragmento. Lo guardamos en el input para que handleInputChange lo siga uniendo
+          // pero NO lo enviamos a procesar todavía a menos que pase mucho tiempo.
+          return; 
+      }
+
       if (!isQueueProcessing.current) {
           processNextInQueue();
       }
@@ -324,12 +340,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
     let input = cleanSkuM7(rawCode);
     if (!input || input.length < 3) return;
 
-    // === M7 V16 DYNAMIC SPLIT (FAST-TRACK) ===
-    // Optimización ultra agresiva de latencia: Si detectamos ":", sabemos que ajover inyecta el SKU seguido de ":".
-    // Esto borra la necesidad de iterar sobre expresiones regulares complejas o búsquedas profundas.
-    if (input.includes(':')) {
-       input = input.split(':')[0].trim();
-    }
+    // === M7 V17.1: El SKU siempre está antes de los dos puntos ===
+    // Ya lo maneja cleanSkuM7, pero aquí aseguramos que la ráfaga fue capturada con su delimitador
 
     // === M7 AI BRAIN: Verificar memoria auto-regenerativa primero ===
     // Si la lectura "sucia" (ej: D403199:BL:1) ya fue aprendida, la traducimos al SKU real (D403199).
@@ -376,7 +388,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
         const qtyToAdd = factor > 1 ? factor : 1;
 
         setCounts(prev => {
-          const newQty = (prev[targetId] || 0) + qtyToAdd;
+          const newQty = (Number(prev[targetId]) || 0) + qtyToAdd;
           setLastScan({ 
             id: Math.random(),
             article: master || null, 
@@ -413,7 +425,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
          const targetId = heuristicMatch.articleId;
          // FIX: Previene State batching bug
          setCounts(prev => {
-           const newQty = (prev[targetId] || 0) + 1;
+           const newQty = (Number(prev[targetId]) || 0) + 1;
            setLastScan({ 
               id: Math.random(),
               article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
@@ -454,7 +466,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
             if (id.length >= 4 && input.includes(id)) {
                 const targetId = id;
                 setCounts(prev => {
-                  const newQty = (prev[targetId] || 0) + 1;
+                  const newQty = (Number(prev[targetId]) || 0) + 1;
                   setLastScan({ 
                       id: Math.random(),
                       article: (masterArticulo as Article[]).find(a => a.id === targetId || a.sku === targetId) || null, 
@@ -601,26 +613,18 @@ const BlindCount: React.FC<BlindCountProps> = ({
       processingTimer.current = null;
     }
 
-    const scannerGarbageRegex = /([:Ñ\t\n\r]|S4:)/i;
-    const match = val.match(scannerGarbageRegex);
-
-    if (match) {
-        // Ejecución inmediata, enviar a la cola virtual
-        const cleanedInput = cleanSkuM7(val);
-        if (cleanedInput.length >= 3) {
-          enqueueScan(cleanedInput);
+    // M7 V17: ELIMINADO EL DISPARO INMEDIATO POR ':'
+    // Ahora esperamos a que la ráfaga termine o que el usuario presione Enter
+    // Esto permite que fragmentos de PDF417 se unan en el input antes de procesarse
+    
+    processingTimer.current = setTimeout(() => {
+        // Solo procesamos si hay un ':' (indicador de ráfaga Ajover completa) 
+        // o si han pasado más de 350ms sin nuevos datos (fin de ráfaga por tiempo)
+        if (val.includes(':') || val.length > 20) {
+            enqueueScan(val);
+            setScanInput(''); 
         }
-        setScanInput(''); 
-    } else {
-        // Debounce ultrafast para recolectar el string y empujarlo a la cola
-        processingTimer.current = setTimeout(() => {
-          const cleanedInput = cleanSkuM7(val);
-          if (cleanedInput.length >= 3) {
-             enqueueScan(cleanedInput);
-          }
-          setScanInput(''); // Siempre despejar el input para liberar la pistola físicamente
-        }, 60); 
-    }
+    }, 150); // Debounce optimizado para ráfagas 2D/PDF417
   };
 
   const handleScan = (e: React.FormEvent) => {
@@ -631,7 +635,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const handleSubtract = (articleId: string) => {
     setCounts(prev => ({
       ...prev,
-      [articleId]: Math.max(0, (prev[articleId] || 0) - 1)
+      [articleId]: Math.max(0, (Number(prev[articleId]) || 0) - 1)
     }));
   };
 
@@ -1042,7 +1046,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
     return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
   };
 
-  const totalUnits = Object.values(counts).reduce((a, b) => a + b, 0);
+  // M7 V17 FIX: Usar Number() explícito para evitar concatenación de strings en la suma total
+  const totalUnits = Object.values(counts).reduce((a, b) => Number(a) + Number(b), 0);
 
 
 

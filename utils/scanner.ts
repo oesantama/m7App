@@ -18,18 +18,23 @@ export const cleanSkuM7 = (raw: string): string => {
     }
   }
 
-  // 2. Limpiar sufijos basura comunes generados por lectores mal configurados
+  // 2. Lógica AJOVER: Si contiene ':', el SKU es lo que está antes del PRIMER ':' útil
+  // Pero ojo, solo si el ':' no es parte de un prefijo de basura conocido que ya quitamos.
+  if (code.includes(':')) {
+    // Tomamos la primera parte antes del delimitador de metadatos (formato PDF417 Ajover)
+    const parts = code.split(':');
+    if (parts[0].length >= 3) {
+      code = parts[0];
+    }
+  }
+
+  // 3. Limpiar caracteres de control remanentes (Basura física o regional)
   // Ñ suele ser un ENTER en teclado ES con input EN.
-  // : suele ser TAB o delimitador final.
   // GS1/EAN: Limpieza de prefijo (01) al inicio
   if (code.startsWith('(01)')) code = code.substring(4);
   
-  // M7 FAST SCAN: Solo cortamos desde el PRIMER caracter de basura detectado al FINAL de la cadena útil
-  const garbageRegex = /[:Ñ\t\n\r].*$/;
+  const garbageRegex = /[Ñ\t\n\r]/g;
   code = code.replace(garbageRegex, '');
 
-  // 3. Limpieza final de espacios o caracteres no deseados en los extremos
-  // IMPORTANTE: Ya no dividimos por '+' o '-' o '|' indiscriminadamente
-  // porque podrían ser parte del SKU real.
   return code.trim();
 };

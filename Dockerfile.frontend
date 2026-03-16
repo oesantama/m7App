@@ -13,7 +13,7 @@ RUN rm -f package-lock.json && \
 
 COPY . .
 # Forzamos a Vite a no generar sourcemaps para no agotar la RAM (ahorra ~500MB)
-ENV NODE_OPTIONS="--max-old-space-size=1536" \
+ENV NODE_OPTIONS="--max-old-space-size=1024" \
     GENERATE_SOURCEMAP=false \
     VITE_BUILD_SOURCEMAP=false
 RUN npm run build
