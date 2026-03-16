@@ -116,7 +116,8 @@ const App: React.FC = () => {
     getAvailableVehicles,
 
     // Utilidades
-    logout
+    logout,
+    setNeedsWelcomeRedirect
   } = useAppStore();
 
   const { refreshAppData } = useAppData();
@@ -370,8 +371,6 @@ const App: React.FC = () => {
     }
   };
 
-  // ============ REDIRECCIÓN INTELIGENTE (POST-LOGIN) ============
-  const { needsWelcomeRedirect, setNeedsWelcomeRedirect } = useAppStore();
 
   useEffect(() => {
     if (isAuthenticated && needsWelcomeRedirect && pages.length > 0 && modules.length > 0 && user) {
@@ -947,26 +946,7 @@ const App: React.FC = () => {
             recentAssignments: assignments.slice(-5)
           }}
         />
-        {showTimeoutWarning && (
-          <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in zoom-in duration-300">
-            <div className="bg-white max-w-md w-full p-10 rounded-[3rem] shadow-2xl text-center space-y-6">
-              <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto animate-bounce">
-                <Icons.Alert style={{ width: '40px', height: '40px' }} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 uppercase">¿Sigues ahí?</h3>
-              <p className="text-slate-500 font-medium">Tu sesión se cerrará por inactividad en:</p>
-              <div className="text-6xl font-black text-emerald-500 tabular-nums">
-                00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
-              </div>
-              <button
-                onClick={resetInactivityTimer}
-                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl"
-              >
-                Continuar Trabajando
-              </button>
-            </div>
-          </div>
-        )}
+
       </React.Suspense>
     </>
   );
