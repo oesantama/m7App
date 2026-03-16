@@ -536,7 +536,8 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
             </div>
         );
     }
-
+    
+    return (
         <div className="p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
             <div className="max-w-full mx-auto w-full flex flex-col h-full space-y-4 animate-in fade-in duration-500">
                 <div className="flex items-center justify-between">
