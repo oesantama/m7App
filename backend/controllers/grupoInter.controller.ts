@@ -800,7 +800,7 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
 
         // Filtro por Número de Documento (Prioritario)
         if (nroDocumento) {
-            query += ` AND (p.numero_documento = $${paramIdx} OR p.nro_documento = $${paramIdx})`;
+            query += ` AND p.numero_documento = $${paramIdx}`;
             values.push(nroDocumento);
             paramIdx++;
         } else {
@@ -816,10 +816,8 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
                 paramIdx++;
             }
 
-            // M7-EXT: Fallback de 8 días si no hay filtros especificados
-            if (!fechaDesde && !fechaHasta) {
-                query += ` AND (p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`;
-            }
+            // M7-EXT: Eliminada la restricción de 8 días por solicitud del usuario
+            // El API pública ahora devuelve todo el historial si no hay filtros específicos
         }
 
         query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 1000';
@@ -828,8 +826,8 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
         const mappedOrders = result.rows.map(o => ({
             id: o.id,
             estado: o.estado === 'Entregado' ? 'Entregado' : (o.estado || 'En proceso'),
-            nroGuia: o.nro_guia || o.numero_guia || 'PD-' + (o.nro_documento || o.numero_documento),
-            nroPedido: o.nro_documento || o.numero_documento,
+            nroGuia: o.numero_guia || 'PD-' + o.numero_documento,
+            nroPedido: o.numero_documento,
             fechaEntregado: o.fecha_entregado ? o.fecha_entregado.toISOString().replace('T', ' ').substring(0, 16) : null,
             fctUltimoCorte: o.f_ultimo_corte ? (typeof o.f_ultimo_corte === 'string' ? o.f_ultimo_corte.split('T')[0] : o.f_ultimo_corte.toISOString().split('T')[0]) : null,
             ciudadOrigen: o.ciudad_origen || "MEDELLÍN",
