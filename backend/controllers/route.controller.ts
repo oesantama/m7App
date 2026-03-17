@@ -137,22 +137,23 @@ export const logRouteMovement = async (req: Request, res: Response) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7)
     `, [routeId, invoiceId, action, userId, previousPlate, newPlate, JSON.stringify(details)]);
 
-    // APRENDIZAJE IA M7: Si se agrega una factura a una ruta (manual), aprendemos la afinidad Ciudad-Vehículo
+    // APRENDIZAJE IA M7 IQ: Si se agrega una factura a una ruta (manual), aprendemos la afinidad Ciudad-Vehículo-Barrio
     if (action === 'ADD' && details?.city && newPlate) {
       // Buscamos el ID del vehículo por la placa
       const vRes = await pool.query('SELECT id FROM vehicles WHERE plate = $1', [newPlate]);
       if (vRes.rows.length > 0) {
         const vId = vRes.rows[0].id;
         const city = String(details.city).toUpperCase().trim();
+        const neighborhood = String(details.neighborhood || '').toUpperCase().trim();
 
         await pool.query(`
-                INSERT INTO routing_patterns (city, vehicle_id, strength, last_used)
-                VALUES ($1, $2, 1, NOW())
-                ON CONFLICT (city, vehicle_id) DO UPDATE SET
+                INSERT INTO routing_patterns (city, vehicle_id, neighborhood, strength, last_used)
+                VALUES ($1, $2, $3, 1, NOW())
+                ON CONFLICT (city, vehicle_id, neighborhood) DO UPDATE SET
                 strength = routing_patterns.strength + 1,
                 last_used = NOW()
-            `, [city, vId]);
-        console.log(`[M7-LEARNING] Patrón registrado: ${city} -> ${newPlate} (Strength++)`);
+            `, [city, vId, neighborhood]);
+        console.log(`[M7-LEARNING-IQ] Patrón registrado: ${city} | ${neighborhood} -> ${newPlate} (Strength++)`);
       }
     }
 

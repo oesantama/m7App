@@ -37,7 +37,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'delivery_confirmations': ['dispatch_id', 'invoice_id', 'driver_id', 'vehicle_id', 'delivery_type', 'delivered_items', 'notes', 'delivered_at', 'created_at'],
   'delivery_returns': ['confirmation_id', 'invoice_id', 'driver_id', 'vehicle_id', 'return_reason', 'notes', 'status', 'created_at'],
   'delivery_return_items': ['return_id', 'sku', 'article_name', 'quantity_returned', 'quantity_delivered', 'unit', 'notes'],
-  'routing_patterns': ['city', 'vehicle_id', 'strength', 'last_used'],
+  'routing_patterns': ['city', 'vehicle_id', 'neighborhood', 'strength', 'last_used'],
   'deletion_logs': ['table_name', 'record_id', 'record_data', 'deleted_by', 'deleted_at'],
   'vehicle_locations': ['vehicle_id', 'driver_id', 'latitude', 'longitude', 'accuracy', 'speed', 'heading', 'updated_at', 'timestamp'],
   'document_consolidated_items': ['document_id', 'article_id', 'count_1', 'count_2', 'inventory_user', 'inventory_observation', 'expected_qty', 'picked_qty', 'dispatched_qty'],
@@ -148,6 +148,25 @@ const healSchema = async (client: any) => {
     } catch (e) {}
   }
 
+  // FASE ESPECIAL M7 IQ: Reparación de tipos para Capacitaciones (Solución Profesional)
+  try {
+    const tsCheck = await client.query("SELECT data_type FROM information_schema.columns WHERE table_name = 'training_sessions' AND column_name = 'id'");
+    if (tsCheck.rows.length > 0 && tsCheck.rows[0].data_type !== 'text') {
+      console.log('[M7-DB-IQ] Detectado tipo de dato incorrecto en training_sessions.id. Corrigiendo a TEXT...');
+      // 1. Quitar FKs dependientes temporalmente
+      await client.query('ALTER TABLE training_attendance DROP CONSTRAINT IF EXISTS training_attendance_session_id_fkey');
+      // 2. Cambiar tipo en tabla maestra
+      await client.query('ALTER TABLE training_sessions ALTER COLUMN id TYPE TEXT');
+      // 3. Cambiar tipo en tabla dependiente
+      await client.query('ALTER TABLE training_attendance ALTER COLUMN session_id TYPE TEXT');
+      // 4. Restaurar FK
+      await client.query('ALTER TABLE training_attendance ADD CONSTRAINT training_attendance_session_id_fkey FOREIGN KEY (session_id) REFERENCES training_sessions(id) ON DELETE CASCADE');
+      console.log('[M7-DB-IQ] Reparación de Capacitaciones completada exitosamente.');
+    }
+  } catch (err: any) {
+    console.error('[M7-DB-IQ-ERROR] No se pudo reparar automáticamente las tablas de capacitación:', err.message);
+  }
+
   // FASE ESPECIAL: LIMPIEZA DE DUPLICADOS PARA ON CONFLICT (ESTABILIDAD NUCLEAR)
   try {
     console.log('[M7-DB-HEAL] Limpiando duplicados para estabilidad ON CONFLICT...');
@@ -187,6 +206,13 @@ const healSchema = async (client: any) => {
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS unq_inv_cli_batch 
       ON inventario_clientes (client_id, article_id, batch)
+    `);
+
+    console.log('[M7-DB-IQ] Configurando restricciones de Aprendizaje Granular...');
+    await client.query(`
+      DROP INDEX IF EXISTS unq_routing_patterns_city_veh;
+      CREATE UNIQUE INDEX IF NOT EXISTS unq_routing_patterns_granular 
+      ON routing_patterns (city, vehicle_id, neighborhood);
     `);
 
   } catch (e: any) {

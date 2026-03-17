@@ -27,6 +27,12 @@ const ORBIT_HUB_ORIGIN = {
   address: "CR 48C N°100 Sur - 72 Bodega 4 y 10, La Tablaza"
 };
 
+const RESTRICTED_NEIGHBORHOODS = ['COMUNA 13', 'SAN JAVIER', 'SANTO DOMINGO', 'POPULAR', 'SANTA CRUZ', 'MANRIQUE', 'ARANJUEZ'];
+
+const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  return Math.sqrt(Math.pow(Number(lat1 || 0) - Number(lat2 || 0), 2) + Math.pow(Number(lng1 || 0) - Number(lng2 || 0), 2));
+};
+
 interface RoutingPattern {
   city: string;
   vehicle_id: string;
@@ -46,7 +52,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   invoices, vehicles, drivers, assignments, documents, activeRoutes, user, clients, onAssign, onSaveRoute, onRefresh
 }) => {
   const mapRef = useRef<L.Map | null>(null);
-  const isSuperAdmin = user.roleId === 'ROL-01' || user.role_id === 'ROL-01' || user.email === 'admin@millasiete.com';
+  const isSuperAdmin = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
   const allowedClientIds = user.clientIds || [];
   
   // Filtrar clientes permitidos
@@ -309,6 +315,46 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       // 1. Preparación de Facturas (Copias)
       let availableInvoices = (specificInvoices || [...validInvoices]).map(inv => ({ ...inv }));
+      const retailChainKeywords = ['JUMBO', 'EXITO', 'TOROS', 'MAKRO', 'ALKOSTO'];
+
+      // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA ---
+      // Identificar pedidos que van para un mismo almacén de cadena y asignar vehículo dedicado si el volumen es alto.
+      const retailGroups: { [key: string]: Invoice[] } = {};
+      retailChainKeywords.forEach(chain => {
+        const matches = availableInvoices.filter(inv => inv.customerName.toUpperCase().includes(chain));
+        if (matches.length > 0) retailGroups[chain] = matches;
+      });
+
+      Object.entries(retailGroups).forEach(([chain, chainInvoices]) => {
+        const totalChainVol = chainInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
+        
+        // Si el volumen para este almacén de cadena llena al menos el 40% de un camión promedio (u 8m3), 
+        // le asignamos un vehículo dedicado de inmediato.
+        if (totalChainVol >= 8 && availableVehicles.length > 0) {
+           // Buscar vehículo que no esté usado y que tenga capacidad suficiente
+           const bestVeh = [...availableVehicles]
+             .filter(v => !usedVehicleIds.has(v.id))
+             .sort((a,b) => Math.abs(Number(a.capacityM3) - totalChainVol) - Math.abs(Number(b.capacityM3) - totalChainVol))[0];
+
+           if (bestVeh) {
+              const vCap = Number(bestVeh.capacityM3) || 25;
+              suggestions.push({
+                id: `route-iq-retail-${chain}-${Date.now()}`,
+                vehicle: bestVeh,
+                assignedInvoices: chainInvoices,
+                totalVolume: Number(Number(totalChainVol).toFixed(2)),
+                utilization: Math.round((totalChainVol / vCap) * 100),
+                city: chainInvoices[0].city || 'LOGÍSTICA ESPECIAL'
+              });
+              usedVehicleIds.add(bestVeh.id);
+              // Quitar de la lista general
+              const chainIds = new Set(chainInvoices.map(i => i.id));
+              availableInvoices = availableInvoices.filter(i => !chainIds.has(i.id));
+              console.log(`[M7-IQ] Asignación Dedicada: ${chain} -> ${bestVeh.plate} (${totalChainVol}m³)`);
+           }
+        }
+      });
+
 
       // 2. Detección Inteligente de Prioridades, Horarios y DIRECCIONES
       const timeRegex = /\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM|PARA LAS|A LAS)\b/i;
@@ -373,6 +419,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // Iteramos sobre cada vehículo disponible prioritario
       prioritizedFleet.forEach(vehicle => {
         if (availableInvoices.length === 0) return;
+        if (usedVehicleIds.has(vehicle.id)) return; // Skip if already used in retail phase
 
         const load: Invoice[] = [];
         let currentLoadVolume = 0;
@@ -383,69 +430,59 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const targetMaxCapacity = nominalCapacity * 0.90; // Meta y límite: 90%
         const absoluteMaxCapacity = targetMaxCapacity;      // Techo duro estricto
 
-        // Rastreo de conflictos horarios en esta ruta específica
-        const earlyBirdAssigned = new Set<string>();
+        // RESTRICCIÓN M7 IQ: Vehículos de gran capacidad no entran a barrios periféricos
+        const isLargeVehicle = nominalCapacity > 15;
 
-        // -- FASE 1: NÚCLEO DE CIUDAD (IA REGENERATIVA) --
-        // Buscamos si este vehículo tiene una ciudad de alta afinidad aprendida
+        // -- FASE 1: NÚCLEO GEOGRÁFICO (IA REGENERATIVA CIRCULAR) --
+        // Si hay afinidad, empezamos en esa ciudad
         const affinity = learningPatterns.find(p => p.vehicle_id === vehicle.id);
         const targetCity = affinity ? affinity.city : null;
 
-        if (availableInvoices.length > 0) {
-          // IA: Si hay afinidad, intentamos empezar con una factura de esa ciudad
-          let seedInvoice = null;
-          if (targetCity) {
-            // @ts-ignore
-            seedInvoice = availableInvoices.find(inv => inv.cityKey === targetCity);
-          }
+        let currentLat = ORBIT_HUB_ORIGIN.lat;
+        let currentLng = ORBIT_HUB_ORIGIN.lng;
 
-          // Si no hay afinidad o no hay facturas de esa ciudad, tomamos la primera disponible
-          if (!seedInvoice) seedInvoice = availableInvoices[0];
+        // Buscamos la mejor "semilla" para iniciar la ruta circular
+        let i = 0;
+        while (i < availableInvoices.length && currentLoadVolume < targetMaxCapacity) {
+          // Encontrar la más cercana a la posición actual (Nearest Neighbor)
+          let bestNextIdx = -1;
+          let minDist = Infinity;
 
-          // @ts-ignore
-          const seedCity = seedInvoice.cityKey;
-
-          // Filtramos candidatos principales: misma ciudad
-          // @ts-ignore
-          let primaryCandidates = availableInvoices.filter(inv => inv.cityKey === seedCity);
-
-          // Llenamos con candidatos de la misma ciudad
-          for (let i = 0; i < primaryCandidates.length; i++) {
-            const inv = primaryCandidates[i];
-
-            // Lógica de No Interferencia de Horarios Críticos + CASTING DE VOLUMEN
-            const invVol = Number(inv.volumeM3) || 0;
-            if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
-              load.push(inv);
-              currentLoadVolume += invVol;
-
+          for (let j = 0; j < availableInvoices.length; j++) {
+              const inv = availableInvoices[j];
+              const invVol = Number(inv.volumeM3) || 0;
+              
+              // VALIDACIÓN DE RESTRICCIÓN DE BARRIO
               // @ts-ignore
-              if (inv.detectedTime) earlyBirdAssigned.add(inv.detectedTime);
+              const isRestricted = isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(inv.neighborhoodKey);
+              if (isRestricted) continue;
 
-              // Eliminar de availableInvoices (buscando por ID original para seguridad)
-              const globalIdx = availableInvoices.findIndex(x => x.id === inv.id);
-              if (globalIdx !== -1) availableInvoices.splice(globalIdx, 1);
-            }
+              if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
+                  const dist = getDistance(currentLat, currentLng, Number(inv.lat || 0), Number(inv.lng || 0));
+                  
+                  // IA: Priorizar afinidad de ciudad aprendida
+                  // @ts-ignore
+                  const affinityBonus = (targetCity && inv.cityKey === targetCity) ? 0.8 : 1.0; // Give a bonus for invoices in the target city
+                  const finalDist = dist * affinityBonus;
+
+                  if (finalDist < minDist) {
+                      minDist = finalDist;
+                      bestNextIdx = j;
+                  }
+              }
           }
-        }
 
-        // -- FASE 2: RELLENO AGRESIVO (VORAZ / FILL THE GAPS) --
-        // Si aún no llegamos al target, buscamos CUALQUIER factura que quepa (Best Fit simple)
-        if (currentLoadVolume < targetMaxCapacity && availableInvoices.length > 0) {
-          // Recorremos las facturas restantes para encontrar las que "calzan" mejor
-          let i = 0;
-          while (i < availableInvoices.length && currentLoadVolume < targetMaxCapacity) {
-            const inv = availableInvoices[i];
-            const invVol = Number(inv.volumeM3) || 0;
-
-            if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
+          if (bestNextIdx !== -1) {
+              const inv = availableInvoices[bestNextIdx];
               load.push(inv);
-              currentLoadVolume += invVol;
-              availableInvoices.splice(i, 1);
-              // Seguir intentando en la misma posición (que ahora tiene el siguiente elemento)
-            } else {
-              i++;
-            }
+              currentLoadVolume += Number(inv.volumeM3) || 0;
+              currentLat = Number(inv.lat || currentLat); // Update current position to the last assigned invoice
+              currentLng = Number(inv.lng || currentLng);
+              availableInvoices.splice(bestNextIdx, 1);
+              // Reset i to re-evaluate distances from the new currentLat/Lng
+              i = 0; 
+          } else {
+              break; // No more invoices fit or no suitable invoices found for this vehicle
           }
         }
 
@@ -546,7 +583,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       details: {
         comment: auditComment,
         volume: data.invoice.volumeM3,
-        city: data.invoice.city // REGLA ORBIT: Enviamos ciudad para aprendizaje IA
+        city: data.invoice.city || 'SIN_CIUDAD',
+        neighborhood: data.invoice.neighborhood || 'SIN_BARRIO' // REGLA M7 IQ: Enviamos barrio para aprendizaje granular
       }
     }).catch(err => console.error("Error logging movement:", err));
 
