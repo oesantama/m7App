@@ -795,15 +795,35 @@ const App: React.FC = () => {
             user={user!}
             clients={allMasterData.masterClientes || []}
             onAssign={async (vId, dId, cId) => {
-              const newAssign = { vehicleId: vId, driverId: dId, clientId: cId, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+              const tempId = `temp-${Date.now()}`;
+              const newAssign = { 
+                id: tempId, 
+                vehicleId: vId, 
+                driverId: dId, 
+                clientId: cId, 
+                isActive: true, 
+                createdAt: new Date().toISOString(), 
+                updatedAt: new Date().toISOString() 
+              };
               // @ts-ignore
-              addAssignment(newAssign); // Actualización optimista
+              addAssignment(newAssign); // Actualización optimista con ID temporal
+              
               try {
-                await api.saveAssignment(newAssign);
+                const res = await api.saveAssignment(newAssign);
+                if (res.success && res.id) {
+                    // Actualizar el ID temporal por el real en el store
+                    useAppStore.setState(state => ({
+                        assignments: state.assignments.map(a => a.id === tempId ? { ...a, id: res.id } : a)
+                    }));
+                }
                 toast.success("Asignación guardada con éxito");
-                refreshAppData(); // Sincronización real
+                // refreshAppData(); No es estrictamente necesario recargar todo si ya actualizamos el ID, pero ayuda a la consistencia
               } catch (e: any) {
                 console.error("Error saving assignment:", e);
+                // Revertir cambio optimista si falla
+                useAppStore.setState(state => ({
+                    assignments: state.assignments.filter(a => a.id !== tempId)
+                }));
                 toast.error("Error en asignación", { description: e.message || "Conflicto en el servidor" });
               }
             }}

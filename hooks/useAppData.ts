@@ -126,6 +126,7 @@ export const useAppData = () => {
           // [M7-FIX] Normalizar snake_case → camelCase para que AssignmentManager pueda filtrar correctamente
           assignments: Array.isArray(assignmentsDataRaw) ? assignmentsDataRaw.map((a: any) => ({
             ...a,
+            id: a.id || a.assignment_id || a._id,
             vehicleId: a.vehicleId || a.vehicle_id,
             driverId: a.driverId || a.driver_id,
             clientId: a.clientId || a.client_id,

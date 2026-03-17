@@ -29,6 +29,7 @@ dist-ssr
 !M7_PRODUCTION_SETUP.sql
 !backend/init_production_coolify.sql
 !backend/full_restore.sql
+!backend/scripts/MIGRACION_CAPACITACIONES.sql
 
 # Editor directories and files
 .vscode/*

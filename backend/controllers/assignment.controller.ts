@@ -45,13 +45,14 @@ export const saveAssignment = async (req: Request, res: Response) => {
       });
     }
 
-    await client.query(`
+    const insertRes = await client.query(`
       INSERT INTO assignments (vehicle_id, driver_id, client_id, is_active)
       VALUES ($1, $2, $3, true)
+      RETURNING id
     `, [vehicleId, driverId, clientId]);
 
     await client.query('COMMIT');
-    res.json({ success: true, message: 'Asignación guardada con éxito' });
+    res.json({ success: true, message: 'Asignación guardada con éxito', id: insertRes.rows[0].id });
   } catch (err: any) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: "Error al procesar la asignación", details: err.message });
