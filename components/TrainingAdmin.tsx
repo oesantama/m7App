@@ -246,7 +246,7 @@ const TrainingAdmin: React.FC = () => {
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                      <div className="absolute inset-0 bg-white/80 backdrop-blur-md" onClick={() => setShowModal(false)}></div>
-                     <form onSubmit={handleSave} className="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] z-10 border border-slate-100 animate-in slide-in-from-bottom-8 duration-500 relative">
+                     <form onSubmit={handleSave} className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 sm:p-10 rounded-[2.5rem] sm:rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] z-10 border border-slate-100 animate-in slide-in-from-bottom-8 duration-500 relative">
                         <div className="flex justify-between items-center mb-10">
                             <div>
                                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Programar Sesión</h3>

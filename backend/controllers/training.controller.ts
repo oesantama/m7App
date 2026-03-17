@@ -122,9 +122,20 @@ export const saveSession = async (req: Request, res: Response) => {
     // Calcular expires_at si viene duration_minutes
     let expires_at = s.expiresAt;
     if (!expires_at && s.durationMinutes) {
-        const date = new Date(s.scheduledAt || Date.now());
-        date.setMinutes(date.getMinutes() + parseInt(s.durationMinutes) + 60); // 1h de gracia por defecto
-        expires_at = date.toISOString();
+        try {
+            const baseDate = s.scheduledAt ? new Date(s.scheduledAt) : new Date();
+            if (!isNaN(baseDate.getTime())) {
+                baseDate.setMinutes(baseDate.getMinutes() + (parseInt(s.durationMinutes) || 60) + 60);
+                expires_at = baseDate.toISOString();
+            }
+        } catch (e) {
+            console.warn("[TRAINING-CTRL] Error calculando expiración:", e);
+        }
+    }
+
+    // Asegurar que expires_at sea null si es inválido para evitar crash en toISOString o DB
+    if (expires_at && isNaN(new Date(expires_at).getTime())) {
+        expires_at = null;
     }
 
     await pool.query(`
@@ -140,13 +151,17 @@ export const saveSession = async (req: Request, res: Response) => {
         screenshots = $9, tracking_token = $10, updated_at = CURRENT_TIMESTAMP
     `, [
         s.id || `sess-${Date.now()}`, s.topic, s.content, s.instructor, 
-        s.locationType, s.scheduledAt, s.durationMinutes, expires_at, 
-        JSON.stringify(s.screenshots || []), tracking_token, s.createdBy
+        s.locationType, s.scheduledAt || null, parseInt(s.durationMinutes) || 0, expires_at, 
+        JSON.stringify(s.screenshots || []), tracking_token, s.createdBy || (req as any).user?.id || 'SYSTEM'
     ]);
     res.json({ success: true, tracking_token });
   } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "Error al guardar sesión de capacitación" });
+    console.error("[TRAINING-CTRL] ERROR CRÍTICO AL GUARDAR SESIÓN:", err);
+    res.status(500).json({ 
+        error: "Error al guardar sesión de capacitación", 
+        details: err.message,
+        hint: "Verifique que las tablas existan y las fechas sean válidas" 
+    });
   }
 };
 
