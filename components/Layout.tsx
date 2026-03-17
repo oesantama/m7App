@@ -213,17 +213,8 @@ const Layout: React.FC<LayoutProps> = ({
           )}
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar px-2 mt-4">
-          {hasPermission(user, 'CAPACITACIONES', 'view') && (
-            <button 
-              onClick={() => setActiveTab('capacitaciones')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all font-bold text-[11px] rounded-xl mb-4 ${activeTab === 'capacitaciones' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-            >
-              <span className={activeTab === 'capacitaciones' ? 'text-slate-950' : 'text-emerald-500'}><Icons.Award className="w-5 h-5" /></span>
-              {!isCollapsed && <span className="truncate uppercase tracking-wide">Centro de Formación</span>}
-            </button>
-          )}
 
+        <nav className="flex-1 space-y-1 overflow-y-auto custom-scrollbar px-2 mt-4">
 
           {menuGroups.map((group) => (
             <div key={group.id} className="space-y-0.5">
