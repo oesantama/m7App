@@ -245,56 +245,71 @@ const TrainingAdmin: React.FC = () => {
             {/* Modal Creación (Resumido por espacio) */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                     <div className="absolute inset-0 bg-white/80 backdrop-blur-md" onClick={() => setShowModal(false)}></div>
-                     <form onSubmit={handleSave} className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 sm:p-10 rounded-[2.5rem] sm:rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] z-10 border border-slate-100 animate-in slide-in-from-bottom-8 duration-500 relative">
-                        <div className="flex justify-between items-center mb-10">
+                     <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
+                     <div className="bg-white w-full max-w-lg max-h-[90vh] rounded-[2.5rem] shadow-2xl z-10 border border-slate-100 animate-in zoom-in-95 duration-300 flex flex-col overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="p-8 pb-4 flex justify-between items-center bg-white border-b border-slate-50">
                             <div>
-                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Programar Sesión</h3>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Programar Sesión</h3>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Nuevos Contenidos y Formación</p>
                             </div>
-                            <button type="button" onClick={() => setShowModal(false)} className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all"><Icons.Plus className="w-6 h-6 rotate-45" /></button>
+                            <button type="button" onClick={() => setShowModal(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all">
+                                <Icons.Plus className="w-5 h-5 rotate-45" />
+                            </button>
                         </div>
 
-                        <div className="space-y-6">
+                        {/* Modal Content (Scrollable) */}
+                        <form id="training-form" onSubmit={handleSave} className="flex-grow overflow-y-auto p-8 space-y-6 bg-slate-50/30">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase block px-3">Tema de Capacitación</label>
-                                <input required value={form.topic} onChange={e => setForm({...form, topic: e.target.value.toUpperCase()})} placeholder="EJ: SEGURIDAD EN ALTURAS..." className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-xs outline-none focus:border-blue-500 focus:bg-white transition-all" />
+                                <label className="text-[10px] font-black text-slate-400 uppercase block px-3 tracking-widest">Tema de Capacitación</label>
+                                <input required value={form.topic} onChange={e => setForm({...form, topic: e.target.value.toUpperCase()})} placeholder="EJ: SEGURIDAD EN ALTURAS..." className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs outline-none focus:border-blue-500 transition-all shadow-sm" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase block px-3">Descripción / Contenido</label>
-                                <textarea required value={form.content} onChange={e => setForm({...form, content: e.target.value})} placeholder="Resumen de los puntos tratados..." className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-bold text-xs outline-none focus:border-blue-500 focus:bg-white transition-all min-h-[100px]" />
+                                <label className="text-[10px] font-black text-slate-400 uppercase block px-3 tracking-widest">Descripción / Contenido</label>
+                                <textarea required value={form.content} onChange={e => setForm({...form, content: e.target.value})} placeholder="Resumen de los puntos tratados..." className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-xs outline-none focus:border-blue-500 transition-all min-h-[100px] shadow-sm" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase block px-3">Instructor</label>
-                                    <input required value={form.instructor} onChange={e => setForm({...form, instructor: e.target.value.toUpperCase()})} placeholder="NOMBRE..." className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-xs outline-none focus:border-blue-500 focus:bg-white transition-all" />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block px-3 tracking-widest">Instructor</label>
+                                    <input required value={form.instructor} onChange={e => setForm({...form, instructor: e.target.value.toUpperCase()})} placeholder="NOMBRE..." className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs outline-none focus:border-blue-500 transition-all shadow-sm" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase block px-3">Medio</label>
-                                    <select value={form.locationType} onChange={e => setForm({...form, locationType: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-xs outline-none focus:border-blue-500 focus:bg-white transition-all uppercase">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block px-3 tracking-widest">Medio</label>
+                                    <select value={form.locationType} onChange={e => setForm({...form, locationType: e.target.value})} className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs outline-none focus:border-blue-500 transition-all uppercase shadow-sm">
                                         <option value="PRESENCIAL">PRESENCIAL</option>
                                         <option value="VIRTUAL">VIRTUAL</option>
                                     </select>
                                 </div>
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase block px-3">Fecha y Hora de Inicio</label>
-                                <input required type="datetime-local" value={form.scheduledAt} onChange={e => setForm({...form, scheduledAt: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-xs outline-none focus:border-blue-500 focus:bg-white transition-all" />
+                                <label className="text-[10px] font-black text-slate-400 uppercase block px-3 tracking-widest">Fecha y Hora de Inicio</label>
+                                <input required type="datetime-local" value={form.scheduledAt} onChange={e => setForm({...form, scheduledAt: e.target.value})} className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs outline-none focus:border-blue-500 transition-all shadow-sm" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase block px-3">Duración (Min)</label>
-                                    <input type="number" value={form.durationMinutes} onChange={e => setForm({...form, durationMinutes: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-xs outline-none focus:border-blue-500 focus:bg-white transition-all" />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block px-3 tracking-widest">Duración (Min)</label>
+                                    <input type="number" value={form.durationMinutes} onChange={e => setForm({...form, durationMinutes: e.target.value})} className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs outline-none focus:border-blue-500 transition-all shadow-sm" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase block px-3">Expiración Link</label>
-                                    <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-xs outline-none focus:border-blue-500 focus:bg-white transition-all" />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block px-3 tracking-widest">Expiración Link</label>
+                                    <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} className="w-full px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xs outline-none focus:border-blue-500 transition-all shadow-sm" />
                                 </div>
                             </div>
+                        </form>
+
+                        {/* Modal Footer (Fixed) */}
+                        <div className="p-8 bg-white border-t border-slate-50">
+                            <button 
+                                form="training-form"
+                                type="submit" 
+                                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-slate-900/20 hover:bg-blue-600 transition-all active:scale-95 flex items-center justify-center gap-3"
+                            >
+                                <Icons.Plus className="w-5 h-5" />
+                                Guardar y Generar Link
+                            </button>
                         </div>
 
-                        <button type="submit" className="w-full mt-10 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-blue-600 transition-all hover:-translate-y-1 active:scale-95">Guardar y Generar Link</button>
-                     </form>
+                     </div>
                 </div>
             )}
         </div>

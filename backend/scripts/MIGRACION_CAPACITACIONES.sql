@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS user_training_progress (
 );
 
 CREATE TABLE IF NOT EXISTS training_sessions (
-    id TEXT PRIMARY KEY,
+    id TEXT PRIMARY KEY, -- DEBE SER TEXT PARA SOPORTAR 'sess-...'
     topic TEXT NOT NULL,
     content TEXT,
     instructor TEXT,
@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS training_sessions (
 );
 
 CREATE TABLE IF NOT EXISTS training_attendance (
-    id SERIAL PRIMARY KEY, -- SERIAL para autogenerar ID si no se proporciona
-    session_id TEXT REFERENCES training_sessions(id),
+    id SERIAL PRIMARY KEY, -- SERIAL PARA AUTO-GENERAR ID
+    session_id TEXT REFERENCES training_sessions(id) ON DELETE CASCADE,
     full_name TEXT,
     document_number TEXT,
     job_title TEXT,
