@@ -10,6 +10,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - AI_MODEL=${AI_MODEL}
+      - NODE_OPTIONS=--max-old-space-size=1024
     env_file:
       - .env
     volumes:
@@ -20,7 +21,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
     depends_on:
       postgres:
         condition: service_healthy

@@ -17,8 +17,14 @@ export interface TokenPayload {
     permissions?: any[];
 }
 
-export const signAccessToken = (payload: TokenPayload): string => {
-    return sign(payload, PRIVATE_KEY, {
+export const signAccessToken = (payload: any): string => {
+    // Aseguramos que el payload tenga tanto role_id como roleId para compatibilidad total
+    const enrichedPayload = {
+        ...payload,
+        roleId: payload.roleId || payload.role_id,
+        role_id: payload.role_id || payload.roleId
+    };
+    return sign(enrichedPayload, PRIVATE_KEY, {
         algorithm: 'RS256',
         expiresIn: '365d' // Expiración extendida a 365 días por solicitud de Oscar
     });

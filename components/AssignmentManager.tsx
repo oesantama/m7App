@@ -25,6 +25,11 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
   
   const [showHistory, setShowHistory] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  
+  // Filtros
+  const [filterPlatePending, setFilterPlatePending] = useState('');
+  const [filterClientActive, setFilterClientActive] = useState('');
+  const [filterPlateActive, setFilterPlateActive] = useState('');
 
   // ... (perms and memo logic remains same)
   const isSuperUser = user.roleId === 'ROL-01';
@@ -35,9 +40,16 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
   const activeAssignments = useMemo(() => 
     assignments.filter(a => {
       const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
-      return active;
+      if (!active) return false;
+
+      // Aplicar filtros
+      const matchesClient = !filterClientActive || (a.clientId || (a as any).client_id) === filterClientActive;
+      const v = vehicles.find(veh => veh.id === a.vehicleId);
+      const matchesPlate = !filterPlateActive || v?.plate.toLowerCase().includes(filterPlateActive.toLowerCase());
+
+      return matchesClient && matchesPlate;
     }),
-    [assignments]
+    [assignments, filterClientActive, filterPlateActive, vehicles]
   );
 
   const historyAssignments = useMemo(() => 
@@ -50,8 +62,12 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
 
   // Vehículos pendientes: TODOS los que no tienen asignación activa actualmente
   const pendingVehicles = useMemo(() => 
-    vehicles.filter(v => !activeAssignments.some(a => a.vehicleId === v.id)),
-    [vehicles, activeAssignments]
+    vehicles.filter(v => {
+      const isPending = !activeAssignments.some(a => a.vehicleId === v.id);
+      const matchesPlate = !filterPlatePending || v.plate.toLowerCase().includes(filterPlatePending.toLowerCase());
+      return isPending && matchesPlate;
+    }),
+    [vehicles, activeAssignments, filterPlatePending]
   );
 
   // Conductores disponibles: TODOS los activos y sin asignación
@@ -140,31 +156,28 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
         </div>
       </div>
 
-      {/* Sugerencia IA M7 - Ahora más compacta y arriba */}
-      {!showHistory && pendingVehicles.length > 0 && availableDrivers.length > 0 && (
-        <div className="p-4 bg-slate-900 rounded-3xl border border-white/5 flex items-center gap-6 animate-in slide-in-from-top-2 duration-500">
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
-              <Icons.Brain className="text-slate-950 w-5 h-5" />
-          </div>
-          <div className="flex-1">
-              <p className="text-slate-300 text-[11px] font-medium leading-tight">
-                  <span className="text-emerald-400 font-black uppercase mr-2">M7 AI Analysis:</span>
-                  Detecto <span className="text-white font-black">{pendingVehicles.length} vehículos</span> listos. Sugiero vincular por historial para optimizar despacho.
-              </p>
-          </div>
-          <button onClick={handleAutoSuggest} className="px-5 py-2.5 bg-emerald-500 text-slate-950 rounded-lg font-black text-[9px] uppercase tracking-widest hover:bg-emerald-400 transition-all shrink-0">
-              Confirmar Vínculo IA
-          </button>
-        </div>
-      )}
+
 
         {!showHistory ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Columna Pendientes */}
             <div className="space-y-6">
-              <div className="flex items-center justify-between px-4">
-                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Vehículos sin Tripulación ({pendingVehicles.length})</h3>
-                <div className="h-1 flex-1 mx-6 bg-slate-100 rounded-full"></div>
+              <div className="flex flex-col gap-4 px-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Vehículos sin Tripulación ({pendingVehicles.length})</h3>
+                  <div className="h-1 flex-1 ml-6 bg-slate-100 rounded-full"></div>
+                </div>
+                {/* Filtro por Placa */}
+                <div className="relative">
+                  <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input 
+                    type="text"
+                    placeholder="BUSCAR POR PLACA..."
+                    value={filterPlatePending}
+                    onChange={(e) => setFilterPlatePending(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 pl-11 pr-4 py-3 rounded-2xl text-[10px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
+                  />
+                </div>
               </div>
               <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 {pendingVehicles.map(v => (
@@ -213,9 +226,32 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
 
             {/* Columna Activos */}
             <div className="space-y-6">
-              <div className="flex items-center justify-between px-4">
-                <h3 className="text-sm font-black text-emerald-500 uppercase tracking-widest">Plan de Operación Activo ({activeAssignments.length})</h3>
-                <div className="h-1 flex-1 mx-6 bg-emerald-100 rounded-full"></div>
+              <div className="flex flex-col gap-4 px-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-emerald-500 uppercase tracking-widest">Plan de Operación Activo ({activeAssignments.length})</h3>
+                  <div className="h-1 flex-1 ml-6 bg-emerald-100 rounded-full"></div>
+                </div>
+                {/* Filtros Activos */}
+                <div className="grid grid-cols-2 gap-2">
+                  <select 
+                    value={filterClientActive}
+                    onChange={(e) => setFilterClientActive(e.target.value)}
+                    className="bg-white border border-emerald-100 px-3 py-3 rounded-2xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
+                  >
+                    <option value="">TODOS LOS CLIENTES</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <div className="relative">
+                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-500" />
+                    <input 
+                      type="text"
+                      placeholder="PLACA..."
+                      value={filterPlateActive}
+                      onChange={(e) => setFilterPlateActive(e.target.value)}
+                      className="w-full bg-white border border-emerald-100 pl-8 pr-3 py-3 rounded-2xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 {activeAssignments.map(a => {

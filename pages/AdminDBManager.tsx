@@ -396,19 +396,40 @@ const AdminDBManager: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Gestor de Base de Datos <span className="text-xs bg-red-600 text-white px-2 py-1 rounded ml-2">ADMIN</span></h1>
         
-        <div className="flex bg-slate-200 rounded p-1">
+        <div className="flex gap-2">
             <button 
-                onClick={() => setMode('TABLE')}
-                className={`px-4 py-1 rounded text-sm font-bold transition-colors ${mode === 'TABLE' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                onClick={async () => {
+                   if(confirm("¿Deseas restaurar el sistema? Esto sincronizará todos los menús, rutas y catálogos base.")) {
+                       try {
+                           const res = await fetch('/api/system/restore', { 
+                               method: 'POST',
+                               headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                           });
+                           if (res.ok) {
+                               toast.success("Sistema Restaurado", { description: "Refresque la página para ver los cambios." });
+                               loadTables();
+                           }
+                       } catch (e) { toast.error("Error en restauración"); }
+                   }
+                }}
+                className="px-4 py-1 bg-slate-800 text-white rounded text-xs font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg flex items-center gap-2"
             >
-                Tabla
+                <Icons.History className="w-3 h-3" /> Restaurar Menús
             </button>
-            <button 
-                onClick={() => setMode('SQL')}
-                className={`px-4 py-1 rounded text-sm font-bold transition-colors ${mode === 'SQL' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-            >
-                SQL
-            </button>
+            <div className="flex bg-slate-200 rounded p-1">
+                <button 
+                    onClick={() => setMode('TABLE')}
+                    className={`px-4 py-1 rounded text-sm font-bold transition-colors ${mode === 'TABLE' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+                >
+                    Tabla
+                </button>
+                <button 
+                    onClick={() => setMode('SQL')}
+                    className={`px-4 py-1 rounded text-sm font-bold transition-colors ${mode === 'SQL' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
+                >
+                    SQL
+                </button>
+            </div>
         </div>
       </div>
 

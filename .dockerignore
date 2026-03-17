@@ -22,3 +22,5 @@ docs
 Dockerfile*
 docker-compose*
 scripts
+.wwebjs_auth
+**/SingletonSocket

@@ -76,9 +76,17 @@ app.get('/health', (req, res) => {
 
 // Middleware de Whitelisting y Protección Global (Seguridad Arquitectónica)
 app.use('/api', (req, res, next) => {
-  const publicPaths = ['/auth/login', '/health', '/', '/geocode', '/grupo-inter/public/list'];
+  const publicPaths = [
+    '/auth/login', 
+    '/health', 
+    '/', 
+    '/geocode', 
+    '/grupo-inter/public/list',
+    '/training/public/attendance',
+    '/training/public/session'
+  ];
   
-  if (publicPaths.includes(req.path)) {
+  if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {
     return next();
   }
   return authenticateToken(req, res, next);

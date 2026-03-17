@@ -43,7 +43,7 @@ const ID_MAP: Record<string, string> = {
     'DASHBOARD': 'PAG-25',
     'NOTIFICACIONES': 'PAG-07',
     'GRUPO_INTER': 'PAG-31',
-    'WHATSAPP': 'PAG-33'
+    'WHATSAPP': 'PAG-07' // CORREGIDO: PAG-33 es Capacitaciones, PAG-07 es WhatsApp/Notificaciones
 };
 
 export const requirePermission = (moduleName: string, action: string) => {
@@ -51,11 +51,16 @@ export const requirePermission = (moduleName: string, action: string) => {
         const user = req.user;
         
         if (!user) {
+            console.error(`[AUTH-P-FAIL] No user in request for ${moduleName}:${action}`);
             return res.status(401).json({ success: false, error: 'Usuario no autenticado.' });
         }
 
         // El rol de ADMIN (ROL-01) tiene acceso total por defecto
-        if (user.roleId === 'ROL-01' || user.role_id === 'ROL-01' || user.email === 'admin@millasiete.com') {
+        // Robustecido para comparar de forma segura y insensible a mayúsculas
+        const isAdminRole = user.roleId === 'ROL-01' || user.role_id === 'ROL-01';
+        const isAdminEmail = user.email?.toLowerCase() === 'admin@millasiete.com';
+
+        if (isAdminRole || isAdminEmail) {
             return next();
         }
 
@@ -70,7 +75,7 @@ export const requirePermission = (moduleName: string, action: string) => {
             console.warn(`[AUTH-403] Usuario ${user.email} intentó acceder a ${moduleName}:${action} sin permiso. ID esperado: ${pageId}`);
             return res.status(403).json({ 
                 success: false, 
-                error: `Permiso insuficiente. Se requiere ${moduleName}:${action}` 
+                error: `Permiso insuficiente para ${moduleName}` 
             });
         }
 

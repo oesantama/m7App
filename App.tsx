@@ -48,6 +48,8 @@ const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
 const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
 const ExecutiveDashboard = lazyWithRetry(() => import('./components/ExecutiveDashboard'));
 const GrupoInterView = lazyWithRetry(() => import('./components/GrupoInterView'));
+const TrainingAdmin = lazyWithRetry(() => import('./components/TrainingAdmin'));
+const PublicAttendanceForm = lazyWithRetry(() => import('./components/PublicAttendanceForm'));
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
 import { useAppStore } from './stores/useAppStore';
@@ -136,9 +138,13 @@ const App: React.FC = () => {
         setIsPortalMode(true);
         if (hash.includes('tracking')) {
           setPortalRoute('tracking');
+        } else if (hash.includes('/attendance/register')) {
+          setIsPortalMode(true); // Tratamos el registro como modo portal (sin sidebar)
         } else {
           setPortalRoute('login');
         }
+      } else if (window.location.pathname.startsWith('/attendance/register')) {
+          setIsPortalMode(true);
       } else {
         setIsPortalMode(false);
       }
@@ -663,6 +669,12 @@ const App: React.FC = () => {
             }}
           />
         );
+      case 'training-ops':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Administración...</div>}>
+            <TrainingAdmin />
+          </React.Suspense>
+        );
       case 'grupo-inter-ops':
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Grupo Inter View...</div>}>
@@ -853,21 +865,25 @@ const App: React.FC = () => {
   };
 
   if (isPortalMode) {
+    const isAttendance = window.location.pathname.startsWith('/attendance/register');
+    
     return (
       <>
         <Toaster position="top-right" richColors theme="dark" />
         <PWABanner />
 
         <PortalLayout>
-          {portalRoute === 'login' && <ClientLogin onLogin={(token, user) => {
-            // Handle client login state if we want persistence, for now just show success and maybe redirect to dashboard
-            // For MVP, login just shows success or could store token
-            localStorage.setItem('m7_client_token', token);
-            // Redirect to simplified dashboard if we had one, or just stay logged in
-            // For now, let's redirect to tracking
-            window.location.hash = '#/portal/tracking';
-          }} />}
-          {portalRoute === 'tracking' && <OrderTracking />}
+          {isAttendance ? (
+            <PublicAttendanceForm />
+          ) : (
+            <>
+              {portalRoute === 'login' && <ClientLogin onLogin={(token, user) => {
+                localStorage.setItem('m7_client_token', token);
+                window.location.hash = '#/portal/tracking';
+              }} />}
+              {portalRoute === 'tracking' && <OrderTracking />}
+            </>
+          )}
         </PortalLayout>
       </>
     );
