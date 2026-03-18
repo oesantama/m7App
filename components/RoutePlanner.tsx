@@ -172,24 +172,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return { count, volume, additionalVehicles };
   }, [unassignedInvoices]);
 
-  const remainingVehicles = useMemo(() => {
-    const usedIds = new Set(suggestedRoutes.map(r => r.vehicle.id));
-    return availableVehicles.filter(v => !usedIds.has(v.id));
-  }, [availableVehicles, suggestedRoutes]);
-
-  // Carga inicial de patrones de aprendizaje
-  useEffect(() => {
-    api.getRoutingPatterns().then(data => {
-      if (Array.isArray(data)) {
-        // console.log(`[ORBIT-INTELLIGENCE] Cargados ${data.length} patrones de aprendizaje regenerativo.`);
-        setLearningPatterns(data);
-      }
-    }).catch(err => console.error("Error cargando patrones IA:", err));
-  }, [onRefresh]);
-
-
-
-
   const availableVehicles = useMemo(() => {
     // REGLA M7: Un vehículo es "disponible" si:
     // 1. Tiene un vínculo activo (VehicleAssignment) con el cliente seleccionado.
@@ -245,6 +227,24 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
     return fleet;
   }, [assignments, vehicles, drivers, selectedClient, activeRoutes]);
+
+  const remainingVehicles = useMemo(() => {
+    const usedIds = new Set(suggestedRoutes.map(r => r.vehicle.id));
+    return availableVehicles.filter(v => !usedIds.has(v.id));
+  }, [availableVehicles, suggestedRoutes]);
+
+  // Carga inicial de patrones de aprendizaje
+  useEffect(() => {
+    api.getRoutingPatterns().then(data => {
+      if (Array.isArray(data)) {
+        // console.log(`[ORBIT-INTELLIGENCE] Cargados ${data.length} patrones de aprendizaje regenerativo.`);
+        setLearningPatterns(data);
+      }
+    }).catch(err => console.error("Error cargando patrones IA:", err));
+  }, [onRefresh]);
+
+
+
 
   const fleetGeneralMetrics = useMemo(() => {
     const activeLinks = assignments.filter(a => {
