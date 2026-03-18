@@ -306,25 +306,25 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
 
   return (
     <div className="p-4 md:p-8 h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar">
-      <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1 min-h-0">
+      <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 flex-1 min-h-0">
         
         {/* PANEL IZQUIERDA: CREAR NUEVO */}
-        <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-slate-100 space-y-8 flex flex-col">
+        <div className="bg-white rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-xl border border-slate-100 space-y-6 md:space-y-8 flex flex-col">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-emerald-500 text-slate-900 rounded-2xl flex items-center justify-center shadow-lg"><Icons.Plus className="w-8 h-8" /></div>
+            <div className="w-12 h-12 md:w-14 md:h-14 bg-emerald-500 text-slate-900 rounded-2xl flex items-center justify-center shadow-lg shrink-0"><Icons.Plus className="w-6 h-6 md:w-8 md:h-8" /></div>
             <div>
-              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Nuevo Recibo Manual</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inicie un proceso sin documento previo</p>
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tighter">Nuevo Recibo Manual</h2>
+              <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inicie un proceso sin documento</p>
             </div>
           </div>
 
-          <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="space-y-4 md:space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Cliente / Operación</label>
               <select 
                 value={selectedClientId} 
                 onChange={e => setSelectedClientId(e.target.value)}
-                className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full p-3 md:p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 transition-all cursor-pointer"
               >
                 <option value="">SELECCIONE CLIENTE</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -332,13 +332,13 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Documento de Referencia (ID L)</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Documento de Referencia</label>
               <input 
                 type="text" 
                 value={externalDocId}
                 onChange={e => setExternalDocId(e.target.value.toUpperCase())}
                 placeholder="EJ: L-2024-XXXX"
-                className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 transition-all"
+                className="w-full p-3 md:p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 transition-all"
               />
             </div>
 
@@ -349,24 +349,24 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
                 value={vehiclePlate}
                 onChange={e => setVehiclePlate(e.target.value.toUpperCase())}
                 placeholder="EJ: ABC-123"
-                className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 transition-all"
+                className="w-full p-3 md:p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xs uppercase outline-none focus:border-emerald-500 transition-all"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Tipo de Plan de Referencia</label>
-              <div className="grid grid-cols-2 gap-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Tipo de Plan</label>
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
                 <button
                   onClick={() => setPlanType('PLAN NORMAL')}
-                  className={`py-3 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${planType === 'PLAN NORMAL' ? 'bg-emerald-500 border-emerald-500 text-slate-900 shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
+                  className={`py-3 rounded-2xl font-black text-[9px] md:text-[10px] uppercase border-2 transition-all ${planType === 'PLAN NORMAL' ? 'bg-emerald-500 border-emerald-500 text-slate-900 shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
                 >
-                  Plan Normal (Ajover)
+                  Normal (Ajover)
                 </button>
                 <button
                   onClick={() => setPlanType('PLAN R')}
-                  className={`py-3 rounded-2xl font-black text-[10px] uppercase border-2 transition-all ${planType === 'PLAN R' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
+                  className={`py-3 rounded-2xl font-black text-[9px] md:text-[10px] uppercase border-2 transition-all ${planType === 'PLAN R' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
                 >
-                  Plan R (Externo)
+                  R (Externo)
                 </button>
               </div>
             </div>
@@ -375,42 +375,42 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
           <button
             onClick={handleStartManual}
             disabled={isCreating}
-            className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-20"
+            className="w-full py-4 md:py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-20 shrink-0"
           >
             {isCreating ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Icons.Play className="w-5 h-5" />}
-            Iniciar Auditoría Manual
+            Iniciar Auditoría
           </button>
         </div>
 
         {/* PANEL DERECHA: CONTINUAR EXISTENTES */}
-        <div className="bg-slate-900 rounded-[3rem] p-10 shadow-2xl flex flex-col min-h-0">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-xl font-black text-white uppercase tracking-tight">Continuar Pendientes</h3>
+        <div className="bg-slate-900 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl flex flex-col min-h-[400px] lg:min-h-0">
+          <div className="flex justify-between items-center mb-6 md:mb-8 shrink-0">
+            <h3 className="text-lg md:text-xl font-black text-white uppercase tracking-tight">Continuar Pendientes</h3>
             <span className="px-3 py-1 bg-emerald-500 text-slate-950 rounded-lg text-[10px] font-black">{filteredDocs.length}</span>
           </div>
 
-          <div className="relative mb-6">
+          <div className="relative mb-4 md:mb-6 shrink-0">
             <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 w-4 h-4" />
             <input 
               type="text" 
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="BUSCAR POR ID O PLACA..."
-              className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold text-xs outline-none focus:border-emerald-500 transition-all"
+              className="w-full pl-12 pr-4 py-3 md:py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold text-xs outline-none focus:border-emerald-500 transition-all"
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 md:space-y-4 pr-2">
             {filteredDocs.map(doc => (
-              <div key={doc.id} className="bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden group/card hover:bg-white/10 transition-all">
-                <div className="p-6 flex items-center justify-between gap-4">
+              <div key={doc.id} className="bg-white/5 border border-white/10 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden group/card hover:bg-white/10 transition-all">
+                <div className="p-4 md:p-6 flex items-center justify-between gap-3 md:gap-4">
                   <button
                     onClick={() => setSelectedDocForCount(doc)}
                     className="flex-1 text-left min-w-0"
                   >
                     <p className="text-[10px] font-black text-emerald-500 uppercase mb-1">{doc.externalDocId}</p>
-                    <p className="text-lg font-black text-white uppercase tracking-tighter truncate">{doc.vehicleData || 'S/A'}</p>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">
+                    <p className="text-base md:text-lg font-black text-white uppercase tracking-tighter truncate">{doc.vehicleData || 'S/A'}</p>
+                    <p className="text-[8px] md:text-[9px] text-slate-500 font-bold uppercase mt-1">
                       {doc.createdAt && !isNaN(new Date(doc.createdAt).getTime()) 
                         ? `HACE ${Math.round((Date.now() - new Date(doc.createdAt).getTime()) / 60000)} MINS`
                         : 'RECIÉN CREADO'}
@@ -426,9 +426,9 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
                 
                 {/* BOTONES CARGA EXCEL PARA MANUALES (Plan Normal / Plan R) */}
                 {String(doc.planType).toUpperCase().includes('MANUAL') && (
-                  <div className="px-6 pb-6 mt-[-10px] grid grid-cols-2 gap-2">
-                    <label className="py-3 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border border-emerald-500/20 rounded-xl font-black text-[8px] uppercase tracking-tighter transition-all flex items-center justify-center gap-1 cursor-pointer shadow-lg group">
-                      <Icons.Excel className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                  <div className="px-4 md:px-6 pb-4 md:pb-6 mt-[-10px] grid grid-cols-2 gap-2">
+                    <label className="py-2.5 md:py-3 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border border-emerald-500/20 rounded-xl font-black text-[7px] md:text-[8px] uppercase tracking-tighter transition-all flex items-center justify-center gap-1 cursor-pointer shadow-lg group">
+                      <Icons.Excel className="w-3 h-3 md:w-4 md:h-4 group-hover:scale-110 transition-transform" />
                       Plan Normal
                       <input 
                         type="file" 
@@ -437,8 +437,8 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
                         onChange={(e) => handleManualExcelUpload(e, doc, 'Plan Normal')} 
                       />
                     </label>
-                    <label className="py-3 bg-blue-500/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 rounded-xl font-black text-[8px] uppercase tracking-tighter transition-all flex items-center justify-center gap-1 cursor-pointer shadow-lg group">
-                      <Icons.Excel className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                    <label className="py-2.5 md:py-3 bg-blue-500/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 rounded-xl font-black text-[7px] md:text-[8px] uppercase tracking-tighter transition-all flex items-center justify-center gap-1 cursor-pointer shadow-lg group">
+                      <Icons.Excel className="w-3 h-3 md:w-4 md:h-4 group-hover:scale-110 transition-transform" />
                       Plan R
                       <input 
                         type="file" 
@@ -452,9 +452,9 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
               </div>
             ))}
             {filteredDocs.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center text-center opacity-20 py-20">
-                <Icons.Package className="w-20 h-20 text-white mb-4" />
-                <p className="text-white font-black uppercase text-xs">No hay planes pendientes</p>
+              <div className="h-full flex flex-col items-center justify-center text-center opacity-20 py-10 md:py-20">
+                <Icons.Package className="w-16 h-16 md:w-20 md:h-20 text-white mb-4" />
+                <p className="text-white font-black uppercase text-[10px] md:text-xs">No hay planes pendientes</p>
               </div>
             )}
           </div>

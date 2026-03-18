@@ -1490,11 +1490,21 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         </button>
                         <button
                           onClick={() => handleExportPlanilla(route)}
-                          className="px-4 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center hover:bg-rose-100 hover:text-rose-600 transition-all shadow-sm font-bold text-[10px] uppercase gap-2"
+                          className="px-4 bg-slate-50 text-slate-500 rounded-lg flex items-center justify-center hover:bg-slate-100 hover:text-slate-600 transition-all shadow-sm font-bold text-[10px] uppercase gap-2"
                           title="Exportar Planilla PDF"
                         >
                           <Icons.FileText className="w-4 h-4" />
                           PDF
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSuggestedRoutes(prev => prev.filter((_, i) => i !== rIdx));
+                            toast.success(`Ruta del vehículo ${route.vehicle.plate} descartada. Facturas devueltas a la bolsa.`);
+                          }}
+                          className="px-4 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm font-bold text-[10px] uppercase gap-2"
+                          title="Eliminar ruta de sugerencias y devolver facturas"
+                        >
+                          <Icons.Trash className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
