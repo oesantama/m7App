@@ -395,8 +395,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         inv.cityKey = (String(inv.city || 'SIN_CIUDAD')).toUpperCase().trim();
         
         const rawAddr = (String(inv.address || '')).toUpperCase();
+        // REGLA M7: Extraemos la dirección rellenando los números con ceros a la izquierda 
+        // para un ordenamiento numérico perfecto (ej. CL 10 vs CL 103 -> CL00010 vs CL00103)
         // @ts-ignore
-        inv.startAddressForSort = rawAddr.replace(/[^0-9A-Z]/g, ''); 
+        inv.startAddressForSort = rawAddr.replace(/\d+/g, num => num.padStart(5, '0')).replace(/[^0-9A-Z]/g, ''); 
         // @ts-ignore
         inv.neighborhoodKey = (String(inv.neighborhood || 'SIN_BARRIO')).toUpperCase().trim();
       });
