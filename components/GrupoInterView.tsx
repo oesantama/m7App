@@ -31,6 +31,7 @@ interface Order {
   estado: string;
   manifiesto?: string;
   planilla?: string;
+  numero_planilla?: string;
   flete?: number;
   ruta?: string;
   items?: any[];
@@ -283,15 +284,17 @@ const GrupoInterView: React.FC = () => {
       }
       const exportData = orders.map(o => ({
         'Número Documento': o.numero_documento,
+        'Planilla': o.numero_planilla || '-',
         'Número Guía': o.numero_guia || '-',
         'Fct. Último Corte': o.f_ultimo_corte ? new Date(o.f_ultimo_corte).toLocaleDateString() : '-',
         'NIT Cliente': o.nit,
         'Nombre Cliente': o.cliente,
-        'Dirección': o.direccion,
         'Municipio Destino': o.municipio_destino,
+        'Dirección': o.direccion,
         'Manual': o.producto,
         'Clasificación': o.clasificacion,
         'Estado': o.estado,
+        'Valor Flete': o.valor_flete || 0,
         'Fecha Carga': new Date(o.fecha_carge).toLocaleString()
       }));
 
@@ -592,11 +595,13 @@ const GrupoInterView: React.FC = () => {
                 <thead className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 tracking-wider border-b">
                   <tr>
                     <th className="px-6 py-4">Documento</th>
+                    <th className="px-6 py-4">Planilla</th>
                     <th className="px-6 py-4">Fct. Último C.</th>
-                    <th className="px-6 py-4">Cliente / NIT</th>
+                    <th className="px-6 py-4">Cliente / Destino</th>
                     <th className="px-6 py-4">Cant. Total</th>
                     <th className="px-6 py-4">Precio Total</th>
                     <th className="px-6 py-4">Peso Total</th>
+                    <th className="px-6 py-4">Flete ($)</th>
                     <th className="px-6 py-4">Última Novedad</th>
                     <th className="px-6 py-4 text-right">Acciones</th>
                   </tr>
@@ -610,16 +615,27 @@ const GrupoInterView: React.FC = () => {
                     orders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => (
                       <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 font-bold text-slate-900">{order.numero_documento}</td>
+                        <td className="px-6 py-4">
+                           <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-black uppercase tracking-tight border border-slate-200">
+                             {order.numero_planilla || '-'}
+                           </span>
+                        </td>
                         <td className="px-6 py-4 font-medium">{order.f_ultimo_corte ? new Date(order.f_ultimo_corte).toLocaleDateString() : '-'}</td>
                         <td className="px-6 py-4">
                            <div className="flex flex-col">
                              <span className="font-bold text-slate-800">{order.cliente}</span>
-                             <span className="text-[10px] text-slate-400 font-bold">{order.nit}</span>
+                             <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest">{order.municipio_destino}</span>
+                             <span className="text-[9px] text-slate-400 font-bold">{order.nit}</span>
                            </div>
                         </td>
                         <td className="px-6 py-4 font-bold text-slate-400">{order.cantidad_total || 0}</td>
                         <td className="px-6 py-4 font-bold text-slate-400">${(order.precio_total || 0).toLocaleString()}</td>
                         <td className="px-6 py-4 font-bold text-slate-400">{order.peso_total_prod || 0} Kg</td>
+                        <td className="px-6 py-4">
+                           <span className="font-black text-emerald-600">
+                             ${Math.round(order.valor_flete || 0).toLocaleString()}
+                           </span>
+                        </td>
                         <td className="px-6 py-4">
                            <div className="flex flex-col min-w-[150px]">
                              <span className="text-[10px] font-black text-blue-600 uppercase mb-1">

@@ -90,6 +90,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [addInvoiceModal, setAddInvoiceModal] = useState<{ isOpen: boolean; routeIndex: number | null }>({ isOpen: false, routeIndex: null });
   const [isSaving, setIsSaving] = useState(false);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<Invoice | null>(null);
+  const [manualRouteModal, setManualRouteModal] = useState(false);
   const [lastReadjustmentResult, setLastReadjustmentResult] = useState<{ docs: number, facts: number, unrouted: number, docIds: string[] } | null>(null);
   const [dispatchConfirmation, setDispatchConfirmation] = useState<{ isOpen: boolean, route: SuggestedRoute | null, isMass: boolean }>({ isOpen: false, route: null, isMass: false });
   const [modalSearchTerm, setModalSearchTerm] = useState('');
@@ -164,15 +165,17 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     });
     return { planR, planNormal };
   }, [unassignedInvoices, documents]);
-
   const unassignedMetrics = useMemo(() => {
-    const vol = unassignedInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
-    return {
-      count: unassignedInvoices.length,
-      volume: Number(Number(vol).toFixed(2)),
-      additionalVehicles: Math.ceil(Number(vol) / 25) // Asumiendo capacidad promedio de 25m3
-    };
+    const count = unassignedInvoices.length;
+    const volume = Number(unassignedInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0).toFixed(2));
+    const additionalVehicles = Math.ceil(volume / 10); // Estimación rápida: 1 camión cada 10m3
+    return { count, volume, additionalVehicles };
   }, [unassignedInvoices]);
+
+  const remainingVehicles = useMemo(() => {
+    const usedIds = new Set(suggestedRoutes.map(r => r.vehicle.id));
+    return availableVehicles.filter(v => !usedIds.has(v.id));
+  }, [availableVehicles, suggestedRoutes]);
 
   // Carga inicial de patrones de aprendizaje
   useEffect(() => {
@@ -261,7 +264,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const normalizeId = (id: any) => String(id || '').trim().toUpperCase();
       const vId = normalizeId(v.id);
 
-      // Buscar ruta activa para este vehículo
       const activeRoute = activeRoutes.find(r => 
         normalizeId(r.vehicleId || (r as any).vehicle_id) === vId &&
         ['EST-10', 'EST-11', 'ASSIGNED', 'IN ROUTE', 'EN_RUTA', 'ASIGNADA', 'EN RUTA', 'PENDIENTE', 'CONFIRMADA', 'PENDING_SIGNATURES'].includes(String(r.status || '').toUpperCase())
@@ -301,37 +303,58 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   // ...
 
   const handleGeneralReadjustment = () => {
+    if (suggestedRoutes.length === 0) return;
     setReadjustmentModal({ isOpen: true, selectedDocIds: new Set() });
+  };
+
+  const handleCreateManualRoute = (vehicle: Vehicle) => {
+    const newRoute: SuggestedRoute = {
+      id: `route-manual-${Date.now()}-${vehicle.plate}`,
+      vehicle: vehicle as any,
+      assignedInvoices: [],
+      totalVolume: 0,
+      utilization: 0,
+      city: 'MANUAL'
+    };
+    setSuggestedRoutes([...suggestedRoutes, newRoute]);
+    setManualRouteModal(false);
+    toast.success(`Ruta manual creada para ${vehicle.plate}`);
+  };
+
+  const onManualSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
   };
 
   const runOrbitOptimization = (specificInvoices?: Invoice[]) => {
     setIsOptimizing(true);
     setSuggestedRoutes([]);
     if (!specificInvoices) setLastReadjustmentResult(null);
-    setReadjustmentModal({ isOpen: false, selectedDocIds: new Set() }); // Cerrar modal si estaba abierto
+    setReadjustmentModal({ isOpen: false, selectedDocIds: new Set() });
 
     setTimeout(() => {
       const suggestions: SuggestedRoute[] = [];
+      const usedVehicleIds = new Set<string>(); // MOVIMIENTO DE DECLARACIÓN AQUÍ
 
       // 1. Preparación de Facturas (Copias)
-      let availableInvoices = (specificInvoices || [...validInvoices]).map(inv => ({ ...inv }));
+      let availableInvoices = (specificInvoices || [...validInvoices])
+        .filter(inv => inv && typeof inv === 'object') // Guardia extra
+        .map(inv => ({ ...inv }));
+
       const retailChainKeywords = ['JUMBO', 'EXITO', 'TOROS', 'MAKRO', 'ALKOSTO'];
 
       // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA ---
-      // Identificar pedidos que van para un mismo almacén de cadena y asignar vehículo dedicado si el volumen es alto.
       const retailGroups: { [key: string]: Invoice[] } = {};
       retailChainKeywords.forEach(chain => {
-        const matches = availableInvoices.filter(inv => inv.customerName.toUpperCase().includes(chain));
+        const matches = availableInvoices.filter(inv => 
+          (String(inv.customerName || '')).toUpperCase().includes(chain)
+        );
         if (matches.length > 0) retailGroups[chain] = matches;
       });
 
       Object.entries(retailGroups).forEach(([chain, chainInvoices]) => {
         const totalChainVol = chainInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
         
-        // Si el volumen para este almacén de cadena llena al menos el 40% de un camión promedio (u 8m3), 
-        // le asignamos un vehículo dedicado de inmediato.
         if (totalChainVol >= 8 && availableVehicles.length > 0) {
-           // Buscar vehículo que no esté usado y que tenga capacidad suficiente
            const bestVeh = [...availableVehicles]
              .filter(v => !usedVehicleIds.has(v.id))
              .sort((a,b) => Math.abs(Number(a.capacityM3) - totalChainVol) - Math.abs(Number(b.capacityM3) - totalChainVol))[0];
@@ -344,17 +367,14 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 assignedInvoices: chainInvoices,
                 totalVolume: Number(Number(totalChainVol).toFixed(2)),
                 utilization: Math.round((totalChainVol / vCap) * 100),
-                city: chainInvoices[0].city || 'LOGÍSTICA ESPECIAL'
+                city: (chainInvoices[0]?.city || 'LOGÍSTICA ESPECIAL')
               });
               usedVehicleIds.add(bestVeh.id);
-              // Quitar de la lista general
               const chainIds = new Set(chainInvoices.map(i => i.id));
               availableInvoices = availableInvoices.filter(i => !chainIds.has(i.id));
-              console.log(`[M7-IQ] Asignación Dedicada: ${chain} -> ${bestVeh.plate} (${totalChainVol}m³)`);
            }
         }
       });
-
 
       // 2. Detección Inteligente de Prioridades, Horarios y DIRECCIONES
       const timeRegex = /\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM|PARA LAS|A LAS)\b/i;
@@ -362,9 +382,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       availableInvoices.forEach(inv => {
         const doc = documents.find(d => d.id === inv.docLId);
-        const notes = (doc?.inventory_observation || inv.notes || '').toUpperCase();
+        const notesRaw = (doc?.inventory_observation || inv.notes || '');
+        const notes = String(notesRaw).toUpperCase();
 
-        // Detección de Hora Específica
         const timeMatch = notes.match(timeRegex);
         // @ts-ignore
         inv.detectedTime = timeMatch ? timeMatch[0].trim() : null;
@@ -372,79 +392,53 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // @ts-ignore
         inv.isPriority = priorityKeywords.some(kw => notes.includes(kw)) || !!timeMatch;
         // @ts-ignore
-        inv.cityKey = (inv.city || 'SIN_CIUDAD').toUpperCase().trim();
+        inv.cityKey = (String(inv.city || 'SIN_CIUDAD')).toUpperCase().trim();
         
-        // NORMALIZACIÓN DE DIRECCIÓN PARA AGRUPAMIENTO
-        // Quitamos "CL", "CRA", "NO", caracteres especiales para dejar solo "10 5 5"
-        const rawAddr = (inv.address || '').toUpperCase();
+        const rawAddr = (String(inv.address || '')).toUpperCase();
         // @ts-ignore
         inv.startAddressForSort = rawAddr.replace(/[^0-9A-Z]/g, ''); 
         // @ts-ignore
-        inv.neighborhoodKey = (inv.neighborhood || '').toUpperCase().trim();
+        inv.neighborhoodKey = (String(inv.neighborhood || 'SIN_BARRIO')).toUpperCase().trim();
       });
 
-      // 3. Ordenamiento Global: Prioridad > Barrio > Dirección > Volumen
-      // Esto agrupa entregas cercanas automáticamente
+      // 3. Ordenamiento Global
       availableInvoices.sort((a, b) => {
-        // 1. Prioridad
         // @ts-ignore
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
-        
-        // 2. Ciudad (Agrupación Macro)
         // @ts-ignore
-        if (a.cityKey !== b.cityKey) return a.cityKey.localeCompare(b.cityKey);
-
-        // 3. Barrio (Agrupación Micro)
+        if (a.cityKey !== b.cityKey) return (a.cityKey || '').localeCompare(b.cityKey || '');
         // @ts-ignore
-        if (a.neighborhoodKey !== b.neighborhoodKey) return a.neighborhoodKey.localeCompare(b.neighborhoodKey);
-
-        // 4. Dirección (Secuencialidad)
+        if (a.neighborhoodKey !== b.neighborhoodKey) return (a.neighborhoodKey || '').localeCompare(b.neighborhoodKey || '');
         // @ts-ignore
-        if (a.startAddressForSort !== b.startAddressForSort) return a.startAddressForSort.localeCompare(b.startAddressForSort);
-
-        // 5. Volumen (Llenado) - Casting explícito para evitar fallos de string
+        if (a.startAddressForSort !== b.startAddressForSort) return (a.startAddressForSort || '').localeCompare(b.startAddressForSort || '');
         return (Number(b.volumeM3) || 0) - (Number(a.volumeM3) || 0);
       });
 
-      const usedVehicleIds = new Set<string>();
+      const prioritizedFleet = [...availableVehicles]
+        .filter(v => !usedVehicleIds.has(v.id))
+        .sort((a, b) => (Number(b.capacityM3) || 0) - (Number(a.capacityM3) || 0));
 
-      // ============================================
-      // ALGORITMO AGRESIVO DE LLENADO (90% TARGET)
-      // ============================================
-
-      // [IA REGENERATIVA ORBIT] Ordenar vehículos por capacidad (Nominal DESC)
-      // para favorecer la consolidación en camiones grandes primero.
-      const prioritizedFleet = [...availableVehicles].sort((a, b) => (Number(b.capacityM3) || 0) - (Number(a.capacityM3) || 0));
-
-      // Iteramos sobre cada vehículo disponible prioritario
       prioritizedFleet.forEach(vehicle => {
         if (availableInvoices.length === 0) return;
-        if (usedVehicleIds.has(vehicle.id)) return; // Skip if already used in retail phase
+        if (usedVehicleIds.has(vehicle.id)) return;
 
         const load: Invoice[] = [];
         let currentLoadVolume = 0;
 
-        // Capacidad REGLA ORBIT: MÁXIMO 90% (TECHO DURO)
         const vCap = Number(vehicle.capacityM3) || 0;
         const nominalCapacity = vCap > 0 ? vCap : 30;
-        const targetMaxCapacity = nominalCapacity * 0.90; // Meta y límite: 90%
-        const absoluteMaxCapacity = targetMaxCapacity;      // Techo duro estricto
-
-        // RESTRICCIÓN M7 IQ: Vehículos de gran capacidad no entran a barrios periféricos
+        const targetMaxCapacity = nominalCapacity * 0.90;
+        const absoluteMaxCapacity = targetMaxCapacity;
         const isLargeVehicle = nominalCapacity > 15;
 
-        // -- FASE 1: NÚCLEO GEOGRÁFICO (IA REGENERATIVA CIRCULAR) --
-        // Si hay afinidad, empezamos en esa ciudad
         const affinity = learningPatterns.find(p => p.vehicle_id === vehicle.id);
         const targetCity = affinity ? affinity.city : null;
 
         let currentLat = ORBIT_HUB_ORIGIN.lat;
         let currentLng = ORBIT_HUB_ORIGIN.lng;
 
-        // Buscamos la mejor "semilla" para iniciar la ruta circular
         let i = 0;
         while (i < availableInvoices.length && currentLoadVolume < targetMaxCapacity) {
-          // Encontrar la más cercana a la posición actual (Nearest Neighbor)
           let bestNextIdx = -1;
           let minDist = Infinity;
 
@@ -452,17 +446,16 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               const inv = availableInvoices[j];
               const invVol = Number(inv.volumeM3) || 0;
               
-              // VALIDACIÓN DE RESTRICCIÓN DE BARRIO
               // @ts-ignore
-              const isRestricted = isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(inv.neighborhoodKey);
+              const nKey = inv.neighborhoodKey || '';
+              const isRestricted = isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(nKey);
               if (isRestricted) continue;
 
               if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
                   const dist = getDistance(currentLat, currentLng, Number(inv.lat || 0), Number(inv.lng || 0));
-                  
-                  // IA: Priorizar afinidad de ciudad aprendida
                   // @ts-ignore
-                  const affinityBonus = (targetCity && inv.cityKey === targetCity) ? 0.8 : 1.0; // Give a bonus for invoices in the target city
+                  const cKey = inv.cityKey || '';
+                  const affinityBonus = (targetCity && cKey === targetCity) ? 0.8 : 1.0;
                   const finalDist = dist * affinityBonus;
 
                   if (finalDist < minDist) {
@@ -476,27 +469,23 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               const inv = availableInvoices[bestNextIdx];
               load.push(inv);
               currentLoadVolume += Number(inv.volumeM3) || 0;
-              currentLat = Number(inv.lat || currentLat); // Update current position to the last assigned invoice
+              currentLat = Number(inv.lat || currentLat);
               currentLng = Number(inv.lng || currentLng);
               availableInvoices.splice(bestNextIdx, 1);
-              // Reset i to re-evaluate distances from the new currentLat/Lng
               i = 0; 
           } else {
-              break; // No more invoices fit or no suitable invoices found for this vehicle
+              break; 
           }
         }
 
-        // -- FASE 3: UBICACIÓN DE VEHÍCULO --
-        // Asignamos el vehículo si lleva carga significativa
         if (load.length > 0) {
-          // IA REGENERATIVA ORBIT: Aprender de la ciudad dominante para fortalecer el patrón
           const cityCounts: { [key: string]: number } = {};
           load.forEach(inv => {
             // @ts-ignore
-            const c = inv.cityKey;
+            const c = inv.cityKey || 'SIN_CIUDAD';
             cityCounts[c] = (cityCounts[c] || 0) + 1;
           });
-          const dominantCity = Object.keys(cityCounts).reduce((a, b) => cityCounts[a] > cityCounts[b] ? a : b);
+          const dominantCity = Object.keys(cityCounts).reduce((a, b) => cityCounts[a] > cityCounts[b] ? a : b, 'LOGÍSTICA');
 
           suggestions.push({
             id: `route-${Date.now()}-${vehicle.plate}`,
@@ -510,25 +499,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         }
       });
 
-      // Reporte final para el usuario
       if (suggestions.length === 0) {
         if (availableVehicles.length === 0) {
-          toast.error(`NO HAY TRIPULACIONES DISPONIBLES PARA ${clients.find(c => c.id === selectedClient)?.name || 'EL CLIENTE'}.`);
+          toast.error(`NO HAY TRIPULACIONES DISPONIBLES.`);
         } else {
           toast.info("No se hallaron rutas factibles.");
         }
       } else {
-        toast.success(`Algoritmo OrbitM7 (Fuerza 90%): ${suggestions.length} rutas generadas.`);
+        toast.success(`Algoritmo OrbitM7 (IQ 90%): ${suggestions.length} rutas generadas.`);
       }
 
       setSuggestedRoutes(suggestions);
 
-      // Si fue un reajuste, calculamos el resumen para la visual especial
       if (specificInvoices) {
         const totalInvoices = specificInvoices.length;
         const assignedCount = suggestions.reduce((acc, r) => acc + r.assignedInvoices.length, 0);
 
-        // Obtener los external_doc_id reales para el resumen
         const processedDocIds = Array.from(readjustmentModal.selectedDocIds).map(id => {
           const strId = String(id);
           const d = documents.find(doc => doc.id === strId);
@@ -601,6 +587,14 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       updatedAt: new Date().toISOString(),
       statusId: 'EST-01'
     }, ...prev]);
+
+    // REGLA M7 IQ: Advertencia de acceso si el vehículo es grande y el barrio es restringido
+    const nominalCapacity = Number(route.vehicle.capacityM3) || 0;
+    const isLarge = nominalCapacity > 15;
+    const neighborhood = (data.invoice.neighborhood || '').toUpperCase().trim();
+    if (isLarge && RESTRICTED_NEIGHBORHOODS.includes(neighborhood)) {
+        toast.warning(`Atención: El barrio ${neighborhood} tiene restricciones para vehículos grandes (${nominalCapacity}m³). Proceda con precaución.`, { duration: 5000 });
+    }
 
     setSuggestedRoutes(newSuggestions);
     setAuditModal(null);
@@ -1246,6 +1240,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           >
             <Icons.CheckCircle className="w-4 h-4" />
             {isSaving ? '...' : 'CONFIRMAR TODO'}
+          </button>
+
+          <button
+            onClick={() => setManualRouteModal(true)}
+            disabled={remainingVehicles.length === 0}
+            className="w-full md:w-auto px-4 py-3 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap flex items-center gap-2"
+          >
+            <Icons.Plus className="w-3 h-3" />
+            RUTA MANUAL
           </button>
 
           <button
@@ -2160,6 +2163,62 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             </div>
             
             <p className="text-[7px] text-slate-600 font-bold uppercase tracking-widest pt-2">OrbitM7 Data Integrity Protocol</p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nueva Ruta Manual */}
+      {manualRouteModal && (
+        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-indigo-50 rounded-t-[2.5rem]">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white text-indigo-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Icons.Truck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Nueva Ruta Manual</h3>
+                  <p className="text-xs font-bold text-slate-500 uppercase">Vehículos con vínculos activos remanentes</p>
+                </div>
+              </div>
+              <button onClick={() => setManualRouteModal(false)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                <Icons.X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+              {remainingVehicles.length === 0 ? (
+                <div className="py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No hay vínculos activos sobrantes</p>
+                </div>
+              ) : (
+                remainingVehicles.map(v => (
+                  <div
+                    key={v.id}
+                    onClick={() => handleCreateManualRoute(v)}
+                    className="p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-500 hover:bg-white transition-all cursor-pointer group flex justify-between items-center"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-xs shadow-lg transform group-hover:scale-110 transition-transform">
+                        {v.plate.slice(0, 3)}
+                      </div>
+                      <div>
+                        <p className="font-black text-sm text-slate-900 uppercase">{v.plate}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{(v as any).driverName || 'Sin Conductor'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">CAPACIDAD</p>
+                      <p className="text-sm font-black text-indigo-600">{v.capacityM3}m³</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="p-6 bg-slate-50 border-t border-slate-100 rounded-b-[2.5rem]">
+              <p className="text-[8px] text-slate-400 font-bold uppercase text-center">Solo se muestran vehículos en estado "Disponible" con operadora activa</p>
+            </div>
           </div>
         </div>
       )}
