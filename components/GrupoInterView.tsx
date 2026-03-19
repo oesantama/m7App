@@ -415,7 +415,13 @@ const GrupoInterView: React.FC = () => {
     const term = searchTerm.toLowerCase().trim();
     return (o.numero_documento || '').toLowerCase().includes(term) ||
            (o.cliente || '').toLowerCase().includes(term) ||
-           String(o.nit || '').toLowerCase().includes(term);
+           String(o.nit || '').toLowerCase().includes(term) ||
+           (o.numero_planilla || '').toLowerCase().includes(term) ||
+           (o.placa || '').toLowerCase().includes(term) ||
+           (o.municipio_destino || '').toLowerCase().includes(term) ||
+           (o.estado || '').toLowerCase().includes(term) ||
+           (o.no_factura_m7 || '').toLowerCase().includes(term) ||
+           (o.historico && o.historico.length > 0 ? o.historico[0].estado : '').toLowerCase().includes(term);
   });
 
   return (
@@ -581,7 +587,10 @@ const GrupoInterView: React.FC = () => {
                     placeholder="Búsqueda global..." 
                     className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" 
                     value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }} 
                     onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)} 
                   />
                 </div>

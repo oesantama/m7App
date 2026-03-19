@@ -733,7 +733,16 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         let paramIdx = 1;
 
         if (search) {
-            query += ` AND (p.numero_documento ILIKE $${paramIdx} OR p.cliente ILIKE $${paramIdx})`;
+            query += ` AND (
+                p.numero_documento::TEXT ILIKE $${paramIdx} OR 
+                p.cliente::TEXT ILIKE $${paramIdx} OR 
+                p.nit::TEXT ILIKE $${paramIdx} OR 
+                p.numero_planilla::TEXT ILIKE $${paramIdx} OR 
+                p.placa::TEXT ILIKE $${paramIdx} OR 
+                p.municipio_destino::TEXT ILIKE $${paramIdx} OR
+                p.estado::TEXT ILIKE $${paramIdx} OR
+                p.no_factura_m7::TEXT ILIKE $${paramIdx}
+            )`;
             values.push(`%${search}%`);
             paramIdx++;
         }
