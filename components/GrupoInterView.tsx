@@ -285,6 +285,7 @@ const GrupoInterView: React.FC = () => {
       const exportData = orders.map(o => ({
         'Número Documento': o.numero_documento,
         'Planilla': o.numero_planilla || '-',
+        'Placa': o.placa || '-',
         'Número Guía': o.numero_guia || '-',
         'Fct. Último Corte': o.f_ultimo_corte ? new Date(o.f_ultimo_corte).toLocaleDateString() : '-',
         'NIT Cliente': o.nit,
@@ -604,6 +605,7 @@ const GrupoInterView: React.FC = () => {
                   <tr>
                     <th className="px-6 py-4">Documento</th>
                     <th className="px-6 py-4">Planilla</th>
+                    <th className="px-6 py-4">Placa</th>
                     <th className="px-6 py-4">Fct. Último C.</th>
                     <th className="px-6 py-4">Cliente / Destino</th>
                     <th className="px-6 py-4">Cant. Total</th>
@@ -628,6 +630,7 @@ const GrupoInterView: React.FC = () => {
                              {order.numero_planilla || '-'}
                            </span>
                         </td>
+                        <td className="px-6 py-4 font-black text-slate-700 uppercase">{order.placa || '-'}</td>
                         <td className="px-6 py-4 font-medium">{order.f_ultimo_corte ? new Date(order.f_ultimo_corte).toLocaleDateString() : '-'}</td>
                         <td className="px-6 py-4">
                            <div className="flex flex-col">
