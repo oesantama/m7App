@@ -709,5 +709,14 @@ export const api = {
         }
       }
     }
+
+    if (buffer.trim()) {
+      try {
+        const data = JSON.parse(buffer);
+        onProgress(data);
+      } catch (e) {
+        console.warn("Error parseando buffer final de stream:", buffer);
+      }
+    }
   },
 };

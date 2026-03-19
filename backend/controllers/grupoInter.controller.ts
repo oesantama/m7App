@@ -601,8 +601,24 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        // M7-ATOMIC-OCR: Motor Atómico de Procesamiento Completo (v1.9.30)
-        // Reducimos 50 peticiones a solo 1 (1 RPM), garantizando CERO errores de cuota.
+        // M7-ATOMIC-OCR: Motor Atómico Numérico Exclusivo (v1.9.31)
+        // Extraemos solo la parte numérica de los pedidos porque el PDF puede traerlos sin letras o con otras letras (ej. TR-GENI vs TI)
+        const numericDocsMap = new Map<string, string>();
+        for (const doc of pendingDocs) {
+            const numPart = String(doc).replace(/\D/g, '');
+            if (numPart) {
+                numericDocsMap.set(numPart, doc);
+            }
+        }
+        const numericList = Array.from(numericDocsMap.keys());
+
+        if (numericList.length === 0) {
+            sendProgress({ type: 'log', message: 'No hay pedidos con formato numérico.' });
+            sendProgress({ type: 'end', message: 'No hay pedidos válidos para analizar.', matches: 0 });
+            res.end();
+            return;
+        }
+
         const keys = getAPIKeysPool();
         const apiKey = keys[0]; 
         const modelName = process.env.AI_MODEL || "gemini-1.5-flash";
@@ -610,21 +626,20 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         
         sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico para ${totalPages} páginas...` });
         
-        // El PDF completo en Base64
         const fullPdfBase64 = req.file.buffer.toString('base64');
 
-        const prompt = `Actúa como un motor OCR de logística avanzada. 
+        const prompt = `Actúa como un motor OCR estadístico de logística. 
         Analiza este documento PDF completo de ${totalPages} páginas.
-        Tu tarea es identificar en qué página se encuentra cada uno de los siguientes números de documento:
-        [${pendingDocs.join(', ')}]
+        Busca EXCLUSIVAMENTE estos NÚMEROS exactos (ignora cualquier palabra o letra alrededor de ellos):
+        [${numericList.join(', ')}]
         
         REGLAS:
-        1. Escanea todas las páginas del PDF.
-        2. Para cada documento encontrado, identifica el NÚMERO DE PÁGINA (1-index).
-        3. Responde exclusivamente con un objeto JSON siguiendo este formato:
-        {"matches": [{"doc": "NUMERO_DOC", "page": NUM_PAGINA}]}
-        4. Si no encuentras ninguno, responde: {"matches": []}
-        5. No incluyas texto adicional, solo el JSON.`;
+        1. Escanea visualmente todas las páginas.
+        2. Si encuentras uno de estos números impreso en la página, registra el NÚMERO y la PÁGINA (1-index).
+        3. Responde SOLO con un JSON estricto con esta estructura exacta:
+        {"matches": [{"doc": "SOLO_LOS_NUMEROS", "page": NUM_PAGINA}]}
+        4. Si no hay coincidencias, responde: {"matches": []}
+        5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
 
         try {
             const result = await generateContentWithRetry(visionModel, [
@@ -635,22 +650,23 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             const response = await result.response;
             const textResponse = response.text().trim();
             
-            // Extraer JSON de la respuesta (por si Gemini incluye markdown)
             const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
             if (!jsonMatch) throw new Error("Gemini no devolvió un formato JSON válido.");
             
             const data = JSON.parse(jsonMatch[0]);
             const foundMatches = data.matches || [];
             
-            sendProgress({ type: 'log', message: `🔍 Gemini detectó ${foundMatches.length} documentos potenciales.` });
+            sendProgress({ type: 'log', message: `🔍 Inteligencia detectó ${foundMatches.length} números en el documento.` });
 
             let finalMatches = 0;
             for (const item of foundMatches) {
-                const docNum = item.doc;
-                const pageIndex = item.page - 1; // Convertir a 0-index
+                // Limpiamos lo que traiga gemini por seguridad
+                const matchedNum = String(item.doc).replace(/\D/g, '');
+                const originalDocId = numericDocsMap.get(matchedNum);
+                const pageIndex = item.page - 1;
 
-                if (pageIndex >= 0 && pageIndex < totalPages && pendingDocs.includes(docNum)) {
-                    sendProgress({ type: 'log', message: `✅ Validando Match: ${docNum} en Pág ${item.page}...` });
+                if (pageIndex >= 0 && pageIndex < totalPages && originalDocId) {
+                    sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${item.page}...` });
                     
                     // Extraer solo la página específica para guardarla como acta
                     const subPdf = await PDFDocument.create();
@@ -663,11 +679,11 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 
                     await pool.query(
                         "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
-                        [base64Page, username, docNum]
+                        [base64Page, username, originalDocId]
                     );
 
                     // Registrar en histórico
-                    const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [docNum]);
+                    const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
                     if (pedRes.rows.length > 0) {
                         await pool.query(
                             "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', 'PDF Procesado Automáticamente', 'System OCR')",
@@ -685,12 +701,17 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         } catch (error: any) {
             console.error('[ATOMIC-OCR] Error:', error);
             sendProgress({ type: 'log', message: `❌ Error en el motor atómico: ${error.message}` });
-            throw error;
+            sendProgress({ type: 'end', message: 'Motor Atómico Interrumpido.', matches: 0 });
         }
         res.end();
     } catch (error) {
         console.error('[GRUPO-INTER] Error Crítico de Procesamiento:', error);
-        res.status(500).json({ message: 'Error interno en el núcleo de paralelización' });
+        if (!res.headersSent) {
+            res.status(500).json({ message: 'Error interno en el núcleo de paralelización' });
+        } else {
+            res.write(JSON.stringify({ type: 'end', message: 'Fallo interno crítico', matches: 0 }) + '\n');
+            res.end();
+        }
     }
 };
 

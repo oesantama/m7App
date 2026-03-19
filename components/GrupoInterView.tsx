@@ -409,6 +409,14 @@ const GrupoInterView: React.FC = () => {
     item.remision?.toLowerCase().includes(productSearch.toLowerCase())
   ) || [];
 
+  const visibleOrders = orders.filter(o => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase().trim();
+    return (o.numero_documento || '').toLowerCase().includes(term) ||
+           (o.cliente || '').toLowerCase().includes(term) ||
+           String(o.nit || '').toLowerCase().includes(term);
+  });
+
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
       {/* Overlay de Carga con Barra de Progreso */}
@@ -609,10 +617,10 @@ const GrupoInterView: React.FC = () => {
                 <tbody className="divide-y divide-slate-50 text-xs text-slate-600">
                   {loading ? (
                     <tr><td colSpan={9} className="py-20 text-center text-slate-400 font-medium">Sincronizando con Orbit...</td></tr>
-                  ) : orders.length === 0 ? (
+                  ) : visibleOrders.length === 0 ? (
                     <tr><td colSpan={9} className="py-20 text-center text-slate-300 font-medium">Sin registros encontrados</td></tr>
                   ) : (
-                    orders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => (
+                    visibleOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => (
                       <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 font-bold text-slate-900">{order.numero_documento}</td>
                         <td className="px-6 py-4">
@@ -691,11 +699,11 @@ const GrupoInterView: React.FC = () => {
                   </select>
                 </div>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                Página {currentPage} de {Math.ceil(orders.length / itemsPerPage)}
+                Página {currentPage} de {Math.ceil(visibleOrders.length / itemsPerPage)}
               </div>
               <div className="flex gap-2">
-                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-4 py-2 bg-white border rounded-xl disabled:opacity-30 hover:bg-slate-100 transition shadow-sm text-xs font-bold">Anterior</button>
-                <button disabled={currentPage >= Math.ceil(orders.length / itemsPerPage)} onClick={() => setCurrentPage(p => p + 1)} className="px-4 py-2 bg-white border rounded-xl disabled:opacity-30 hover:bg-slate-100 transition shadow-sm text-xs font-bold">Siguiente</button>
+                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="px-4 py-2 bg-white border rounded-xl disabled:opacity-30 hover:bg-slate-100 transition shadow-sm text-xs font-bold">Anterior</button>
+                <button disabled={currentPage >= Math.ceil(visibleOrders.length / itemsPerPage)} onClick={() => setCurrentPage(p => p + 1)} className="px-4 py-2 bg-white border rounded-xl disabled:opacity-30 hover:bg-slate-100 transition shadow-sm text-xs font-bold">Siguiente</button>
               </div>
             </div>
           </div>
