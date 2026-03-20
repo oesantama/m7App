@@ -100,12 +100,24 @@ const GrupoInterView: React.FC = () => {
 
   const { user } = useAppStore();
 
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    status: string;
+    client: string;
+    fechaCorteDesde: string;
+    fechaCorteHasta: string;
+    placa?: string;
+    planilla?: string;
+    factura?: string;
+  }>({
     status: '',
     client: '',
     fechaCorteDesde: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     fechaCorteHasta: new Date().toISOString().split('T')[0],
+    placa: '',
+    planilla: '',
+    factura: ''
   });
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
   useEffect(() => {
     // Solo carga inicial o cambio de pestaña, pero quitamos filters de la dependencia
@@ -410,7 +422,18 @@ const GrupoInterView: React.FC = () => {
     item.remision?.toLowerCase().includes(productSearch.toLowerCase())
   ) || [];
 
-  const visibleOrders = orders.filter(o => {
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    setSortConfig({ key, direction });
+    setCurrentPage(1);
+  };
+
+  let visibleOrders = orders.filter(o => {
+    if (filters.placa && !(o.placa || '').toLowerCase().includes(filters.placa.toLowerCase().trim())) return false;
+    if (filters.planilla && !(o.numero_planilla || '').toLowerCase().includes(filters.planilla.toLowerCase().trim())) return false;
+    if (filters.factura && !(o.no_factura_m7 || '').toLowerCase().includes(filters.factura.toLowerCase().trim())) return false;
+
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();
     return (o.numero_documento || '').toLowerCase().includes(term) ||
@@ -423,6 +446,27 @@ const GrupoInterView: React.FC = () => {
            (o.no_factura_m7 || '').toLowerCase().includes(term) ||
            (o.historico && o.historico.length > 0 ? o.historico[0].estado : '').toLowerCase().includes(term);
   });
+
+  if (sortConfig !== null) {
+    visibleOrders.sort((a: any, b: any) => {
+      let aVal = a[sortConfig.key];
+      let bVal = b[sortConfig.key];
+      if (sortConfig.key === 'clienteDestino') {
+         aVal = (a.cliente || '') + (a.municipio_destino || '');
+         bVal = (b.cliente || '') + (b.municipio_destino || '');
+      } else if (sortConfig.key === 'ultimaNovedad') {
+         aVal = a.historico && a.historico.length > 0 ? a.historico[0].estado : '';
+         bVal = b.historico && b.historico.length > 0 ? b.historico[0].estado : '';
+      }
+      if (aVal === null || aVal === undefined) aVal = '';
+      if (bVal === null || bVal === undefined) bVal = '';
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
@@ -551,60 +595,81 @@ const GrupoInterView: React.FC = () => {
           </div>
         ) : (
           <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-            <div className="p-8 border-b border-slate-100 bg-slate-50/30 flex flex-col md:flex-row gap-6 items-end justify-between">
-              <div className="flex-1 flex flex-col md:flex-row gap-4 w-full items-end">
-                <div className="flex-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Rango de Consulta</label>
-                  <div className="flex gap-2 bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
-                    <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none" value={filters.fechaCorteDesde} onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})} />
-                    <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none" value={filters.fechaCorteHasta} onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})} />
+            <div className="p-8 border-b border-slate-100 bg-slate-50/30 flex flex-col gap-6">
+              <div className="flex flex-col md:flex-row gap-4 w-full items-end justify-between">
+                <div className="flex-1 flex flex-col md:flex-row gap-4 w-full items-end">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Rango de Consulta</label>
+                    <div className="flex gap-2 bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
+                      <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none" value={filters.fechaCorteDesde} onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})} />
+                      <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none" value={filters.fechaCorteHasta} onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      const today = new Date();
+                      const eightDaysAgo = new Date();
+                      eightDaysAgo.setDate(today.getDate() - 8);
+                      const newFilters = {
+                        ...filters,
+                        fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0],
+                        fechaCorteHasta: today.toISOString().split('T')[0]
+                      };
+                      setFilters(newFilters);
+                      setTimeout(() => fetchOrders(searchTerm), 0);
+                    }}
+                    className="px-6 py-3.5 bg-amber-50 text-amber-600 rounded-2xl text-[10px] font-black flex items-center gap-2 hover:bg-amber-100 transition-all border border-amber-100/50 uppercase tracking-widest"
+                  >
+                    <Clock size={16} /> ÚLTIMOS 8 DÍAS
+                  </button>
+
+                  <div className="w-full md:w-64 relative group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Búsqueda global..." 
+                      className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" 
+                      value={searchTerm} 
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1);
+                      }} 
+                      onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)} 
+                    />
                   </div>
                 </div>
 
-                <button 
-                  onClick={() => {
-                    const today = new Date();
-                    const eightDaysAgo = new Date();
-                    eightDaysAgo.setDate(today.getDate() - 8);
-                    const newFilters = {
-                      ...filters,
-                      fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0],
-                      fechaCorteHasta: today.toISOString().split('T')[0]
-                    };
-                    setFilters(newFilters);
-                    // Ejecutamos inmediatamente con los nuevos filtros
-                    setTimeout(() => fetchOrders(searchTerm), 0);
-                  }}
-                  className="px-6 py-3.5 bg-amber-50 text-amber-600 rounded-2xl text-[10px] font-black flex items-center gap-2 hover:bg-amber-100 transition-all border border-amber-100/50 uppercase tracking-widest"
-                >
-                  <Clock size={16} /> ÚLTIMOS 8 DÍAS
-                </button>
-
-                <div className="w-full md:w-64 relative group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Búsqueda global..." 
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" 
-                    value={searchTerm} 
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setCurrentPage(1);
-                    }} 
-                    onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)} 
-                  />
+                <div className="flex gap-3">
+                  <button onClick={() => fetchOrders(searchTerm)} className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-lg shadow-slate-200 active:scale-95">Consultar</button>
+                  <button 
+                      onClick={() => handleExportExcel()}
+                      className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl font-black hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+                      title="Exportar a Excel"
+                    >
+                      <FileSpreadsheet size={20} />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <button onClick={() => fetchOrders(searchTerm)} className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-lg shadow-slate-200 active:scale-95">Consultar</button>
-                <button 
-                    onClick={() => handleExportExcel()}
-                    className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl font-black hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                    title="Exportar a Excel"
-                  >
-                    <FileSpreadsheet size={20} />
-                </button>
+              <div className="flex flex-col md:flex-row gap-4 w-full items-end mt-2">
+                <div className="flex-1 relative">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 text-blue-600">Filtro Factura</label>
+                  <input type="text" placeholder="Ej. TI1000..." className="w-full px-4 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" value={filters.factura || ''} onChange={e => {setFilters({...filters, factura: e.target.value}); setCurrentPage(1);}} />
+                </div>
+                <div className="flex-1 relative">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 text-blue-600">Filtro Planilla</label>
+                  <input type="text" placeholder="Ej. 100043" className="w-full px-4 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" value={filters.planilla || ''} onChange={e => {setFilters({...filters, planilla: e.target.value}); setCurrentPage(1);}} />
+                </div>
+                <div className="flex-1 relative">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 text-blue-600">Filtro Placa</label>
+                  <input type="text" placeholder="Ej. LZN785" className="w-full px-4 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm uppercase" value={filters.placa || ''} onChange={e => {setFilters({...filters, placa: e.target.value}); setCurrentPage(1);}} />
+                </div>
+                <div className="flex items-center justify-center px-6 py-3 bg-blue-50 border border-blue-100 rounded-2xl shadow-sm">
+                  <span className="text-blue-600 font-extrabold text-[12px] uppercase tracking-widest flex items-center gap-2">
+                    <span className="bg-white text-slate-800 px-3 py-1 rounded-lg border border-blue-100">{visibleOrders.length}</span> Registros
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -612,24 +677,35 @@ const GrupoInterView: React.FC = () => {
               <table className="w-full text-left">
                 <thead className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 tracking-wider border-b">
                   <tr>
-                    <th className="px-6 py-4">Documento</th>
-                    <th className="px-6 py-4">Planilla</th>
-                    <th className="px-6 py-4">Placa</th>
-                    <th className="px-6 py-4">Fct. Último C.</th>
-                    <th className="px-6 py-4">Cliente / Destino</th>
-                    <th className="px-6 py-4">Cant. Total</th>
-                    <th className="px-6 py-4">Precio Total</th>
-                    <th className="px-6 py-4">Peso Total</th>
-                    <th className="px-6 py-4">Flete ($)</th>
-                    <th className="px-6 py-4">Última Novedad</th>
+                    {[
+                      { key: 'numero_documento', label: 'Documento' },
+                      { key: 'numero_planilla', label: 'Planilla' },
+                      { key: 'placa', label: 'Placa' },
+                      { key: 'f_ultimo_corte', label: 'Fct. Último C.' },
+                      { key: 'clienteDestino', label: 'Cliente / Destino' },
+                      { key: 'cantidad_total', label: 'Cant. Total' },
+                      { key: 'precio_total', label: 'Precio Total' },
+                      { key: 'peso_total_prod', label: 'Peso Total' },
+                      { key: 'valor_flete', label: 'Flete ($)' },
+                      { key: 'ultimaNovedad', label: 'Última Novedad' }
+                    ].map(col => (
+                      <th key={col.key} className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group select-none" onClick={() => requestSort(col.key)}>
+                        <div className="flex items-center gap-1">
+                          {col.label} 
+                          <span className={`text-[10px] transition-opacity ${sortConfig?.key === col.key ? 'opacity-100 text-blue-500' : 'opacity-0 group-hover:opacity-100 text-slate-300'}`}>
+                            {sortConfig?.key === col.key ? (sortConfig.direction === 'asc' ? '↓' : '↑') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
                     <th className="px-6 py-4 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-xs text-slate-600">
                   {loading ? (
-                    <tr><td colSpan={9} className="py-20 text-center text-slate-400 font-medium">Sincronizando con Orbit...</td></tr>
+                    <tr><td colSpan={11} className="py-20 text-center text-slate-400 font-medium">Sincronizando con Orbit...</td></tr>
                   ) : visibleOrders.length === 0 ? (
-                    <tr><td colSpan={9} className="py-20 text-center text-slate-300 font-medium">Sin registros encontrados</td></tr>
+                    <tr><td colSpan={11} className="py-20 text-center text-slate-300 font-medium">Sin registros encontrados</td></tr>
                   ) : (
                     visibleOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => (
                       <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
