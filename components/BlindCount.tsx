@@ -67,7 +67,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [count1Data, setCount1Data] = useState<{ [articleId: string]: number }>(() => {
     const initial: { [id: string]: number } = {};
     docL.items.forEach(it => {
-      if (it.count1 > 0) initial[it.articleId] = it.count1;
+      if (it.count1 > 0) initial[it.articleId] = Number(it.count1);
     });
     return initial;
   });
@@ -512,9 +512,6 @@ const BlindCount: React.FC<BlindCountProps> = ({
         (a.barcode && a.barcode === input)
     );
     if (inMaster) {
-        const factor = inMaster.factorInter || inMaster.factorStd || 1;
-        const autoQty = factor > 1 ? factor : 1;
-        
         const newExtra = {
           articleId: inMaster.id,
           sku: inMaster.sku || inMaster.id,
@@ -534,11 +531,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
             return [...prev, newExtra];
         });
         
-        // M7 V16.2: Encolar la cantidad real detectada (si es caja, sumar el factor)
+        // Siempre sumar 1 por pistoleada — el factor solo aplica en botones Convertir/Revertir
         setTimeout(() => {
-            for(let i=0; i<autoQty; i++) {
-                enqueueScan(inMaster.sku || inMaster.id);
-            }
+            enqueueScan(inMaster.sku || inMaster.id);
         }, 100);
         return; 
     }
