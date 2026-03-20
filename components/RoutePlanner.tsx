@@ -114,6 +114,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<Invoice | null>(null);
   const [manualRouteModal, setManualRouteModal] = useState(false);
+  const [manualVehicleSearch, setManualVehicleSearch] = useState('');
   const [lastReadjustmentResult, setLastReadjustmentResult] = useState<{ docs: number, facts: number, unrouted: number, docIds: string[] } | null>(null);
   const [dispatchConfirmation, setDispatchConfirmation] = useState<{ isOpen: boolean, route: SuggestedRoute | null, isMass: boolean }>({ isOpen: false, route: null, isMass: false });
   const [modalSearchTerm, setModalSearchTerm] = useState('');
@@ -2644,41 +2645,64 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   <p className="text-xs font-bold text-slate-500 uppercase">Vehículos con vínculos activos remanentes</p>
                 </div>
               </div>
-              <button onClick={() => setManualRouteModal(false)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+              <button onClick={() => { setManualRouteModal(false); setManualVehicleSearch(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
                 <Icons.X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
 
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-4">
-              {remainingVehicles.length === 0 ? (
+            <div className="px-8 pt-6 pb-2">
+              <div className="relative">
+                <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Buscar por placa o conductor..."
+                  onChange={(e) => setManualVehicleSearch(e.target.value.toUpperCase())}
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-black uppercase outline-none focus:border-indigo-400 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="px-8 pb-8 overflow-y-auto custom-scrollbar flex-1 space-y-3 pt-3">
+              {remainingVehicles.length === 0 && (
                 <div className="py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No hay vínculos activos sobrantes</p>
                 </div>
-              ) : (
-                remainingVehicles.map(v => (
-                  <div
-                    key={v.id}
-                    onClick={() => handleCreateManualRoute(v)}
-                    className="p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-500 hover:bg-white transition-all cursor-pointer group flex justify-between items-center"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-xs shadow-lg transform group-hover:scale-110 transition-transform">
-                        {v.plate.slice(0, 3)}
-                      </div>
-                      <div>
-                        <p className="font-black text-sm text-slate-900 uppercase">{v.plate}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{(v as any).driverName || 'Sin Conductor'}</p>
-                      </div>
+              )}
+              {remainingVehicles.length > 0 && remainingVehicles.filter(v =>
+                v.plate.toUpperCase().includes(manualVehicleSearch) ||
+                ((v as any).driverName || '').toUpperCase().includes(manualVehicleSearch)
+              ).length === 0 && (
+                <div className="py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sin resultados para "{manualVehicleSearch}"</p>
+                </div>
+              )}
+              {remainingVehicles.filter(v =>
+                v.plate.toUpperCase().includes(manualVehicleSearch) ||
+                ((v as any).driverName || '').toUpperCase().includes(manualVehicleSearch)
+              ).map(v => (
+                <div
+                  key={v.id}
+                  onClick={() => handleCreateManualRoute(v)}
+                  className="p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-500 hover:bg-white transition-all cursor-pointer group flex justify-between items-center"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-xs shadow-lg transform group-hover:scale-110 transition-transform">
+                      {v.plate.slice(0, 3)}
                     </div>
-                    <div className="text-right">
-                      <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">CAPACIDAD</p>
-                      <p className="text-sm font-black text-indigo-600">{v.capacityM3}m³</p>
+                    <div>
+                      <p className="font-black text-sm text-slate-900 uppercase">{v.plate}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{(v as any).driverName || 'Sin Conductor'}</p>
                     </div>
                   </div>
-                ))
-              )}
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">CAPACIDAD</p>
+                    <p className="text-sm font-black text-indigo-600">{v.capacityM3}m³</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            
+
             <div className="p-6 bg-slate-50 border-t border-slate-100 rounded-b-[2.5rem]">
               <p className="text-[8px] text-slate-400 font-bold uppercase text-center">Solo se muestran vehículos en estado "Disponible" con operadora activa</p>
             </div>
