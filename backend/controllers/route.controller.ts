@@ -224,3 +224,44 @@ export const getLatestLocations = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Error al obtener ubicaciones del centro de mando" });
   }
 };
+
+// Geocodificación con Nominatim + caché en BD
+let lastNominatimCall = 0;
+export const geocodeAddress = async (req: Request, res: Response) => {
+  const { address, city } = req.body;
+  if (!address || !city) return res.status(400).json({ error: 'address and city required' });
+
+  const addressKey = `${address}|${city}`.toLowerCase().trim();
+  try {
+    // Verificar caché
+    const cached = await pool.query('SELECT lat, lng FROM geocoding_cache WHERE address_key = $1', [addressKey]);
+    if (cached.rowCount && cached.rowCount > 0) {
+      return res.json({ lat: cached.rows[0].lat, lng: cached.rows[0].lng, cached: true });
+    }
+
+    // Rate limit Nominatim: máx 1 req/seg
+    const now = Date.now();
+    const wait = 1100 - (now - lastNominatimCall);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    lastNominatimCall = Date.now();
+
+    const query = encodeURIComponent(`${address}, ${city}, Colombia`);
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=co`, {
+      headers: { 'User-Agent': 'OrbitM7LogisticsApp/1.0' }
+    });
+    const data = await response.json() as any[];
+
+    if (data && data.length > 0) {
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      await pool.query(
+        'INSERT INTO geocoding_cache (address_key, address, city, lat, lng) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (address_key) DO NOTHING',
+        [addressKey, address, city, lat, lng]
+      );
+      return res.json({ lat, lng, cached: false });
+    }
+    res.json({ lat: 6.2518, lng: -75.5636, cached: false, fallback: true });
+  } catch (err: any) {
+    res.json({ lat: 6.2518, lng: -75.5636, cached: false, fallback: true });
+  }
+};

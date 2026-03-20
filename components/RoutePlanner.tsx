@@ -164,15 +164,34 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
       return;
     }
-    const timer = setTimeout(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
       const container = document.getElementById('route-preview-map');
-      if (!container) return;
+      if (!container || cancelled) return;
       if (routePreviewMapRef.current) {
         routePreviewMapRef.current.remove();
         routePreviewMapRef.current = null;
       }
       const route = routeMapModal.route!;
-      const stops = route.assignedInvoices.filter(inv => Number(inv.lat) && Number(inv.lng));
+
+      // Geocodificar stops que tienen coordenadas por defecto (centro de Medellín)
+      const DEFAULT_LAT = 6.2518, DEFAULT_LNG = -75.5636;
+      const enriched = await Promise.all(
+        route.assignedInvoices.map(async (inv) => {
+          const lat = Number(inv.lat), lng = Number(inv.lng);
+          const isDefault = Math.abs(lat - DEFAULT_LAT) < 0.001 && Math.abs(lng - DEFAULT_LNG) < 0.001;
+          if (isDefault && inv.address && inv.city) {
+            try {
+              const geo = await api.geocodeAddress({ address: inv.address, city: inv.city });
+              if (geo?.lat && geo?.lng && !geo.fallback) return { ...inv, lat: geo.lat, lng: geo.lng };
+            } catch {}
+          }
+          return inv;
+        })
+      );
+      if (cancelled) return;
+
+      const stops = enriched.filter(inv => Number(inv.lat) && Number(inv.lng));
       const centerLat = stops.length > 0 ? stops.reduce((a, inv) => a + Number(inv.lat), 0) / stops.length : ORBIT_HUB_ORIGIN.lat;
       const centerLng = stops.length > 0 ? stops.reduce((a, inv) => a + Number(inv.lng), 0) / stops.length : ORBIT_HUB_ORIGIN.lng;
 
@@ -208,7 +227,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
       routePreviewMapRef.current = map;
     }, 250);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [routeMapModal.isOpen, routeMapModal.route]);
 
   // FILTRADO DE FACTURAS APTAS: Real (basado en lo que viene del API de facturas)
