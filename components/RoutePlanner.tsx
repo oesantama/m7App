@@ -196,7 +196,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           className: '', iconSize: [26, 26], iconAnchor: [13, 13]
         });
         L.marker([lat, lng], { icon: stopIcon })
-          .bindPopup(`<b>${i + 1}. ${inv.invoiceNumber}</b><br>${inv.customerName}<br><small>${inv.address} · ${inv.city}</small>`)
+          .bindPopup(`<b>${i + 1}. ${inv.invoiceNumber}</b><br>${inv.customerName || ''}<br><small>${inv.address} · ${inv.city}</small>`)
           .addTo(map);
       });
 
@@ -1072,7 +1072,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const dateStr = new Date().toLocaleDateString('es-CO');
     const fileName = `PLANILLA-${route.vehicle.plate}-${dateStr.replace(/\//g, '')}.pdf`;
 
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const PW = pdf.internal.pageSize.getWidth();
     const PH = pdf.internal.pageSize.getHeight();
     const ML = 10, MR = 10, CW = PW - ML - MR;
@@ -1171,20 +1171,21 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
           fmtCOP(inv.invoiceValue || 0),
           method,
-          `${inv.customerName}\n${inv.address} - ${inv.city}`,
+          `${inv.customerName || ''}\n${inv.address} - ${inv.city}`,
         ];
       }),
-      styles: { fontSize: 6, cellPadding: 2 },
-      headStyles: { fillColor: [241,245,249], textColor: [15,23,42], fontStyle: 'bold', fontSize: 6.5 },
+      styles: { fontSize: 7, cellPadding: 2.5 },
+      headStyles: { fillColor: [241,245,249], textColor: [15,23,42], fontStyle: 'bold', fontSize: 7 },
       columnStyles: {
-        0: { cellWidth: 7, halign: 'center' },
-        1: { cellWidth: 10, halign: 'center' },
-        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
-        3: { cellWidth: 20, halign: 'center' },
-        4: { cellWidth: 8, halign: 'center' },
-        5: { cellWidth: 14, halign: 'center' },
-        6: { cellWidth: 22, halign: 'right' },
-        7: { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
+        0: { cellWidth: 9,  halign: 'center' },
+        1: { cellWidth: 13, halign: 'center' },
+        2: { cellWidth: 28, halign: 'center', fontStyle: 'bold' },
+        3: { cellWidth: 26, halign: 'center' },
+        4: { cellWidth: 11, halign: 'center' },
+        5: { cellWidth: 20, halign: 'center' },
+        6: { cellWidth: 28, halign: 'right' },
+        7: { cellWidth: 13, halign: 'center', fontStyle: 'bold' },
+        8: { cellWidth: 105, halign: 'left' },
       },
       theme: 'grid',
       didParseCell: (data: any) => {
