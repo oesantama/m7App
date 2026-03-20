@@ -131,7 +131,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ isOpen: boolean; id: string } | null>(null);
   const [routeMapModal, setRouteMapModal] = useState<{ isOpen: boolean; route: SuggestedRoute | null }>({ isOpen: false, route: null });
   const routePreviewMapRef = useRef<L.Map | null>(null);
-  const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Suprime chars residuales del scanner
+  const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addInvoiceInputRef = useRef<HTMLInputElement>(null);
 
   const handleDeleteDocument = async (id: string) => {
     setShowDeleteConfirm({ isOpen: true, id });
@@ -1924,39 +1925,46 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               <div className="relative">
                 <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
                 <input
+                  ref={addInvoiceInputRef}
                   autoFocus
                   type="text"
                   placeholder="Buscar por factura, cliente o pedido..."
                   value={modalSearchTerm}
                   onChange={(e) => {
-                    // Si hay supresión activa (scanner aún enviando chars residuales), ignorar
-                    if (scanSuppressRef.current) { setModalSearchTerm(''); return; }
                     const raw = e.target.value;
-                    // Factura electrónica colombiana: extrae NumFac del código de barras
+
+                    const clearInput = () => {
+                      setModalSearchTerm('');
+                      if (addInvoiceInputRef.current) addInvoiceInputRef.current.value = '';
+                    };
+
+                    // Suprimir chars residuales del scanner
+                    if (scanSuppressRef.current) { clearInput(); return; }
+
+                    // Factura electrónica colombiana PDF417 — extrae NumFac
                     const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
                     if (numFacMatch) {
                       const invoiceNum = numFacMatch[1].trim().toUpperCase();
-                      setModalSearchTerm('');
-                      // Suprimir chars residuales por 600ms
+                      clearInput();
                       if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
-                      scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 600);
-                      // Buscar y agregar directamente
+                      scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 800);
                       const match = unassignedInvoices.find(inv =>
                         (inv.invoiceNumber || '').toUpperCase() === invoiceNum
                       );
                       if (match) handleAddInvoiceToRoute(match);
-                      else setModalSearchTerm(invoiceNum); // Mostrar si no hay match exacto
-                    } else {
-                      setModalSearchTerm(raw.toUpperCase());
-                      // Auto-select si búsqueda manual deja exactamente 1 resultado
-                      if (raw.length >= 4) {
-                        const term = raw.toLowerCase();
-                        const matches = unassignedInvoices.filter(inv =>
-                          (inv.invoiceNumber || '').toLowerCase().includes(term) ||
-                          (inv.orderNumber || '').toLowerCase().includes(term)
-                        );
-                        if (matches.length === 1) handleAddInvoiceToRoute(matches[0]);
-                      }
+                      else setModalSearchTerm(invoiceNum);
+                      return;
+                    }
+
+                    // Búsqueda manual normal
+                    setModalSearchTerm(raw.toUpperCase());
+                    if (raw.length >= 4) {
+                      const term = raw.toLowerCase();
+                      const matches = unassignedInvoices.filter(inv =>
+                        (inv.invoiceNumber || '').toLowerCase().includes(term) ||
+                        (inv.orderNumber || '').toLowerCase().includes(term)
+                      );
+                      if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); clearInput(); }
                     }
                   }}
                   className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
