@@ -1952,21 +1952,30 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   onChange={(e) => {
                     const raw = e.target.value;
 
-                    const clearInput = () => {
-                      setModalSearchTerm('');
+                    const clearDom = () => {
                       if (addInvoiceInputRef.current) addInvoiceInputRef.current.value = '';
                     };
+                    const clearInput = () => {
+                      setModalSearchTerm('');
+                      clearDom();
+                    };
 
-                    // Suprimir chars residuales del scanner
-                    if (scanSuppressRef.current) { clearInput(); return; }
+                    // Suprimir chars residuales del scanner — reiniciar timer en cada char
+                    if (scanSuppressRef.current) {
+                      clearTimeout(scanSuppressRef.current);
+                      scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
+                      clearDom();
+                      return;
+                    }
 
                     // Factura electrónica colombiana PDF417 — extrae NumFac
-                    const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
+                    // Lookahead (?=[A-Z][a-z]|\s|$) evita capturar el campo siguiente (FecFac, NitOFE…)
+                    const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)(?=[A-Z][a-z]|\s|$)/);
                     if (numFacMatch) {
                       const invoiceNum = numFacMatch[1].trim().toUpperCase();
                       clearInput();
                       if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
-                      scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 800);
+                      scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
                       const match = unassignedInvoices.find(inv =>
                         (inv.invoiceNumber || '').toUpperCase() === invoiceNum
                       );
