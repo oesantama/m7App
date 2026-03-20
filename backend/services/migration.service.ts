@@ -153,6 +153,19 @@ const healSchema = async (client: any) => {
     } catch (e) {}
   }
 
+  // FASE: RESYNC DE SECUENCIAS SERIAL — evita "duplicate key value violates unique constraint pkey"
+  for (const table of serialTables) {
+    try {
+      await client.query(`
+        SELECT setval(
+          pg_get_serial_sequence('${table}', 'id'),
+          COALESCE((SELECT MAX(id) FROM "${table}"), 0) + 1,
+          false
+        )
+      `);
+    } catch (e) {}
+  }
+
   // FASE ESPECIAL M7 IQ: Reparación de tipos para Capacitaciones (Solución Profesional)
   try {
     const tsCheck = await client.query("SELECT data_type FROM information_schema.columns WHERE table_name = 'training_sessions' AND column_name = 'id'");
