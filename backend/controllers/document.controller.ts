@@ -1173,40 +1173,62 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
     const plateParam = String(plate).trim();
 
     const result = await pool.query(`
+      WITH base AS (
+        SELECT
+          di.id                                                                                   AS item_id,
+          COALESCE(NULLIF(TRIM(di.invoice),''), NULLIF(TRIM(di.order_number),''), di.un_code)    AS inv_key,
+          dl.vehicle_plate                                                                        AS truck_origin,
+          dl.external_doc_id                                                                      AS load_id
+        FROM document_items di
+        JOIN documents_l dl ON di.document_id = dl.id
+        WHERE
+          ($1::text = ''
+            OR dl.external_doc_id ILIKE '%' || $1 || '%'
+            OR di.invoice         ILIKE '%' || $1 || '%'
+            OR di.order_number    ILIKE '%' || $1 || '%')
+          AND
+          ($2::text = ''
+            OR dl.vehicle_plate ILIKE '%' || $2 || '%')
+      ),
+      -- Búsqueda de placa destino: route_invoices → routes → vehicles
+      -- vehicle_id puede ser el UUID del vehículo O su placa directamente
+      route_truck AS (
+        SELECT DISTINCT ON (ri.invoice_id)
+          ri.invoice_id,
+          COALESCE(v.plate, r.vehicle_id)    AS truck_plate,
+          COALESCE(drv.document_number, '')  AS driver_doc
+        FROM route_invoices ri
+        JOIN  routes r   ON r.id::text = ri.route_id::text
+        LEFT JOIN vehicles v
+          ON v.id::text = r.vehicle_id::text
+          OR v.plate    = r.vehicle_id
+        LEFT JOIN drivers drv
+          ON drv.id::text = r.driver_id::text
+        ORDER BY ri.invoice_id, ri.created_at DESC
+      ),
+      -- Búsqueda de placa/conductor por despacho: dispatch_assignments → assignments → vehicles
+      dispatch_truck AS (
+        SELECT DISTINCT ON (da.invoice_id)
+          da.invoice_id,
+          COALESCE(v2.plate, '')            AS truck_plate,
+          COALESCE(drv2.document_number, '') AS driver_doc
+        FROM dispatch_assignments da
+        LEFT JOIN assignments asgn
+          ON asgn.driver_id::text = da.driver_id::text
+        LEFT JOIN vehicles v2   ON v2.id::text  = asgn.vehicle_id::text
+        LEFT JOIN drivers  drv2 ON drv2.id::text = da.driver_id::text
+        ORDER BY da.invoice_id, da.created_at DESC
+      )
       SELECT DISTINCT
-        COALESCE(NULLIF(TRIM(di.invoice), ''), NULLIF(TRIM(di.order_number), ''), di.un_code) AS "DOCUMENT_ID",
-        dl.vehicle_plate                                                                        AS "TRUCK_ID_ORIGIN",
-        dl.external_doc_id                                                                      AS "LOAD_ID",
-        COALESCE(v.plate,  v2.plate)                                                            AS "TRUCK_ID_DESTIN",
-        COALESCE(drv.document_number, drv2.document_number)                                     AS "DRIVER_ID_DESTIN"
-
-      FROM document_items di
-      JOIN documents_l dl ON di.document_id = dl.id
-
-      -- Ruta asignada (vía route_invoices)
-      LEFT JOIN route_invoices ri
-        ON ri.invoice_id::text = COALESCE(NULLIF(TRIM(di.invoice),''), NULLIF(TRIM(di.order_number),''))
-      LEFT JOIN routes r  ON r.id::text = ri.route_id::text
-      LEFT JOIN vehicles v   ON v.id::text  = r.vehicle_id::text
-      LEFT JOIN drivers  drv ON drv.id::text = r.driver_id::text
-
-      -- Despacho directo (vía dispatch_assignments → assignments → vehicle)
-      LEFT JOIN dispatch_assignments da
-        ON da.invoice_id::text = COALESCE(NULLIF(TRIM(di.invoice),''), NULLIF(TRIM(di.order_number),''))
-      LEFT JOIN assignments asgn ON asgn.driver_id::text = da.driver_id::text AND asgn.is_active = true
-      LEFT JOIN vehicles  v2    ON v2.id::text  = asgn.vehicle_id::text
-      LEFT JOIN drivers   drv2  ON drv2.id::text = da.driver_id::text
-
-      WHERE
-        ($1::text = ''
-          OR dl.external_doc_id ILIKE '%' || $1 || '%'
-          OR di.invoice         ILIKE '%' || $1 || '%'
-          OR di.order_number    ILIKE '%' || $1 || '%')
-        AND
-        ($2::text = ''
-          OR dl.vehicle_plate ILIKE '%' || $2 || '%')
-
-      ORDER BY dl.external_doc_id, "DOCUMENT_ID"
+        b.inv_key      AS "DOCUMENT_ID",
+        b.truck_origin AS "TRUCK_ID_ORIGIN",
+        b.load_id      AS "LOAD_ID",
+        NULLIF(COALESCE(NULLIF(rt.truck_plate,''), NULLIF(dt.truck_plate,'')), '') AS "TRUCK_ID_DESTIN",
+        NULLIF(COALESCE(NULLIF(rt.driver_doc,''),  NULLIF(dt.driver_doc,'')), '')  AS "DRIVER_ID_DESTIN"
+      FROM base b
+      LEFT JOIN route_truck    rt ON rt.invoice_id = b.inv_key
+      LEFT JOIN dispatch_truck dt ON dt.invoice_id = b.inv_key
+      ORDER BY b.load_id, b.inv_key
       LIMIT 5000
     `, [docParam, plateParam]);
 
