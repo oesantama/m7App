@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { api } from '../services/api';
 import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem } from '../types';
 import BlindCount from './BlindCount';
-import { hasPermission } from '../utils/permissions';
 import * as XLSX from 'xlsx';
 
 interface RecibidoManualProps {
@@ -20,7 +19,7 @@ interface RecibidoManualProps {
 }
 
 const RecibidoManual: React.FC<RecibidoManualProps> = ({
-  documents, user, masterEstados, masterNotificaciones,
+  documents, user, masterNotificaciones,
   masterTipoNotificacion,
   masterArticulo,
   clients,
@@ -58,32 +57,12 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
       });
 
       if (res.success) {
-        const newDoc: DocumentL = {
-          ...res.document,
-          items: [] // Inicia vacío para manual
-        };
-        api.bulkCreateDocuments({ documents: [newDoc] })
-      .then(res => {
-        if (res.success) {
-          toast.success("Inventario manual iniciado.");
-          onUpdateDocuments([...documents, newDoc]);
-          setSelectedDocForCount(newDoc);
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        const errorMsg = err.response?.data?.error || "Error al iniciar auditoría manual";
-        const details = err.response?.data?.details || "";
-        
-        if (err.response?.status === 409) {
-            toast.error(errorMsg, {
-                description: details,
-                duration: 5000
-            });
-        } else {
-            toast.error(errorMsg);
-        }
-      });
+        // createManualDocument ya creó el documento en BD — no llamar bulkCreateDocuments aquí
+        // (causaría 409 duplicado al intentar insertar el mismo ID de documento)
+        const newDoc: DocumentL = { ...res.document, items: [] };
+        toast.success("Inventario manual iniciado.");
+        onUpdateDocuments([...documents, newDoc]);
+        setSelectedDocForCount(newDoc);
       } else {
         toast.error(res.error || "Error al crear documento");
       }
@@ -94,58 +73,51 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
     }
   };
 
-  const handlePartialSave = (currentItems: DocumentLItem[], generalObs: string) => {
+  const handlePartialSave = async (currentItems: DocumentLItem[], generalObs: string) => {
     if (!selectedDocForCount) return;
-
-    api.syncInventory({
-      docId: selectedDocForCount.id,
-      items: currentItems,
-      user: user.name,
-      notes: generalObs,
-      isPartial: true
-    }).then(res => {
+    try {
+      const res = await api.syncInventory({
+        docId: selectedDocForCount.id,
+        items: currentItems,
+        user: user.name,
+        notes: generalObs,
+        isPartial: true
+      });
       if (res.success) {
-        const updatedDocs = documents.map(d =>
+        onUpdateDocuments(documents.map(d =>
           d.id === selectedDocForCount.id ? { ...d, items: currentItems, updatedAt: new Date().toISOString() } : d
-        );
-        onUpdateDocuments(updatedDocs);
+        ));
       }
-    });
+    } catch (e: any) {
+      if (import.meta.env.DEV) console.error('[M7-PARTIAL-SAVE]', e.message);
+    }
   };
 
-  const handleFinishCount = (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => {
+  const handleFinishCount = async (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => {
     if (!selectedDocForCount) return;
-
-    api.syncInventory({
-      docId: selectedDocForCount.id,
-      items: finalItems,
-      user: user.name,
-      notes: generalObs,
-      isPartial: false,
-      driverEmail: updateEmail
-    }).then(res => {
+    try {
+      const res = await api.syncInventory({
+        docId: selectedDocForCount.id,
+        items: finalItems,
+        user: user.name,
+        notes: generalObs,
+        isPartial: false,
+        driverEmail: updateEmail
+      });
       if (res.success) {
         toast.success("Recibo manual finalizado.");
-        const updatedDocs = documents.map(d =>
+        onUpdateDocuments(documents.map(d =>
           d.id === selectedDocForCount.id
-            ? {
-              ...d,
-              items: finalItems,
-              status: DocStatus.INVENTORED,
-              inventoryDate: new Date().toISOString(),
-              inventoryUser: user.name,
-              inventoryNotes: generalObs,
-              updatedBy: user.name,
-              updatedAt: new Date().toISOString()
-            }
+            ? { ...d, items: finalItems, status: DocStatus.INVENTORED, inventoryDate: new Date().toISOString(), inventoryUser: user.name, inventoryNotes: generalObs, updatedBy: user.name, updatedAt: new Date().toISOString() }
             : d
-        );
-        onUpdateDocuments(updatedDocs);
+        ));
         setSelectedDocForCount(null);
       } else {
         toast.error("Error al sincronizar: " + (res.error || "Desconocido"));
       }
-    });
+    } catch (e: any) {
+      toast.error("Error de conexion: " + e.message);
+    }
   };
 
   const handleManualExcelUpload = (e: React.ChangeEvent<HTMLInputElement>, doc: DocumentL, forcedType?: 'Plan Normal' | 'Plan R') => {

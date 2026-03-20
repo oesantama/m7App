@@ -6,6 +6,36 @@ import { Icons, INITIAL_CLIENTS } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { useAppStore } from '../stores/useAppStore';
+import {
+  OPTIMIZATION_CONSTANTS,
+  estimateStopArrival,
+  estimateRouteReturn,
+  parseDetectedTimeToMinutes,
+  rebalanceSingleRoute
+} from '../utils/routeUtils';
+import {
+  ORBIT_HUB_ORIGIN,
+  RESTRICTED_NEIGHBORHOODS,
+  LARGE_VEHICLE_THRESHOLD_M3,
+  RETAIL_CHAIN_KEYWORDS,
+  RETAIL_CHAIN_MIN_VOLUME_M3
+} from '../config/routeConfig';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+// ── Helpers de visualización ──────────────────────────────────────────────────
+const CITY_PALETTE = ['#6366f1','#8b5cf6','#06b6d4','#14b8a6','#f43f5e','#f97316','#22c55e','#3b82f6','#ec4899','#84cc16'];
+const getCityDotColor = (city: string): string => {
+  let h = 0;
+  for (let i = 0; i < city.length; i++) h = city.charCodeAt(i) + ((h << 5) - h);
+  return CITY_PALETTE[Math.abs(h) % CITY_PALETTE.length];
+};
+const getTimeWindowUrgency = (mins: number | null): 'critical' | 'warning' | 'ok' => {
+  if (!mins) return 'ok';
+  if (mins < 600) return 'critical';  // antes de las 10 AM
+  if (mins < 780) return 'warning';   // 10 AM – 1 PM
+  return 'ok';
+};
 
 interface RoutePlannerProps {
   invoices: Invoice[];
@@ -21,13 +51,6 @@ interface RoutePlannerProps {
   onRefresh?: () => void;
 }
 
-const ORBIT_HUB_ORIGIN = {
-  lat: 6.110595,
-  lng: -75.641505,
-  address: "CR 48C N°100 Sur - 72 Bodega 4 y 10, La Tablaza"
-};
-
-const RESTRICTED_NEIGHBORHOODS = ['COMUNA 13', 'SAN JAVIER', 'SANTO DOMINGO', 'POPULAR', 'SANTA CRUZ', 'MANRIQUE', 'ARANJUEZ'];
 
 const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
   return Math.sqrt(Math.pow(Number(lat1 || 0) - Number(lat2 || 0), 2) + Math.pow(Number(lng1 || 0) - Number(lng2 || 0), 2));
@@ -106,6 +129,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   }>({ isOpen: false, type: 'warning', message: '' });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ isOpen: boolean; id: string } | null>(null);
+  const [routeMapModal, setRouteMapModal] = useState<{ isOpen: boolean; route: SuggestedRoute | null }>({ isOpen: false, route: null });
+  const routePreviewMapRef = useRef<L.Map | null>(null);
 
   const handleDeleteDocument = async (id: string) => {
     setShowDeleteConfirm({ isOpen: true, id });
@@ -127,6 +152,62 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       toast.error('Error de conexión');
     }
   };
+
+  // Mapa de vista previa de ruta
+  useEffect(() => {
+    if (!routeMapModal.isOpen || !routeMapModal.route) {
+      if (routePreviewMapRef.current) {
+        routePreviewMapRef.current.remove();
+        routePreviewMapRef.current = null;
+      }
+      return;
+    }
+    const timer = setTimeout(() => {
+      const container = document.getElementById('route-preview-map');
+      if (!container) return;
+      if (routePreviewMapRef.current) {
+        routePreviewMapRef.current.remove();
+        routePreviewMapRef.current = null;
+      }
+      const route = routeMapModal.route!;
+      const stops = route.assignedInvoices.filter(inv => Number(inv.lat) && Number(inv.lng));
+      const centerLat = stops.length > 0 ? stops.reduce((a, inv) => a + Number(inv.lat), 0) / stops.length : ORBIT_HUB_ORIGIN.lat;
+      const centerLng = stops.length > 0 ? stops.reduce((a, inv) => a + Number(inv.lng), 0) / stops.length : ORBIT_HUB_ORIGIN.lng;
+
+      const map = L.map(container, { zoomControl: true }).setView([centerLat, centerLng], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+
+      // Hub marker
+      const hubIcon = L.divIcon({
+        html: `<div style="background:#0f172a;color:#10b981;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;border:2px solid #10b981;box-shadow:0 2px 8px rgba(0,0,0,0.5)">HUB</div>`,
+        className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+      });
+      L.marker([ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng], { icon: hubIcon })
+        .bindPopup('<b>HUB ORBIT</b><br>Punto de despacho').addTo(map);
+
+      const points: L.LatLng[] = [L.latLng(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng)];
+      const dotColor = getCityDotColor(route.city);
+
+      stops.forEach((inv, i) => {
+        const lat = Number(inv.lat), lng = Number(inv.lng);
+        points.push(L.latLng(lat, lng));
+        const stopIcon = L.divIcon({
+          html: `<div style="background:${dotColor};color:white;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,0.35)">${i + 1}</div>`,
+          className: '', iconSize: [26, 26], iconAnchor: [13, 13]
+        });
+        L.marker([lat, lng], { icon: stopIcon })
+          .bindPopup(`<b>${i + 1}. ${inv.invoiceNumber}</b><br>${inv.customerName}<br><small>${inv.address} · ${inv.city}</small>`)
+          .addTo(map);
+      });
+
+      if (points.length > 1) {
+        L.polyline(points, { color: dotColor, weight: 2.5, opacity: 0.8, dashArray: '8,5' }).addTo(map);
+        map.fitBounds(L.latLngBounds(points), { padding: [24, 24] });
+      }
+      routePreviewMapRef.current = map;
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [routeMapModal.isOpen, routeMapModal.route]);
 
   // FILTRADO DE FACTURAS APTAS: Real (basado en lo que viene del API de facturas)
   const validInvoices = useMemo(() => {
@@ -185,13 +266,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       return active && clientMatch;
     });
 
-    console.log('[DEBUG-RP] Cliente Seleccionado:', selectedClient);
-    console.log('[DEBUG-RP] Vínculos Activos filtrados:', activeLinks.length);
-    console.log('[DEBUG-RP] Total Vehículos en Store:', vehicles.length);
-
     const fleet = activeLinks.map(link => {
       const v = vehicles.find(veh => veh.id === link.vehicleId);
-      if (!v) console.log('[DEBUG-RP] Vehículo NO encontrado en store para ID:', link.vehicleId);
       const d = drivers.find(drv => drv.id === link.driverId);
 
       if (!v || !d) return null;
@@ -199,10 +275,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // Validar estado 'Disponible'
       const vStatus = String(v.status || '').toUpperCase();
       const isAvailable = vStatus === 'DISPONIBLE' || String(v.statusId).toUpperCase() === 'EST-01';
-      if (!isAvailable) {
-        console.log(`[DEBUG-RP] Vehículo ${v.plate} descartado por estado:`, vStatus, v.statusId);
-        return null;
-      }
+      if (!isAvailable) return null;
 
       // Validar si está en despacho o ruta activa
       // Normalización robusta para comparación de IDs
@@ -240,7 +313,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // console.log(`[ORBIT-INTELLIGENCE] Cargados ${data.length} patrones de aprendizaje regenerativo.`);
         setLearningPatterns(data);
       }
-    }).catch(err => console.error("Error cargando patrones IA:", err));
+    }).catch(err => { if (import.meta.env.DEV) console.error('[M7-IA-PATTERNS]', err); });
   }, [onRefresh]);
 
 
@@ -340,12 +413,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         .filter(inv => inv && typeof inv === 'object') // Guardia extra
         .map(inv => ({ ...inv }));
 
-      const retailChainKeywords = ['JUMBO', 'EXITO', 'TOROS', 'MAKRO', 'ALKOSTO'];
-
       // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA ---
       const retailGroups: { [key: string]: Invoice[] } = {};
-      retailChainKeywords.forEach(chain => {
-        const matches = availableInvoices.filter(inv => 
+      RETAIL_CHAIN_KEYWORDS.forEach(chain => {
+        const matches = availableInvoices.filter(inv =>
           (String(inv.customerName || '')).toUpperCase().includes(chain)
         );
         if (matches.length > 0) retailGroups[chain] = matches;
@@ -353,8 +424,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       Object.entries(retailGroups).forEach(([chain, chainInvoices]) => {
         const totalChainVol = chainInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
-        
-        if (totalChainVol >= 8 && availableVehicles.length > 0) {
+
+        if (totalChainVol >= RETAIL_CHAIN_MIN_VOLUME_M3 && availableVehicles.length > 0) {
            const bestVeh = [...availableVehicles]
              .filter(v => !usedVehicleIds.has(v.id))
              .sort((a,b) => Math.abs(Number(a.capacityM3) - totalChainVol) - Math.abs(Number(b.capacityM3) - totalChainVol))[0];
@@ -388,7 +459,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const timeMatch = notes.match(timeRegex);
         // @ts-ignore
         inv.detectedTime = timeMatch ? timeMatch[0].trim() : null;
-
+        // @ts-ignore
+        inv.timeWindowMinutes = (inv as any).detectedTime
+          ? parseDetectedTimeToMinutes((inv as any).detectedTime)
+          : null;
         // @ts-ignore
         inv.isPriority = priorityKeywords.some(kw => notes.includes(kw)) || !!timeMatch;
         // @ts-ignore
@@ -407,6 +481,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       availableInvoices.sort((a, b) => {
         // @ts-ignore
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
+        // Ventana horaria: entregas con hora límite más temprana primero
+        // @ts-ignore
+        const aTime = (a as any).timeWindowMinutes ?? Infinity;
+        // @ts-ignore
+        const bTime = (b as any).timeWindowMinutes ?? Infinity;
+        if (aTime !== bTime) return aTime - bTime;
         // @ts-ignore
         if (a.cityKey !== b.cityKey) return (a.cityKey || '').localeCompare(b.cityKey || '');
         // @ts-ignore
@@ -428,10 +508,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         let currentLoadVolume = 0;
 
         const vCap = Number(vehicle.capacityM3) || 0;
-        const nominalCapacity = vCap > 0 ? vCap : 30;
-        const targetMaxCapacity = nominalCapacity * 0.90;
-        const absoluteMaxCapacity = targetMaxCapacity;
-        const isLargeVehicle = nominalCapacity > 15;
+        const nominalCapacity = vCap > 0 ? vCap : OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+        const targetMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION;
+        const absoluteMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION;
+        const isLargeVehicle = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
 
         const affinity = learningPatterns.find(p => p.vehicle_id === vehicle.id);
         const targetCity = affinity ? affinity.city : null;
@@ -554,11 +634,24 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       route.assignedInvoices.push(data.invoice);
     }
 
-    // Recalculate using fallback capacity same as optimization loop to prevent NaN
-    const realCapacity = Number(route.vehicle.capacityM3) > 0 ? Number(route.vehicle.capacityM3) : 30;
+    // Recalculate using fallback capacity
+    const realCapacity = Number(route.vehicle.capacityM3) > 0 ? Number(route.vehicle.capacityM3) : OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
     const newVol = route.assignedInvoices.reduce((acc, curr) => acc + (Number(curr.volumeM3) || 0), 0);
     route.totalVolume = Number(Number(newVol).toFixed(2));
     route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
+
+    // Rebalanceo incremental: si se removió una factura, intentar rellenar desde no asignadas
+    if (action === 'REMOVE') {
+      const assignedIds = new Set(newSuggestions.flatMap(r => r.assignedInvoices.map(i => i.id)));
+      const currentUnassigned = validInvoices.filter(inv =>
+        !assignedIds.has(inv.id) && !learningExemptions.includes(inv.id) && inv.id !== data.invoice.id
+      );
+      const { updatedRoute, addedInvoiceIds } = rebalanceSingleRoute(route, currentUnassigned);
+      if (addedInvoiceIds.size > 0) {
+        newSuggestions[data.routeIndex] = updatedRoute;
+        toast.info(`Rebalanceo: ${addedInvoiceIds.size} factura(s) agregada(s) automáticamente`);
+      }
+    }
 
     // Registrar Auditoría en el Servidor
     api.logRouteMovement({
@@ -572,9 +665,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         comment: auditComment,
         volume: data.invoice.volumeM3,
         city: data.invoice.city || 'SIN_CIUDAD',
-        neighborhood: data.invoice.neighborhood || 'SIN_BARRIO' // REGLA M7 IQ: Enviamos barrio para aprendizaje granular
+        neighborhood: (data.invoice as any).neighborhood || 'SIN_BARRIO'
       }
-    }).catch(err => console.error("Error logging movement:", err));
+    }).catch(() => { /* movement log failed — non-critical */ });
 
     setAuditLogs(prev => [{
       id: `LOG-${Date.now()}`,
@@ -590,12 +683,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       statusId: 'EST-01'
     }, ...prev]);
 
-    // REGLA M7 IQ: Advertencia de acceso si el vehículo es grande y el barrio es restringido
+    // Advertencia si vehículo grande entra a barrio restringido
     const nominalCapacity = Number(route.vehicle.capacityM3) || 0;
-    const isLarge = nominalCapacity > 15;
-    const neighborhood = (data.invoice.neighborhood || '').toUpperCase().trim();
+    const isLarge = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
+    const neighborhood = ((data.invoice as any).neighborhood || '').toUpperCase().trim();
     if (isLarge && RESTRICTED_NEIGHBORHOODS.includes(neighborhood)) {
-        toast.warning(`Atención: El barrio ${neighborhood} tiene restricciones para vehículos grandes (${nominalCapacity}m³). Proceda con precaución.`, { duration: 5000 });
+      toast.warning(`Atención: ${neighborhood} tiene restricciones para vehículos grandes (${nominalCapacity}m³).`, { duration: 5000 });
     }
 
     setSuggestedRoutes(newSuggestions);
@@ -633,14 +726,14 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const utilization = (loadVolume / newCapacity) * 100;
 
     // REGLA DE CAPACIDAD M7
-    if (utilization > 95) {
+    if (utilization > OPTIMIZATION_CONSTANTS.CRITICAL_THRESHOLD * 100) {
       setCapacityAlert({
         isOpen: true,
         type: 'error',
-        message: `BLOQUEO: La carga actual (${(Number(loadVolume) || 0).toFixed(2)}m³) excede el límite crítico del 95% para este vehículo (${newCapacity}m³). ¿Deseas ajustar automáticamente la carga al 90%?`,
-        confirmLabel: 'Ajustar al 90% y Asignar',
+        message: `BLOQUEO: La carga actual (${(Number(loadVolume) || 0).toFixed(2)}m³) excede el límite crítico del ${OPTIMIZATION_CONSTANTS.CRITICAL_THRESHOLD * 100}% para este vehículo (${newCapacity}m³). ¿Deseas ajustar automáticamente la carga al ${OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION * 100}%?`,
+        confirmLabel: `Ajustar al ${OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION * 100}% y Asignar`,
         onConfirm: () => {
-          const targetVolume = newCapacity * 0.90;
+          const targetVolume = newCapacity * OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION;
           let currentVol = loadVolume;
           const removedInvoices: Invoice[] = [];
           while (currentVol > targetVolume && route.assignedInvoices.length > 0) {
@@ -661,11 +754,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       return;
     }
 
-    if (utilization > 90) {
+    if (utilization > OPTIMIZATION_CONSTANTS.WARN_THRESHOLD * 100) {
       setCapacityAlert({
         isOpen: true,
         type: 'warning',
-        message: `ALERTA: La carga excede el 90% de capacidad (${utilization.toFixed(1)}%). ¿Deseas proceder con el cambio o ajustar la carga al 90%?`,
+        message: `ALERTA: La carga excede el ${OPTIMIZATION_CONSTANTS.WARN_THRESHOLD * 100}% de capacidad (${utilization.toFixed(1)}%). ¿Deseas proceder con el cambio?`,
         confirmLabel: 'Proceder con Cambio',
         onConfirm: () => {
           route.vehicle = newVehicle;
@@ -712,6 +805,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       if (res.success) {
         toast.success("Despacho Orbit Confirmado Exitosamente");
+
+        // M7 IQ: aprender de la ruta confirmada (señal más fuerte que adición manual)
+        const stops = route.assignedInvoices.map(inv => ({
+          city: String(inv.city || 'SIN_CIUDAD').toUpperCase().trim(),
+          neighborhood: String((inv as any).neighborhoodKey || '').toUpperCase().trim()
+        }));
+        api.learnFromCompletedRoute({ vehicleId: route.vehicle.id, stops })
+          .catch(() => { /* route learning failed — non-critical */ });
+
         setSuggestedRoutes(prev => prev.filter(r => r.id !== route.id));
         if (onRefresh) onRefresh();
       } else {
@@ -727,7 +829,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   // 1. Efecto para Instancia del Mapa (Crear/Destruir)
   useEffect(() => {
     if (viewMode === 'map' && !mapRef.current) {
-      console.log('[ORBIT-MAP] Inicializando instancia Leaflet Premium...');
       const container = document.getElementById('orbit-routing-map');
       if (container) {
         mapRef.current = L.map('orbit-routing-map', {
@@ -747,7 +848,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
     return () => {
       if (mapRef.current) {
-        console.log('[ORBIT-MAP] Destruyendo instancia Leaflet...');
         mapRef.current.remove();
         mapRef.current = null;
       }
@@ -759,7 +859,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const map = mapRef.current;
     if (!map || (viewMode !== 'map' && viewMode !== 'active')) return;
 
-    console.log('[ORBIT-MAP] Actualizando capas de datos...');
 
     // Invalidar tamaño con retardo para asegurar que el contenedor está listo
     setTimeout(() => { map.invalidateSize(); }, 400);
@@ -940,16 +1039,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         if (res.success) {
           successCount++;
         } else {
-          console.error(`Error en ruta ${route.vehicle.plate}:`, res.error);
           failCount++;
         }
-        
-        // Pequeño delay opcional para no saturar si hay muchos
+
         if (routesToProcess.length > 5) {
           await new Promise(resolve => setTimeout(resolve, 50));
         }
-      } catch (e) {
-        console.error(`Error fatal en ruta ${route.vehicle.plate}:`, e);
+      } catch {
         failCount++;
       }
     }
@@ -969,15 +1065,205 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     setDispatchConfirmation({ isOpen: false, route: null, isMass: false });
   };
 
-  const handleExportPlanilla = (route: SuggestedRoute) => {
+  const handleExportPlanilla = async (route: SuggestedRoute) => {
     const despachador = user.name || 'SISTEMA ORBIT';
-    const driverName = (route.vehicle as any).driverName || (route.vehicle as any).driver_name || (route as any).driver_name || 'Óscar Santamaría';
+    const driverName = (route.vehicle as any).driverName || (route.vehicle as any).driver_name || 'Conductor';
+    const currentClient = (clients || []).find(c => String(c.id) === String(selectedClient));
+    const dateStr = new Date().toLocaleDateString('es-CO');
+    const fileName = `PLANILLA-${route.vehicle.plate}-${dateStr.replace(/\//g, '')}.pdf`;
 
-    // 0. Logo del Cliente Dinámico (Soporte multi-campo & Base64 robusto)
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const PW = pdf.internal.pageSize.getWidth();
+    const PH = pdf.internal.pageSize.getHeight();
+    const ML = 10, MR = 10, CW = PW - ML - MR;
+    let y = ML;
+
+    // ── HEADER BAR ──────────────────────────────────────────────────────────
+    pdf.setFillColor(15, 23, 42);
+    pdf.roundedRect(ML, y, CW, 22, 2, 2, 'F');
+    pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.text((currentClient?.name || 'OPERACION LOGISTICA').toUpperCase().substring(0, 32), ML + 4, y + 9);
+    pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(16, 185, 129);
+    pdf.text('ORBITM7 LOGISTICS INTELLIGENCE', ML + 4, y + 15);
+
+    const infoItems: [string, string][] = [
+      ['DOC L', route.assignedInvoices[0]?.docLId || 'S/N'],
+      ['FECHA', dateStr],
+      ['VEHICULO', route.vehicle.plate],
+      ['CONDUCTOR', driverName.substring(0, 18)],
+      ['FACTURAS', String(route.assignedInvoices.length)],
+      ['DESPACHADOR', despachador.substring(0, 16)],
+    ];
+    const gridX = ML + CW * 0.42;
+    const itemW = (CW - CW * 0.42 - 2) / 3;
+    infoItems.forEach(([label, val], i) => {
+      const col = i % 3, row = Math.floor(i / 3);
+      const ix = gridX + col * itemW, iy = y + 4 + row * 9;
+      pdf.setFontSize(5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139);
+      pdf.text(label, ix, iy);
+      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.text(val, ix, iy + 5);
+    });
+    y += 26;
+
+    // ── PAYMENT SECTION ──────────────────────────────────────────────────────
+    const bankW = Math.floor(CW * 0.62);
+    const totW = CW - bankW - 3;
+    const totX = ML + bankW + 3;
+
+    autoTable(pdf, {
+      startY: y, margin: { left: ML }, tableWidth: bankW,
+      head: [['BANCO', 'VALOR', 'COMPROBANTE', 'FECHA']],
+      body: [['','','',''],['','','',''],['','','','']],
+      styles: { fontSize: 6, cellPadding: 2, minCellHeight: 6.5 },
+      headStyles: { fillColor: [241,245,249], textColor: [15,23,42], fontStyle: 'bold', fontSize: 6 },
+      theme: 'grid',
+    });
+    const bankEndY = (pdf as any).lastAutoTable.finalY;
+
+    const fmtCOP = (v: number) => `$ ${v.toLocaleString('es-CO')}`;
+    const cashTotal = route.assignedInvoices.reduce((acc, inv) => {
+      const m = String((inv as any).paymentMethod || inv.items?.[0]?.paymentMethod || 'EF').toUpperCase();
+      return (m === 'EF' || m === 'CONTADO' || m === 'EFECTIVO') ? acc + (Number(inv.invoiceValue) || 0) : acc;
+    }, 0);
+    const creditTotal = route.assignedInvoices.reduce((acc, inv) => {
+      const m = String((inv as any).paymentMethod || inv.items?.[0]?.paymentMethod || '').toUpperCase();
+      return (m.includes('30D') || m.includes('60D') || m.includes('CREDIT') || m === 'CR') ? acc + (Number(inv.invoiceValue) || 0) : acc;
+    }, 0);
+    const totRows: [string, string][] = [
+      ['EFECTIVO (EF)', fmtCOP(cashTotal)],
+      ['CREDITO (30/60D)', fmtCOP(creditTotal)],
+      ['DIFERENCIA', '$ 0'],
+      ['TOTAL RECAUDO', fmtCOP(cashTotal + creditTotal)],
+    ];
+    let totY = y;
+    totRows.forEach(([label, val], i) => {
+      const isLast = i === totRows.length - 1;
+      pdf.setFillColor(...(isLast ? [15,23,42] : [241,245,249]) as [number,number,number]);
+      pdf.rect(totX, totY, totW, 6.5, 'F');
+      pdf.setDrawColor(203, 213, 225); pdf.rect(totX, totY, totW, 6.5);
+      pdf.setFontSize(5.5); pdf.setFont('helvetica', isLast ? 'bold' : 'normal');
+      pdf.setTextColor(...(isLast ? [255,255,255] : [15,23,42]) as [number,number,number]);
+      pdf.text(label, totX + 1.5, totY + 4.5);
+      pdf.text(val, totX + totW - 1.5, totY + 4.5, { align: 'right' });
+      totY += 6.5;
+    });
+    y = Math.max(bankEndY, totY) + 3;
+
+    pdf.setFillColor(15, 23, 42); pdf.rect(ML, y, CW, 6, 'F');
+    pdf.setFontSize(6); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(16, 185, 129);
+    pdf.text('CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)', PW / 2, y + 4, { align: 'center' });
+    y += 8;
+
+    // ── INVOICES TABLE ────────────────────────────────────────────────────────
+    autoTable(pdf, {
+      startY: y, margin: { left: ML, right: MR },
+      head: [['#', 'U.NEG', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
+      body: route.assignedInvoices.map((inv, idx) => {
+        const fi = (inv.items?.[0] || {}) as any;
+        const method = String((inv as any).paymentMethod || fi.paymentMethod || '-').toUpperCase();
+        return [
+          String(idx + 1),
+          String(inv.unCode || fi.unCode || fi.un_code || '-'),
+          inv.invoiceNumber,
+          String(inv.orderNumber || inv.docLId || '-'),
+          String(inv.totalItems || '-'),
+          String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
+          fmtCOP(inv.invoiceValue || 0),
+          method,
+          `${inv.customerName}\n${inv.address} - ${inv.city}`,
+        ];
+      }),
+      styles: { fontSize: 6, cellPadding: 2 },
+      headStyles: { fillColor: [241,245,249], textColor: [15,23,42], fontStyle: 'bold', fontSize: 6.5 },
+      columnStyles: {
+        0: { cellWidth: 7, halign: 'center' },
+        1: { cellWidth: 10, halign: 'center' },
+        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
+        3: { cellWidth: 20, halign: 'center' },
+        4: { cellWidth: 8, halign: 'center' },
+        5: { cellWidth: 14, halign: 'center' },
+        6: { cellWidth: 22, halign: 'right' },
+        7: { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
+      },
+      theme: 'grid',
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.row.index % 2 !== 0)
+          data.cell.styles.fillColor = [248, 250, 252];
+      },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 5;
+
+    // ── CARGO CONSOLIDATION ───────────────────────────────────────────────────
+    const cargoMap = new Map<string, { id: string; name: string; total: number }>();
+    route.assignedInvoices.forEach(inv => {
+      inv.items?.forEach((it: any) => {
+        const id = String(it.sku || it.articleId || it.id || 'N/A');
+        const name = String(it.articleName || it.name || id);
+        if (!cargoMap.has(id)) cargoMap.set(id, { id, name, total: 0 });
+        cargoMap.get(id)!.total += Number(it.qty || it.expectedQty || it.quantity || 0);
+      });
+    });
+    const cargoItems = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+    if (cargoItems.length > 0) {
+      if (y > PH - 65) { pdf.addPage(); y = ML; }
+      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
+      pdf.text('CONSOLIDADO DE MERCANCIA (RESUMEN DE CARGA)', ML, y);
+      y += 4;
+      const cargoRows: string[][] = [];
+      for (let i = 0; i < cargoItems.length; i += 2) {
+        const a = cargoItems[i], b = cargoItems[i + 1];
+        cargoRows.push([a.id, a.name.substring(0,32), String(a.total), b?b.id:'', b?b.name.substring(0,32):'', b?String(b.total):'']);
+      }
+      autoTable(pdf, {
+        startY: y, margin: { left: ML, right: MR },
+        head: [['ID','DESCRIPCION','CANT','ID','DESCRIPCION','CANT']],
+        body: cargoRows,
+        styles: { fontSize: 6, cellPadding: 2 },
+        headStyles: { fillColor: [241,245,249], textColor: [15,23,42], fontStyle: 'bold', fontSize: 6 },
+        columnStyles: {
+          0: { cellWidth: 17, halign: 'center' },
+          1: { cellWidth: 55 },
+          2: { cellWidth: 13, halign: 'center', fontStyle: 'bold' },
+          3: { cellWidth: 17, halign: 'center' },
+          4: { cellWidth: 55 },
+          5: { cellWidth: 13, halign: 'center', fontStyle: 'bold' },
+        },
+        theme: 'grid',
+      });
+      y = (pdf as any).lastAutoTable.finalY + 8;
+    }
+
+    // ── SIGNATURES ────────────────────────────────────────────────────────────
+    if (y > PH - 40) { pdf.addPage(); y = ML + 20; }
+    const sigW = (CW - 20) / 2;
+    pdf.setDrawColor(15, 23, 42); pdf.setLineWidth(0.4);
+    pdf.line(ML + 5, y + 18, ML + 5 + sigW, y + 18);
+    pdf.line(ML + 5 + sigW + 20, y + 18, ML + 5 + sigW * 2 + 20, y + 18);
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
+    pdf.text('FIRMA CONDUCTOR', ML + 5 + sigW / 2, y + 22, { align: 'center' });
+    pdf.setFontSize(6); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139);
+    pdf.text(driverName.toUpperCase(), ML + 5 + sigW / 2, y + 27, { align: 'center' });
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
+    pdf.text('DESPACHO / AUDITORIA', ML + 5 + sigW + 20 + sigW / 2, y + 22, { align: 'center' });
+    pdf.setFontSize(6); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139);
+    pdf.text(despachador.toUpperCase(), ML + 5 + sigW + 20 + sigW / 2, y + 27, { align: 'center' });
+
+    pdf.setFontSize(5); pdf.setTextColor(148, 163, 184);
+    pdf.text(`ORBITM7 Intelligence - ${dateStr} - ${route.vehicle.plate} - ${route.assignedInvoices.length} facturas`, PW / 2, PH - 5, { align: 'center' });
+
+    pdf.save(fileName);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _unusedLegacy = (route: SuggestedRoute) => {
+    const despachador = user.name || 'SISTEMA ORBIT';
+    const driverName = (route.vehicle as any).driverName || (route.vehicle as any).driver_name || (route as any).driver_name || 'Oscar Santamaria';
+
+    // 0. Logo del Cliente Dinamico (Soporte multi-campo & Base64 robusto)
     const currentClient = (clients || []).find(c => String(c.id) === String(selectedClient));
     let clientLogo = currentClient?.logo_url || currentClient?.logoUrl || currentClient?.logo || currentClient?.avatar || '';
-    
-    // Si es base64 y le falta el prefijo, lo agregamos
+
     if (clientLogo && !clientLogo.startsWith('http') && !clientLogo.startsWith('data:')) {
         clientLogo = `data:image/png;base64,${clientLogo}`;
     }
@@ -1371,7 +1657,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     <div key={route.id} className="bg-white rounded-[2.5rem] shadow-lg border border-slate-100 overflow-hidden flex flex-col group hover:border-emerald-500 transition-all">
                       <div className="p-4 bg-slate-950 text-white flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${route.utilization >= 90 ? 'bg-emerald-500 text-slate-950' : 'bg-amber-500 text-slate-950'}`}><Icons.Truck className="w-5 h-5" /></div>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${route.utilization > 92 ? 'bg-red-500 text-white' : route.utilization >= 85 ? 'bg-emerald-500 text-slate-950' : 'bg-amber-400 text-slate-950'}`}><Icons.Truck className="w-5 h-5" /></div>
                           <div>
                             <div className="flex items-center gap-2">
                               <p className="font-black text-sm uppercase tracking-tighter leading-none">{route.vehicle.plate}</p>
@@ -1383,25 +1669,35 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                                 <Icons.Check className="w-3 h-3 text-white" />
                               </button>
                             </div>
-                            <p className="text-[8px] text-slate-500 font-black uppercase mt-1 tracking-widest">
+                            <p className="text-[8px] text-slate-400 font-black uppercase mt-1 tracking-widest flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getCityDotColor(route.city) }} />
                               {route.city} • {(route.vehicle as any).driverName || 'S/C'}
                             </p>
+                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-white/10 rounded-full text-[7px] text-slate-300 font-bold">
+                              ↩ ~{estimateRouteReturn(route.assignedInvoices.length)}
+                            </span>
                           </div>
                         </div>
                         <div className="text-right flex items-center gap-3">
                           <div className="text-right">
                             <p className="text-xs font-black text-white">
-                              <span className={(Number(route.totalVolume) || 0) > (Number(route.vehicle.capacityM3) || 30) ? 'text-red-500' : 'text-emerald-400'}>
+                              <span className={(Number(route.totalVolume) || 0) > (Number(route.vehicle.capacityM3) || 30) ? 'text-red-400' : 'text-emerald-400'}>
                                 {(Number(route.totalVolume) || 0).toFixed(2)}
                               </span>
                               <span className="text-slate-500 mx-1">/</span>
                               {(Number(route.vehicle.capacityM3) || 0).toFixed(2)}m³
                             </p>
+                            <div className="mt-1 h-1.5 bg-white/10 rounded-full overflow-hidden w-20 ml-auto">
+                              <div
+                                className={`h-full rounded-full transition-all ${route.utilization > 92 ? 'bg-red-400' : route.utilization >= 85 ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                                style={{ width: `${Math.min(route.utilization, 100)}%` }}
+                              />
+                            </div>
                           </div>
                           <div className="w-[1px] h-6 bg-white/10"></div>
                           <div>
-                            <p className={`text-xl font-black ${route.utilization > 100 ? 'text-red-500' : (route.utilization >= 90 ? 'text-emerald-400' : 'text-amber-400')}`}>{route.utilization}%</p>
-                            <p className="text-[6px] font-black uppercase text-slate-600 tracking-widest">Ocupación</p>
+                            <p className={`text-xl font-black ${route.utilization > 92 ? 'text-red-400' : route.utilization >= 85 ? 'text-emerald-400' : 'text-amber-400'}`}>{route.utilization}%</p>
+                            <p className="text-[6px] font-black uppercase text-slate-600 tracking-widest">Ocupacion</p>
                           </div>
                           <button
                             onClick={() => setAddInvoiceModal({ isOpen: true, routeIndex: rIdx })}
@@ -1416,11 +1712,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       <div className="p-4 flex-1 overflow-y-auto custom-scrollbar space-y-2 max-h-[300px] bg-slate-50/30">
                         {route.assignedInvoices.map((inv, iIdx) => {
                           const isPriority = (inv as any).isPriority;
+                          const estimatedArrival = estimateStopArrival(iIdx);
+                          const hasTimeWindow = !!(inv as any).detectedTime;
                           return (
                             <div key={`${inv.id}-${iIdx}`} className={`p-3 bg-white rounded-xl border ${isPriority ? 'border-amber-400 ring-1 ring-amber-100' : 'border-slate-100'} shadow-sm group/item hover:shadow-md transition-all flex flex-col gap-2`}>
                               <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <div className={`w-6 h-6 ${isPriority ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-400'} rounded-lg flex items-center justify-center font-black text-[9px] shrink-0`}>{iIdx + 1}</div>
+                                  <div className={`w-7 h-7 ${isPriority ? 'bg-amber-500 text-white ring-2 ring-amber-300/50' : 'bg-slate-800 text-white'} rounded-lg flex items-center justify-center font-black text-[9px] shrink-0 shadow-sm`}>{iIdx + 1}</div>
                                   <div className="min-w-0">
                                     <p className="font-black text-[10px] text-slate-900 truncate">
                                       {inv.invoiceNumber}
@@ -1439,6 +1737,20 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                               <div className="flex items-center gap-2 text-[8px] text-slate-600 bg-slate-50 p-2 rounded-lg">
                                 <Icons.MapPin className="w-3 h-3 text-slate-400" />
                                 <span className="truncate flex-1 font-bold">{inv.address} • {inv.city}</span>
+                              </div>
+
+                              <div className="flex items-center gap-2 text-[8px]">
+                                <Icons.Clock className="w-3 h-3 text-slate-400" />
+                                <span className="text-slate-500 font-semibold">Est. llegada:</span>
+                                <span className="font-black text-slate-700">{estimatedArrival}</span>
+                                {hasTimeWindow && (() => {
+                                  const urg = getTimeWindowUrgency((inv as any).timeWindowMinutes);
+                                  return (
+                                    <span className={`ml-1 px-1.5 py-0.5 font-black rounded text-[7px] border ${urg === 'critical' ? 'bg-red-100 text-red-700 border-red-200' : urg === 'warning' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>
+                                      {urg === 'critical' ? '🔴' : urg === 'warning' ? '🟡' : '🟢'} {(inv as any).detectedTime}
+                                    </span>
+                                  );
+                                })()}
                               </div>
 
                               {inv.notes && (
@@ -1491,9 +1803,17 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                           {isSaving ? '...' : 'CONFIRMAR'}
                         </button>
                         <button
+                          onClick={() => setRouteMapModal({ isOpen: true, route })}
+                          className="px-4 bg-indigo-50 text-indigo-500 rounded-lg flex items-center justify-center hover:bg-indigo-500 hover:text-white transition-all shadow-sm font-bold text-[10px] uppercase gap-2"
+                          title="Ver ruta en mapa"
+                        >
+                          <Icons.MapPin className="w-4 h-4" />
+                          MAPA
+                        </button>
+                        <button
                           onClick={() => handleExportPlanilla(route)}
                           className="px-4 bg-slate-50 text-slate-500 rounded-lg flex items-center justify-center hover:bg-slate-100 hover:text-slate-600 transition-all shadow-sm font-bold text-[10px] uppercase gap-2"
-                          title="Exportar Planilla PDF"
+                          title="Exportar Planilla PDF A4"
                         >
                           <Icons.FileText className="w-4 h-4" />
                           PDF
@@ -2175,6 +2495,75 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             </div>
             
             <p className="text-[7px] text-slate-600 font-bold uppercase tracking-widest pt-2">OrbitM7 Data Integrity Protocol</p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Vista Previa de Ruta en Mapa */}
+      {routeMapModal.isOpen && routeMapModal.route && (
+        <div className="fixed inset-0 z-[700] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-950 rounded-t-[2.5rem] shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg" style={{ backgroundColor: getCityDotColor(routeMapModal.route.city) }}>
+                  <Icons.MapPin className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-tighter">
+                    Ruta — {routeMapModal.route.vehicle.plate}
+                  </h3>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getCityDotColor(routeMapModal.route.city) }} />
+                    {routeMapModal.route.city} · {(routeMapModal.route.vehicle as any).driverName || 'S/C'} · {routeMapModal.route.assignedInvoices.length} paradas
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`px-3 py-1.5 rounded-xl text-xs font-black ${routeMapModal.route.utilization > 92 ? 'bg-red-500/20 text-red-300' : routeMapModal.route.utilization >= 85 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                  {routeMapModal.route.utilization}% · {routeMapModal.route.totalVolume}m³
+                </div>
+                <button
+                  onClick={() => setRouteMapModal({ isOpen: false, route: null })}
+                  className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-all"
+                >
+                  <Icons.X className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Map + Stop list side by side */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Leaflet map */}
+              <div id="route-preview-map" className="flex-1 z-0" />
+
+              {/* Stop list */}
+              <div className="w-64 shrink-0 overflow-y-auto custom-scrollbar bg-slate-50 border-l border-slate-100 p-3 space-y-2">
+                {/* Hub */}
+                <div className="flex items-center gap-2 p-2 bg-slate-900 rounded-xl">
+                  <div className="w-7 h-7 bg-emerald-500 text-slate-950 rounded-lg flex items-center justify-center font-black text-[9px] shadow-sm shrink-0">HUB</div>
+                  <div>
+                    <p className="text-[8px] font-black text-emerald-400 uppercase">Punto de Despacho</p>
+                    <p className="text-[7px] text-slate-400 font-bold">ORBIT HUB</p>
+                  </div>
+                </div>
+                {routeMapModal.route.assignedInvoices.map((inv, i) => (
+                  <div key={inv.id} className="flex items-start gap-2 p-2 bg-white rounded-xl border border-slate-100 shadow-sm">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center font-black text-[9px] text-white shrink-0 shadow-sm" style={{ backgroundColor: getCityDotColor(routeMapModal.route!.city) }}>{i + 1}</div>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-black text-slate-900 truncate">{inv.invoiceNumber}</p>
+                      <p className="text-[7px] text-slate-500 font-bold truncate">{inv.customerName}</p>
+                      <p className="text-[7px] text-slate-400 truncate">{inv.address}</p>
+                      {(inv as any).detectedTime && (
+                        <span className="text-[6px] font-black text-amber-600 bg-amber-50 px-1 py-0.5 rounded mt-0.5 inline-block">
+                          {(inv as any).detectedTime}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}

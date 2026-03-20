@@ -72,7 +72,11 @@ export const fetchJson = async (url: string, options?: any) => {
       }
 
       if (!res.ok) {
-        throw new Error(data.error || data || `Error HTTP: ${res.status}`);
+        const msg = typeof data === 'object'
+          ? (data.error || data.message || `Error HTTP: ${res.status}`)
+          : (data || `Error HTTP: ${res.status}`);
+        const detail = typeof data === 'object' && data.details ? ` — ${data.details}` : '';
+        throw new Error(`${msg}${detail}`);
       }
 
       return data;
@@ -339,6 +343,12 @@ export const api = {
     body: JSON.stringify(data)
   }),
   getRoutingPatterns: () => fetchJson(`${API_URL}/routes/patterns`),
+  learnFromCompletedRoute: (data: { vehicleId: string; stops: Array<{ city: string; neighborhood: string }> }) =>
+    fetchJson(`${API_URL}/routes/learn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }),
 
   // GPS Tracking (Nueva API dedicada)
   updateVehicleLocation: (data: any) => fetchJson(`${API_URL}/locations/update`, {

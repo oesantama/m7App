@@ -2,13 +2,13 @@
 import React, { useState, useMemo } from 'react';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
-import { DocumentL, User, DocStatus, MasterRecord, Invoice, DocumentLItem, UserRole } from '../types';
+import { DocumentL, User, DocStatus, MasterRecord, Invoice, UserRole } from '../types';
 import { api } from '../services/api';
 import ConsultasDocumentosL from './ConsultasDocumentosL';
 import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
-import { formatCurrency, formatDate } from '../utils/formatting';
+import { formatCurrency } from '../utils/formatting';
 
 // Extendemos DocumentL localmente para manejar el estado de duplicado en la UI
 interface PreviewDocument extends DocumentL {
@@ -124,7 +124,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   React.useEffect(() => {
     api.getClients().then(data => {
       if (Array.isArray(data)) setAllClients(data);
-    }).catch(console.error);
+    }).catch(() => { /* clients load failed — non-critical */ });
   }, []);
 
   const handleDeleteDocument = (docId: string) => {
@@ -170,7 +170,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           toast.error('Error al actualizar: ' + (res.error || "Desconocido"));
         }
       }).catch(err => {
-        console.error(err);
+        if (import.meta.env.DEV) console.error('[M7-STATUS]', err);
         toast.error('Error de red al actualizar estado');
       }).finally(() => {
         setIsUpdatingStatus(false);
@@ -254,19 +254,21 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
         const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
         
-        // FUNCIÓN DE BÚSQUEDA MEJORADA: PRIORIDAD EXACTA
+        // FUNCIÓN DE BÚSQUEDA MEJORADA: PRIORIDAD EXACTA + normalización de acentos
+        const normStr = (s: string) =>
+          s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const findIdx = (terms: string[]) => {
-           // Paso 1: Búsqueda EXACTA
+           // Paso 1: Búsqueda EXACTA (insensible a acentos)
            const exactIdx = headers.findIndex(h => {
              if (!h) return false;
-             return terms.some(t => h.toLowerCase().trim() === t.toLowerCase().trim());
+             return terms.some(t => normStr(h) === normStr(t));
            });
            if (exactIdx !== -1) return exactIdx;
 
-           // Paso 2: Búsqueda PARCIAL (Solo si falla la exacta)
+           // Paso 2: Búsqueda PARCIAL (insensible a acentos, solo si falla la exacta)
            return headers.findIndex(h => {
              if (!h) return false;
-             return terms.some(t => h.toLowerCase().trim().includes(t.toLowerCase().trim()));
+             return terms.some(t => normStr(h).includes(normStr(t)));
            });
         };
 
@@ -361,13 +363,31 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iPeso = findIdx(['peso', 'weight', 'kgs', 'kilogramos']);
         
         // [NEW] Campos requeridos en detalle con discriminación por Plan (Solicitud Usuario)
-        const iUnCodeDetail = isPlanR 
-          ? findIdx(['un']) 
+        const iUnCodeDetail = isPlanR
+          ? findIdx(['un'])
           : findIdx(['un orig']);
 
-        const iClientRefDetail = isPlanR 
-          ? findIdx(['cliente']) 
+        const iClientRefDetail = isPlanR
+          ? findIdx(['cliente'])
           : findIdx(['envío', 'envio']);
+
+        // Nombre del cliente destinatario (para identificar almacenes de cadena)
+        // Plan R: columna "Nombre" | Plan Normal: columna "Clnt Envío" (con variantes)
+        const iCustomerName = isPlanR
+          ? findIdx(['nombre', 'nombre cliente', 'razon social', 'razon'])
+          : findIdx(['clnt envio', 'clnt env', 'cliente envio', 'nombre envio', 'nombre cliente', 'razon social']);
+
+        if (import.meta.env.DEV) {
+          const dataRowsDebug = rawData.slice(headerRowIndex + 1).filter(r => r && r.length > 0).slice(0, 3);
+          const sampleCustomerNames = dataRowsDebug.map(r => iCustomerName !== -1 ? String(r[iCustomerName] || '') : 'IDX=-1');
+          console.group('[M7-COLUMNAS DETECTADAS]');
+          console.log('Tipo plan:', type, '| isPlanR:', isPlanR);
+          console.log('Headers del Excel:', headers);
+          console.log('customerName idx:', iCustomerName, iCustomerName !== -1 ? `→ col="${headers[iCustomerName]}" | samples: ${JSON.stringify(sampleCustomerNames)}` : '→ NO DETECTADA');
+          console.log('clientRef idx:', iClientRefDetail, iClientRefDetail !== -1 ? `→ "${headers[iClientRefDetail]}"` : '→ NO DETECTADA');
+          console.log('Todos los headers (normalizados):', headers.map((h, i) => `[${i}] "${h}" → "${h.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}"`));
+          console.groupEnd();
+        }
         
         const dataRows = rawData.slice(headerRowIndex + 1);
         const docsMap = new Map<string, { codplan: string, placa: string, carga: string, city: string, address: string, deliveryDate: string | null, items: any[], consolidatedItems: any[] }>();
@@ -398,9 +418,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           const group = docsMap.get(groupKey)!;
           const sku = val(iArticulo);
           if (sku) {
-             const rawVol = val(iVolTotal);
-             
-             // Lógica de Parseo Númerico (M7 FIX)
+             // Lógica de Parseo Numerico (M7 FIX)
              const parseNumberM7 = (raw: string, isPlanR: boolean, columnType: 'qty' | 'vol' | 'weight') => {
                  if (!raw || raw.trim() === '') return 0;
                  let val = raw.trim();
@@ -457,8 +475,9 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               driverNote: val(iObs), // Observación Excel -> Nota Conductor
               orderNumber: val(iPed),
               peso: pesoVal,
-              unCode: val(iUnCodeDetail),      // [NEW]
-              clientRef: val(iClientRefDetail) // [NEW]
+              unCode: val(iUnCodeDetail),
+              clientRef: val(iClientRefDetail),
+              customerName: val(iCustomerName) // nombre destinatario para deteccion de cadenas
             });
 
             // 2. Mapeo para AUDITORÃA (Consolidado Inventario)
@@ -475,7 +494,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         });
 
         // VALIDACIÓN DE DUPLICADOS: Placa y Carga (Case Insensitive)
-        const mapped: PreviewDocument[] = Array.from(docsMap.entries()).map(([key, data]) => {
+        const mapped: PreviewDocument[] = Array.from(docsMap.entries()).map(([, data]) => {
           const existingDoc = documents.find(d => {
             const dCarga = String(d.externalDocId || (d as any).external_doc_id || '').trim().toLowerCase();
             const dPlaca = String(d.vehicleData || (d as any).vehicle_plate || (d as any).plate || '').trim().toLowerCase();
@@ -546,7 +565,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
   const totalPreviewPages = previewPageSize === 'all' ? 1 : Math.ceil(filteredPreviewItems.length / previewPageSize);
 
-  const handleSync = () => {
+  const handleSync = async () => {
     if (!preview) return;
     
     // Restaurada lógica de BLOQUEO de duplicados a petición del usuario
@@ -563,22 +582,26 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     });
 
     if (payloadDocs.length > 0) {
-      // ENVIAR NUEVOS Y ACTUALIZACIONES
-      api.bulkCreateDocuments({ documents: payloadDocs }).then(res => {
+      try {
+        const res = await api.bulkCreateDocuments({ documents: payloadDocs });
         if (res.success) {
-            onDocumentsChange([...payloadDocs, ...documents]); // Optimistic update
-            if (onRefresh) onRefresh(); // Trigger global data refresh
-            toast.success(`Procesados ${payloadDocs.length} documentos (Creación/Actualización).`);
-            setPreview(null);
+          onDocumentsChange([...payloadDocs, ...documents]);
+          if (onRefresh) onRefresh();
+          toast.success(`Procesados ${payloadDocs.length} documentos (Creación/Actualización).`);
+          setPreview(null);
         } else {
-           toast.error(`Error del servidor: ${res.error || 'Desconocido'}`);
+          toast.error(`Error del servidor: ${res.error || 'Desconocido'}`);
         }
-      }).catch((err) => {
-         console.error('[M7-SYNC] Error:', err);
-         toast.error("Error al sincronizar con el servidor. Verifique su conexión.");
-      });
+      } catch (err: any) {
+        if (import.meta.env.DEV) console.error('[M7-SYNC]', err);
+        setSyncError({
+          title: 'Error de Sincronización',
+          message: err.message || 'Error al sincronizar con el servidor. Verifique su conexión.',
+          duplicates: []
+        });
+        return;
+      }
 
-      // Si había duplicados, avisamos pero permitimos el proceso de los nuevos
       if (duplicatedDocs.length > 0) {
         setSyncError({
           title: "Sincronización Parcial",
@@ -587,7 +610,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         });
       }
     } else {
-      // Si todos son duplicados, bloqueamos totalmente y mostramos detalle
       setSyncError({
         title: "Bloqueo de Sincronización",
         message: "No se guardó nada. Todos los documentos del archivo ya existen en el sistema. Revise si está intentando cargar el mismo archivo.",

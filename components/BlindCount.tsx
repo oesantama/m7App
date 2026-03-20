@@ -288,18 +288,10 @@ const BlindCount: React.FC<BlindCountProps> = ({
   };
 
   const enqueueScan = (rawString: string) => {
-      // M7 V17 STITCHING LOGIC: Si el código no tiene ':' y no es un SKU directo, lo acumulamos
-      const cleanInput = cleanSkuM7(rawString);
-      
-      // Si el código contiene ':' procesamos de inmediato (es una ráfaga completa o final de ráfaga)
-      if (rawString.includes(':')) {
-          scanQueue.current.push(rawString);
-      } else {
-          // Si no tiene ':', es un fragmento. Lo guardamos en el input para que handleInputChange lo siga uniendo
-          // pero NO lo enviamos a procesar todavía a menos que pase mucho tiempo.
-          return; 
-      }
-
+      if (!rawString || rawString.trim().length < 2) return;
+      // M7 V18: Encolar siempre — processBarcode se encarga de limpiar y clasificar.
+      // Ya no descartamos códigos sin ':' aquí; eso causaba pérdida silenciosa de lecturas 1D largas.
+      scanQueue.current.push(rawString);
       if (!isQueueProcessing.current) {
           processNextInQueue();
       }
@@ -603,7 +595,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     setScanInput(''); // Limpiar input para el próximo
   };
 
-  // M7 FAST SCANNER: Manejo de entrada Ultra Liviano
+  // M7 V18 FAST SCANNER: Manejo de entrada sin doble-disparo
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase();
     setScanInput(val);
@@ -613,23 +605,33 @@ const BlindCount: React.FC<BlindCountProps> = ({
       processingTimer.current = null;
     }
 
-    // M7 V17: ELIMINADO EL DISPARO INMEDIATO POR ':'
-    // Ahora esperamos a que la ráfaga termine o que el usuario presione Enter
-    // Esto permite que fragmentos de PDF417 se unan en el input antes de procesarse
-    
-    processingTimer.current = setTimeout(() => {
-        // Solo procesamos si hay un ':' (indicador de ráfaga Ajover completa) 
-        // o si han pasado más de 350ms sin nuevos datos (fin de ráfaga por tiempo)
-        if (val.includes(':') || val.length > 20) {
-            enqueueScan(val);
-            setScanInput(''); 
-        }
-    }, 150); // Debounce optimizado para ráfagas 2D/PDF417
+    // PDF417 Ajover: el ':' indica que la ráfaga llegó completa → procesar AHORA, sin esperar Enter.
+    // Esto evita que el Enter del scanner dispare handleScan DESPUÉS del timer (doble-add).
+    if (val.includes(':') && val.length >= 5) {
+      enqueueScan(val);
+      setScanInput('');
+      return;
+    }
+
+    // Fallback para códigos muy largos sin ':' (hardware que no envía Enter en ciertos modelos)
+    if (val.length > 20) {
+      processingTimer.current = setTimeout(() => {
+        processBarcode(val);
+        setScanInput('');
+      }, 200);
+    }
   };
 
   const handleScan = (e: React.FormEvent) => {
     e.preventDefault();
-    processBarcode(scanInput);
+    // CRÍTICO: Cancelar timer pendiente antes de procesar (evita doble-add con PDF417)
+    if (processingTimer.current) {
+      clearTimeout(processingTimer.current);
+      processingTimer.current = null;
+    }
+    const code = scanInput.trim();
+    setScanInput('');
+    if (code.length >= 2) processBarcode(code);
   };
 
   const handleSubtract = (articleId: string) => {

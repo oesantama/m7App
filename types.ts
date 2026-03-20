@@ -176,6 +176,7 @@ export interface DocumentLItem {
   orderNumber?: string;
   unCode?: string;
   clientRef?: string;
+  customerName?: string;
   peso?: number;
   paymentMethod?: string;
   paymentValue?: string;

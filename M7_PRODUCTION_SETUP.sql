@@ -24,6 +24,8 @@ ALTER TABLE document_items ADD COLUMN IF NOT EXISTS city TEXT;
 ALTER TABLE document_items ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE document_items ADD COLUMN IF NOT EXISTS batch TEXT DEFAULT 'S/L';
 ALTER TABLE document_items ADD COLUMN IF NOT EXISTS observation TEXT;
+ALTER TABLE document_items ADD COLUMN IF NOT EXISTS customer_name TEXT;
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS auto_created BOOLEAN DEFAULT FALSE;
 
 -- 4. Re-estructurar Restricciones de Integridad
 DO $$
@@ -36,7 +38,19 @@ END $$;
 -- Permitir duplicados controlados por ID de documento, SKU y Factura/Pedido
 ALTER TABLE document_items ADD CONSTRAINT document_items_pk_composite UNIQUE (document_id, article_id, invoice, order_number);
 
--- 5. Tabla de Pedidos (Grupo Inter)
+-- 5. Tabla de Novedades de Inventario
+CREATE TABLE IF NOT EXISTS inventory_news (
+    id SERIAL PRIMARY KEY,
+    document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE,
+    article_id TEXT,
+    quantity NUMERIC DEFAULT 0,
+    observation TEXT,
+    photo_urls TEXT[],
+    user_name TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. Tabla de Pedidos (Grupo Inter)
 CREATE TABLE IF NOT EXISTS grupo_inter_pedidos (
     id SERIAL PRIMARY KEY,
     nro_documento VARCHAR(100),

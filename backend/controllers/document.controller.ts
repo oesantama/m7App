@@ -115,13 +115,14 @@ export const syncInventory = async (req: Request, res: Response) => {
           observation: item.inventoryNote || item.inventory_observation || ''
         };
 
-        // Auto-crear artículo si no existe (mismo comportamiento anterior)
+        // Auto-crear artículo si no existe
         const artCheck = await client.query('SELECT 1 FROM articles WHERE UPPER(TRIM(id)) = $1', [artId]);
         if (artCheck.rows.length === 0) {
           await client.query(`
-            INSERT INTO articles (id, name, client_id, uom_std, factor_std, status_id)
-            VALUES ($1, $2, $3, 'und', 1, 'EST-01')
-          `, [artId, `ARTÍCULO AUTO-CREADO: ${artId}`, clientId]);
+            INSERT INTO articles (id, name, client_id, uom_std, factor_std, status_id, auto_created)
+            VALUES ($1, $2, $3, 'und', 1, 'EST-01', TRUE)
+          `, [artId, `AUTO: ${artId}`, clientId]);
+          console.log(`[M7-AUTO-ART] Articulo auto-creado en syncInventory: ${artId} (cliente: ${clientId})`);
         }
       }
       skuAggregates[artId].count1 += Number(item.count1 || item.count_1 || 0);
@@ -492,10 +493,10 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
           const artCheck = await client.query('SELECT 1 FROM articles WHERE id = $1', [artId]);
           if (artCheck.rowCount === 0) {
             await client.query(`
-               INSERT INTO articles (id, name, client_id, uom_std, factor_std, status_id)
-               VALUES ($1, $2, $3, 'und', 1, 'EST-01')
-             `, [artId, `AUTO-CREATED ${artId}`, doc.clientId]);
-            console.log(`[M7-AUTO] Artículo creado automáticamente: ${artId}`);
+               INSERT INTO articles (id, name, client_id, uom_std, factor_std, status_id, auto_created)
+               VALUES ($1, $2, $3, 'und', 1, 'EST-01', TRUE)
+             `, [artId, `AUTO: ${artId}`, doc.clientId]);
+            console.log(`[M7-AUTO-ART] Articulo auto-creado en bulkCreate: ${artId} (cliente: ${doc.clientId})`);
           }
         }
 
@@ -518,8 +519,9 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
                 expected_qty = expected_qty + $1,
                 unit = $2, volume = $3, unit_volume = $4,
                 city = $5, address = $6, observation = $7,
-                batch = $8, peso = $9, un_code = $10, client_ref = $11
-              WHERE document_id = $12 AND article_id = $13 AND invoice = $14
+                batch = $8, peso = $9, un_code = $10, client_ref = $11,
+                customer_name = $12
+              WHERE document_id = $13 AND article_id = $14 AND invoice = $15
             `, [
               item.expectedQty || 0,
               item.unit || 'und',
@@ -532,12 +534,13 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.peso || 0,
               item.unCode || null,
               item.clientRef || null,
+              (item as any).customerName || null,
               doc.id, artId, invoice
             ]);
           } else {
             await client.query(`
-              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             `, [
               doc.id,
               artId,
@@ -554,7 +557,8 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.batch || 'S/L',
               item.peso || 0,
               item.unCode || null,
-              item.clientRef || null
+              item.clientRef || null,
+              (item as any).customerName || null
             ]);
           }
         }
@@ -643,7 +647,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(document_items.city) as city,
         MAX(document_items.neighborhood) as neighborhood,
         MAX(document_items.address) as address,
-        MAX(document_items.address) as "customerName",
+        MAX(document_items.customer_name) as "customerName",
         SUM(document_items.expected_qty) as "totalItems",
         SUM(document_items.volume) as "volumeM3",
         document_items.document_id as "docLId",

@@ -164,6 +164,43 @@ export const logRouteMovement = async (req: Request, res: Response) => {
   }
 };
 
+export const learnFromCompletedRoute = async (req: Request, res: Response) => {
+  const { vehicleId, stops } = req.body;
+
+  if (!vehicleId || !Array.isArray(stops) || stops.length === 0) {
+    return res.status(400).json({ error: "vehicleId y stops[] son requeridos" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    for (const stop of stops) {
+      const city = String(stop.city || '').toUpperCase().trim();
+      const neighborhood = String(stop.neighborhood || '').toUpperCase().trim();
+      if (!city) continue;
+
+      await client.query(`
+        INSERT INTO routing_patterns (city, vehicle_id, neighborhood, strength, last_used)
+        VALUES ($1, $2, $3, 2, NOW())
+        ON CONFLICT (city, vehicle_id, neighborhood) DO UPDATE SET
+          strength = routing_patterns.strength + 2,
+          last_used = NOW()
+      `, [city, vehicleId, neighborhood]);
+    }
+
+    await client.query('COMMIT');
+    console.log(`[M7-IQ-ROUTE] Aprendizaje de ruta confirmada: ${stops.length} paradas para vehículo ${vehicleId}`);
+    res.json({ success: true, patternsUpdated: stops.length });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-IQ-ROUTE-ERR]', err.message);
+    res.status(500).json({ error: "Error al registrar aprendizaje de ruta" });
+  } finally {
+    client.release();
+  }
+};
+
 export const updateLocation = async (req: Request, res: Response) => {
   const { vehicleId, driverId, latitude, longitude, accuracy, speed, heading } = req.body;
   try {

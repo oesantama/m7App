@@ -40,8 +40,9 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [isSyncingPartial, setIsSyncingPartial] = useState(false);
   const [isSyncingFinal, setIsSyncingFinal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  
-  // Nuevo Estado: Cambio Rápido de Documento
+  const [searchRecibo, setSearchRecibo] = useState('');
+
+  // Cambio Rápido de Documento
   const [docToChangeStatus, setDocToChangeStatus] = useState<DocumentL | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -61,96 +62,105 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
   const activeList = showHistory ? completedRecibo : pendingRecibo;
 
+  const filteredList = useMemo(() => {
+    if (!searchRecibo.trim()) return activeList;
+    const term = searchRecibo.toLowerCase();
+    return activeList.filter(d =>
+      (d.externalDocId || '').toLowerCase().includes(term) ||
+      (d.vehicleData || '').toLowerCase().includes(term) ||
+      (d.inventoryUser || '').toLowerCase().includes(term) ||
+      (d.planType || '').toLowerCase().includes(term)
+    );
+  }, [activeList, searchRecibo]);
+
   const paginatedDocs = useMemo(() => {
-    if (rowsPerPage === 'all') return activeList;
+    if (rowsPerPage === 'all') return filteredList;
     const start = (currentPage - 1) * rowsPerPage;
-    return activeList.slice(start, start + rowsPerPage);
-  }, [activeList, currentPage, rowsPerPage]);
+    return filteredList.slice(start, start + rowsPerPage);
+  }, [filteredList, currentPage, rowsPerPage]);
 
-  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(activeList.length / rowsPerPage);
+  // Métricas por documento (volume total, progreso, novedades)
+  const getDocMetrics = (doc: DocumentL) => {
+    const items = doc.items || [];
+    const totalItems = items.length;
+    const countedItems = items.filter(i => i.countedQty > 0 || i.status === 'Matches' || i.status === 'OK').length;
+    const novedades = items.filter(i => i.status === 'Mismatch' || i.status === 'Novedad' || i.novedad).length;
+    const totalVol = items.reduce((acc, i) => acc + (parseFloat(String(i.volume || '0')) || 0), 0);
+    const progress = totalItems > 0 ? Math.round((countedItems / totalItems) * 100) : 0;
+    return { totalItems, countedItems, novedades, totalVol, progress };
+  };
 
-  const handleStartCount = (doc: DocumentL) => {
-    api.updateDocumentStatus(doc.id, DocStatus.COUNTING, user.name);
-    const updatedDocs = documents.map(d => d.id === doc.id ? { ...d, status: DocStatus.COUNTING, updatedBy: user.name, updatedAt: new Date().toISOString() } : d);
-    onUpdateDocuments(updatedDocs);
+  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(filteredList.length / rowsPerPage);
+
+  const handleStartCount = async (doc: DocumentL) => {
+    try {
+      await api.updateDocumentStatus(doc.id, DocStatus.COUNTING, user.name);
+    } catch {
+      // Estado local se actualiza igual; el fallo de red se reintentará en el siguiente sync
+    }
+    onUpdateDocuments(documents.map(d =>
+      d.id === doc.id ? { ...d, status: DocStatus.COUNTING, updatedBy: user.name, updatedAt: new Date().toISOString() } : d
+    ));
     setSelectedDocForCount({ ...doc, status: DocStatus.COUNTING });
   };
 
-  const handlePartialSave = (currentItems: DocumentLItem[], generalObs: string) => {
+  const handlePartialSave = async (currentItems: DocumentLItem[], generalObs: string) => {
     if (!selectedDocForCount) return;
-
     setIsSyncingPartial(true);
-    api.syncInventory({
-      docId: selectedDocForCount.id,
-      items: currentItems,
-      user: user.name,
-      notes: generalObs,
-      isPartial: true
-    }).then(res => {
+    try {
+      const res = await api.syncInventory({
+        docId: selectedDocForCount.id,
+        items: currentItems,
+        user: user.name,
+        notes: generalObs,
+        isPartial: true
+      });
       if (res.success) {
-        const updatedDocs = documents.map(d =>
+        onUpdateDocuments(documents.map(d =>
           d.id === selectedDocForCount.id ? { ...d, items: currentItems, updatedAt: new Date().toISOString() } : d
-        );
-        onUpdateDocuments(updatedDocs);
+        ));
         toast.info("Progreso guardado en el servidor.");
       }
-    }).catch(err => {
-      console.error('[M7-PARTIAL-SYNC] Error:', err);
+    } catch (err: any) {
       toast.error("Error al guardar progreso parcial.");
-    }).finally(() => {
+      if (import.meta.env.DEV) console.error('[M7-PARTIAL-SYNC]', err);
+    } finally {
       setIsSyncingPartial(false);
-    });
+    }
   };
 
-  const handleFinishCount = (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => {
+  const handleFinishCount = async (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => {
     if (!selectedDocForCount) return;
-
-    if (updateEmail && onUpdateNotificationEmail) {
-      onUpdateNotificationEmail(updateEmail);
-    }
+    if (updateEmail && onUpdateNotificationEmail) onUpdateNotificationEmail(updateEmail);
 
     setIsSyncingFinal(true);
-    // Persistir en el servidor
-    api.syncInventory({
-      docId: selectedDocForCount.id,
-      items: finalItems,
-      user: user.name,
-      notes: generalObs,
-      isPartial: false,
-      driverEmail: updateEmail
-    }).then(res => {
+    try {
+      const res = await api.syncInventory({
+        docId: selectedDocForCount.id,
+        items: finalItems,
+        user: user.name,
+        notes: generalObs,
+        isPartial: false,
+        driverEmail: updateEmail
+      });
       if (res.success) {
         toast.success("Inventario finalizado y sincronizado.");
-
-        // SOLO SI HAY ÉXITO: Actualizar localmente y cerrar modal
-        const updatedDocs = documents.map(d =>
-          d.id === selectedDocForCount.id
-            ? {
-              ...d,
-              items: finalItems,
-              status: DocStatus.INVENTORED,
-              inventoryDate: new Date().toISOString(),
-              inventoryUser: user.name,
-              inventoryNotes: generalObs, // Persistencia local de las notas
-              updatedBy: user.name,
-              updatedAt: new Date().toISOString()
-            }
-            : d
-        );
-
         localStorage.removeItem(`m7_offline_count_${selectedDocForCount.id}`);
-        onUpdateDocuments(updatedDocs);
+        onUpdateDocuments(documents.map(d =>
+          d.id === selectedDocForCount.id
+            ? { ...d, items: finalItems, status: DocStatus.INVENTORED, inventoryDate: new Date().toISOString(), inventoryUser: user.name, inventoryNotes: generalObs, updatedBy: user.name, updatedAt: new Date().toISOString() }
+            : d
+        ));
         setSelectedDocForCount(null);
       } else {
         toast.error("Error al sincronizar: " + (res.error || "Desconocido"));
-        // El modal permanece abierto para que el usuario NO pierda el trabajo
       }
-    }).catch(err => {
-      console.error('[M7-FINISH-SYNC] Error:', err);
+    } catch (err: any) {
       toast.error("Error al finalizar inventario.");
-    }).finally(() => {
+      if (import.meta.env.DEV) console.error('[M7-FINISH-SYNC]', err);
+    } finally {
       setIsSyncingFinal(false);
-    });
+    }
   };
 
   const handleResendClick = (doc: any) => {
@@ -328,7 +338,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           toast.error('Error al actualizar: ' + (res.error || "Desconocido"));
         }
       }).catch(err => {
-        console.error(err);
+        if (import.meta.env.DEV) console.error('[M7-STATUS]', err);
         toast.error('Error de red al actualizar estado');
       }).finally(() => {
         setIsUpdatingStatus(false);
@@ -390,138 +400,212 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           {activeTab === 'recibo' ? (
             <>
               {/* SUBHEADER DE CONTROL (RECIBO) */}
-              <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center shrink-0 px-8">
-                <div className="flex items-center gap-4">
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">{showHistory ? 'Historial de Auditoría' : 'Planes en Espera'}</h3>
-                  <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase shadow-md ${showHistory ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-slate-950'}`}>
-                    {activeList.length} {showHistory ? 'FINALIZADOS' : 'ACTIVOS'}
-                  </span>
-                  
-                  {/* TOGGLE HISTORIAL */}
-                  <button 
-                    onClick={() => { setShowHistory(!showHistory); setCurrentPage(1); }}
-                    className={`ml-4 flex items-center gap-2 px-4 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all border-2 ${showHistory ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100 hover:border-blue-500 hover:text-blue-500'}`}
-                  >
-                    <Icons.History className="w-3 h-3" />
-                    {showHistory ? 'Ver Pendientes' : 'Ver Historial'}
-                  </button>
+              <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/50 shrink-0 space-y-3">
+                <div className="flex justify-between items-center flex-wrap gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">{showHistory ? 'Historial de Auditoría' : 'Planes en Espera'}</h3>
+                    <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase shadow-sm ${showHistory ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-slate-950'}`}>
+                      {filteredList.length}{searchRecibo ? ` / ${activeList.length}` : ''} {showHistory ? 'FINALIZADOS' : 'ACTIVOS'}
+                    </span>
+                    <button
+                      onClick={() => { setShowHistory(!showHistory); setCurrentPage(1); setSearchRecibo(''); }}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all border-2 ${showHistory ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100 hover:border-blue-500 hover:text-blue-500'}`}
+                    >
+                      <Icons.History className="w-3 h-3" />
+                      {showHistory ? 'Ver Pendientes' : 'Ver Historial'}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Filas:</label>
+                    <select value={rowsPerPage} onChange={e => { setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1); }} className="p-2 bg-white border-2 border-slate-100 rounded-lg text-[10px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm cursor-pointer">
+                      <option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value="all">Todas</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Filas:</label>
-                  <select value={rowsPerPage} onChange={e => { setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1); }} className="p-2 bg-white border-2 border-slate-100 rounded-lg text-[10px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm cursor-pointer">
-                    <option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value="all">Todas</option>
-                  </select>
+                {/* BÚSQUEDA */}
+                <div className="relative">
+                  <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    value={searchRecibo}
+                    onChange={e => { setSearchRecibo(e.target.value); setCurrentPage(1); }}
+                    placeholder="Buscar por Doc L, placa, operador..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-slate-100 rounded-xl text-xs font-bold outline-none focus:border-emerald-500 transition-all shadow-sm"
+                  />
+                  {searchRecibo && (
+                    <button onClick={() => setSearchRecibo('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+                      <Icons.X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
 
               <div className="p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar bg-slate-50/5">
                 {/* ... (Contenido de Recibo existente) ... */}
             <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
-              {paginatedDocs.map(doc => (
-                <div key={doc.id} className="flex flex-col p-6 bg-white border-2 border-slate-50 rounded-[2.5rem] hover:border-emerald-500 transition-all group shadow-md hover:shadow-xl relative overflow-hidden">
-                  <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${doc.status === DocStatus.COUNTING ? 'bg-blue-500' : doc.status === DocStatus.INVENTORED ? 'bg-slate-400' : 'bg-amber-400'}`}></div>
+              {paginatedDocs.map(doc => {
+                const metrics = getDocMetrics(doc);
+                const isCountingStatus = String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase();
+                const isInventoredStatus = String(doc.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase();
+                const isPending = String(doc.status).toUpperCase() === DocStatus.PENDING.toUpperCase();
+                const isManual = String(doc.planType || '').toUpperCase().includes('MANUAL');
+                const planLabel = isManual ? 'MANUAL' : (String(doc.planType || '').toUpperCase().includes('PLAN R') ? 'PLAN R' : 'PLAN NORMAL');
 
-                  <div className="flex justify-between items-start mb-6">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${doc.status === DocStatus.COUNTING ? 'bg-blue-900 text-blue-400 animate-pulse' : 'bg-slate-900 text-emerald-500'}`}>
-                      <Icons.Package />
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-2">
-                      <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border tracking-widest ${String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase() ? 'bg-blue-50 text-blue-600 border-blue-100' : (String(doc.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase() ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100')}`}>
-                        {doc.status}
-                      </span>
-                      {String(doc.planType).toUpperCase().includes('MANUAL') && (
-                        <span className="px-3 py-1 bg-slate-900 text-emerald-400 rounded-lg text-[8px] font-black uppercase border border-emerald-500/30 tracking-widest shadow-lg animate-pulse">
-                          MODO MANUAL
-                        </span>
-                      )}
-                      
-                      {String(doc.status).toUpperCase() === DocStatus.PENDING.toUpperCase() && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setDocToChangeStatus(doc); setSelectedStatus(doc.status || ''); }}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-white text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-200 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all shadow-sm group"
-                          >
-                             <Icons.RefreshCw className="w-3 h-3 group-hover:animate-spin" /> ESTADO
-                          </button>
-                      )}
-                      
-                      <p className="text-[9px] text-slate-400 font-black uppercase mt-1 tracking-widest">
-                        {doc.inventoryDate && !isNaN(new Date(doc.inventoryDate).getTime()) 
-                          ? new Date(doc.inventoryDate).toLocaleDateString() + ' ' + new Date(doc.inventoryDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                          : ((doc.createdAt || (doc as any).created_at) ? new Date(doc.createdAt || (doc as any).created_at).toLocaleDateString() : 'SIN FECHA')}
-                      </p>
-                    </div>
-                  </div>
+                const docDate = doc.inventoryDate && !isNaN(new Date(doc.inventoryDate).getTime())
+                  ? new Date(doc.inventoryDate)
+                  : (doc.createdAt || (doc as any).created_at)
+                    ? new Date(doc.createdAt || (doc as any).created_at)
+                    : null;
 
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Documento L</p>
-                      <h4 className="font-black text-slate-900 uppercase text-xl tracking-tighter truncate">{doc.externalDocId}</h4>
-                    </div>
+                return (
+                  <div key={doc.id} className="flex flex-col bg-white border-2 border-slate-100 rounded-[2rem] hover:border-emerald-400 transition-all group shadow-md hover:shadow-xl relative overflow-hidden">
+                    {/* BARRA DE ESTADO LATERAL */}
+                    <div className={`absolute top-0 left-0 bottom-0 w-1.5 rounded-l-[2rem] ${isCountingStatus ? 'bg-blue-500' : isInventoredStatus ? 'bg-emerald-500' : 'bg-amber-400'}`} />
 
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[8px] font-black text-slate-400 uppercase">Vehículo / Placa:</span>
-                        <span className="text-[10px] font-black text-slate-900 uppercase">{doc.vehicleData || 'S/A'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[8px] font-black text-slate-400 uppercase">Items:</span>
-                        <span className="text-[10px] font-black text-emerald-600 uppercase">{doc.items.length} REF</span>
+                    {/* HEADER */}
+                    <div className="p-5 pb-3 pl-6">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md shrink-0 ${isCountingStatus ? 'bg-blue-900 text-blue-400 animate-pulse' : isInventoredStatus ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-900 text-emerald-400'}`}>
+                            <Icons.Package className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Doc L</p>
+                            <h4 className="font-black text-slate-900 uppercase text-base tracking-tight truncate leading-tight">{doc.externalDocId}</h4>
+                          </div>
+                        </div>
+                        {/* BADGES */}
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${isCountingStatus ? 'bg-blue-50 text-blue-600 border border-blue-100' : isInventoredStatus ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                            {doc.status}
+                          </span>
+                          <span className={`px-2.5 py-1 rounded-lg text-[7px] font-black uppercase tracking-widest ${isManual ? 'bg-slate-900 text-emerald-400 border border-emerald-500/20' : planLabel === 'PLAN R' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
+                            {planLabel}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="mt-6 pt-6 border-t border-slate-50">
-                    <button 
-                      onClick={() => handleStartCount(doc)} 
-                      disabled={doc.status === DocStatus.INVENTORED || !hasPermission(user, 'RECIBIDO_MATERIAL', 'create')}
-                      className={`w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-3 ${(doc.status === DocStatus.INVENTORED || !hasPermission(user, 'RECIBIDO_MATERIAL', 'create')) ? 'opacity-20 cursor-not-allowed hidden' : 'hover:bg-emerald-600 active:scale-95'}`}
-                    >
-                      {String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase() ? <Icons.Audit /> : <Icons.Signature />}
-                      {String(doc.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase() ? 'INVENTARIADO' : (String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase() ? 'CONTINUAR' : 'AUDITAR')}
-                    </button>
-
-                    {/* BOTONES CARGA EXCEL PARA MANUALES (Plan Normal / Plan R) */}
-                    {String(doc.planType).toUpperCase().includes('MANUAL') && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <label className="py-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-black text-[9px] uppercase tracking-tight transition-all shadow-sm flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white cursor-pointer active:scale-95 group">
-                          <Icons.Excel className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          Plan Normal
-                          <input 
-                            type="file" 
-                            accept=".xlsx,.xls" 
-                            className="hidden" 
-                            onChange={(e) => handleManualExcelUpload(e, doc, 'Plan Normal')} 
+                    {/* BARRA DE PROGRESO (solo si tiene items y no está inventoriado) */}
+                    {metrics.totalItems > 0 && (
+                      <div className="px-6 pb-2">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Progreso conteo</span>
+                          <span className="text-[8px] font-black text-slate-700">{metrics.countedItems}/{metrics.totalItems} ref · {metrics.progress}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${metrics.progress === 100 ? 'bg-emerald-500' : metrics.progress > 50 ? 'bg-blue-500' : 'bg-amber-400'}`}
+                            style={{ width: `${metrics.progress}%` }}
                           />
-                        </label>
-                        <label className="py-3 bg-blue-50 text-blue-600 border border-blue-100 rounded-2xl font-black text-[9px] uppercase tracking-tight transition-all shadow-sm flex items-center justify-center gap-2 hover:bg-blue-600 hover:text-white cursor-pointer active:scale-95 group">
-                          <Icons.Excel className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          Plan R
-                          <input 
-                            type="file" 
-                            accept=".xlsx,.xls,.csv" 
-                            className="hidden" 
-                            onChange={(e) => handleManualExcelUpload(e, doc, 'Plan R')} 
-                          />
-                        </label>
+                        </div>
                       </div>
                     )}
 
-                    {(!hasPermission(user, 'RECIBIDO_MATERIAL', 'create') && doc.status !== DocStatus.INVENTORED) && (
-                       <div className="w-full py-4 items-center justify-center text-center">
-                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><Icons.Shield className="w-3 h-3 inline mr-1" /> MODO LECTURA</span>
-                       </div>
-                    )}
-                    {doc.status === DocStatus.INVENTORED && (
+                    {/* DATOS PRINCIPALES */}
+                    <div className="px-6 py-3 space-y-2">
+                      <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div>
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Vehículo</p>
+                          <p className="text-[10px] font-black text-slate-900 uppercase truncate">{doc.vehicleData || 'S/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Ítems</p>
+                          <p className="text-[10px] font-black text-emerald-600">{metrics.totalItems} REF</p>
+                        </div>
+                        <div>
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Volumen</p>
+                          <p className="text-[10px] font-black text-indigo-600">{metrics.totalVol.toFixed(3)} m³</p>
+                        </div>
+                        <div>
+                          <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Novedades</p>
+                          <p className={`text-[10px] font-black ${metrics.novedades > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                            {metrics.novedades > 0 ? `⚠ ${metrics.novedades} nov.` : '✓ Sin novedad'}
+                          </p>
+                        </div>
+                        {doc.inventoryUser && (
+                          <div className="col-span-2">
+                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Operador</p>
+                            <p className="text-[10px] font-black text-slate-700 uppercase truncate">{doc.inventoryUser}</p>
+                          </div>
+                        )}
+                        {(doc.inventoryNotes || doc.inventory_observation) && (
+                          <div className="col-span-2">
+                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Observación</p>
+                            <p className="text-[9px] text-slate-600 font-semibold leading-snug line-clamp-2 italic">
+                              "{(doc.inventoryNotes || doc.inventory_observation || '').substring(0, 80)}"
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* FECHA */}
+                      <div className="flex items-center justify-between">
+                        <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">
+                          {isInventoredStatus ? 'Inventariado:' : 'Recibido:'}
+                        </p>
+                        <p className="text-[8px] font-black text-slate-600">
+                          {docDate ? `${docDate.toLocaleDateString('es-CO')} ${docDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'SIN FECHA'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* ACCIONES */}
+                    <div className="px-6 pb-5 pt-2 mt-auto space-y-2 border-t border-slate-50">
+                      {isPending && hasPermission(user, 'RECIBIDO_MATERIAL', 'create') && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDocToChangeStatus(doc); setSelectedStatus(doc.status || ''); }}
+                          className="w-full py-2 flex items-center justify-center gap-2 bg-white text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-200 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm"
+                        >
+                          <Icons.RefreshCw className="w-3 h-3" /> Cambiar Estado
+                        </button>
+                      )}
+
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleResendClick(doc); }}
-                        className="w-full py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 mt-2"
+                        onClick={() => handleStartCount(doc)}
+                        disabled={isInventoredStatus || !hasPermission(user, 'RECIBIDO_MATERIAL', 'create')}
+                        className={`w-full py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 ${isInventoredStatus || !hasPermission(user, 'RECIBIDO_MATERIAL', 'create') ? 'hidden' : isCountingStatus ? 'bg-blue-600 text-white hover:bg-blue-500 active:scale-95' : 'bg-slate-900 text-white hover:bg-emerald-600 active:scale-95'}`}
                       >
-                        <Icons.Send className="w-4 h-4" /> REENVIAR
+                        {isCountingStatus ? <Icons.Audit className="w-4 h-4" /> : <Icons.Signature className="w-4 h-4" />}
+                        {isCountingStatus ? 'Continuar Conteo' : 'Iniciar Auditoría'}
                       </button>
-                    )}
+
+                      {/* CARGA EXCEL PARA MANUALES */}
+                      {isManual && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="py-2.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl font-black text-[8px] uppercase tracking-tight flex items-center justify-center gap-1.5 hover:bg-emerald-600 hover:text-white cursor-pointer active:scale-95 group transition-all">
+                            <Icons.Excel className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                            Plan Normal
+                            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => handleManualExcelUpload(e, doc, 'Plan Normal')} />
+                          </label>
+                          <label className="py-2.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl font-black text-[8px] uppercase tracking-tight flex items-center justify-center gap-1.5 hover:bg-blue-600 hover:text-white cursor-pointer active:scale-95 group transition-all">
+                            <Icons.Excel className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                            Plan R
+                            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleManualExcelUpload(e, doc, 'Plan R')} />
+                          </label>
+                        </div>
+                      )}
+
+                      {!hasPermission(user, 'RECIBIDO_MATERIAL', 'create') && !isInventoredStatus && (
+                        <div className="py-3 text-center">
+                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">
+                            <Icons.Shield className="w-3 h-3 inline mr-1" /> MODO LECTURA
+                          </span>
+                        </div>
+                      )}
+
+                      {isInventoredStatus && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleResendClick(doc); }}
+                          className="w-full py-3 bg-slate-50 text-slate-500 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-50 hover:text-blue-600 transition-all flex items-center justify-center gap-2 border border-slate-100"
+                        >
+                          <Icons.Send className="w-3.5 h-3.5" /> Reenviar Notificación
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
                {activeList.length === 0 && (
                 <div className="col-span-full py-32 flex flex-col items-center justify-center text-center space-y-4">
                   <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 border-4 border-dashed border-slate-100"><Icons.Check /></div>
@@ -534,11 +618,19 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           </div>
 
             {/* PAGINACIÓN INFERIOR (RECIBO) */}
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-center items-center gap-8 shrink-0">
-              <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight className="rotate-180" /></button>
-              <span className="text-[11px] font-black uppercase text-slate-900 tracking-widest">Página {currentPage} de {totalPages || 1}</span>
-              <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm"><Icons.ChevronRight /></button>
-            </div>
+            {totalPages > 1 && (
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-center items-center gap-6 shrink-0">
+                <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm">
+                  <Icons.ChevronRight className="rotate-180 w-4 h-4" />
+                </button>
+                <span className="text-[10px] font-black uppercase text-slate-700 tracking-widest">
+                  Pág {currentPage} / {totalPages} &nbsp;·&nbsp; {filteredList.length} docs
+                </span>
+                <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm">
+                  <Icons.ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </>
         ) : activeTab === 'picking' ? (
           <div className="p-8 flex-1 overflow-hidden flex flex-col">
@@ -556,7 +648,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                   const res = await api.getDocuments();
                   onUpdateDocuments(res);
                 } catch (e) {
-                  console.error("Error al refrescar documentos:", e);
+                  if (import.meta.env.DEV) console.error('[M7-REFRESH]', e);
                 }
               }}
             />
@@ -570,44 +662,43 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
     )}
       {/* DIÁLOGO REENVÍO */}
       {showResendDialog && (
-        <div className="fixed inset-0 z-[600] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
-          <div className="bg-white w-full max-w-lg rounded-[3.5rem] p-12 text-center space-y-8 shadow-2xl border border-white/5">
-            <div className="w-16 h-16 bg-blue-500 text-white rounded-[1.5rem] mx-auto flex items-center justify-center shadow-xl mb-4"><Icons.Send className="w-8 h-8" /></div>
-            <div className="space-y-3">
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Nuevo Recibo Manual</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inicie un proceso sin documento previo</p>
-              </div>
+        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 text-center space-y-6 shadow-2xl">
+            <div className="w-14 h-14 bg-blue-500 text-white rounded-2xl mx-auto flex items-center justify-center shadow-lg">
+              <Icons.Send className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Reenviar Notificación</h2>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                Doc: {resendTarget?.externalDocId || '—'}
+              </p>
             </div>
 
-            {/* CONSEJO M7 PRACTICO */}
-            <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] flex items-start gap-4">
-               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm shrink-0"><Icons.Excel className="w-5 h-5" /></div>
-               <div>
-                  <h4 className="text-[10px] font-black text-emerald-700 uppercase mb-1">¿Cómo cargar el archivo Excel?</h4>
-                  <p className="text-[9px] text-emerald-600/80 font-bold leading-relaxed">
-                    1. Inicie su auditoría aquí a la izquierda.<br/>
-                    2. Al lado aparecerá su plan en <strong>"PENDIENTES"</strong>.<br/>
-                    3. Use el botón <strong>"SUBIR EXCEL"</strong> para completar los datos.
-                  </p>
-               </div>
+            <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-start gap-3 text-left">
+              <Icons.Alert className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-[9px] text-blue-700 font-bold leading-relaxed">
+                Se enviará el resumen del inventario al correo indicado. Verifique que la dirección sea correcta antes de continuar.
+              </p>
             </div>
+
             <input
               type="email"
               value={manualEmail}
               onChange={e => setManualEmail(e.target.value)}
-              placeholder="CORREO@DESTINO.COM"
-              className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-center text-xs outline-none focus:border-blue-500 transition-all shadow-inner"
+              placeholder="correo@destino.com"
+              className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-center text-sm outline-none focus:border-blue-500 transition-all"
             />
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               <button
                 onClick={confirmResend}
                 disabled={!manualEmail.includes('@')}
-                className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-blue-600 shadow-2xl transition-all disabled:opacity-20 active:scale-95"
+                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-500 shadow-lg transition-all disabled:opacity-30 active:scale-95 flex items-center justify-center gap-2"
               >
-                Enviar Ahora
+                <Icons.Send className="w-4 h-4" /> Enviar Ahora
               </button>
-              <button onClick={() => setShowResendDialog(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Cancelar</button>
+              <button onClick={() => setShowResendDialog(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-700 transition-colors">
+                Cancelar
+              </button>
             </div>
           </div>
         </div>

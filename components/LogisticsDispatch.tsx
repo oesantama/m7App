@@ -492,7 +492,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
         // 3. Fallback to API if we don't have all invoices locally
         if (localMatches.length < rawIds.length) {
-            console.log(`[ROUTE-DEBUG] Missing ${rawIds.length - localMatches.length} invoices locally. Fetching...`);
             setFetchStatus('FETCHING'); 
             try {
                 const idsParam = targetIds.join(',');
@@ -508,7 +507,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     setFetchStatus('ERROR (Invalid Data)');
                 }
             } catch (e: any) {
-                console.error("Error fetching route invoices fallback:", e);
+                if (import.meta.env.DEV) console.error('[M7-INVOICES-FALLBACK]', e);
                 setFetchStatus(`ERROR: ${e.message}`);
             }
         } else {
@@ -741,11 +740,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await (navigator as any).wakeLock.request('screen');
-                    console.log('[M7-WAKE] Pantalla bloqueada encendida');
                 }
-            } catch (err) {
-                console.warn('[M7-WAKE-ERR]', err);
-            }
+            } catch { /* wakeLock no soportado o denegado — no critico */ }
         };
 
         requestWakeLock();
@@ -765,12 +761,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 speed: pos.coords.speed,
                                 heading: pos.coords.heading
                             });
-                        } catch (e) {
-                            console.warn('[M7-GPS-REPORT-SILENT-ERR]', e);
-                        }
+                        } catch { /* GPS update failed silently */ }
                     }
                 },
-                (err) => console.warn('[M7-GPS-PERM-DENIED]', err.message),
+                () => { /* GPS permission denied */ },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }, 15000); // Reducción a 15 segundos para mayor precisión
@@ -787,7 +781,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const data = await api.getPendingSignatures(user.id);
             setPendingSignatures(data);
         } catch (e) {
-            console.error("Error fetching pending signatures:", e);
+            if (import.meta.env.DEV) console.error('[M7-SIGNATURES]', e);
         }
     };
 
@@ -796,7 +790,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const data = await api.getUsers();
             setAllUsers(data);
         } catch (e) {
-            console.error("Error fetching all users:", e);
+            if (import.meta.env.DEV) console.error('[M7-USERS]', e);
         }
     };
 
