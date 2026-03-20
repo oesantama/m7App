@@ -131,6 +131,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ isOpen: boolean; id: string } | null>(null);
   const [routeMapModal, setRouteMapModal] = useState<{ isOpen: boolean; route: SuggestedRoute | null }>({ isOpen: false, route: null });
   const routePreviewMapRef = useRef<L.Map | null>(null);
+  const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Suprime chars residuales del scanner
 
   const handleDeleteDocument = async (id: string) => {
     setShowDeleteConfirm({ isOpen: true, id });
@@ -855,19 +856,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   }, [viewMode]);
 
   // 2. Efecto para Renderizado de Datos en el Mapa
-  // Auto-selección cuando el scanner lee exactamente 1 factura
-  useEffect(() => {
-    if (!addInvoiceModal.isOpen || modalSearchTerm.length < 4) return;
-    const term = modalSearchTerm.toLowerCase();
-    const matches = unassignedInvoices.filter(inv =>
-      (inv.invoiceNumber || '').toLowerCase().includes(term) ||
-      (inv.orderNumber || '').toLowerCase().includes(term)
-    );
-    if (matches.length === 1) {
-      handleAddInvoiceToRoute(matches[0]);
-      setModalSearchTerm('');
-    }
-  }, [modalSearchTerm]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1941,13 +1929,34 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   placeholder="Buscar por factura, cliente o pedido..."
                   value={modalSearchTerm}
                   onChange={(e) => {
+                    // Si hay supresión activa (scanner aún enviando chars residuales), ignorar
+                    if (scanSuppressRef.current) { setModalSearchTerm(''); return; }
                     const raw = e.target.value;
                     // Factura electrónica colombiana: extrae NumFac del código de barras
                     const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
                     if (numFacMatch) {
-                      setModalSearchTerm(numFacMatch[1].trim().toUpperCase());
+                      const invoiceNum = numFacMatch[1].trim().toUpperCase();
+                      setModalSearchTerm('');
+                      // Suprimir chars residuales por 600ms
+                      if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
+                      scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 600);
+                      // Buscar y agregar directamente
+                      const match = unassignedInvoices.find(inv =>
+                        (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+                      );
+                      if (match) handleAddInvoiceToRoute(match);
+                      else setModalSearchTerm(invoiceNum); // Mostrar si no hay match exacto
                     } else {
                       setModalSearchTerm(raw.toUpperCase());
+                      // Auto-select si búsqueda manual deja exactamente 1 resultado
+                      if (raw.length >= 4) {
+                        const term = raw.toLowerCase();
+                        const matches = unassignedInvoices.filter(inv =>
+                          (inv.invoiceNumber || '').toLowerCase().includes(term) ||
+                          (inv.orderNumber || '').toLowerCase().includes(term)
+                        );
+                        if (matches.length === 1) handleAddInvoiceToRoute(matches[0]);
+                      }
                     }
                   }}
                   className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
