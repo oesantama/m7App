@@ -375,16 +375,12 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (itemInDoc) {
         const targetId = itemInDoc.articleId;
         
-        // M7 V16.4: Inteligencia de Factores - Si el artículo tiene un factor > 1, asumimos que el código representa ese bulto/caja
-        const factor = master ? (master.factorInter || master.factorStd || 1) : 1;
-        const qtyToAdd = factor > 1 ? factor : 1;
-
         setCounts(prev => {
-          const newQty = (Number(prev[targetId]) || 0) + qtyToAdd;
-          setLastScan({ 
+          const newQty = (Number(prev[targetId]) || 0) + 1;
+          setLastScan({
             id: Math.random(),
-            article: master || null, 
-            message: qtyToAdd > 1 ? `${targetId} [CAJA +${qtyToAdd}]` : targetId, 
+            article: master || null,
+            message: targetId,
             status: 'success',
             qty: newQty
           });
