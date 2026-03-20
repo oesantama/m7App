@@ -22,6 +22,8 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
   
   // Estado local para selección de conductor (fila)
   const [rowDrivers, setRowDrivers] = useState<{[key: string]: string}>({});
+  const [driverSearch, setDriverSearch] = useState<{[key: string]: string}>({});
+  const [driverDropdownOpen, setDriverDropdownOpen] = useState<{[key: string]: boolean}>({});
   
   const [showHistory, setShowHistory] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -202,14 +204,56 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
                                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
 
-                            <select 
-                                value={rowDrivers[v.id] || ''}
-                                onChange={(e) => setRowDrivers(prev => ({...prev, [v.id]: e.target.value}))}
-                                className="flex-[1.5] bg-white border border-slate-200 px-3 py-3 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
-                            >
-                                <option value="">2. CONDUCTOR...</option>
-                                {availableDrivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                            </select>
+                            {/* Conductor searchable dropdown */}
+                            <div className="flex-[1.5] relative">
+                              <button
+                                type="button"
+                                onClick={() => setDriverDropdownOpen(prev => ({...prev, [v.id]: !prev[v.id]}))}
+                                className="w-full bg-white border border-slate-200 px-3 py-3 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all text-left flex items-center justify-between"
+                              >
+                                <span className={rowDrivers[v.id] ? 'text-slate-900' : 'text-slate-400'}>
+                                  {rowDrivers[v.id] ? availableDrivers.find(d => d.id === rowDrivers[v.id])?.name || '2. CONDUCTOR...' : '2. CONDUCTOR...'}
+                                </span>
+                                <Icons.ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0 rotate-90" />
+                              </button>
+                              {driverDropdownOpen[v.id] && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                                  <div className="p-2 border-b border-slate-100">
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      placeholder="Buscar conductor..."
+                                      value={driverSearch[v.id] || ''}
+                                      onChange={(e) => setDriverSearch(prev => ({...prev, [v.id]: e.target.value}))}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px] font-bold uppercase outline-none focus:border-emerald-400"
+                                    />
+                                  </div>
+                                  <div className="max-h-48 overflow-y-auto">
+                                    {availableDrivers
+                                      .filter(d => d.name.toUpperCase().includes((driverSearch[v.id] || '').toUpperCase()))
+                                      .map(d => (
+                                        <button
+                                          key={d.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setRowDrivers(prev => ({...prev, [v.id]: d.id}));
+                                            setDriverDropdownOpen(prev => ({...prev, [v.id]: false}));
+                                            setDriverSearch(prev => ({...prev, [v.id]: ''}));
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-[9px] font-black uppercase hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                                        >
+                                          {d.name}
+                                        </button>
+                                      ))
+                                    }
+                                    {availableDrivers.filter(d => d.name.toUpperCase().includes((driverSearch[v.id] || '').toUpperCase())).length === 0 && (
+                                      <p className="px-3 py-3 text-[9px] text-slate-400 font-bold uppercase text-center">Sin resultados</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                         </div>
                         <button 
                             onClick={() => handleAssignClick(v.id)}
