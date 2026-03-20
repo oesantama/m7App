@@ -1177,6 +1177,11 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
         SELECT
           di.id                                                                                   AS item_id,
           COALESCE(NULLIF(TRIM(di.invoice),''), NULLIF(TRIM(di.order_number),''), di.un_code)    AS inv_key,
+          -- ID compuesto igual al que generan el frontend y los controladores de rutas/despacho
+          CONCAT(
+            TRIM(di.document_id::text), '_',
+            TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number, 'NA'))
+          )                                                                                       AS compound_id,
           dl.vehicle_plate                                                                        AS truck_origin,
           dl.external_doc_id                                                                      AS load_id
         FROM document_items di
@@ -1191,7 +1196,7 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
             OR dl.vehicle_plate ILIKE '%' || $2 || '%')
       ),
       -- Búsqueda de placa destino: route_invoices → routes → vehicles
-      -- vehicle_id puede ser el UUID del vehículo O su placa directamente
+      -- invoice_id puede ser el ID compuesto (doc_id + '_' + factura) o la factura corta
       route_truck AS (
         SELECT DISTINCT ON (ri.invoice_id)
           ri.invoice_id,
@@ -1226,8 +1231,8 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
         NULLIF(COALESCE(NULLIF(rt.truck_plate,''), NULLIF(dt.truck_plate,'')), '') AS "TRUCK_ID_DESTIN",
         NULLIF(COALESCE(NULLIF(rt.driver_doc,''),  NULLIF(dt.driver_doc,'')), '')  AS "DRIVER_ID_DESTIN"
       FROM base b
-      LEFT JOIN route_truck    rt ON rt.invoice_id = b.inv_key
-      LEFT JOIN dispatch_truck dt ON dt.invoice_id = b.inv_key
+      LEFT JOIN route_truck    rt ON rt.invoice_id = b.inv_key OR rt.invoice_id = b.compound_id
+      LEFT JOIN dispatch_truck dt ON dt.invoice_id = b.inv_key OR dt.invoice_id = b.compound_id
       ORDER BY b.load_id, b.inv_key
       LIMIT 5000
     `, [docParam, plateParam]);
