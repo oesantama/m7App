@@ -45,12 +45,11 @@ export const saveAssignment = async (req: Request, res: Response) => {
       });
     }
 
-    // Resync sequence before insert to prevent pkey collision
-    await client.query(`SELECT setval(pg_get_serial_sequence('assignments','id'), COALESCE((SELECT MAX(id) FROM assignments),0)+1, false)`);
-
+    // Insert usando MAX(id)+1 manual para evitar conflicto de secuencia desincronizada
     const insertRes = await client.query(`
-      INSERT INTO assignments (vehicle_id, driver_id, client_id, is_active)
-      VALUES ($1, $2, $3, true)
+      INSERT INTO assignments (id, vehicle_id, driver_id, client_id, is_active)
+      SELECT COALESCE(MAX(id), 0) + 1, $1, $2, $3, true
+      FROM assignments
       RETURNING id
     `, [vehicleId, driverId, clientId]);
 
