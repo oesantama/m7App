@@ -48,6 +48,7 @@ const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
 const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
 const ExecutiveDashboard = lazyWithRetry(() => import('./components/ExecutiveDashboard'));
 const GrupoInterView = lazyWithRetry(() => import('./components/GrupoInterView'));
+const MastersuiteReport = lazyWithRetry(() => import('./components/MastersuiteReport'));
 const TrainingAdmin = lazyWithRetry(() => import('./components/TrainingAdmin'));
 const PublicAttendanceForm = lazyWithRetry(() => import('./components/PublicAttendanceForm'));
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
@@ -679,6 +680,12 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Grupo Inter View...</div>}>
             <GrupoInterView />
+          </React.Suspense>
+        );
+      case 'informe-mastersuite':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Informe Mastersuite...</div>}>
+            <MastersuiteReport />
           </React.Suspense>
         );
       case 'flotas':

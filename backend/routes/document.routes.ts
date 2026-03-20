@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog } from '../controllers/document.controller.js';
+import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport } from '../controllers/document.controller.js';
 
 import { requirePermission } from '../middleware/auth.middleware.js';
 
@@ -60,6 +60,13 @@ router.get('/invoices', (req, res, next) => {
   res.status(403).json({ success: false, error: 'Permiso insuficiente para ver facturas' });
 }, getInvoices);
 router.post('/process-l-payment', requirePermission('DOCUMENTOS_L', 'edit'), processDocumentLPayment);
+router.get('/mastersuite-report', (req, res, next) => {
+  const user = (req as any).user;
+  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const hasPerm = user?.permissions?.some((p: any) => (p.module === 'PAG-34' || p.module === 'PAG-16' || p.module === 'PAG-15') && p.actions.includes('view'));
+  if (isSuper || hasPerm) return next();
+  res.status(403).json({ success: false, error: 'Permiso insuficiente' });
+}, getMastersuiteReport);
 
 
 export default router;

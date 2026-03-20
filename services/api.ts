@@ -356,6 +356,13 @@ export const api = {
       body: JSON.stringify(data)
     }),
 
+  getMastersuiteReport: (params?: { document?: string; plate?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.document) qs.set('document', params.document);
+    if (params?.plate) qs.set('plate', params.plate);
+    return fetchJson(`${API_URL}/documents/mastersuite-report?${qs.toString()}`);
+  },
+
   // GPS Tracking (Nueva API dedicada)
   updateVehicleLocation: (data: any) => fetchJson(`${API_URL}/locations/update`, {
     method: 'POST',

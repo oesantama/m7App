@@ -1160,3 +1160,42 @@ export const getInventoryLog = async (req: Request, res: Response) => {
   }
 };
 
+export const getMastersuiteReport = async (req: Request, res: Response) => {
+  try {
+    const { document = '', plate = '' } = req.query as { document?: string; plate?: string };
+
+    const result = await pool.query(`
+      SELECT DISTINCT
+        COALESCE(NULLIF(TRIM(di.invoice), ''), di.order_number)   AS "DOCUMENT_ID",
+        dl.vehicle_plate                                           AS "TRUCK_ID_ORIGIN",
+        dl.external_doc_id                                         AS "LOAD_ID",
+        v.plate                                                    AS "TRUCK_ID_DESTIN",
+        drv.document_number                                        AS "DRIVER_ID_DESTIN"
+      FROM document_items di
+      JOIN documents_l dl ON di.document_id = dl.id
+      LEFT JOIN route_invoices ri
+        ON ri.invoice_id = COALESCE(NULLIF(TRIM(di.invoice), ''), di.order_number)
+      LEFT JOIN routes r ON r.id::text = ri.route_id::text
+      LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+      LEFT JOIN drivers drv ON drv.id::text = r.driver_id::text
+      WHERE dl.plan_type IN ('Plan R', 'Plan Normal')
+        AND (
+          ri.id IS NOT NULL
+          OR EXISTS (
+            SELECT 1 FROM dispatch_assignments da
+            WHERE da.invoice_id = COALESCE(NULLIF(TRIM(di.invoice), ''), di.order_number)
+          )
+        )
+        AND ($1::text = '' OR dl.external_doc_id ILIKE '%' || $1 || '%'
+             OR di.invoice ILIKE '%' || $1 || '%')
+        AND ($2::text = '' OR dl.vehicle_plate ILIKE '%' || $2 || '%')
+      ORDER BY dl.external_doc_id, "DOCUMENT_ID"
+    `, [document, plate]);
+
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[M7-MASTERSUITE-ERR]', err.message);
+    res.status(500).json({ error: 'Error al generar informe Mastersuite', details: err.message });
+  }
+};
+
