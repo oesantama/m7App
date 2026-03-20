@@ -708,8 +708,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
 
     setSuggestedRoutes(newSuggestions);
-    setAddInvoiceModal({ isOpen: false, routeIndex: null });
-    toast.success(`Factura agregada a ruta ${route.vehicle.plate}`);
+    setModalSearchTerm('');
+    toast.success(`✓ ${invoice.invoiceNumber} → ${route.vehicle.plate}`);
   };
 
   const handleSwapRouteVehicle = (routeIndex: number, newVehicle: Vehicle) => {
@@ -855,6 +855,20 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   }, [viewMode]);
 
   // 2. Efecto para Renderizado de Datos en el Mapa
+  // Auto-selección cuando el scanner lee exactamente 1 factura
+  useEffect(() => {
+    if (!addInvoiceModal.isOpen || modalSearchTerm.length < 4) return;
+    const term = modalSearchTerm.toLowerCase();
+    const matches = unassignedInvoices.filter(inv =>
+      (inv.invoiceNumber || '').toLowerCase().includes(term) ||
+      (inv.orderNumber || '').toLowerCase().includes(term)
+    );
+    if (matches.length === 1) {
+      handleAddInvoiceToRoute(matches[0]);
+      setModalSearchTerm('');
+    }
+  }, [modalSearchTerm]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || (viewMode !== 'map' && viewMode !== 'active')) return;
@@ -1926,7 +1940,16 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   type="text"
                   placeholder="Buscar por factura, cliente o pedido..."
                   value={modalSearchTerm}
-                  onChange={(e) => setModalSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    // Factura electrónica colombiana: extrae NumFac del código de barras
+                    const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
+                    if (numFacMatch) {
+                      setModalSearchTerm(numFacMatch[1].trim().toUpperCase());
+                    } else {
+                      setModalSearchTerm(raw.toUpperCase());
+                    }
+                  }}
                   className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
                 />
               </div>
@@ -1953,77 +1976,67 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 }
 
                 return filtered.map((inv, index) => (
-                  <div key={`${inv.id}-${index}`} className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-emerald-100 group gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-black text-xs text-slate-900 uppercase flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                        <span className="whitespace-nowrap">{inv.invoiceNumber}</span>
-                        <span className="hidden sm:inline text-slate-300">|</span>
-                        <span className="truncate text-slate-600 font-bold">{inv.customerName}</span>
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase truncate">
-                          {inv.address} • {inv.city}
+                  <div key={`${inv.id}-${index}`} className="bg-slate-50 p-4 rounded-2xl hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-emerald-100 group">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-xs text-slate-900 uppercase flex flex-wrap items-center gap-1 gap-x-2">
+                          <span className="whitespace-nowrap">{inv.invoiceNumber}</span>
+                          <span className="text-slate-300">|</span>
+                          <span className="truncate text-slate-600 font-bold">{inv.customerName}</span>
                         </p>
-                        {inv.orderNumber && (
-                          <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-bold uppercase border border-indigo-100">
-                            PED: {inv.orderNumber}
-                          </span>
-                        )}
-                        {inv.externalDocId && (
-                          <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase border border-slate-200">
-                            DOC: {inv.externalDocId}
-                          </span>
-                        )}
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Orbit (R)' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                          {documents.find(d => d.id === inv.docLId)?.planType || 'Plan Normal'}
-                        </span>
-                      </div>
-                      {(inv as any).isPriority && (
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200 shadow-sm animate-pulse">
-                            <Icons.Alert className="w-2.5 h-2.5" />
-                            <span className="text-[8px] font-black uppercase">Horario Crítico</span>
-                          </div>
-                          {(inv as any).detectedTime && (
-                            <span className="bg-slate-900 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase shadow-md flex items-center gap-1">
-                              <Icons.Clock className="w-2 h-2" />
-                              {(inv as any).detectedTime}
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase truncate">
+                            {inv.address} • {inv.city}
+                          </p>
+                          {inv.orderNumber && (
+                            <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-bold uppercase border border-indigo-100">
+                              PED: {inv.orderNumber}
                             </span>
                           )}
+                          {inv.externalDocId && (
+                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase border border-slate-200">
+                              DOC: {inv.externalDocId}
+                            </span>
+                          )}
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Orbit (R)' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                            {documents.find(d => d.id === inv.docLId)?.planType || 'Plan Normal'}
+                          </span>
                         </div>
-                      )}
-                      {(inv.notes || (inv as any).detectedTime) && (
-                        <p className="text-[9px] text-amber-600 italic mt-1 truncate opacity-90 font-bold bg-amber-50/50 p-1 rounded-lg inline-block border border-amber-100">
-                          "{inv.notes || `ENTREGA PRIORITARIA: ${(inv as any).detectedTime}`}"
+                        {(inv as any).isPriority && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200 shadow-sm animate-pulse">
+                              <Icons.Alert className="w-2.5 h-2.5" />
+                              <span className="text-[8px] font-black uppercase">Horario Crítico</span>
+                            </div>
+                            {(inv as any).detectedTime && (
+                              <span className="bg-slate-900 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase shadow-md flex items-center gap-1">
+                                <Icons.Clock className="w-2 h-2" />
+                                {(inv as any).detectedTime}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-black text-emerald-600">
+                          {(() => { try { return (Number(inv.volumeM3) || 0).toFixed(3); } catch (e) { return "0.000"; } })()}m³
                         </p>
-                      )}
+                        <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tight">
+                          {(() => { try { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(inv.invoiceValue || 0); } catch (e) { return "$0"; } })()}
+                        </p>
+                        <button
+                          onClick={() => handleAddInvoiceToRoute(inv)}
+                          className="mt-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-sm"
+                        >
+                          Agregar
+                        </button>
+                      </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-black text-emerald-600">
-                        {(() => {
-                          try {
-                            return (Number(inv.volumeM3) || 0).toFixed(3);
-                          } catch (e) {
-                            return "0.000";
-                          }
-                        })()}m³
+                    {(inv.notes || (inv as any).detectedTime) && (
+                      <p className="text-[9px] text-amber-600 italic mt-2 line-clamp-2 font-bold bg-amber-50/50 px-2 py-1 rounded-lg border border-amber-100 w-full">
+                        "{inv.notes || `ENTREGA PRIORITARIA: ${(inv as any).detectedTime}`}"
                       </p>
-                      <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tight">
-                        {(() => {
-                          try {
-                            return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(inv.invoiceValue || 0);
-                          } catch (e) {
-                            return "$0";
-                          }
-                        })()}
-                      </p>
-                      <button
-                        onClick={() => handleAddInvoiceToRoute(inv)}
-                        className="mt-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-sm"
-                      >
-                        Agregar
-                      </button>
-                    </div>
+                    )}
                   </div>
                 ))
               })()}
