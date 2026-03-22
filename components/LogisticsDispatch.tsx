@@ -93,6 +93,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
     const [voucherModal, setVoucherModal]   = useState<{ isOpen: boolean; invoice: any } | null>(null);
     const [showReturnsModal, setShowReturnsModal] = useState(false);
+    const [routeSearch, setRouteSearch]     = useState('');
 
     // TAB HISTORIAL
     const [historyTab, setHistoryTab] = useState<'ENTREGAS' | 'DEVOLUCIONES'>('ENTREGAS');
@@ -590,19 +591,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         if (!address && !city) return null;
 
         try {
-            const params = new URLSearchParams();
-            if (address) params.set('address', address);
-            if (city) params.set('city', city);
-
-            // Llamar al backend proxy (sin CORS, con caché y rate-limit)
-            const res = await fetch(`/api/geocode?${params.toString()}`);
-            if (!res.ok) return null;
-            const data = await res.json();
-            if (data.success && data.coords) {
-                return data.coords as [number, number];
-            }
+            const data = await api.geocodeAddress({ address: address || '', city: city || '' });
+            if (data?.lat && data?.lng) return [data.lat, data.lng] as [number, number];
         } catch (e) {
-            console.warn('[M7-GEO] Error al llamar proxy geocoding:', e);
+            console.warn('[M7-GEO] Error geocoding:', e);
         }
         return null;
     };
@@ -1156,12 +1148,37 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     {/* Lista de Rutas Lateral - Más delgada y sólida */}
                     <div className="w-[340px] border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar p-4 space-y-3 shrink-0">
                         <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Unidades en Ruta</h3>
+
+                        {/* Buscador de rutas */}
+                        <div className="relative mb-1">
+                            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+                            <input
+                                type="text"
+                                placeholder="Buscar placa, conductor..."
+                                value={routeSearch}
+                                onChange={e => setRouteSearch(e.target.value.toUpperCase())}
+                                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold uppercase outline-none focus:border-emerald-400 transition-all"
+                            />
+                            {routeSearch && (
+                                <button onClick={() => setRouteSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    <Icons.X className="w-3 h-3 text-slate-300 hover:text-slate-500" />
+                                </button>
+                            )}
+                        </div>
+
                         {activeRoutes.length === 0 ? (
                             <div className="text-center p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Esperando despacho...</p>
                             </div>
                         ) : (
-                            activeRoutes.map((route) => {
+                            activeRoutes
+                            .filter(route => {
+                                if (!routeSearch) return true;
+                                const q = routeSearch.toLowerCase();
+                                return (route.plate || '').toLowerCase().includes(q)
+                                    || (route.driver_name || '').toLowerCase().includes(q);
+                            })
+                            .map((route) => {
                                 const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
                                 const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
                                     const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');

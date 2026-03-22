@@ -56,8 +56,9 @@ export const initDispatch = async (req: Request, res: Response) => {
             }
 
             await pool.query(`
-                INSERT INTO dispatch_signatures_pending (dispatch_id, user_id, role_type, signed, signed_at)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO dispatch_signatures_pending (id, dispatch_id, user_id, role_type, signed, signed_at)
+                SELECT COALESCE(MAX(id),0)+1, $1, $2, $3, $4, $5
+                FROM dispatch_signatures_pending
             `, [dispatchId, sig.userId, sig.role, isSigned, signedAt]);
         }
 
