@@ -656,6 +656,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(documents_l.plan_type) as "planType",
         MAX(documents_l.vehicle_plate) as "plate",
         MAX(documents_l.status) as "status",
+        MAX(document_items.item_status) as "itemStatus",
         MAX(da.id) as "dispatchId",
         MAX(da.status) as "dispatchStatus",
         MAX(pa.leader_id) as "pickerLeader",

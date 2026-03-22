@@ -126,7 +126,7 @@ export const api = {
   confirmDelivery(data: {
     invoiceId: string; dispatchId?: string; driverId: string; vehicleId?: string;
     deliveryType: 'FULL' | 'PARTIAL' | 'RETURN';
-    deliveredItems: any[]; notes?: string; returnReason?: string; password: string;
+    deliveredItems: any[]; notes?: string; returnReason?: string; password?: string;
   }) {
     return fetchJson(`${API_URL}/dispatch/confirm-delivery`, {
       method: 'POST',

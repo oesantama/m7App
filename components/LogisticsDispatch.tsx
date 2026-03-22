@@ -1080,7 +1080,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 // Actualización optimista: marcar factura como EN RUTA localmente
                 setRouteInvoices(prev => prev.map(inv =>
                     (inv.id === assigningInvoice.id || inv.invoiceNumber === assigningInvoice.invoiceNumber)
-                        ? { ...inv, status: 'EST-11' }
+                        ? { ...inv, itemStatus: 'EST-11' }
                         : inv
                 ));
                 setAssigningInvoice(null);
@@ -1121,7 +1121,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // ─── CONFIRMACIÓN ENTREGA AL CLIENTE ─────────────────────────────────────
     const handleConfirmDelivery = async () => {
         if (!deliveryModal?.invoice) return;
-        if (!deliveryPassword) { toast.error('Ingresa la contraseña del conductor'); return; }
 
         const inv = deliveryModal.invoice;
         const route = deliveryModal.route;
@@ -1142,18 +1141,24 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 deliveredItems: deliveryItems,
                 notes: deliveryNotes || undefined,
                 returnReason: deliveryReturnReason || undefined,
-                password: deliveryPassword,
             });
 
             if (res.success) {
+                const newItemStatus = deliveryType === 'FULL' ? 'EST-12' : deliveryType === 'PARTIAL' ? 'EST-13' : 'EST-01';
                 const msg = deliveryType === 'FULL'
                     ? '✅ Entrega completa registrada'
                     : deliveryType === 'PARTIAL'
                     ? '⚠️ Entrega parcial – devolución creada'
                     : '🔄 Devolución total registrada';
                 toast.success(msg);
+                // Optimistic update
+                setRouteInvoices(prev => prev.map(i =>
+                    (i.id === inv.id || i.invoiceNumber === inv.invoiceNumber)
+                        ? { ...i, itemStatus: newItemStatus }
+                        : i
+                ));
                 setDeliveryModal(null);
-                onRefresh(); // Refresca el estado de las facturas
+                onRefresh();
             }
         } catch (e: any) {
             toast.error(e.message || 'Error al confirmar entrega');
@@ -1533,8 +1538,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <h5 className="text-[14px] font-black text-slate-900">#{inv.invoiceNumber || inv.id}</h5>
-                                                        {inv.status === 'EST-12' && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-full">ENTREGADO</span>}
-                                                        {inv.status === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
+                                                        {(inv.itemStatus||inv.status) === 'EST-11' && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black rounded-full">EN RUTA</span>}
+                                                        {(inv.itemStatus||inv.status) === 'EST-12' && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-full">ENTREGADO</span>}
+                                                        {(inv.itemStatus||inv.status) === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
                                                         {hasPendingSignature && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black rounded-full animate-pulse">FIRMA</span>}
                                                     </div>
                                                     <p className="text-[10px] font-bold text-slate-500 uppercase leading-none">{inv.customerName || 'S/N'}</p>
@@ -1551,7 +1557,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 </button>
 
                                                 {/* DESPACHAR — si no ha sido enviado al camión aún */}
-                                                {!['EST-11','EST-12','EST-13','EST-14'].includes(inv.status) && !hasPendingSignature && (
+                                                {(() => {
+                                                    const ds = inv.itemStatus || inv.status || '';
+                                                    return !['EST-11','EST-12','EST-13','EST-14'].includes(ds) && !hasPendingSignature;
+                                                })() && (
                                                     <button
                                                         onClick={() => setAssigningInvoice(inv)}
                                                         className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg"
@@ -1562,7 +1571,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 )}
 
                                                 {/* ENTREGAR — cuando ya está en ruta y el usuario ya firmó */}
-                                                {inv.status === 'EST-11' && !hasPendingSignature && (
+                                                {(inv.itemStatus || inv.status) === 'EST-11' && !hasPendingSignature && (
                                                     <button
                                                         onClick={() => {
                                                             const items = (inv.items || []).map((it: any) => ({
@@ -1585,7 +1594,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 )}
 
                                                 {/* SUBIR SOPORTE — cuando ya fue entregado */}
-                                                {(inv.status === 'EST-12' || inv.status === 'EST-14') && (
+                                                {(['EST-12','EST-13','EST-14'].includes(inv.itemStatus || inv.status || '')) && (
                                                     <button
                                                         onClick={() => setVoucherModal({ isOpen: true, invoice: inv })}
                                                         className="px-4 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all flex items-center gap-2"

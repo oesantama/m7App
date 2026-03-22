@@ -235,21 +235,12 @@ export const confirmDelivery = async (req: Request, res: Response) => {
         deliveryType, deliveredItems = [], notes, returnReason, password
     } = req.body;
 
-    if (!invoiceId || !driverId || !deliveryType || !password) {
-        return res.status(400).json({ error: 'Faltan campos requeridos: invoiceId, driverId, deliveryType, password' });
+    if (!invoiceId || !driverId || !deliveryType) {
+        return res.status(400).json({ error: 'Faltan campos requeridos: invoiceId, driverId, deliveryType' });
     }
 
     try {
         await pool.query('BEGIN');
-
-        // 1. Validar contraseña del conductor
-        const userRes = await pool.query('SELECT password FROM users WHERE id = $1', [driverId]);
-        if (!userRes.rows.length) throw new Error('Conductor no encontrado');
-        const valid = await bcrypt.compare(password, userRes.rows[0].password);
-        if (!valid) {
-            await pool.query('ROLLBACK');
-            return res.status(401).json({ error: 'Contraseña del conductor incorrecta' });
-        }
 
         // 2. Determinar nuevo estado de la factura
         const statusMap: Record<string, string> = {
