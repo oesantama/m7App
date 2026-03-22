@@ -608,7 +608,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // Algoritmo Nearest-Neighbor para ruta óptima (Greedy TSP)
     const optimizeRouteOrder = (
         origin: [number, number],
-        points: { inv: any; coords: [number, number] }[]
+        points: { inv: any; coords: [number, number]; exact: boolean }[]
     ) => {
         if (points.length === 0) return [];
         const dist = (a: [number, number], b: [number, number]) =>
@@ -761,23 +761,56 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
         if (drawMapRunRef.current !== runId) return; // aborted after forEach
 
-        // Añadir marcador de regreso al HUB al final
-        points.push(L.latLng(origin[0], origin[1]));
+        // ── RUTA POR CALLES REALES (OSRM) ─────────────────────────────────
+        // Waypoints: HUB → paradas en orden optimizado → HUB
+        const waypointList = [
+            { lat: origin[0], lng: origin[1] },
+            ...optimized.map(({ coords }) => ({ lat: coords[0], lng: coords[1] })),
+            { lat: origin[0], lng: origin[1] }
+        ];
 
-        // Dibujar polyline con la ruta optimizada
-        if (points.length > 2 && mapRef.current) {
-            routePolylineRef.current = L.polyline(points, {
-                color: '#0ea5e9',
-                weight: 4,
-                opacity: 0.85,
-                dashArray: '8, 12'
-            }).addTo(mapRef.current);
+        // Todos los puntos para fitBounds (fallback y OSRM)
+        const allLatLngs = waypointList.map(w => L.latLng(w.lat, w.lng));
 
-            const bounds = L.latLngBounds(points);
-            mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 14 });
+        let usedRoadRoute = false;
+        try {
+            const roadData = await api.getRoadRoute(waypointList);
+            if (drawMapRunRef.current !== runId) return;
+            if (roadData?.coordinates?.length > 1) {
+                // OSRM devuelve [lng, lat] — Leaflet necesita [lat, lng]
+                const roadPoints = (roadData.coordinates as [number, number][])
+                    .map(([lng, lat]) => L.latLng(lat, lng));
+                routePolylineRef.current = L.polyline(roadPoints, {
+                    color: '#0ea5e9',
+                    weight: 5,
+                    opacity: 0.9,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(mapRef.current!);
+
+                const km   = ((roadData.distance_m || 0) / 1000).toFixed(1);
+                const mins = Math.round((roadData.duration_s || 0) / 60);
+                toast.success(`🚚 ${routeMarkersRef.current.length} paradas · ${km} km · ~${mins} min`, { duration: 5000 });
+                usedRoadRoute = true;
+            }
+        } catch (e) {
+            console.warn('[M7-OSRM] Fallback a líneas rectas:', e);
         }
 
-        toast.success(`🗺️ Ruta optimizada: ${routeMarkersRef.current.length} de ${data.length} puntos en mapa`, { duration: 4000, icon: '🚚' });
+        // Fallback: líneas rectas si OSRM falló
+        if (!usedRoadRoute && mapRef.current) {
+            routePolylineRef.current = L.polyline(allLatLngs, {
+                color: '#0ea5e9',
+                weight: 4,
+                opacity: 0.7,
+                dashArray: '8, 12'
+            }).addTo(mapRef.current);
+            toast.success(`🗺️ ${routeMarkersRef.current.length} de ${data.length} puntos en mapa`, { duration: 4000, icon: '🚚' });
+        }
+
+        if (mapRef.current) {
+            mapRef.current.fitBounds(L.latLngBounds(allLatLngs), { padding: [60, 60], maxZoom: 14 });
+        }
     };
 
     // 4. Efecto para cargar detalle de ruta y dibujar en mapa (visualizedRoute)

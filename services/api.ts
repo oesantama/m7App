@@ -373,6 +373,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }),
+  getRoadRoute: (waypoints: { lat: number; lng: number }[]) =>
+    fetchJson(`${API_URL}/routes/road-route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ waypoints })
+    }),
 
   getMastersuiteReport: (params?: { document?: string; plate?: string }) => {
     const qs = new URLSearchParams();

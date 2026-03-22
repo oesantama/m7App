@@ -265,3 +265,36 @@ export const geocodeAddress = async (req: Request, res: Response) => {
     res.json({ lat: 6.2518, lng: -75.5636, cached: false, fallback: true });
   }
 };
+
+// Ruteo real por calles via OSRM (OpenStreetMap) — proxy para evitar CORS
+export const getRoadRoute = async (req: Request, res: Response) => {
+  const { waypoints } = req.body as { waypoints: { lat: number; lng: number }[] };
+  if (!Array.isArray(waypoints) || waypoints.length < 2) {
+    return res.status(400).json({ error: 'Se requieren al menos 2 waypoints' });
+  }
+
+  // OSRM espera lng,lat (no lat,lng)
+  const coords = waypoints.map(wp => `${wp.lng},${wp.lat}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`;
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'OrbitM7-Logistics/1.0 (logistics@orbitm7.io)' },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) throw new Error(`OSRM status ${response.status}`);
+    const data = await response.json() as any;
+
+    if (data.code === 'Ok' && data.routes?.[0]?.geometry) {
+      return res.json({
+        coordinates: data.routes[0].geometry.coordinates, // [[lng,lat], ...]
+        distance_m:  data.routes[0].distance,
+        duration_s:  data.routes[0].duration
+      });
+    }
+    return res.status(404).json({ error: 'OSRM no encontró ruta' });
+  } catch (err: any) {
+    console.error('[M7-OSRM]', err.message);
+    return res.status(500).json({ error: 'Error al calcular ruta por calles' });
+  }
+};
