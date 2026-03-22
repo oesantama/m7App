@@ -95,6 +95,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [showReturnsModal, setShowReturnsModal] = useState(false);
     const [routeSearch, setRouteSearch]     = useState('');
     const drawMapRunRef = useRef<number>(0); // cancel concurrent drawRouteOnMap calls
+    const [mapRouteInfo, setMapRouteInfo] = useState<{
+        plate: string; driverName: string;
+        stops: { invNum: string; customer: string; items: number; estMin: number }[];
+        distanceKm: number; drivingMin: number; totalDeliveryMin: number;
+    } | null>(null);
 
     // TAB HISTORIAL
     const [historyTab, setHistoryTab] = useState<'ENTREGAS' | 'DEVOLUCIONES'>('ENTREGAS');
@@ -772,6 +777,23 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         // Todos los puntos para fitBounds (fallback y OSRM)
         const allLatLngs = waypointList.map(w => L.latLng(w.lat, w.lng));
 
+        // ── ESTIMADO DE ENTREGA POR PARADA ──────────────────────────────────
+        // Base 3 min + 0.5 min por cada 5 artículos + 3 min si requiere firma
+        const stopEstimates = optimized.map(({ inv }) => {
+            const items    = Number(inv.totalItems || inv.item_count || 1);
+            const baseMin  = 3;
+            const itemsMin = Math.ceil(items / 5);
+            const sigMin   = 2; // siempre hay recepción + firma
+            const estMin   = baseMin + itemsMin + sigMin;
+            return {
+                invNum:   String(inv.invoiceNumber || inv.id || ''),
+                customer: String(inv.customerName || ''),
+                items,
+                estMin
+            };
+        });
+        const totalDeliveryMin = stopEstimates.reduce((s, st) => s + st.estMin, 0);
+
         let usedRoadRoute = false;
         try {
             const roadData = await api.getRoadRoute(waypointList);
@@ -788,9 +810,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     lineCap: 'round'
                 }).addTo(mapRef.current!);
 
-                const km   = ((roadData.distance_m || 0) / 1000).toFixed(1);
-                const mins = Math.round((roadData.duration_s || 0) / 60);
-                toast.success(`🚚 ${routeMarkersRef.current.length} paradas · ${km} km · ~${mins} min`, { duration: 5000 });
+                const distKm    = (roadData.distance_m || 0) / 1000;
+                const drivingMn = Math.round((roadData.duration_s || 0) / 60);
+                setMapRouteInfo({
+                    plate:           visualizedRoute?.plate || '',
+                    driverName:      visualizedRoute?.driver_name || '',
+                    stops:           stopEstimates,
+                    distanceKm:      distKm,
+                    drivingMin:      drivingMn,
+                    totalDeliveryMin
+                });
                 usedRoadRoute = true;
             }
         } catch (e) {
@@ -805,7 +834,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 opacity: 0.7,
                 dashArray: '8, 12'
             }).addTo(mapRef.current);
-            toast.success(`🗺️ ${routeMarkersRef.current.length} de ${data.length} puntos en mapa`, { duration: 4000, icon: '🚚' });
+            setMapRouteInfo({
+                plate:           visualizedRoute?.plate || '',
+                driverName:      visualizedRoute?.driver_name || '',
+                stops:           stopEstimates,
+                distanceKm:      0,
+                drivingMin:      0,
+                totalDeliveryMin
+            });
         }
 
         if (mapRef.current) {
@@ -830,6 +866,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 routePolylineRef.current.remove();
                 routePolylineRef.current = null;
             }
+            setMapRouteInfo(null);
         }
     }, [visualizedRoute, selectedActiveRoute, invoices]);
 
@@ -1224,6 +1261,47 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     <div className="w-[340px] border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar p-4 space-y-3 shrink-0">
                         <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Unidades en Ruta</h3>
 
+                        {/* ── RESUMEN TOTAL DE TODAS LAS RUTAS ── */}
+                        {activeRoutes.length > 0 && (() => {
+                            const totalInvoices = activeRoutes.reduce((s, r) => s + (r.invoice_ids?.length || 0), 0);
+                            const totalVol = activeRoutes.reduce((s, r) => {
+                                return s + (r.invoice_ids || []).reduce((sv: number, id: string) => {
+                                    const inv = invoices.find(i => String(i.id).trim() === String(id).trim() || String(i.invoiceNumber).trim() === String(id).trim());
+                                    return sv + Number(inv?.volumeM3 || 0);
+                                }, 0);
+                            }, 0);
+                            const delivered = invoices.filter(i => ['EST-12','EST-14'].includes(i.status as string)).length;
+                            const pct = totalInvoices > 0 ? Math.round((delivered / totalInvoices) * 100) : 0;
+                            return (
+                                <div className="bg-slate-900 rounded-2xl p-3 mb-1 space-y-2">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Resumen Total de Despacho</p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="text-center">
+                                            <div className="text-lg font-black text-white">{activeRoutes.length}</div>
+                                            <div className="text-[7px] font-bold text-slate-500 uppercase">Rutas</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-lg font-black text-emerald-400">{totalInvoices}</div>
+                                            <div className="text-[7px] font-bold text-slate-500 uppercase">Facturas</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-lg font-black text-amber-400">{totalVol.toFixed(1)}</div>
+                                            <div className="text-[7px] font-bold text-slate-500 uppercase">m³</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between mb-1">
+                                            <span className="text-[7px] font-black text-slate-400 uppercase">Progreso entregas</span>
+                                            <span className="text-[8px] font-black text-emerald-400">{delivered}/{totalInvoices} · {pct}%</span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                            <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
                         {/* Buscador de rutas */}
                         <div className="relative mb-1">
                             <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
@@ -1315,6 +1393,75 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             <div className="w-px h-3 bg-white/20"></div>
                             <div className="text-[9px] font-black text-white">{vehicleLocations.length} Activos</div>
                         </div>
+
+                        {/* ── PANEL FLOTANTE DE RUTA ACTIVA ── */}
+                        {mapRouteInfo && (
+                            <div className="absolute top-4 right-4 z-[400] w-72 bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+                                {/* Header vehículo */}
+                                <div className="px-4 py-3 bg-slate-800/80 flex items-center justify-between border-b border-white/5">
+                                    <div className="flex items-center gap-2">
+                                        <Icons.Truck className="w-4 h-4 text-emerald-400" />
+                                        <span className="text-sm font-black text-white tracking-wider">{mapRouteInfo.plate || '—'}</span>
+                                    </div>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[110px]">{mapRouteInfo.driverName || 'Sin conductor'}</span>
+                                </div>
+
+                                {/* Stats de ruta */}
+                                {mapRouteInfo.distanceKm > 0 && (
+                                    <div className="grid grid-cols-3 divide-x divide-white/5 border-b border-white/5">
+                                        <div className="px-3 py-2 text-center">
+                                            <div className="text-base font-black text-sky-400">{mapRouteInfo.stops.length}</div>
+                                            <div className="text-[7px] font-bold text-slate-500 uppercase">Paradas</div>
+                                        </div>
+                                        <div className="px-3 py-2 text-center">
+                                            <div className="text-base font-black text-amber-400">{mapRouteInfo.distanceKm.toFixed(1)}</div>
+                                            <div className="text-[7px] font-bold text-slate-500 uppercase">km ruta</div>
+                                        </div>
+                                        <div className="px-3 py-2 text-center">
+                                            <div className="text-base font-black text-emerald-400">{mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin}</div>
+                                            <div className="text-[7px] font-bold text-slate-500 uppercase">min total</div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Desglose tiempo */}
+                                {mapRouteInfo.distanceKm > 0 && (
+                                    <div className="px-4 py-2 flex gap-3 text-[9px] border-b border-white/5">
+                                        <span className="text-slate-400">🚗 Conducción: <span className="text-white font-bold">{mapRouteInfo.drivingMin} min</span></span>
+                                        <span className="text-slate-400">📦 Entregas: <span className="text-white font-bold">{mapRouteInfo.totalDeliveryMin} min</span></span>
+                                    </div>
+                                )}
+
+                                {/* Lista de paradas con tiempo estimado */}
+                                <div className="max-h-56 overflow-y-auto custom-scrollbar">
+                                    {mapRouteInfo.stops.map((st, i) => (
+                                        <div key={i} className="flex items-center gap-2 px-4 py-2 border-b border-white/5 hover:bg-white/5 transition-all">
+                                            <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
+                                                <span className="text-[8px] font-black text-slate-300">{i + 1}</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[9px] font-black text-white truncate">#{st.invNum}</div>
+                                                <div className="text-[8px] text-slate-400 truncate">{st.customer}</div>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <div className="text-[9px] font-black text-amber-400">~{st.estMin} min</div>
+                                                <div className="text-[7px] text-slate-500">{st.items} art.</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Footer total */}
+                                <div className="px-4 py-2 bg-slate-800/60 flex justify-between items-center">
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase">Tiempo estimado total</span>
+                                    <span className="text-sm font-black text-emerald-400">
+                                        {Math.floor((mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin) / 60) > 0
+                                            ? `${Math.floor((mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin) / 60)}h ${(mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin) % 60}min`
+                                            : `${mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin} min`}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>
