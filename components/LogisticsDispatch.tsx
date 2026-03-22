@@ -575,28 +575,32 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     };
 
     // Geocodifica una dirección a través del BACKEND (proxy para evitar CORS con Nominatim)
-    const geocodeAddress = async (inv: any): Promise<[number, number] | null> => {
+    const geocodeAddress = async (inv: any): Promise<{ coords: [number, number]; exact: boolean } | null> => {
         const city = inv.city || inv.municipio || '';
         const address = inv.address || inv.direccion || inv.customerAddress || inv.shipAddress || '';
 
-        // Si las coordenadas propias son distintas al punto genérico de Medellín, usarlas
+        // Coordenadas propias distintas al genérico de Medellín → usar directamente
         if (inv.lat && inv.lng) {
             const lat = Number(inv.lat);
             const lng = Number(inv.lng);
             if (Math.abs(lat - 6.2518) > 0.001 || Math.abs(lng + 75.5636) > 0.001) {
-                return [lat, lng];
+                return { coords: [lat, lng], exact: true };
             }
         }
 
-        if (!address && !city) return null;
+        // Sin dirección ni ciudad → coordenada aproximada de Colombia centro
+        if (!address && !city) return { coords: [6.2518, -75.5636], exact: false };
 
         try {
             const data = await api.geocodeAddress({ address: address || '', city: city || '' });
-            if (data?.lat && data?.lng) return [data.lat, data.lng] as [number, number];
+            if (data?.lat && data?.lng) {
+                const exact = !data.fallback;
+                return { coords: [data.lat as number, data.lng as number], exact };
+            }
         } catch (e) {
             console.warn('[M7-GEO] Error geocoding:', e);
         }
-        return null;
+        return { coords: [6.2518, -75.5636], exact: false };
     };
 
 
@@ -641,24 +645,37 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         // Marcador de estado "cargando"
         const loadingToast = toast.loading(`📍 Geocodificando ${data.length} puntos de entrega...`);
 
-        // Geocodificar todas las facturas en paralelo (con pequeño delay para respetar Nominatim)
-        const geocoded: { inv: any; coords: [number, number] }[] = [];
+        // Geocodificar todas las facturas secuencialmente (caché BD = rápido en 2ª consulta)
+        const geocoded: { inv: any; coords: [number, number]; exact: boolean }[] = [];
         for (let i = 0; i < data.length; i++) {
             const inv = data[i];
-            const coords = await geocodeAddress(inv);
-            if (coords) {
-                geocoded.push({ inv, coords });
+            const result = await geocodeAddress(inv);
+            if (result) {
+                geocoded.push({ inv, coords: result.coords, exact: result.exact });
             }
-            // Pequeña pausa entre peticiones para no saturar Nominatim (1 req/seg)
-            if (i < data.length - 1) await new Promise(r => setTimeout(r, 300));
+            if (i < data.length - 1) await new Promise(r => setTimeout(r, 200));
         }
 
         toast.dismiss(loadingToast);
 
         if (geocoded.length === 0) {
-            toast.error('No se pudieron geocodificar las direcciones. Verifique ciudad y dirección en las facturas.');
+            toast.error('No se pudieron geocodificar las direcciones.');
             return;
         }
+
+        // Distribuir en espiral los puntos que cayeron en la misma coordenada (sin geocodificar exacto)
+        const seen = new Map<string, number>();
+        geocoded.forEach(g => {
+            const key = `${g.coords[0].toFixed(4)},${g.coords[1].toFixed(4)}`;
+            const count = seen.get(key) || 0;
+            if (count > 0) {
+                // Pequeño jitter en espiral para que sean visibles por separado
+                const angle = (count * 137.5 * Math.PI) / 180;
+                const radius = 0.003 * Math.ceil(count / 8);
+                g.coords = [g.coords[0] + radius * Math.cos(angle), g.coords[1] + radius * Math.sin(angle)];
+            }
+            seen.set(key, count + 1);
+        });
 
         // Ordenar puntos con Nearest-Neighbor desde el HUB M7
         const origin: [number, number] = [M7_HUB_ORIGIN.lat, M7_HUB_ORIGIN.lng];
@@ -667,14 +684,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         // Construir lista de puntos para la polyline
         const points: L.LatLng[] = [L.latLng(origin[0], origin[1])];
 
-        optimized.forEach(({ inv, coords }, idx) => {
+        optimized.forEach(({ inv, coords, exact }, idx) => {
             const pos = L.latLng(coords[0], coords[1]);
             points.push(pos);
 
-            // Color del marcador según estado
-            const isDelivered = inv.status === 'EST-11' || inv.status === 'COMPLETED' || inv.status === 'Entregado';
-            const markerColor = isDelivered ? '#10b981' : '#1e293b';
-            const textColor = isDelivered ? '#fff' : '#10b981';
+            // Color: verde=entregado, slate=pendiente, ámbar=ubicación aproximada
+            const isDelivered = ['EST-12', 'EST-14', 'COMPLETED', 'Entregado'].includes(inv.status);
+            const isApprox    = !exact;
+            const markerColor = isDelivered ? '#10b981' : isApprox ? '#f59e0b' : '#1e293b';
+            const borderColor = isDelivered ? '#059669' : isApprox ? '#d97706' : '#10b981';
+            const textColor   = '#fff';
 
             const icon = L.divIcon({
                 className: 'custom-invoice-marker',
@@ -682,15 +701,17 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     <div style="
                         width:32px; height:32px;
                         background:${markerColor};
-                        border:3px solid ${isDelivered ? '#059669' : '#10b981'};
+                        border:3px solid ${borderColor};
                         border-radius:50%;
                         display:flex; align-items:center; justify-content:center;
                         font-size:11px; font-weight:900; color:${textColor};
                         box-shadow:0 4px 12px rgba(0,0,0,0.3);
                         position:relative;
+                        ${isApprox ? 'opacity:0.75;' : ''}
                     ">
                         ${idx + 1}
-                        ${isDelivered ? '<div style="position:absolute;top:-2px;right:-2px;width:10px;height:10px;background:#10b981;border-radius:50%;border:2px solid white">✓</div>' : ''}
+                        ${isDelivered ? '<div style="position:absolute;top:-2px;right:-2px;width:10px;height:10px;background:#10b981;border-radius:50%;border:2px solid white;font-size:7px;display:flex;align-items:center;justify-content:center;">✓</div>' : ''}
+                        ${isApprox ? '<div style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:2px solid white;font-size:7px;display:flex;align-items:center;justify-content:center;">~</div>' : ''}
                     </div>
                 `,
                 iconSize: [32, 32],
@@ -711,6 +732,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <div style="height:1px; background:#f1f5f9; margin:4px 0"></div>
                         <div style="font-size:10px; font-weight:700; color:#475569; text-transform:uppercase">${inv.customerName || ''}</div>
                         <div style="font-size:10px; color:#64748b; margin-top:2px">📍 ${city}${city && address ? ' — ' : ''}${address}</div>
+                        ${isApprox ? '<div style="font-size:9px;color:#d97706;font-weight:700;margin-top:2px;">⚠ Ubicación aproximada</div>' : ''}
                         ${notes ? `<div style="font-size:9px; color:#94a3b8; margin-top:2px; font-style:italic">📝 ${notes}</div>` : ''}
                         <div style="margin-top:4px; font-size:9px; font-weight:900; color:${isDelivered ? '#10b981' : '#f59e0b'}">${statusLabel}</div>
                         <div style="font-size:9px; color:#94a3b8">${(Number(inv.volumeM3) || 0).toFixed(2)} m³</div>
