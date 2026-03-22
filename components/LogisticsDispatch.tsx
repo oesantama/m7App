@@ -94,6 +94,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [voucherModal, setVoucherModal]   = useState<{ isOpen: boolean; invoice: any } | null>(null);
     const [showReturnsModal, setShowReturnsModal] = useState(false);
     const [routeSearch, setRouteSearch]     = useState('');
+    const drawMapRunRef = useRef<number>(0); // cancel concurrent drawRouteOnMap calls
 
     // TAB HISTORIAL
     const [historyTab, setHistoryTab] = useState<'ENTREGAS' | 'DEVOLUCIONES'>('ENTREGAS');
@@ -575,7 +576,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     };
 
     // Geocodifica una dirección a través del BACKEND (proxy para evitar CORS con Nominatim)
-    const geocodeAddress = async (inv: any): Promise<{ coords: [number, number]; exact: boolean } | null> => {
+    const geocodeAddress = async (inv: any): Promise<{ coords: [number, number]; exact: boolean; cached: boolean } | null> => {
         const city = inv.city || inv.municipio || '';
         const address = inv.address || inv.direccion || inv.customerAddress || inv.shipAddress || '';
 
@@ -584,23 +585,23 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const lat = Number(inv.lat);
             const lng = Number(inv.lng);
             if (Math.abs(lat - 6.2518) > 0.001 || Math.abs(lng + 75.5636) > 0.001) {
-                return { coords: [lat, lng], exact: true };
+                return { coords: [lat, lng], exact: true, cached: true };
             }
         }
 
         // Sin dirección ni ciudad → coordenada aproximada de Colombia centro
-        if (!address && !city) return { coords: [6.2518, -75.5636], exact: false };
+        if (!address && !city) return { coords: [6.2518, -75.5636], exact: false, cached: true };
 
         try {
             const data = await api.geocodeAddress({ address: address || '', city: city || '' });
             if (data?.lat && data?.lng) {
                 const exact = !data.fallback;
-                return { coords: [data.lat as number, data.lng as number], exact };
+                return { coords: [data.lat as number, data.lng as number], exact, cached: !!data.cached };
             }
         } catch (e) {
             console.warn('[M7-GEO] Error geocoding:', e);
         }
-        return { coords: [6.2518, -75.5636], exact: false };
+        return { coords: [6.2518, -75.5636], exact: false, cached: false };
     };
 
 
@@ -634,6 +635,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const drawRouteOnMap = async (data: any[]) => {
         if (!mapRef.current || data.length === 0) return;
 
+        // Increment run counter — any older concurrent execution will detect the change and stop
+        const runId = ++drawMapRunRef.current;
+
         // Limpiar visualización previa
         routeMarkersRef.current.forEach(m => m.remove());
         routeMarkersRef.current = [];
@@ -645,33 +649,37 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         // Marcador de estado "cargando"
         const loadingToast = toast.loading(`📍 Geocodificando ${data.length} puntos de entrega...`);
 
-        // Geocodificar todas las facturas secuencialmente (caché BD = rápido en 2ª consulta)
+        // Geocodificar todas las facturas — omite delay si la respuesta viene de caché
         const geocoded: { inv: any; coords: [number, number]; exact: boolean }[] = [];
         for (let i = 0; i < data.length; i++) {
+            if (drawMapRunRef.current !== runId) { toast.dismiss(loadingToast); return; } // aborted
             const inv = data[i];
             const result = await geocodeAddress(inv);
             if (result) {
                 geocoded.push({ inv, coords: result.coords, exact: result.exact });
             }
-            if (i < data.length - 1) await new Promise(r => setTimeout(r, 200));
+            // Only throttle when NOT served from cache (geocodeAddress returns cached=true flag)
+            if (i < data.length - 1 && !(result as any)?.cached) {
+                await new Promise(r => setTimeout(r, 200));
+            }
         }
 
         toast.dismiss(loadingToast);
+        if (drawMapRunRef.current !== runId) return; // aborted after geocoding
 
         if (geocoded.length === 0) {
             toast.error('No se pudieron geocodificar las direcciones.');
             return;
         }
 
-        // Distribuir en espiral los puntos que cayeron en la misma coordenada (sin geocodificar exacto)
+        // Distribuir en espiral los puntos que cayeron en la misma coordenada (fallback)
         const seen = new Map<string, number>();
         geocoded.forEach(g => {
             const key = `${g.coords[0].toFixed(4)},${g.coords[1].toFixed(4)}`;
             const count = seen.get(key) || 0;
             if (count > 0) {
-                // Pequeño jitter en espiral para que sean visibles por separado
                 const angle = (count * 137.5 * Math.PI) / 180;
-                const radius = 0.003 * Math.ceil(count / 8);
+                const radius = 0.004 * Math.ceil(count / 8);
                 g.coords = [g.coords[0] + radius * Math.cos(angle), g.coords[1] + radius * Math.sin(angle)];
             }
             seen.set(key, count + 1);
@@ -685,6 +693,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         const points: L.LatLng[] = [L.latLng(origin[0], origin[1])];
 
         optimized.forEach(({ inv, coords, exact }, idx) => {
+            if (drawMapRunRef.current !== runId) return; // aborted mid-render
+            if (!mapRef.current) return;
+
             const pos = L.latLng(coords[0], coords[1]);
             points.push(pos);
 
@@ -693,71 +704,48 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const isApprox    = !exact;
             const markerColor = isDelivered ? '#10b981' : isApprox ? '#f59e0b' : '#1e293b';
             const borderColor = isDelivered ? '#059669' : isApprox ? '#d97706' : '#10b981';
-            const textColor   = '#fff';
 
+            // Wrap index in <span> to prevent Leaflet tagName error on text-node clicks
             const icon = L.divIcon({
                 className: 'custom-invoice-marker',
-                html: `
-                    <div style="
-                        width:32px; height:32px;
-                        background:${markerColor};
-                        border:3px solid ${borderColor};
-                        border-radius:50%;
-                        display:flex; align-items:center; justify-content:center;
-                        font-size:11px; font-weight:900; color:${textColor};
-                        box-shadow:0 4px 12px rgba(0,0,0,0.3);
-                        position:relative;
-                        ${isApprox ? 'opacity:0.75;' : ''}
-                    ">
-                        ${idx + 1}
-                        ${isDelivered ? '<div style="position:absolute;top:-2px;right:-2px;width:10px;height:10px;background:#10b981;border-radius:50%;border:2px solid white;font-size:7px;display:flex;align-items:center;justify-content:center;">✓</div>' : ''}
-                        ${isApprox ? '<div style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:2px solid white;font-size:7px;display:flex;align-items:center;justify-content:center;">~</div>' : ''}
-                    </div>
-                `,
+                html: `<div style="width:32px;height:32px;background:${markerColor};border:3px solid ${borderColor};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.3);position:relative;${isApprox ? 'opacity:0.75;' : ''}"><span>${idx + 1}</span>${isDelivered ? '<div style="position:absolute;top:-2px;right:-2px;width:10px;height:10px;background:#10b981;border-radius:50%;border:2px solid white;"></div>' : ''}${isApprox ? '<div style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;background:#f59e0b;border-radius:50%;border:2px solid white;"></div>' : ''}</div>`,
                 iconSize: [32, 32],
                 iconAnchor: [16, 16]
             });
 
-            const city = inv.city || '';
-            const address = inv.address || inv.customerAddress || 'Sin dirección';
-            const notes = inv.notes || inv.observaciones || '';
+            const city    = String(inv.city || '');
+            const address = String(inv.address || inv.customerAddress || 'Sin dirección');
+            const notes   = String(inv.notes || inv.observaciones || '');
+            const name    = String(inv.customerName || '');
+            const invNum  = String(inv.invoiceNumber || inv.id || '');
+            const vol     = (Number(inv.volumeM3) || 0).toFixed(2);
             const statusLabel = isDelivered ? '✅ ENTREGADO' : '⏳ PENDIENTE';
 
             const marker = L.marker(pos, { icon })
-                .addTo(mapRef.current!)
-                .bindPopup(`
-                    <div style="min-width:180px; font-family:system-ui; padding:4px">
-                        <div style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:.05em">Entrega #${idx + 1}</div>
-                        <div style="font-size:13px; font-weight:900; color:#0f172a; margin:2px 0">#${inv.invoiceNumber || inv.id}</div>
-                        <div style="height:1px; background:#f1f5f9; margin:4px 0"></div>
-                        <div style="font-size:10px; font-weight:700; color:#475569; text-transform:uppercase">${inv.customerName || ''}</div>
-                        <div style="font-size:10px; color:#64748b; margin-top:2px">📍 ${city}${city && address ? ' — ' : ''}${address}</div>
-                        ${isApprox ? '<div style="font-size:9px;color:#d97706;font-weight:700;margin-top:2px;">⚠ Ubicación aproximada</div>' : ''}
-                        ${notes ? `<div style="font-size:9px; color:#94a3b8; margin-top:2px; font-style:italic">📝 ${notes}</div>` : ''}
-                        <div style="margin-top:4px; font-size:9px; font-weight:900; color:${isDelivered ? '#10b981' : '#f59e0b'}">${statusLabel}</div>
-                        <div style="font-size:9px; color:#94a3b8">${(Number(inv.volumeM3) || 0).toFixed(2)} m³</div>
-                    </div>
-                `);
+                .addTo(mapRef.current)
+                .bindPopup(`<div style="min-width:180px;font-family:system-ui;padding:4px"><div style="font-size:9px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.05em">Entrega #${idx + 1}</div><div style="font-size:13px;font-weight:900;color:#0f172a;margin:2px 0">#${invNum}</div><div style="height:1px;background:#f1f5f9;margin:4px 0"></div><div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase">${name}</div><div style="font-size:10px;color:#64748b;margin-top:2px">📍 ${city}${city && address ? ' — ' : ''}${address}</div>${isApprox ? '<div style="font-size:9px;color:#d97706;font-weight:700;margin-top:2px;">⚠ Ubicación aproximada</div>' : ''}${notes ? '<div style="font-size:9px;color:#94a3b8;margin-top:2px;font-style:italic">📝 ' + notes + '</div>' : ''}<div style="margin-top:4px;font-size:9px;font-weight:900;color:${isDelivered ? '#10b981' : '#f59e0b'}">${statusLabel}</div><div style="font-size:9px;color:#94a3b8">${vol} m³</div></div>`);
             routeMarkersRef.current.push(marker);
         });
+
+        if (drawMapRunRef.current !== runId) return; // aborted after forEach
 
         // Añadir marcador de regreso al HUB al final
         points.push(L.latLng(origin[0], origin[1]));
 
         // Dibujar polyline con la ruta optimizada
-        if (points.length > 2) {
+        if (points.length > 2 && mapRef.current) {
             routePolylineRef.current = L.polyline(points, {
                 color: '#0ea5e9',
                 weight: 4,
                 opacity: 0.85,
                 dashArray: '8, 12'
-            }).addTo(mapRef.current!);
+            }).addTo(mapRef.current);
 
             const bounds = L.latLngBounds(points);
             mapRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 14 });
         }
 
-        toast.success(`🗺️ Ruta optimizada: ${optimized.length} de ${data.length} puntos geocodificados`, { duration: 4000, icon: '🚚' });
+        toast.success(`🗺️ Ruta optimizada: ${routeMarkersRef.current.length} de ${data.length} puntos en mapa`, { duration: 4000, icon: '🚚' });
     };
 
     // 4. Efecto para cargar detalle de ruta y dibujar en mapa (visualizedRoute)
@@ -1196,9 +1184,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             activeRoutes
                             .filter(route => {
                                 if (!routeSearch) return true;
-                                const q = routeSearch.toLowerCase();
-                                return (route.plate || '').toLowerCase().includes(q)
-                                    || (route.driver_name || '').toLowerCase().includes(q);
+                                const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                                const q = norm(routeSearch);
+                                return norm(route.plate || '').includes(q)
+                                    || norm(route.driver_name || '').includes(q);
                             })
                             .map((route) => {
                                 const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
@@ -1314,10 +1303,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 custom-scrollbar bg-slate-50/50">
                             {routeInvoices
                                 .filter(inv => {
-                                    const query = invoiceSearchQuery.toLowerCase();
-                                    return (inv.invoiceNumber || "").toLowerCase().includes(query) || 
-                                           (inv.customerName || "").toLowerCase().includes(query) ||
-                                           (inv.id || "").toLowerCase().includes(query);
+                                    if (!invoiceSearchQuery) return true;
+                                    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                                    const query = norm(invoiceSearchQuery);
+                                    return norm(String(inv.invoiceNumber || '')).includes(query) ||
+                                           norm(String(inv.customerName  || '')).includes(query) ||
+                                           norm(String(inv.id            || '')).includes(query);
                                 })
                                 .map((inv: any, idx: number) => {
                                     const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
