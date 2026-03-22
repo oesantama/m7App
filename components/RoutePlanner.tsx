@@ -2002,7 +2002,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     if (isScan) {
                       // Estrategia 1: formato DIAN PDF417/QR → NumFac:XXXXXXX
                       let invoiceNum: string | null = null;
-                      const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+?)(?=[A-Z][a-z]|\s|$)/i);
+                      const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
                       if (numFacMatch) invoiceNum = numFacMatch[1].toUpperCase();
 
                       // Estrategia 2: buscar patrón alfanumérico en lista de facturas
@@ -2025,6 +2025,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       if (invoiceNum) {
                         const match = unassignedInvoices.find(
                           inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+                               || (inv.id || '').toUpperCase().includes(invoiceNum)
                         );
                         if (match) {
                           handleAddInvoiceToRoute(match);

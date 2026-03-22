@@ -1029,16 +1029,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const handleConfirmDispatch = async () => {
         if (!assigningInvoice) return;
         const totalScanned = Object.values(scannedItems).reduce((a,b)=>a+b, 0);
-        if (totalScanned === 0) {
-            toast.error("Debe escanear al menos un artículo.");
-            return;
-        }
         const totalExpected = (assigningInvoice.items || []).reduce((a: any, b: any) => a + Number(b.qty || b.expectedQty || 0), 0);
-        if (totalScanned < totalExpected) {
+        if (totalExpected > 0 && totalScanned > 0 && totalScanned < totalExpected) {
              setConfirmModal({
                 isOpen: true,
-                title: "Entrega Parcial",
-                message: `Faltan artículos (${totalScanned}/${totalExpected}). ¿Continuar?`,
+                title: "Artículos incompletos",
+                message: `Solo se escanearon ${totalScanned} de ${totalExpected} artículos. ¿Continuar con el despacho?`,
                 onConfirm: processDispatchConfirmation
              });
              return;
@@ -1049,25 +1045,23 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const processDispatchConfirmation = async () => {
         if (!assigningInvoice) return;
         const route = activeRoutes.find(r => r.id === (assigningInvoice.route_id || assigningInvoice.routeId));
-        // Priorizar conductor vinculado a la ruta
         const actualDriver = drivers.find(d => d.id === route?.driver_id || d.id === route?.driverId);
 
-        if ((signNowMap[user.id] !== false && !signatureKeys[user.id])) {
-            toast.error(`Falta firma de ${user.name}`); return;
-        }
-        if (actualDriver && signNowMap[actualDriver.id] !== false && !signatureKeys[actualDriver.id]) {
-            toast.error(`Falta firma de ${actualDriver.name}`); return;
+        // Solo requerir firma del despachador. El conductor firma con FIRMAR (paso separado).
+        if (signNowMap[user.id] !== false && !signatureKeys[user.id]) {
+            toast.error(`Falta su firma de despachador`); return;
         }
 
         setIsValidating(true);
         try {
             const signatures = [];
             signatures.push({ userId: user.id, role: 'DISPATCHER', signNow: signNowMap[user.id] !== false, password: signatureKeys[user.id] });
-            if (actualDriver) signatures.push({ userId: actualDriver.id, role: 'DRIVER', signNow: signNowMap[actualDriver.id] !== false, password: signatureKeys[actualDriver.id] });
-            
+            // Conductor firma en diferido (FIRMAR), no se bloquea aquí
+            if (actualDriver) signatures.push({ userId: actualDriver.id, role: 'DRIVER', signNow: false, password: '' });
+
             if (isAccompanied) {
                 selectedHelpers.slice(0, helperCount).forEach(hid => {
-                    if (hid) signatures.push({ userId: hid, role: 'HELPER', signNow: signNowMap[hid] !== false, password: signatureKeys[hid] });
+                    if (hid) signatures.push({ userId: hid, role: 'HELPER', signNow: false, password: '' });
                 });
             }
 
@@ -1082,11 +1076,17 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 signatures
             });
             if (res.success) {
-                toast.success("Despacho exitoso");
+                toast.success("✅ Despacho confirmado — el conductor debe FIRMAR para proceder");
+                // Actualización optimista: marcar factura como EN RUTA localmente
+                setRouteInvoices(prev => prev.map(inv =>
+                    (inv.id === assigningInvoice.id || inv.invoiceNumber === assigningInvoice.invoiceNumber)
+                        ? { ...inv, status: 'EST-11' }
+                        : inv
+                ));
                 setAssigningInvoice(null);
                 setScannedItems({});
-                onRefresh();
                 fetchPendingSignatures();
+                onRefresh();
             }
         } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
     };
@@ -1561,8 +1561,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     </button>
                                                 )}
 
-                                                {/* ENTREGAR — cuando ya está en ruta */}
-                                                {inv.status === 'EST-11' && (
+                                                {/* ENTREGAR — cuando ya está en ruta y el usuario ya firmó */}
+                                                {inv.status === 'EST-11' && !hasPendingSignature && (
                                                     <button
                                                         onClick={() => {
                                                             const items = (inv.items || []).map((it: any) => ({
