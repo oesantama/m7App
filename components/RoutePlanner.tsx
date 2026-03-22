@@ -1917,7 +1917,14 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       )}
 
       {/* Modal para Agregar Facturas Pendientes */}
-      {addInvoiceModal.isOpen && (
+      {addInvoiceModal.isOpen && (() => {
+        const activeRoute = addInvoiceModal.routeIndex !== null ? suggestedRoutes[addInvoiceModal.routeIndex] : null;
+        const routeInvCount  = activeRoute?.assignedInvoices?.length ?? 0;
+        const routeVolUsed   = activeRoute?.assignedInvoices?.reduce((s, i) => s + (Number(i.volumeM3) || 0), 0) ?? 0;
+        const vehicleCapacity = Number((activeRoute?.vehicle as any)?.capacityM3 || (activeRoute?.vehicle as any)?.capacity_m3 || 0);
+        const plate      = (activeRoute?.vehicle as any)?.plate || '—';
+        const driverName = (activeRoute?.vehicle as any)?.driverName || (activeRoute?.vehicle as any)?.driver_name || 'Sin conductor';
+        return (
         <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-300">
             <div className="p-8 border-b border-slate-100 flex flex-col gap-4 bg-emerald-50 rounded-t-[2.5rem] shrink-0">
@@ -1928,26 +1935,37 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Agregar Factura</h3>
-                    <div className="flex items-center gap-3">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">Seleccione una factura pendiente</p>
-                      <div className="flex items-center gap-2">
-                        <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                        <div className="flex gap-2">
-                          <div className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md text-[8px] font-black uppercase">
-                            UN ORIG (N): {unassignedCounts.planNormal}
-                          </div>
-                          <div className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-[8px] font-black uppercase">
-                            UN ORIG (R): {unassignedCounts.planR}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Seleccione una factura pendiente</p>
                   </div>
                 </div>
                 <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null }); setModalSearchTerm(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
                   <Icons.X className="w-5 h-5 text-slate-400" />
                 </button>
               </div>
+
+              {/* Datos del vehículo destino */}
+              {activeRoute && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 bg-slate-900 text-white rounded-xl px-3 py-1.5">
+                    <Icons.Truck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-[11px] font-black uppercase tracking-wider">{plate}</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 border border-slate-200">
+                    <Icons.User className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-[11px] font-bold text-slate-600 uppercase truncate max-w-[160px]">{driverName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 border border-slate-200">
+                    <Icons.Package className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="text-[11px] font-black text-slate-700">{routeInvCount} fact.</span>
+                  </div>
+                  <div className={`flex items-center gap-2 rounded-xl px-3 py-1.5 border ${vehicleCapacity > 0 && routeVolUsed / vehicleCapacity > 0.9 ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
+                    <Icons.Box className="w-3.5 h-3.5 text-amber-400" />
+                    <span className={`text-[11px] font-black ${vehicleCapacity > 0 && routeVolUsed / vehicleCapacity > 0.9 ? 'text-rose-600' : 'text-slate-700'}`}>
+                      {routeVolUsed.toFixed(2)} / {vehicleCapacity > 0 ? vehicleCapacity.toFixed(2) : '—'} m³
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="relative">
                 <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
@@ -1967,39 +1985,40 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       }
                     };
 
-                    // Suprimir chars residuales tras un scan — reiniciar timer en cada char
+                    // ── SUPRIMIR chars residuales post-scan ──
+                    // Usamos React state (no DOM) para que el input controlado quede realmente vacío
                     if (scanSuppressRef.current) {
                       clearTimeout(scanSuppressRef.current);
                       scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-                      if (addInvoiceInputRef.current) addInvoiceInputRef.current.value = '';
+                      setModalSearchTerm('');
                       return;
                     }
 
                     // ── DETECCIÓN DE SCAN (pistola/QR) ──
-                    // Criterio: contenido largo o con el prefijo DIAN ↓
-                    const isScan = raw.length > 15 || /NumFac/i.test(raw);
+                    // Solo dispara si contiene prefijo DIAN "NumFac" O si el texto llega muy largo
+                    // de golpe (> 50 chars). Evita falsos positivos al escribir manualmente.
+                    const isScan = raw.length > 50 || /NumFac/i.test(raw);
 
                     if (isScan) {
-                      // Estrategia 1: formato DIAN PDF417/QR  →  NumFac:XXXXXXX
+                      // Estrategia 1: formato DIAN PDF417/QR → NumFac:XXXXXXX
                       let invoiceNum: string | null = null;
                       const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+?)(?=[A-Z][a-z]|\s|$)/i);
                       if (numFacMatch) invoiceNum = numFacMatch[1].toUpperCase();
 
-                      // Estrategia 2: buscar cualquier código letra+dígitos que exista en las facturas
+                      // Estrategia 2: buscar patrón alfanumérico en lista de facturas
                       if (!invoiceNum) {
                         const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
                         for (const c of candidates) {
                           if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
-                            invoiceNum = c;
-                            break;
+                            invoiceNum = c; break;
                           }
                         }
-                        // Estrategia 3: primer candidato aunque no coincida (para mostrarlo en buscador)
+                        // Estrategia 3: primer candidato como filtro
                         if (!invoiceNum && candidates.length > 0) invoiceNum = candidates[0];
                       }
 
-                      // Limpiar, suprimir residuales y refocalizar
-                      clearAll();
+                      // Limpiar estado React y activar supresión
+                      setModalSearchTerm('');
                       if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
                       scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
 
@@ -2010,9 +2029,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         if (match) {
                           handleAddInvoiceToRoute(match);
                         } else {
-                          // Dejar el número en el buscador para que el usuario lo vea
-                          setModalSearchTerm(invoiceNum);
-                          if (addInvoiceInputRef.current) addInvoiceInputRef.current.value = invoiceNum;
+                          setModalSearchTerm(invoiceNum); // mostrar número en buscador si no está en lista
                         }
                       }
                       return;
@@ -2026,7 +2043,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         (inv.invoiceNumber || '').toLowerCase().includes(term) ||
                         (inv.orderNumber  || '').toLowerCase().includes(term)
                       );
-                      if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); clearAll(); }
+                      if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); setModalSearchTerm(''); }
                     }
                   }}
                   className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
@@ -2122,7 +2139,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Modal Reasignar Vehículo */}
       {swapVehicleModal.isOpen && (
