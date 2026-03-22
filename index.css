@@ -49,8 +49,16 @@ body {
   display: none !important;
 }
 .m7-premium-popup,
-.vehicle-premium-popup {
+.vehicle-premium-popup,
+.m7-map-popup {
   filter: drop-shadow(0 20px 25px rgba(0, 0, 0, 0.2));
+}
+.m7-map-popup .leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+.m7-map-popup .leaflet-popup-content {
+  width: 240px !important;
 }
 .custom-m7-pin,
 .custom-vehicle-icon {

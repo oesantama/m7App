@@ -721,9 +721,41 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const vol     = (Number(inv.volumeM3) || 0).toFixed(2);
             const statusLabel = isDelivered ? '✅ ENTREGADO' : '⏳ PENDIENTE';
 
+            const statusBg  = isDelivered ? '#d1fae5' : '#fef3c7';
+            const statusClr = isDelivered ? '#065f46' : '#92400e';
+            const popupHtml = `
+<div style="font-family:system-ui,sans-serif;width:240px;border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.18);">
+  <!-- Header -->
+  <div style="background:${markerColor};padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div style="font-size:9px;font-weight:900;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.08em;">Parada ${idx + 1} de ${optimized.length}</div>
+      <div style="font-size:15px;font-weight:900;color:#fff;margin-top:2px;">#${invNum}</div>
+    </div>
+    <div style="background:rgba(255,255,255,.2);border-radius:8px;padding:4px 8px;font-size:9px;font-weight:900;color:#fff;text-transform:uppercase;">${isDelivered ? '✓ OK' : '⏳'}</div>
+  </div>
+  <!-- Body -->
+  <div style="background:#fff;padding:10px 14px;">
+    <!-- Cliente -->
+    <div style="font-size:12px;font-weight:900;color:#0f172a;text-transform:uppercase;line-height:1.2;">${name || '—'}</div>
+    <!-- Dirección -->
+    <div style="display:flex;align-items:flex-start;gap:4px;margin-top:6px;">
+      <span style="font-size:11px;color:#64748b;margin-top:1px;">📍</span>
+      <div style="font-size:11px;color:#475569;font-weight:600;line-height:1.4;">${address}${city ? '<span style="color:#94a3b8;"> · ' + city + '</span>' : ''}</div>
+    </div>
+    ${isApprox ? '<div style="margin-top:5px;background:#fef3c7;border-radius:6px;padding:3px 8px;font-size:9px;font-weight:900;color:#92400e;">⚠ Ubicación aproximada</div>' : ''}
+    ${notes ? '<div style="margin-top:5px;background:#f8fafc;border-radius:6px;padding:4px 8px;font-size:10px;color:#64748b;font-style:italic;">📝 ' + notes + '</div>' : ''}
+    <!-- Separador -->
+    <div style="height:1px;background:#f1f5f9;margin:8px 0;"></div>
+    <!-- Estado + Volumen -->
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="background:${statusBg};border-radius:20px;padding:3px 10px;font-size:10px;font-weight:900;color:${statusClr};">${statusLabel}</div>
+      <div style="font-size:10px;color:#94a3b8;font-weight:700;">${vol} m³</div>
+    </div>
+  </div>
+</div>`;
             const marker = L.marker(pos, { icon })
                 .addTo(mapRef.current)
-                .bindPopup(`<div style="min-width:180px;font-family:system-ui;padding:4px"><div style="font-size:9px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.05em">Entrega #${idx + 1}</div><div style="font-size:13px;font-weight:900;color:#0f172a;margin:2px 0">#${invNum}</div><div style="height:1px;background:#f1f5f9;margin:4px 0"></div><div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase">${name}</div><div style="font-size:10px;color:#64748b;margin-top:2px">📍 ${city}${city && address ? ' — ' : ''}${address}</div>${isApprox ? '<div style="font-size:9px;color:#d97706;font-weight:700;margin-top:2px;">⚠ Ubicación aproximada</div>' : ''}${notes ? '<div style="font-size:9px;color:#94a3b8;margin-top:2px;font-style:italic">📝 ' + notes + '</div>' : ''}<div style="margin-top:4px;font-size:9px;font-weight:900;color:${isDelivered ? '#10b981' : '#f59e0b'}">${statusLabel}</div><div style="font-size:9px;color:#94a3b8">${vol} m³</div></div>`);
+                .bindPopup(popupHtml, { maxWidth: 260, className: 'm7-map-popup' });
             routeMarkersRef.current.push(marker);
         });
 
