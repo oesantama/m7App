@@ -223,8 +223,21 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       if (points.length > 1) {
-        L.polyline(points, { color: dotColor, weight: 2.5, opacity: 0.8, dashArray: '8,5' }).addTo(map);
         map.fitBounds(L.latLngBounds(points), { padding: [24, 24] });
+
+        // Intentar ruta real por calles via OSRM
+        try {
+          const waypoints = points.map(p => ({ lat: p.lat, lng: p.lng }));
+          const roadData = await api.getRoadRoute(waypoints);
+          if (!cancelled && roadData?.coordinates?.length > 1) {
+            const latlngs = roadData.coordinates.map(([lng, lat]: [number, number]) => L.latLng(lat, lng));
+            L.polyline(latlngs, { color: dotColor, weight: 3.5, opacity: 0.85 }).addTo(map);
+          } else {
+            L.polyline(points, { color: dotColor, weight: 2.5, opacity: 0.7, dashArray: '8,5' }).addTo(map);
+          }
+        } catch {
+          if (!cancelled) L.polyline(points, { color: dotColor, weight: 2.5, opacity: 0.7, dashArray: '8,5' }).addTo(map);
+        }
       }
       routePreviewMapRef.current = map;
     }, 250);
