@@ -1959,7 +1959,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     <span className="text-[11px] font-black text-slate-700">{routeInvCount} fact.</span>
                   </div>
                   <div className={`flex items-center gap-2 rounded-xl px-3 py-1.5 border ${vehicleCapacity > 0 && routeVolUsed / vehicleCapacity > 0.9 ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
-                    <Icons.Box className="w-3.5 h-3.5 text-amber-400" />
+                    <Icons.Package className="w-3.5 h-3.5 text-amber-400" />
                     <span className={`text-[11px] font-black ${vehicleCapacity > 0 && routeVolUsed / vehicleCapacity > 0.9 ? 'text-rose-600' : 'text-slate-700'}`}>
                       {routeVolUsed.toFixed(2)} / {vehicleCapacity > 0 ? vehicleCapacity.toFixed(2) : '—'} m³
                     </span>
