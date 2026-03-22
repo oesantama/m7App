@@ -142,7 +142,25 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return fetchJson(`${API_URL}/dispatch/return-history${qs ? '?' + qs : ''}`);
   },
-
+  uploadVoucher(data: {
+    invoiceId: string; dispatchId?: string; fileData: string; fileName: string;
+    fileType: string; fileHash: string; paymentType?: string; amount?: number;
+    bankName?: string; notes?: string; uploadedBy?: string;
+  }) {
+    return fetchJson(`${API_URL}/dispatch/voucher`, { method: 'POST', body: JSON.stringify(data) });
+  },
+  getVouchers(invoiceId: string) {
+    return fetchJson(`${API_URL}/dispatch/vouchers/${encodeURIComponent(invoiceId)}`);
+  },
+  getVoucherFile(id: number) {
+    return fetchJson(`${API_URL}/dispatch/voucher-file/${id}`);
+  },
+  getPendingReturns() {
+    return fetchJson(`${API_URL}/dispatch/returns-pending`);
+  },
+  updateReturnStatus(id: number, data: { status: string; notes?: string }) {
+    return fetchJson(`${API_URL}/dispatch/returns/${id}/status`, { method: 'PUT', body: JSON.stringify(data) });
+  },
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO

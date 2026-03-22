@@ -1952,48 +1952,74 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   value={modalSearchTerm}
                   onChange={(e) => {
                     const raw = e.target.value;
-
-                    const clearDom = () => {
-                      if (addInvoiceInputRef.current) addInvoiceInputRef.current.value = '';
-                    };
-                    const clearInput = () => {
+                    const clearAll = () => {
                       setModalSearchTerm('');
-                      clearDom();
+                      if (addInvoiceInputRef.current) {
+                        addInvoiceInputRef.current.value = '';
+                        addInvoiceInputRef.current.focus();
+                      }
                     };
 
-                    // Suprimir chars residuales del scanner — reiniciar timer en cada char
+                    // Suprimir chars residuales tras un scan — reiniciar timer en cada char
                     if (scanSuppressRef.current) {
                       clearTimeout(scanSuppressRef.current);
                       scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-                      clearDom();
+                      if (addInvoiceInputRef.current) addInvoiceInputRef.current.value = '';
                       return;
                     }
 
-                    // Factura electrónica colombiana PDF417 — extrae NumFac
-                    // Lookahead (?=[A-Z][a-z]|\s|$) evita capturar el campo siguiente (FecFac, NitOFE…)
-                    const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)(?=[A-Z][a-z]|\s|$)/);
-                    if (numFacMatch) {
-                      const invoiceNum = numFacMatch[1].trim().toUpperCase();
-                      clearInput();
+                    // ── DETECCIÓN DE SCAN (pistola/QR) ──
+                    // Criterio: contenido largo o con el prefijo DIAN ↓
+                    const isScan = raw.length > 15 || /NumFac/i.test(raw);
+
+                    if (isScan) {
+                      // Estrategia 1: formato DIAN PDF417/QR  →  NumFac:XXXXXXX
+                      let invoiceNum: string | null = null;
+                      const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+?)(?=[A-Z][a-z]|\s|$)/i);
+                      if (numFacMatch) invoiceNum = numFacMatch[1].toUpperCase();
+
+                      // Estrategia 2: buscar cualquier código letra+dígitos que exista en las facturas
+                      if (!invoiceNum) {
+                        const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                        for (const c of candidates) {
+                          if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
+                            invoiceNum = c;
+                            break;
+                          }
+                        }
+                        // Estrategia 3: primer candidato aunque no coincida (para mostrarlo en buscador)
+                        if (!invoiceNum && candidates.length > 0) invoiceNum = candidates[0];
+                      }
+
+                      // Limpiar, suprimir residuales y refocalizar
+                      clearAll();
                       if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
                       scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-                      const match = unassignedInvoices.find(inv =>
-                        (inv.invoiceNumber || '').toUpperCase() === invoiceNum
-                      );
-                      if (match) handleAddInvoiceToRoute(match);
-                      else setModalSearchTerm(invoiceNum);
+
+                      if (invoiceNum) {
+                        const match = unassignedInvoices.find(
+                          inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+                        );
+                        if (match) {
+                          handleAddInvoiceToRoute(match);
+                        } else {
+                          // Dejar el número en el buscador para que el usuario lo vea
+                          setModalSearchTerm(invoiceNum);
+                          if (addInvoiceInputRef.current) addInvoiceInputRef.current.value = invoiceNum;
+                        }
+                      }
                       return;
                     }
 
-                    // Búsqueda manual normal
+                    // ── ESCRITURA MANUAL ──
                     setModalSearchTerm(raw.toUpperCase());
                     if (raw.length >= 4) {
                       const term = raw.toLowerCase();
                       const matches = unassignedInvoices.filter(inv =>
                         (inv.invoiceNumber || '').toLowerCase().includes(term) ||
-                        (inv.orderNumber || '').toLowerCase().includes(term)
+                        (inv.orderNumber  || '').toLowerCase().includes(term)
                       );
-                      if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); clearInput(); }
+                      if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); clearAll(); }
                     }
                   }}
                   className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"

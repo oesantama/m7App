@@ -7,12 +7,15 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import { Route, Invoice } from '../types';
 import DeliveryHistoryModal from './Logistics/DeliveryHistoryModal';
 import CustomerDeliveryModal from './Logistics/CustomerDeliveryModal';
 import DispatchControlModal from './Logistics/DispatchControlModal';
 import SignatureInputModal from './Logistics/SignatureInputModal';
 import GenericConfirmModal from './Logistics/GenericConfirmModal';
+import PaymentVoucherModal from './Logistics/PaymentVoucherModal';
+import ReturnsControlModal from './Logistics/ReturnsControlModal';
 
 interface LogisticsDispatchProps {
     user: any;
@@ -88,6 +91,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [deliveryReturnReason, setDeliveryReturnReason] = useState('');
     const [deliveryPassword, setDeliveryPassword] = useState('');
     const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+    const [voucherModal, setVoucherModal]   = useState<{ isOpen: boolean; invoice: any } | null>(null);
+    const [showReturnsModal, setShowReturnsModal] = useState(false);
 
     // TAB HISTORIAL
     const [historyTab, setHistoryTab] = useState<'ENTREGAS' | 'DEVOLUCIONES'>('ENTREGAS');
@@ -275,7 +280,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     };
 
     // 3. Generación de Planilla Profesional (Unificada & Refinada)
-    const generateRoutePDF = (route: any) => {
+    const generateRoutePDF = async (route: any) => {
         const despachador = user.name || 'SISTEMA ORBIT';
         const driverName = route.driver_name !== 'S/A' ? route.driver_name : 'Óscar Santamaría';
 
@@ -323,8 +328,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
           return isCredit ? acc + (Number(inv.invoiceValue) || 0) : acc;
         }, 0);
         
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
+        setIsGeneratingPDF(true);
 
         // Construcción del HTML mediante template literal PURO (sin sintaxis React)
         const html = `
@@ -421,7 +425,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
                             <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
                             <td class="text-center" style="background:#f8fafc; font-weight:900;">${method}</td>
-                            <td><div style="font-weight:900">${inv.customerName}</div><div style="font-size:6px; color:#64748b; font-weight:normal;">${inv.address}</div></td>
+                            <td><div style="font-weight:900; font-size:8px;">${inv.customerName}</div><div style="font-size:8px; color:#1e293b; font-weight:900;">${inv.address || ''}</div></td>
                           </tr>
                         `;
                       }).join('')}
@@ -457,12 +461,62 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 <div class="sig-box">DESPACHO / AUDITORÍA: ${despachador.toUpperCase()}</div>
               </div>
 
-              <script>window.onload = () => { setTimeout(() => { window.print(); }, 500); };</script>
             </body>
           </html>
         `;
-        printWindow.document.write(html);
-        printWindow.document.close();
+
+        // Renderizar en iframe oculto → html2canvas → jsPDF → descarga directa
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1122px;height:794px;border:none;visibility:hidden;';
+        document.body.appendChild(iframe);
+
+        await new Promise<void>(resolve => {
+          iframe.onload = () => resolve();
+          iframe.srcdoc = html;
+        });
+
+        // Dar tiempo para que carguen imágenes dentro del iframe
+        await new Promise(r => setTimeout(r, 800));
+
+        try {
+          const canvas = await html2canvas(iframe.contentDocument!.body, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            width: 1122,
+            windowWidth: 1122,
+          });
+
+          const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+          const pdfW = pdf.internal.pageSize.getWidth();
+          const pdfH = pdf.internal.pageSize.getHeight();
+          const pageHeightPx = canvas.width * (pdfH / pdfW);
+
+          let y = 0;
+          let pageNum = 0;
+          while (y < canvas.height) {
+            const sliceH = Math.min(pageHeightPx, canvas.height - y);
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = canvas.width;
+            sliceCanvas.height = sliceH;
+            const ctx = sliceCanvas.getContext('2d')!;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+            ctx.drawImage(canvas, 0, -y);
+            const sliceImg = sliceCanvas.toDataURL('image/jpeg', 0.93);
+            if (pageNum > 0) pdf.addPage();
+            pdf.addImage(sliceImg, 'JPEG', 0, 0, pdfW, pdfH * (sliceH / pageHeightPx));
+            y += sliceH;
+            pageNum++;
+          }
+
+          const fecha = new Date().toISOString().split('T')[0];
+          pdf.save(`planilla_${route.plate || 'ruta'}_${fecha}.pdf`);
+        } finally {
+          document.body.removeChild(iframe);
+          setIsGeneratingPDF(false);
+        }
     };
 
 
@@ -1074,12 +1128,19 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button 
+                    <button
                         onClick={() => setShowHistoryModal(true)}
                         className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/5 text-[8px] font-black uppercase tracking-widest transition-all group"
                     >
                         <Icons.History className="w-3 h-3 opacity-60 group-hover:opacity-100" />
                         <span>Historial</span>
+                    </button>
+                    <button
+                        onClick={() => setShowReturnsModal(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-lg border border-rose-500/20 text-[8px] font-black uppercase tracking-widest transition-all group"
+                    >
+                        <Icons.Package className="w-3 h-3 opacity-80 group-hover:opacity-100" />
+                        <span>Devoluciones</span>
                     </button>
                     <button 
                         onClick={fetchLocations}
@@ -1238,19 +1299,30 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                                                <button 
+                                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                                                <button
                                                     onClick={() => setViewingItemsInvoice(inv)}
                                                     className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all border border-slate-200"
                                                     title="Ver Artículos"
                                                 >
                                                     <Icons.Eye className="w-4 h-4" />
                                                 </button>
-                                                
+
+                                                {/* DESPACHAR — si no ha sido enviado al camión aún */}
+                                                {!['EST-11','EST-12','EST-13','EST-14'].includes(inv.status) && !hasPendingSignature && (
+                                                    <button
+                                                        onClick={() => setAssigningInvoice(inv)}
+                                                        className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg"
+                                                    >
+                                                        <Icons.Truck className="w-4 h-4" />
+                                                        Despachar
+                                                    </button>
+                                                )}
+
+                                                {/* ENTREGAR — cuando ya está en ruta */}
                                                 {inv.status === 'EST-11' && (
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
-                                                            const route = selectedActiveRoute;
                                                             const items = (inv.items || []).map((it: any) => ({
                                                                 sku: it.sku,
                                                                 articleName: it.articleName || it.article_name || it.sku,
@@ -1261,7 +1333,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                             }));
                                                             setDeliveryItems(items);
                                                             setDeliveryType('FULL');
-                                                            setDeliveryModal({ isOpen: true, invoice: inv, route });
+                                                            setDeliveryModal({ isOpen: true, invoice: inv, route: selectedActiveRoute });
                                                         }}
                                                         className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                                                     >
@@ -1270,8 +1342,20 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     </button>
                                                 )}
 
+                                                {/* SUBIR SOPORTE — cuando ya fue entregado */}
+                                                {(inv.status === 'EST-12' || inv.status === 'EST-14') && (
+                                                    <button
+                                                        onClick={() => setVoucherModal({ isOpen: true, invoice: inv })}
+                                                        className="px-4 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all flex items-center gap-2"
+                                                    >
+                                                        <Icons.Upload className="w-4 h-4" />
+                                                        Soporte
+                                                    </button>
+                                                )}
+
+                                                {/* FIRMAR — firma pendiente */}
                                                 {hasPendingSignature && (
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleDelayedSignature(inv)}
                                                         className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700 transition-all flex items-center gap-2"
                                                     >
@@ -1414,6 +1498,23 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 setShowPasswordMap={setShowPasswordMap}
                 isValidating={isValidating}
                 handleConfirmDispatch={handleConfirmDispatch}
+            />
+
+            {/* MODAL: SOPORTE DE PAGO */}
+            {voucherModal?.isOpen && (
+                <PaymentVoucherModal
+                    isOpen={voucherModal.isOpen}
+                    onClose={() => setVoucherModal(null)}
+                    invoice={voucherModal.invoice}
+                    user={user}
+                />
+            )}
+
+            {/* MODAL: CONTROL DE DEVOLUCIONES */}
+            <ReturnsControlModal
+                isOpen={showReturnsModal}
+                onClose={() => setShowReturnsModal(false)}
+                user={user}
             />
         </>
     );

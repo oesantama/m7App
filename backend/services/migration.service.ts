@@ -50,12 +50,13 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'document_l_payments': ['document_id', 'invoice', 'client_ref', 'un_code', 'metodo_pago', 'vmetodo', 'user_id', 'processed_at'],
   'training_sessions': ['topic', 'content', 'instructor', 'location_type', 'scheduled_at', 'duration_minutes', 'expires_at', 'screenshots', 'tracking_token', 'created_by', 'created_at', 'updated_at'],
   'training_attendance': ['session_id', 'full_name', 'document_number', 'job_title', 'signature_b64', 'registered_at'],
-  'geocoding_cache': ['address_key', 'address', 'city', 'lat', 'lng', 'created_at']
+  'geocoding_cache': ['address_key', 'address', 'city', 'lat', 'lng', 'created_at'],
+  'payment_vouchers': ['invoice_id', 'dispatch_id', 'file_hash', 'file_name', 'file_type', 'file_data', 'payment_type', 'amount', 'bank_name', 'notes', 'uploaded_by', 'verified', 'verified_by', 'verified_at', 'created_at']
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {

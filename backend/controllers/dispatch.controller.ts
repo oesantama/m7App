@@ -470,3 +470,142 @@ export const getReturnHistory = async (req: Request, res: Response) => {
     }
 };
 
+// ─── SOPORTES DE PAGO ──────────────────────────────────────────────────────
+
+export const uploadVoucher = async (req: Request, res: Response) => {
+    try {
+        const { invoiceId, dispatchId, fileData, fileName, fileType, fileHash,
+                paymentType, amount, bankName, notes, uploadedBy } = req.body;
+
+        if (!invoiceId || !fileData || !fileHash) {
+            return res.status(400).json({ error: 'invoiceId, fileData y fileHash son requeridos' });
+        }
+
+        // Verificar duplicado por hash (mismo archivo ya subido en el sistema)
+        const dup = await pool.query(
+            `SELECT id, invoice_id FROM payment_vouchers WHERE file_hash = $1 LIMIT 1`,
+            [fileHash]
+        );
+        if (dup.rows.length > 0) {
+            return res.status(409).json({
+                error: 'Este soporte ya fue subido anteriormente',
+                existingInvoice: dup.rows[0].invoice_id
+            });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO payment_vouchers
+               (invoice_id, dispatch_id, file_hash, file_name, file_type, file_data,
+                payment_type, amount, bank_name, notes, uploaded_by, verified)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false)
+             RETURNING id, created_at`,
+            [invoiceId, dispatchId || null, fileHash, fileName, fileType, fileData,
+             paymentType || 'CONSIGNACION', amount || 0, bankName || '', notes || '', uploadedBy || '']
+        );
+
+        res.json({ success: true, voucherId: result.rows[0].id, createdAt: result.rows[0].created_at });
+    } catch (error: any) {
+        console.error('[M7-VOUCHER] uploadVoucher error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getVouchers = async (req: Request, res: Response) => {
+    try {
+        const { invoiceId } = req.params;
+        const result = await pool.query(
+            `SELECT id, invoice_id, dispatch_id, file_name, file_type, payment_type,
+                    amount, bank_name, notes, uploaded_by, verified, verified_by, verified_at, created_at
+             FROM payment_vouchers
+             WHERE invoice_id = $1
+             ORDER BY created_at DESC`,
+            [invoiceId]
+        );
+        res.json(result.rows);
+    } catch (error: any) {
+        console.error('[M7-VOUCHER] getVouchers error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getVoucherFile = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `SELECT file_data, file_type, file_name FROM payment_vouchers WHERE id = $1`,
+            [id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Soporte no encontrado' });
+        res.json({ fileData: result.rows[0].file_data, fileType: result.rows[0].file_type, fileName: result.rows[0].file_name });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// ─── CONTROL DE DEVOLUCIONES (BODEGA) ──────────────────────────────────────
+
+export const getPendingReturns = async (req: Request, res: Response) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                dr.id, dr.invoice_id, dr.driver_id, dr.return_reason, dr.notes,
+                dr.status, dr.created_at,
+                d.name AS driver_name,
+                json_agg(json_build_object(
+                    'sku',               dri.sku,
+                    'article_name',      dri.article_name,
+                    'quantity_returned', dri.quantity_returned,
+                    'quantity_delivered',dri.quantity_delivered,
+                    'unit',              dri.unit,
+                    'notes',             dri.notes
+                )) AS items
+            FROM delivery_returns dr
+            LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
+            LEFT JOIN delivery_return_items dri ON dri.return_id = dr.id
+            WHERE dr.status = 'PENDING'
+            GROUP BY dr.id, d.name
+            ORDER BY dr.created_at DESC
+        `);
+        res.json(result.rows);
+    } catch (error: any) {
+        console.error('[M7-RETURNS] getPendingReturns error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const updateReturnStatus = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { status, destination, handledBy, notes } = req.body;
+
+        if (!['PROCESSED', 'CANCELLED'].includes(status)) {
+            return res.status(400).json({ error: 'Estado inválido. Use PROCESSED o CANCELLED' });
+        }
+
+        await pool.query(
+            `UPDATE delivery_returns
+             SET status = $1,
+                 notes  = COALESCE($2, notes),
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3`,
+            [status, notes || null, id]
+        );
+
+        // Si se procesó, revertir estado de la factura a pendiente para reingreso
+        if (status === 'PROCESSED') {
+            const ret = await pool.query(`SELECT invoice_id FROM delivery_returns WHERE id = $1`, [id]);
+            if (ret.rows.length > 0) {
+                await pool.query(
+                    `UPDATE document_items SET item_status = 'EST-01' WHERE invoice = $1 OR order_number = $1`,
+                    [ret.rows[0].invoice_id]
+                );
+            }
+        }
+
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('[M7-RETURNS] updateReturnStatus error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+};
+
