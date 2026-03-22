@@ -1061,6 +1061,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
         if (res.success) {
           successCount++;
+          // M7 IQ: aprender de cada ruta confirmada en despacho masivo
+          const stops = route.assignedInvoices.map(inv => ({
+            city: String(inv.city || 'SIN_CIUDAD').toUpperCase().trim(),
+            neighborhood: String((inv as any).neighborhoodKey || '').toUpperCase().trim()
+          }));
+          api.learnFromCompletedRoute({ vehicleId: route.vehicle.id, stops })
+            .catch(() => { /* non-critical */ });
         } else {
           failCount++;
         }
