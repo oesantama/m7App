@@ -35,7 +35,7 @@ const TrainingAdmin: React.FC = () => {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const data = await res.json();
-            setSessions(data);
+            setSessions(Array.isArray(data) ? data : []);
         } catch (err) {
             toast.error("Error al cargar sesiones");
         } finally {
