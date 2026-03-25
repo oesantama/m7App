@@ -11,6 +11,8 @@ const TrainingAdmin: React.FC = () => {
     const [selectedSession, setSelectedSession] = useState<any>(null);
     const [attendance, setAttendance] = useState<any[]>([]);
     const [loadingAttendance, setLoadingAttendance] = useState(false);
+    const [extendSession, setExtendSession] = useState<any>(null);
+    const [newExpiresAt, setNewExpiresAt] = useState('');
 
     // Form State
     const [form, setForm] = useState({
@@ -100,6 +102,31 @@ const TrainingAdmin: React.FC = () => {
         XLSX.writeFile(wb, `Asistencias_${selectedSession?.topic}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
+    const handleExtend = async () => {
+        if (!extendSession || !newExpiresAt) return;
+        try {
+            const res = await fetch(`/api/training/sessions/${extendSession.id}/extend`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ newExpiresAt })
+            });
+            if (res.ok) {
+                toast.success("Fecha de expiración actualizada");
+                setExtendSession(null);
+                setNewExpiresAt('');
+                fetchSessions();
+            } else {
+                const data = await res.json();
+                toast.error(data.error || "Error al actualizar");
+            }
+        } catch {
+            toast.error("Error al conectar con el servidor");
+        }
+    };
+
     const copyRegistrationLink = (token: string) => {
         const link = `${window.location.origin}/attendance/register/${token}`;
         navigator.clipboard.writeText(link);
@@ -169,18 +196,24 @@ const TrainingAdmin: React.FC = () => {
                             </div>
                         </div>
                         
-                        <div className="p-4 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-3">
-                            <button 
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 grid grid-cols-3 gap-2">
+                            <button
                                 onClick={() => viewAttendance(s)}
-                                className="py-3 px-4 bg-white border border-slate-200 text-slate-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                                className="py-3 px-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                             >
                                 Asistentes
                             </button>
-                            <button 
-                                onClick={() => copyRegistrationLink(s.tracking_token)}
-                                className="py-3 px-4 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 transition-all shadow-md shadow-blue-500/20"
+                            <button
+                                onClick={() => { setExtendSession(s); setNewExpiresAt(''); }}
+                                className="py-3 px-2 bg-amber-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-amber-600 transition-all shadow-md shadow-amber-500/20"
                             >
-                                Copiar Link
+                                Ampliar
+                            </button>
+                            <button
+                                onClick={() => copyRegistrationLink(s.tracking_token)}
+                                className="py-3 px-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all shadow-md shadow-blue-500/20"
+                            >
+                                Link
                             </button>
                         </div>
                     </div>
@@ -237,6 +270,47 @@ const TrainingAdmin: React.FC = () => {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Ampliar Expiración */}
+            {extendSession && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setExtendSession(null)}></div>
+                    <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl z-10 overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+                            <div>
+                                <p className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1">Ampliar Expiración</p>
+                                <h2 className="text-sm font-black uppercase tracking-tight line-clamp-1">{extendSession.topic}</h2>
+                            </div>
+                            <button onClick={() => setExtendSession(null)} className="w-8 h-8 flex items-center justify-center bg-white/10 rounded-xl hover:bg-red-500 transition-all">
+                                <Icons.Plus className="w-4 h-4 rotate-45" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">Nueva fecha y hora de expiración</label>
+                                <input
+                                    type="datetime-local"
+                                    value={newExpiresAt}
+                                    onChange={e => setNewExpiresAt(e.target.value)}
+                                    className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-xs outline-none focus:border-amber-400 transition-all"
+                                />
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-bold px-1">
+                                Actual: <span className={`font-black ${new Date(extendSession.expires_at) < new Date() ? 'text-red-500' : 'text-slate-700'}`}>
+                                    {new Date(extendSession.expires_at).toLocaleString()}
+                                </span>
+                            </div>
+                            <button
+                                onClick={handleExtend}
+                                disabled={!newExpiresAt}
+                                className="w-full py-4 bg-amber-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-amber-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Guardar Nueva Fecha
+                            </button>
                         </div>
                     </div>
                 </div>

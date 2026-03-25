@@ -165,6 +165,24 @@ export const saveSession = async (req: Request, res: Response) => {
   }
 };
 
+export const extendSession = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { newExpiresAt } = req.body;
+  try {
+    if (!newExpiresAt || isNaN(new Date(newExpiresAt).getTime())) {
+      return res.status(400).json({ error: "Fecha de expiración inválida" });
+    }
+    const result = await pool.query(
+      'UPDATE training_sessions SET expires_at = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, expires_at',
+      [new Date(newExpiresAt).toISOString(), id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: "Sesión no encontrada" });
+    res.json({ success: true, expires_at: result.rows[0].expires_at });
+  } catch (err: any) {
+    res.status(500).json({ error: "Error al actualizar expiración" });
+  }
+};
+
 export const getSessionAttendance = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {

@@ -788,65 +788,171 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
     try {
         const token = req.query.token || req.headers['x-public-token'];
         const MASTER_TOKEN = process.env.PUBLIC_API_TOKEN || 'M7-SECURE-2026-XQW';
-        
+
         if (token !== MASTER_TOKEN) {
-            res.status(401).json({ error: 'No autorizado. Token inválido.' });
+            res.status(401).json({
+                ok: false,
+                codigo: 'TOKEN_INVALIDO',
+                mensaje: 'Acceso denegado. El token proporcionado no es válido.',
+                ayuda: 'Verifique que el parámetro ?token= o el header X-Public-Token sea correcto.'
+            });
             return;
         }
 
         const { fechaDesde, fechaHasta, nroDocumento } = req.query;
-        let query = `
-            SELECT 
-                p.*,
-                (SELECT json_agg(json_build_object(
-                    'tipo', n.tipo,
-                    'observacion', n.observacion,
-                    'fecha', n.fecha,
-                    'usuario', n.usuario
-                ) ORDER BY n.fecha DESC) FROM grupo_inter_novedades n WHERE n.pedido_id::TEXT = p.id::TEXT) as novedades_arr,
-                
-                (SELECT json_agg(json_build_object(
-                    'valor', r.valor,
-                    'notas', r.notas,
-                    'fecha', r.fecha,
-                    'usuario', r.usuario
-                ) ORDER BY r.fecha DESC) FROM grupo_inter_reajustes r WHERE r.pedido_id::TEXT = p.id::TEXT) as reajustes_arr,
 
-                (SELECT json_agg(i ORDER BY i.id ASC) FROM grupo_inter_pedidos_items i WHERE i.pedido_id::TEXT = p.id::TEXT) as items_arr,
-                
-                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id::TEXT = p.id::TEXT) as historico_arr
-            FROM grupo_inter_pedidos p
-            WHERE 1=1
-        `;
-        const values: any[] = [];
-        let paramIdx = 1;
+        // ── Validación de rango de fechas (máximo 60 días) ───────────────────
+        const MAX_DAYS = 60;
+        let desde: Date;
+        let hasta: Date;
 
-        // Filtro por Número de Documento (Prioritario)
-        if (nroDocumento) {
-            query += ` AND p.numero_documento = $${paramIdx}`;
-            values.push(nroDocumento);
-            paramIdx++;
-        } else {
-            // Lógica de fechas (Fct. Último Corte) solo si no se busca por documento
-            if (fechaDesde) {
-                query += ` AND p.f_ultimo_corte >= $${paramIdx}`;
-                values.push(fechaDesde);
-                paramIdx++;
-            }
-            if (fechaHasta) {
-                query += ` AND p.f_ultimo_corte <= $${paramIdx}`;
-                values.push(fechaHasta);
-                paramIdx++;
+        if (!nroDocumento) {
+            hasta  = fechaHasta  ? new Date(String(fechaHasta))  : new Date();
+            desde  = fechaDesde  ? new Date(String(fechaDesde))  : (() => {
+                const d = new Date(hasta);
+                d.setDate(d.getDate() - 30);
+                return d;
+            })();
+
+            if (isNaN(desde.getTime()) || isNaN(hasta.getTime())) {
+                res.status(400).json({
+                    ok: false,
+                    codigo: 'FECHA_INVALIDA',
+                    mensaje: 'Una o ambas fechas tienen un formato incorrecto.',
+                    ayuda: 'Use el formato YYYY-MM-DD. Ejemplo: fechaDesde=2026-01-01&fechaHasta=2026-03-01'
+                });
+                return;
             }
 
-            // M7-EXT: Eliminada la restricción de 8 días por solicitud del usuario
-            // El API pública ahora devuelve todo el historial si no hay filtros específicos
+            const diffDays = Math.ceil((hasta.getTime() - desde.getTime()) / (1000 * 60 * 60 * 24));
+            if (diffDays < 0) {
+                res.status(400).json({
+                    ok: false,
+                    codigo: 'RANGO_INVALIDO',
+                    mensaje: 'La fecha de inicio no puede ser posterior a la fecha de fin.',
+                    detalle: {
+                        fechaDesde: desde.toISOString().split('T')[0],
+                        fechaHasta: hasta.toISOString().split('T')[0]
+                    },
+                    ayuda: 'Verifique que fechaDesde sea anterior o igual a fechaHasta.'
+                });
+                return;
+            }
+            if (diffDays > MAX_DAYS) {
+                res.status(400).json({
+                    ok: false,
+                    codigo: 'RANGO_EXCEDIDO',
+                    mensaje: `El rango de fechas supera el máximo permitido de ${MAX_DAYS} días.`,
+                    detalle: {
+                        diasSolicitados: diffDays,
+                        diasPermitidos: MAX_DAYS,
+                        fechaDesde: desde.toISOString().split('T')[0],
+                        fechaHasta: hasta.toISOString().split('T')[0]
+                    },
+                    ayuda: `Divida la consulta en períodos de máximo ${MAX_DAYS} días. Ejemplo: consulte enero por separado de febrero.`
+                });
+                return;
+            }
         }
 
-        query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 1000';
-        const result = await pool.query(query, values);
+        // ── Construcción de filtros para el CTE base ─────────────────────────
+        const values: any[] = [];
+        let paramIdx = 1;
+        const pedidoFilters: string[] = ['1=1'];
 
-        const mappedOrders = result.rows.map(o => ({
+        if (nroDocumento) {
+            pedidoFilters.push(`p.numero_documento = $${paramIdx}`);
+            values.push(String(nroDocumento));
+            paramIdx++;
+        } else {
+            pedidoFilters.push(`p.f_ultimo_corte >= $${paramIdx}`);
+            values.push(desde!.toISOString().split('T')[0]);
+            paramIdx++;
+
+            pedidoFilters.push(`p.f_ultimo_corte <= $${paramIdx}`);
+            values.push(hasta!.toISOString().split('T')[0]);
+            paramIdx++;
+        }
+
+        // ── Query optimizada con CTE: 1 scan por tabla relacionada en vez de N×4 subqueries ─
+        // Antes: por cada fila devuelta se ejecutaban 4 subqueries correlacionadas.
+        // Ahora: se filtran los pedidos primero (CTE), luego se agregan las tablas
+        // relacionadas en 4 scans únicos usando IN (lista de ids del CTE).
+        const query = `
+            WITH pedidos_filtrados AS (
+                SELECT p.*
+                FROM grupo_inter_pedidos p
+                WHERE ${pedidoFilters.join(' AND ')}
+                ORDER BY p.f_ultimo_corte DESC, p.create_at DESC
+                LIMIT 1000
+            ),
+            novedades_agg AS (
+                SELECT
+                    n.pedido_id::TEXT AS pid,
+                    json_agg(json_build_object(
+                        'tipo',        n.tipo,
+                        'observacion', n.observacion,
+                        'fecha',       n.fecha,
+                        'usuario',     n.usuario
+                    ) ORDER BY n.fecha DESC) AS novedades_arr
+                FROM grupo_inter_novedades n
+                WHERE n.pedido_id::TEXT IN (SELECT id::TEXT FROM pedidos_filtrados)
+                GROUP BY n.pedido_id
+            ),
+            reajustes_agg AS (
+                SELECT
+                    r.pedido_id::TEXT AS pid,
+                    json_agg(json_build_object(
+                        'valor',   r.valor,
+                        'notas',   r.notas,
+                        'fecha',   r.fecha,
+                        'usuario', r.usuario
+                    ) ORDER BY r.fecha DESC) AS reajustes_arr
+                FROM grupo_inter_reajustes r
+                WHERE r.pedido_id::TEXT IN (SELECT id::TEXT FROM pedidos_filtrados)
+                GROUP BY r.pedido_id
+            ),
+            items_agg AS (
+                SELECT
+                    i.pedido_id::TEXT AS pid,
+                    json_agg(i ORDER BY i.id ASC) AS items_arr
+                FROM grupo_inter_pedidos_items i
+                WHERE i.pedido_id::TEXT IN (SELECT id::TEXT FROM pedidos_filtrados)
+                GROUP BY i.pedido_id
+            ),
+            historico_agg AS (
+                SELECT
+                    h.pedido_id::TEXT AS pid,
+                    json_agg(h ORDER BY h.fecha DESC) AS historico_arr
+                FROM grupo_inter_pedidos_historico h
+                WHERE h.pedido_id::TEXT IN (SELECT id::TEXT FROM pedidos_filtrados)
+                GROUP BY h.pedido_id
+            )
+            SELECT
+                p.*,
+                n.novedades_arr,
+                r.reajustes_arr,
+                i.items_arr,
+                h.historico_arr
+            FROM pedidos_filtrados p
+            LEFT JOIN novedades_agg  n ON n.pid = p.id::TEXT
+            LEFT JOIN reajustes_agg  r ON r.pid = p.id::TEXT
+            LEFT JOIN items_agg      i ON i.pid = p.id::TEXT
+            LEFT JOIN historico_agg  h ON h.pid = p.id::TEXT
+            ORDER BY p.f_ultimo_corte DESC, p.create_at DESC
+        `;
+
+        // Timeout de seguridad a nivel de sesión: 30 s
+        const client = await pool.connect();
+        let result: any;
+        try {
+            await client.query("SET LOCAL statement_timeout = '30000'");
+            result = await client.query(query, values);
+        } finally {
+            client.release();
+        }
+
+        const mappedOrders = result.rows.map((o: any) => ({
             id: o.id,
             estado: o.estado === 'Entregado' ? 'Entregado' : (o.estado || 'En proceso'),
             nroGuia: o.numero_guia || 'PD-' + o.numero_documento,
@@ -870,18 +976,46 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
             novedades: o.novedades_arr || [],
             reajustes: o.reajustes_arr || [],
             historicos: o.historico_arr || [],
-            // Mantenemos Novedades (con mayúscula) por retrocompatibilidad si es necesario, 
-            // mapeando el histórico como antes si no hay novedades
             Novedades: (o.historico_arr || []).length > 0 ? o.historico_arr : []
         }));
 
         res.json({
-            count: mappedOrders.length,
-            orders: mappedOrders
+            ok: true,
+            consulta: {
+                tipo: nroDocumento ? 'por_documento' : 'por_rango_fecha',
+                ...(nroDocumento
+                    ? { nroDocumento: String(nroDocumento) }
+                    : {
+                        fechaDesde: desde!.toISOString().split('T')[0],
+                        fechaHasta: hasta!.toISOString().split('T')[0],
+                        diasConsultados: Math.ceil((hasta!.getTime() - desde!.getTime()) / (1000 * 60 * 60 * 24))
+                    }
+                )
+            },
+            resumen: {
+                totalRegistros: mappedOrders.length,
+                entregados:     mappedOrders.filter(o => o.estado === 'Entregado').length,
+                enProceso:      mappedOrders.filter(o => o.estado !== 'Entregado').length
+            },
+            pedidos: mappedOrders
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('[API-PUBLICA-LISTA] Error:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        if (error.code === '57014') {
+            res.status(504).json({
+                ok: false,
+                codigo: 'TIMEOUT_CONSULTA',
+                mensaje: 'La consulta excedió el tiempo máximo de respuesta del servidor.',
+                ayuda: 'Intente con un rango de fechas más corto (máximo 60 días).'
+            });
+        } else {
+            res.status(500).json({
+                ok: false,
+                codigo: 'ERROR_INTERNO',
+                mensaje: 'Ocurrió un error inesperado en el servidor.',
+                ayuda: 'Si el problema persiste, contacte al administrador del sistema.'
+            });
+        }
     }
 };
 

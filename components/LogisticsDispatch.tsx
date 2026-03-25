@@ -352,9 +352,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 .info-label { font-size: 6px; font-weight: 800; color: #64748b; text-transform: uppercase; }
                 .info-val { font-size: 9px; font-weight: 900; }
 
-                .content-flex { display: flex; gap: 10px; align-items: flex-start; }
-                .table-main { flex: 0 0 72%; }
-                .table-side { flex: 1; }
+                .consolidado-section { margin-top: 8px; border-top: 2px solid #0f172a; padding-top: 6px; }
+                .consolidado-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+                .consolidado-col { padding: 0 8px; border-right: 1.5px solid #cbd5e1; }
+                .consolidado-col:first-child { padding-left: 0; }
+                .consolidado-col:last-child { border-right: none; padding-right: 0; }
 
                 table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
                 th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 3px; font-size: 6px; font-weight: 900; text-transform: uppercase; }
@@ -406,60 +408,67 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
               <div class="bank-strip">🏦 CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)</div>
 
-              <div class="content-flex">
-                <div class="table-main">
-                  <table>
-                    <thead>
+              <table>
+                <thead>
+                  <tr>
+                    <th width="35">U.NEG</th>
+                    <th width="75">FACTURA</th>
+                    <th width="75"># INTERNO</th>
+                    <th width="85">REF CLIENTE</th>
+                    <th width="75">VALOR</th>
+                    <th width="35">C.PAG</th>
+                    <th>CLIENTE / DIRECCIÓN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${routeInvoices.map(inv => {
+                    const firstItem = inv.items?.[0] || {} as any;
+                    const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
+                    return `
                       <tr>
-                        <th width="35">U.NEG</th>
-                        <th width="75">FACTURA</th>
-                        <th width="75"># INTERNO</th>
-                        <th width="85">REF CLIENTE</th>
-                        <th width="75">VALOR</th>
-                        <th width="35">C.PAG</th>
-                        <th>CLIENTE / DIRECCIÓN</th>
+                        <td class="text-center">${inv.unCode || firstItem.unCode || firstItem.un_code || '-'}</td>
+                        <td class="text-center" style="font-weight:900;">${inv.invoiceNumber}</td>
+                        <td class="text-center">${inv.orderNumber || inv.docLId || '-'}</td>
+                        <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
+                        <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
+                        <td class="text-center" style="background:#f8fafc; font-weight:900;">${method}</td>
+                        <td><div style="font-weight:900; font-size:8px;">${inv.customerName}</div><div style="font-size:8px; color:#1e293b; font-weight:900;">${inv.address || ''}</div></td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      ${routeInvoices.map(inv => {
-                        const firstItem = inv.items?.[0] || {} as any;
-                        const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
-                        return `
-                          <tr>
-                            <td class="text-center">${inv.unCode || firstItem.unCode || firstItem.un_code || '-'}</td>
-                            <td class="text-center" style="font-weight:900;">${inv.invoiceNumber}</td>
-                            <td class="text-center">${inv.orderNumber || inv.docLId || '-'}</td>
-                            <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
-                            <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
-                            <td class="text-center" style="background:#f8fafc; font-weight:900;">${method}</td>
-                            <td><div style="font-weight:900; font-size:8px;">${inv.customerName}</div><div style="font-size:8px; color:#1e293b; font-weight:900;">${inv.address || ''}</div></td>
-                          </tr>
-                        `;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
 
-                <div class="table-side">
-                  <div style="font-weight:900; font-size:7px; border-bottom:1.5px solid #000; margin-bottom:3px; text-transform:uppercase;">📦 CONSOLIDADO</div>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th width="70%">ID</th><th width="30%">CANT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${(() => {
-                        const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
-                        return items.map(it => `
-                          <tr>
-                            <td class="text-center" style="font-size:6.5px;">${it.id}</td>
-                            <td class="text-center" style="font-weight:900; background:#fefce8;">${it.total}</td>
-                          </tr>
-                        `).join('');
-                      })()}
-                    </tbody>
-                  </table>
+              <div class="consolidado-section">
+                <div style="font-weight:900; font-size:7px; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.1em;">📦 CONSOLIDADO DE CARGA</div>
+                <div class="consolidado-grid">
+                  ${(() => {
+                    const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+                    const chunkSize = Math.ceil(items.length / 3) || 1;
+                    const groups = [items.slice(0, chunkSize), items.slice(chunkSize, chunkSize * 2), items.slice(chunkSize * 2)];
+                    return groups.map(group => `
+                      <div class="consolidado-col">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th width="45%">ID</th>
+                              <th width="20%">CANT</th>
+                              <th width="35%">NOTAS</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${group.map(it => `
+                              <tr>
+                                <td style="font-size:6px;">${it.id}</td>
+                                <td class="text-center" style="font-weight:900; background:#fefce8;">${it.total}</td>
+                                <td style="font-size:6px; color:#64748b;">${it.unit || it.name?.substring(0,15) || '-'}</td>
+                              </tr>
+                            `).join('')}
+                          </tbody>
+                        </table>
+                      </div>
+                    `).join('');
+                  })()}
                 </div>
               </div>
 

@@ -50,6 +50,7 @@ const ExecutiveDashboard = lazyWithRetry(() => import('./components/ExecutiveDas
 const GrupoInterView = lazyWithRetry(() => import('./components/GrupoInterView'));
 const MastersuiteReport = lazyWithRetry(() => import('./components/MastersuiteReport'));
 const TrainingAdmin = lazyWithRetry(() => import('./components/TrainingAdmin'));
+const AjoverDashboard = lazyWithRetry(() => import('./components/AjoverDashboard'));
 const PublicAttendanceForm = lazyWithRetry(() => import('./components/PublicAttendanceForm'));
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
@@ -864,6 +865,16 @@ const App: React.FC = () => {
         } as any} />;
       case 'executive-dashboard':
         return <ExecutiveDashboard />;
+      case 'dashboard-ajover':
+        return (
+          <AjoverDashboard
+            user={user!}
+            vehicles={vehicles}
+            drivers={drivers}
+            routes={routes}
+            invoices={invoices}
+          />
+        );
       case 'despacho':
         return (
           <LogisticsDispatch

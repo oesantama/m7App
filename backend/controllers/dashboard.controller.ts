@@ -87,6 +87,124 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   }
 };
 
+export const getAjoverStats = async (req: Request, res: Response) => {
+  try {
+    const [vehiclesRes, driversRes, routesRes, invoicesRes, returnsRes, topRoutesRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE LOWER(status_id) IN ('est-01','disponible','available') OR LOWER(status) IN ('disponible','available')) as available,
+          COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-02' OR LOWER(status) IN ('en ruta','in route','activo')) as on_route,
+          COALESCE(SUM(capacity_m3), 0) as total_capacity_m3,
+          COALESCE(SUM(capacity_kg), 0) as total_capacity_kg
+        FROM vehicles WHERE client_id = 'CLI-01' OR client_id IS NULL
+      `),
+      pool.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-01' OR LOWER(status) IN ('activo','active')) as active
+        FROM drivers WHERE client_id = 'CLI-01' OR client_id IS NULL
+      `),
+      pool.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE LOWER(status) IN ('activo','active','en ruta')) as active,
+          COUNT(*) FILTER (WHERE LOWER(status) IN ('completado','completed','finalizado')) as completed,
+          COUNT(*) FILTER (WHERE LOWER(status) IN ('pendiente','pending')) as pending
+        FROM routes WHERE client_id = 'CLI-01' OR client_id IS NULL
+      `),
+      pool.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE LOWER(status) IN ('entregado','finalizado','delivered')) as delivered,
+          COUNT(*) FILTER (WHERE LOWER(status) IN ('en ruta','in route','despachado')) as in_route,
+          COUNT(*) FILTER (WHERE LOWER(status) IN ('pendiente','pending','procesando')) as pending,
+          COUNT(*) FILTER (WHERE LOWER(status) IN ('devuelto','returned','retorno')) as returned,
+          COALESCE(SUM(CASE WHEN LOWER(status) IN ('entregado','finalizado','delivered')
+            THEN (SELECT COALESCE(SUM(COALESCE(peso,0)),0) FROM document_items WHERE document_id = d.id) ELSE 0 END), 0) as delivered_weight
+        FROM documents_l d WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+      `),
+      pool.query(`
+        SELECT
+          di.city,
+          COUNT(DISTINCT d.id) as total,
+          COUNT(DISTINCT d.id) FILTER (WHERE LOWER(d.status) IN ('entregado','finalizado','delivered')) as delivered,
+          COUNT(DISTINCT d.id) FILTER (WHERE LOWER(d.status) IN ('devuelto','returned','retorno')) as returned
+        FROM documents_l d
+        JOIN document_items di ON d.id = di.document_id
+        WHERE di.city IS NOT NULL AND d.created_at >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY di.city ORDER BY total DESC LIMIT 10
+      `),
+      pool.query(`
+        SELECT r.name as route_name, r.status,
+          COUNT(DISTINCT r.id) FILTER (WHERE LOWER(r.status) IN ('activo','active','en ruta')) as active_count,
+          v.plate, d.name as driver_name
+        FROM routes r
+        LEFT JOIN vehicles v ON r.vehicle_id = v.id
+        LEFT JOIN drivers d ON r.driver_id = d.id
+        WHERE r.client_id = 'CLI-01' OR r.client_id IS NULL
+        GROUP BY r.name, r.status, v.plate, d.name
+        ORDER BY active_count DESC LIMIT 10
+      `)
+    ]);
+
+    const veh = vehiclesRes.rows[0];
+    const drv = driversRes.rows[0];
+    const rts = routesRes.rows[0];
+    const inv = invoicesRes.rows[0];
+
+    const totalDocs = Number(inv.delivered) + Number(inv.in_route) + Number(inv.pending) + Number(inv.returned);
+    const effectivenessRate = totalDocs > 0 ? Math.round((Number(inv.delivered) / totalDocs) * 100) : 0;
+    const returnRate = totalDocs > 0 ? Math.round((Number(inv.returned) / totalDocs) * 100) : 0;
+
+    res.json({
+      vehicles: {
+        total: Number(veh.total),
+        available: Number(veh.available),
+        onRoute: Number(veh.on_route),
+        totalCapacityM3: Number(veh.total_capacity_m3),
+        totalCapacityKg: Number(veh.total_capacity_kg),
+      },
+      drivers: {
+        total: Number(drv.total),
+        active: Number(drv.active),
+      },
+      routes: {
+        total: Number(rts.total),
+        active: Number(rts.active),
+        completed: Number(rts.completed),
+        pending: Number(rts.pending),
+      },
+      invoices: {
+        total: Number(inv.total),
+        delivered: Number(inv.delivered),
+        inRoute: Number(inv.in_route),
+        pending: Number(inv.pending),
+        returned: Number(inv.returned),
+        deliveredWeight: Number(inv.delivered_weight),
+        effectivenessRate,
+        returnRate,
+      },
+      topCities: returnsRes.rows.map(r => ({
+        city: r.city,
+        total: Number(r.total),
+        delivered: Number(r.delivered),
+        returned: Number(r.returned),
+        effectiveness: Number(r.total) > 0 ? Math.round((Number(r.delivered) / Number(r.total)) * 100) : 0,
+      })),
+      activeRoutes: topRoutesRes.rows.map(r => ({
+        name: r.route_name,
+        status: r.status,
+        plate: r.plate,
+        driver: r.driver_name,
+      })),
+    });
+  } catch (err: any) {
+    console.error('[M7-AJOVER-DASHBOARD] Error:', err.message);
+    res.status(500).json({ error: 'Error al obtener estadísticas Ajover' });
+  }
+};
+
 import { DemandService } from '../services/demand.service.js';
 
 export const getDemandPrediction = async (req: Request, res: Response) => {

@@ -15,6 +15,7 @@ router.post('/progress', requirePermission('CAPACITACIONES', 'edit'), trainingCo
 router.get('/sessions', requirePermission('CAPACITACIONES', 'view'), trainingController.getSessions);
 router.post('/sessions', requirePermission('CAPACITACIONES', 'create'), trainingController.saveSession);
 router.get('/sessions/:id/attendance', requirePermission('CAPACITACIONES', 'view'), trainingController.getSessionAttendance);
+router.patch('/sessions/:id/extend', requirePermission('CAPACITACIONES', 'edit'), trainingController.extendSession);
 
 // Rutas Públicas (Sin requirePermission/Bypass JWT en server.ts)
 router.get('/public/session/:token', trainingController.getPublicSession);
