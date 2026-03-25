@@ -43,7 +43,10 @@ const ID_MAP: Record<string, string> = {
     'DASHBOARD': 'PAG-25',
     'NOTIFICACIONES': 'PAG-07',
     'GRUPO_INTER': 'PAG-31',
-    'WHATSAPP': 'PAG-07' // CORREGIDO: PAG-33 es Capacitaciones, PAG-07 es WhatsApp/Notificaciones
+    'WHATSAPP': 'PAG-07',
+    'CAPACITACIONES': 'PAG-32', // PAG-32 = GESTIÓN ASISTENCIAS (training-ops)
+    'PAG-33': 'PAG-33',         // PAG-33 = CURSOS Y TALLERES (capacitaciones)
+    'PAG-35': 'PAG-35',         // PAG-35 = DASHBOARD AJOVER
 };
 
 export const requirePermission = (moduleName: string, action: string) => {
