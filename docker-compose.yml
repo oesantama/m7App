@@ -10,7 +10,8 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - AI_MODEL=${AI_MODEL}
-      - NODE_OPTIONS=--max-old-space-size=1024
+      # Reducido a 768M para dejar margen a postgres y evolution en gota básica
+      - NODE_OPTIONS=--max-old-space-size=768
     env_file:
       - .env
     volumes:
@@ -21,7 +22,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1024M
+          memory: 800M
+    # Healthcheck: espera 60s para que migraciones terminen antes de recibir tráfico
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ready || exit 1"]
+      interval: 10s
+      timeout: 8s
+      retries: 8
+      start_period: 90s
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,7 +41,8 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     depends_on:
-      - m7app-backend
+      m7app-backend:
+        condition: service_healthy
     restart: always
     networks:
       - m7-network
@@ -50,7 +59,9 @@ services:
       - "8081:8080"
     environment:
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-B3B896F8-9862-4467-9C17-A038848C1726}
-      - SERVER_URL=${EVOLUTION_API_URL:-http://localhost:8081}
+      # SERVER_URL: URL pública de Evolution (usada para QR y webhooks)
+      # Debe ser la URL externa real del servidor, no localhost
+      - SERVER_URL=${EVOLUTION_SERVER_URL:-https://orbitm7.m7apps.com}
       - DOCKER_ENV=true
       - LOG_LEVEL=error
       - DEL_INSTANCE=false
@@ -68,7 +79,8 @@ services:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - m7-network
 
@@ -83,6 +95,18 @@ services:
       - POSTGRES_DB=m7_logistica
     volumes:
       - m7_logistica_data:/var/lib/postgresql/data
+    # Limitar memoria de postgres para no ahogar a los otros contenedores
+    deploy:
+      resources:
+        limits:
+          memory: 350M
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=50
+      -c effective_cache_size=128MB
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U m7_admin -d m7_logistica"]
       interval: 5s

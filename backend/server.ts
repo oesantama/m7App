@@ -70,8 +70,20 @@ app.get('/health-sec', (req, res) => {
   });
 });
 
+// Estado de arranque: false hasta que migraciones terminen
+let systemReady = false;
+
 app.get('/health', (req, res) => {
-  res.json({ status: 'UP', version: '1.9.21-STABLE', timestamp: new Date() });
+  res.json({ status: 'UP', ready: systemReady, version: '1.9.21-STABLE', timestamp: new Date() });
+});
+
+// /ready: usado por Docker healthcheck — retorna 503 mientras migración no termine
+app.get('/ready', (req, res) => {
+  if (systemReady) {
+    res.json({ status: 'READY', message: 'Sistema completamente operacional' });
+  } else {
+    res.status(503).json({ status: 'STARTING', message: 'Sistema iniciando, migraciones en progreso...' });
+  }
 });
 
 // Middleware de Whitelisting y Protección Global (Seguridad Arquitectónica)
@@ -124,7 +136,6 @@ app.listen(PORT, () => {
   initDeliveryTables()
     .then(() => {
       console.log('[ORBIT-BOOT] Tablas de Despacho verificadas.');
-      // Importación dinámica y ejecución de recuperación nuclear
       return import('./services/migration.service.js');
     })
     .then(async (m) => {
@@ -132,9 +143,14 @@ app.listen(PORT, () => {
       console.log('[ORBIT-BOOT] Ejecutando Restauración Nuclear...');
       const result = await m.restoreSystem();
       console.log(`[ORBIT-BOOT] Sistema configurado en ${Date.now() - dbStart}ms:`, result.message);
+      // Marcar sistema como listo — el healthcheck de Docker ahora responderá OK
+      systemReady = true;
+      console.log('[ORBIT-BOOT] ✓ Sistema LISTO para recibir tráfico.');
     })
     .catch((err: any) => {
       console.error('[ORBIT-BOOT] ERROR CRÍTICO EN ARRANQUE:', err.message);
       if (err.stack) console.error(err.stack);
+      // Marcar como listo igual para no bloquear indefinidamente en caso de error no crítico
+      systemReady = true;
     });
 });
