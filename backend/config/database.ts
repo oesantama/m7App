@@ -23,8 +23,8 @@ const pool = new Pool({
   min: 2,
   idleTimeoutMillis: 30_000,        // Cierra conexiones ociosas a los 30s
   connectionTimeoutMillis: 5_000,   // Falla rápido si no hay conexión disponible
-  // SSL solo en producción (Coolify/DigitalOcean)
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  // SSL desactivado: PostgreSQL corre en red Docker interna — no requiere SSL
+  ssl: false,
 });
 
 pool.on('connect', (client) => {
