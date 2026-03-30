@@ -86,7 +86,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         invoice: any;
         route: any;
     } | null>(null);
-    const [deliveryType, setDeliveryType] = useState<'FULL' | 'PARTIAL' | 'RETURN'>('FULL');
+    const [deliveryType, setDeliveryType] = useState<'FULL' | 'PARTIAL' | 'RETURN' | 'REPIQUE'>('FULL');
+    const [repiqueDestination, setRepiqueDestination] = useState<'BODEGA' | 'SAME_PLATE'>('BODEGA');
     const [deliveryItems, setDeliveryItems] = useState<any[]>([]);
     const [deliveryNotes, setDeliveryNotes] = useState('');
     const [deliveryReturnReason, setDeliveryReturnReason] = useState('');
@@ -1163,15 +1164,22 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 deliveredItems: deliveryItems,
                 notes: deliveryNotes || undefined,
                 returnReason: deliveryReturnReason || undefined,
+                repiqueDestination: deliveryType === 'REPIQUE' ? repiqueDestination : undefined,
             });
 
             if (res.success) {
-                const newItemStatus = deliveryType === 'FULL' ? 'EST-12' : deliveryType === 'PARTIAL' ? 'EST-13' : 'EST-01';
-                const msg = deliveryType === 'FULL'
-                    ? '✅ Entrega completa registrada'
-                    : deliveryType === 'PARTIAL'
-                    ? '⚠️ Entrega parcial – devolución creada'
-                    : '🔄 Devolución total registrada';
+                const newItemStatus =
+                    deliveryType === 'FULL'    ? 'EST-12' :
+                    deliveryType === 'PARTIAL' ? 'EST-13' :
+                    deliveryType === 'REPIQUE' ? (repiqueDestination === 'SAME_PLATE' ? 'EST-11' : 'EST-01') :
+                    'EST-01';
+                const msg =
+                    deliveryType === 'FULL'    ? '✅ Entrega completa registrada'              :
+                    deliveryType === 'PARTIAL' ? '⚠️ Entrega parcial – devolución creada'      :
+                    deliveryType === 'REPIQUE' ? (repiqueDestination === 'SAME_PLATE'
+                        ? '🔁 Repique — reasignado a la misma placa'
+                        : '🔁 Repique — devuelto a bodega')                                    :
+                    '🔄 Devolución total registrada';
                 toast.success(msg);
                 // Optimistic update
                 setRouteInvoices(prev => prev.map(i =>
@@ -1717,7 +1725,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 }}
             />
 
-            <CustomerDeliveryModal 
+            <CustomerDeliveryModal
                 isOpen={!!deliveryModal?.isOpen}
                 onClose={() => setDeliveryModal(null)}
                 invoice={deliveryModal?.invoice}
@@ -1731,6 +1739,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 setDeliveryNotes={setDeliveryNotes}
                 deliveryPassword={deliveryPassword}
                 setDeliveryPassword={setDeliveryPassword}
+                repiqueDestination={repiqueDestination}
+                setRepiqueDestination={setRepiqueDestination}
                 isConfirmingDelivery={isConfirmingDelivery}
                 handleConfirmDelivery={handleConfirmDelivery}
             />

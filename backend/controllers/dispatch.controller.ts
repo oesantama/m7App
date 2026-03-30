@@ -232,7 +232,8 @@ export const initDeliveryTables = async () => {
 export const confirmDelivery = async (req: Request, res: Response) => {
     const {
         invoiceId, dispatchId, driverId, vehicleId,
-        deliveryType, deliveredItems = [], notes, returnReason, password
+        deliveryType, deliveredItems = [], notes, returnReason, password,
+        repiqueDestination
     } = req.body;
 
     if (!invoiceId || !driverId || !deliveryType) {
@@ -243,10 +244,12 @@ export const confirmDelivery = async (req: Request, res: Response) => {
         await pool.query('BEGIN');
 
         // 2. Determinar nuevo estado de la factura
+        // REPIQUE: si se reasigna a misma placa → sigue EN_RUTA (EST-11), si va a bodega → Pendiente (EST-01)
         const statusMap: Record<string, string> = {
-            FULL:    'EST-12', // Entregado
-            PARTIAL: 'EST-13', // Entrega Parcial
-            RETURN:  'EST-01', // Devuelto → vuelve a Pendiente
+            FULL:    'EST-12',
+            PARTIAL: 'EST-13',
+            RETURN:  'EST-01',
+            REPIQUE: repiqueDestination === 'SAME_PLATE' ? 'EST-11' : 'EST-01',
         };
         const newStatus = statusMap[deliveryType] ?? 'EST-11';
 
@@ -263,11 +266,13 @@ export const confirmDelivery = async (req: Request, res: Response) => {
 
         const confirmationId: number = confirmRes.rows[0].id;
 
-        // 4. Si hay devolución (PARTIAL o RETURN), crear encabezado + detalle
+        // 4. Si hay devolución (PARTIAL, RETURN o REPIQUE), crear encabezado + detalle
         let returnId: number | null = null;
-        const itemsToReturn = deliveredItems.filter((i: any) => Number(i.quantityReturned) > 0);
+        const itemsToReturn = deliveryType === 'REPIQUE'
+            ? deliveredItems.map((i: any) => ({ ...i, quantityReturned: i.quantityDelivered }))
+            : deliveredItems.filter((i: any) => Number(i.quantityReturned) > 0);
 
-        if ((deliveryType === 'RETURN' || deliveryType === 'PARTIAL') && itemsToReturn.length > 0) {
+        if ((deliveryType === 'RETURN' || deliveryType === 'PARTIAL' || deliveryType === 'REPIQUE') && itemsToReturn.length > 0) {
             const returnRes = await pool.query(`
                 INSERT INTO delivery_returns
                     (confirmation_id, invoice_id, driver_id, vehicle_id, return_reason, notes, status)
@@ -306,11 +311,12 @@ export const confirmDelivery = async (req: Request, res: Response) => {
             confirmationId,
             returnId,
             newStatus,
-            message: deliveryType === 'FULL'
-                ? 'Entrega completa registrada'
-                : deliveryType === 'PARTIAL'
-                ? 'Entrega parcial registrada. Devolución creada.'
-                : 'Devolución total registrada. Factura vuelve a estado Pendiente.',
+            message: deliveryType === 'FULL'    ? 'Entrega completa registrada.' :
+                     deliveryType === 'PARTIAL' ? 'Entrega parcial registrada. Devolución creada.' :
+                     deliveryType === 'REPIQUE' ? (repiqueDestination === 'SAME_PLATE'
+                         ? 'Repique registrado. Factura reasignada a la misma placa.'
+                         : 'Repique registrado. Mercancía devuelta a bodega.')
+                         : 'Devolución total registrada. Factura vuelve a estado Pendiente.',
         });
     } catch (error: any) {
         await pool.query('ROLLBACK');
