@@ -96,7 +96,7 @@ export const getAjoverStats = async (req: Request, res: Response) => {
           COUNT(*) FILTER (WHERE LOWER(status_id) IN ('est-01','disponible','available') OR LOWER(status) IN ('disponible','available')) as available,
           COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-02' OR LOWER(status) IN ('en ruta','in route','activo')) as on_route,
           COALESCE(SUM(capacity_m3), 0) as total_capacity_m3,
-          COALESCE(SUM(capacity_kg), 0) as total_capacity_kg
+          0 as total_capacity_kg
         FROM vehicles WHERE client_id = 'CLI-01' OR client_id IS NULL
       `),
       pool.query(`

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../constants';
 import { api } from '../services/api';
+import { cleanSkuM7 } from '../utils/scanner';
 import { toast } from 'sonner';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -77,7 +78,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     
     // MODALES DE INTERACCIÓN MEJORADA
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
-    const [signatureInputModal, setSignatureInputModal] = useState<{ isOpen: boolean, invoice: any, onConfirm: (pass: string) => void } | null>(null);
+    const [signatureInputModal, setSignatureInputModal] = useState<{ isOpen: boolean, invoice: any, role?: string, onConfirm: (pass: string) => void } | null>(null);
 
     // ENTREGA AL CLIENTE
     const [deliveryModal, setDeliveryModal] = useState<{
@@ -569,9 +570,17 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 const paramsData = await api.getInvoices(undefined, idsParam);
                 
                 if (Array.isArray(paramsData)) {
-                    setFetchStatus(`OK (${paramsData.length})`);
-                    setFn(paramsData);
-                    if (drawMap) drawRouteOnMap(paramsData);
+                    // Deduplicar por invoiceNumber — el JOIN del backend puede generar duplicados
+                    const seen = new Set<string>();
+                    const deduplicated = paramsData.filter(inv => {
+                        const key = cleanId(inv.invoiceNumber || inv.id || '');
+                        if (!key || seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                    });
+                    setFetchStatus(`OK (${deduplicated.length})`);
+                    setFn(deduplicated);
+                    if (drawMap) drawRouteOnMap(deduplicated);
                     return; // Exit, we have fresh data
                 } else {
                     setFetchStatus('ERROR (Invalid Data)');
@@ -1000,7 +1009,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // LOGICA DE NEGOCIO PARA DESPACHO (MOVIDA ANTES DEL RETURN)
     const handleBarcodeScan = async (barcode: string) => {
         if (!assigningInvoice) return;
-        const barcodeClean = String(barcode).trim().toUpperCase();
+        const barcodeClean = cleanSkuM7(barcode);
         
         // Buscar el ítem por SKU o Barcode de forma robusta
         const item = (assigningInvoice.items || []).find((it: any) => 
@@ -1101,9 +1110,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     };
 
     const handleDelayedSignature = async (inv: any) => {
+        const pending = pendingSignatures.find(
+            ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber
+        );
         setSignatureInputModal({
             isOpen: true,
             invoice: inv,
+            role: pending?.role || 'DRIVER',
             onConfirm: (pass: string) => executeSignature(inv, pass)
         });
     };
@@ -1691,9 +1704,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 }}
             />
             
-            <SignatureInputModal 
+            <SignatureInputModal
                 isOpen={!!signatureInputModal}
                 user={user}
+                role={signatureInputModal?.role}
+                invoice={signatureInputModal?.invoice}
                 onClose={() => setSignatureInputModal(null)}
                 onConfirm={(pass) => {
                     const cb = signatureInputModal?.onConfirm;
