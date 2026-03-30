@@ -15,7 +15,7 @@ export const notifyTest = async (req: Request, res: Response) => {
     `);
     res.json({ success: true, message: 'Email enviado correctamente' });
   } catch (err: any) {
-    res.status(500).json({ error: "Falla al enviar notificación", details: err.message });
+    res.status(500).json({ error: "Falla al enviar notificación" });
   }
 };
 
@@ -29,6 +29,6 @@ export const notifyWhatsAppTest = async (req: Request, res: Response) => {
       res.status(500).json({ success: false, error: result.error });
     }
   } catch (err: any) {
-    res.status(500).json({ error: "Falla al procesar envío de WhatsApp", details: err.message });
+    res.status(500).json({ error: "Falla al procesar envío de WhatsApp" });
   }
 };

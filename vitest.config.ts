@@ -7,8 +7,20 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    environmentMatchGlobs: [
+      // Tests de integración HTTP corren en Node.js puro (sin DOM)
+      ['**/backend/tests/integration/**', 'node'],
+      ['**/*integration*', 'node'],
+      ['**/*security*integration*', 'node'],
+    ],
     setupFiles: './tests/setup.ts',
+    // Excluir tests E2E de Playwright — se ejecutan con npx playwright test
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: [
+      'node_modules/**',
+      'dist/**',
+      'tests/e2e/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

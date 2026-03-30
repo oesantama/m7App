@@ -1,5 +1,4 @@
-
-import { describe, it, expect } from 'vitest';
+// @vitest-environment node
 
 const API_URL = 'http://localhost:8080';
 

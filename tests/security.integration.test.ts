@@ -1,62 +1,73 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import axios from 'axios';
+// @vitest-environment node
 
-// Usamos el puerto mapeado de Docker 8090 -> 8080
-const API_URL = 'http://localhost:8090/api';
+const API_URL = 'http://localhost:8080/api';
 
 describe('Auditoría de Seguridad - Integración JWT & RBAC', () => {
   let validToken: string = '';
 
-  // 1. Validar que ninguna ruta protegida sea accesible sin token
-  it('GET /api/documents debe retornar 401 Unauthorized sin token', async () => {
+  beforeAll(async () => {
+    // Obtener token antes de los tests que lo requieren
     try {
-      await axios.get(`${API_URL}/documents`);
-    } catch (error: any) {
-      expect(error.response.status).toBe(401);
-      expect(error.response.data.error).toContain('No se proporcionó un token');
-    }
-  });
-
-  // 2. Validar Login y obtención de token RS256
-  it('POST /api/auth/login debe retornar un token JWT válido', async () => {
-    const response = await axios.post(`${API_URL}/auth/login`, {
-      email: 'admin@millasiete.com',
-      password: 'admin123'
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.data.success).toBe(true);
-    expect(response.data.token).toBeDefined();
-    validToken = response.data.token;
-  });
-
-  // 3. Validar acceso con token válido
-  it('GET /api/documents debe permitir acceso con token válido', async () => {
-    const response = await axios.get(`${API_URL}/documents`, {
-      headers: { Authorization: `Bearer ${validToken}` }
-    });
-    expect(response.status).toBe(200);
-    expect(Array.isArray(response.data)).toBe(true);
-  });
-
-  // 4. Validar protección con token inválido/manipulado
-  it('GET /api/documents debe retornar 401 con token manipulado', async () => {
-    try {
-      await axios.get(`${API_URL}/documents`, {
-        headers: { Authorization: `Bearer ${validToken}X` }
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@millasiete.com', password: 'admin123' })
       });
-    } catch (error: any) {
-      expect(error.response.status).toBe(401);
-      expect(error.response.data.error).toContain('Token inválido');
+      const data = await res.json();
+      validToken = data.token || '';
+    } catch (e) {
+      console.warn('beforeAll login failed:', e);
     }
   });
 
-  // 5. Validar RBAC (Admin tiene permiso total)
-  it('GET /api/users debe permitir acceso a ADMIN', async () => {
-    const response = await axios.get(`${API_URL}/users`, {
-      headers: { Authorization: `Bearer ${validToken}` }
+  // 1. Ruta protegida sin token → 401
+  it('GET /api/documents debe retornar 401 Unauthorized sin token', async () => {
+    const res = await fetch(`${API_URL}/documents`);
+    expect(res.status).toBe(401);
+    const data = await res.json();
+    expect(data.error).toContain('No se proporcionó un token');
+  });
+
+  // 2. Login y obtención de token RS256
+  it('POST /api/auth/login debe retornar un token JWT válido', async () => {
+    const res = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@millasiete.com', password: 'admin123' })
     });
-    expect(response.status).toBe(200);
-    expect(Array.isArray(response.data)).toBe(true);
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.token).toBeDefined();
+  });
+
+  // 3. Acceso con token válido
+  it('GET /api/documents debe permitir acceso con token válido', async () => {
+    const res = await fetch(`${API_URL}/documents`, {
+      headers: { 'Authorization': `Bearer ${validToken}` }
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  // 4. Token manipulado → 401
+  it('GET /api/documents debe retornar 401 con token manipulado', async () => {
+    const res = await fetch(`${API_URL}/documents`, {
+      headers: { 'Authorization': `Bearer ${validToken}X` }
+    });
+    expect(res.status).toBe(401);
+    const data = await res.json();
+    expect(data.error).toContain('Token inválido');
+  });
+
+  // 5. RBAC: admin tiene acceso total
+  it('GET /api/users debe permitir acceso a ADMIN', async () => {
+    const res = await fetch(`${API_URL}/users`, {
+      headers: { 'Authorization': `Bearer ${validToken}` }
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(Array.isArray(data)).toBe(true);
   });
 });

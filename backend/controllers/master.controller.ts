@@ -51,9 +51,8 @@ export const saveMasterRecord = async (req: Request, res: Response) => {
     console.error(`Detalles:`, err.detail);
     console.error(`Payload:`, { id, category, name, statusId });
     console.error(`-------------------------------------------`);
-    res.status(500).json({ 
-        error: "Error al guardar registro maestro", 
-        details: err.message,
+    res.status(500).json({
+        error: "Error al guardar registro maestro",
         category: category
     });
   }

@@ -18,7 +18,6 @@ export const getStatus = async (req: Request, res: Response) => {
     console.error('[M7-WHATSAPP-CTRL] Error obteniendo estado:', err);
     res.status(500).json({ 
       error: "No se pudo obtener el estado del bot",
-      details: err.message 
     });
   }
 };
@@ -43,7 +42,6 @@ export const reconnect = async (req: Request, res: Response) => {
     res.status(500).json({ 
       success: false,
       error: "No se pudo iniciar la sesión",
-      details: err.message 
     });
   }
 };
@@ -64,8 +62,7 @@ export const disconnect = async (req: Request, res: Response) => {
       res.status(500).json({ 
         success: false, 
         error: "No se pudo desconectar la sesión", 
-        details: err.message 
-      });
+        });
     }
 };
 
@@ -85,8 +82,7 @@ export const getHistory = async (req: Request, res: Response) => {
         console.error('[M7-WHATSAPP-CTRL] Error obteniendo historial:', err);
         res.status(500).json({ 
             error: "Error recuperando historial", 
-            details: err.message 
-        });
+              });
     }
 };
 
@@ -211,7 +207,7 @@ export const sendNotification = async (req: Request, res: Response) => {
 
     } catch (err: any) {
         console.error('[M7-WHATSAPP-CTRL] Error en envío masivo:', err);
-        res.status(500).json({ error: "Error procesando envío masivo", details: err.message });
+        res.status(500).json({ error: "Error procesando envío masivo" });
     }
 };
 

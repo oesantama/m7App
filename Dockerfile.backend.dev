@@ -1,0 +1,26 @@
+# ──────────────────────────────────────────────────────────
+# M7 Backend — Imagen de DESARROLLO con hot-reload (tsx watch)
+# No usar en producción. Ver Dockerfile.backend para prod.
+# ──────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Dependencias del sistema
+RUN apk add --no-cache ca-certificates tzdata
+
+ENV TZ=America/Bogota \
+    NODE_ENV=development
+
+# Copiar manifiestos e instalar TODAS las dependencias (incluyendo devDependencies)
+COPY package*.json ./
+RUN npm install --legacy-peer-deps --no-audit --ignore-scripts
+
+# Copiar el código fuente inicial
+# (será sobreescrito por el volume mount en docker-compose.dev.yml)
+COPY . .
+
+EXPOSE 8080
+
+# tsx watch: recarga automática al detectar cambios en cualquier .ts del backend
+CMD ["npx", "tsx", "watch", "--clear-screen=false", "backend/server.ts"]

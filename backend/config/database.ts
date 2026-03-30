@@ -14,8 +14,17 @@ const dbName = process.env.DB_NAME || process.env.POSTGRES_DB || 'm7_logistica';
 
 const connectionString = process.env.DATABASE_URL || `postgres://${dbUser}:${dbPass}@${dbHost}:${dbPort}/${dbName}`;
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const pool = new Pool({
   connectionString,
+  // Tamaño del pool: 20 conexiones máx para aguantar carga sin agotar postgres (max_connections=50)
+  max: 20,
+  min: 2,
+  idleTimeoutMillis: 30_000,        // Cierra conexiones ociosas a los 30s
+  connectionTimeoutMillis: 5_000,   // Falla rápido si no hay conexión disponible
+  // SSL solo en producción (Coolify/DigitalOcean)
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 });
 
 pool.on('connect', (client) => {

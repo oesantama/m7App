@@ -10,10 +10,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-        console.error('--- [M7-SECURITY-AUDIT] 🚨 FALLA DE AUTENTICACIÓN ---');
-        console.error(`Método: ${req.method} | URL: ${req.url}`);
-        console.error('Cabeceras Recibidas:', JSON.stringify(req.headers, null, 2));
-        console.error('-------------------------------------------------------');
+        console.error(`[AUTH-MISSING-TOKEN] ${req.method} ${req.url}`);
         return res.status(401).json({ success: false, error: 'Acceso denegado. No se proporcionó un token.' });
     }
 
@@ -23,9 +20,6 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
         next();
     } catch (error: any) {
         console.error(`[AUTH-FAILURE] Token inválido para: ${req.method} ${req.url}. Error: ${error.message}`);
-        // Ofuscar el token para los logs de depuración
-        const partialToken = token.substring(0, 10) + '...';
-        console.log(`[DEBUG-TOKEN]: Received token: ${partialToken}`);
         return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
     }
 };

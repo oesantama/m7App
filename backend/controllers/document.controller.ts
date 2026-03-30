@@ -64,7 +64,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-GET-DOC-ERR]', err.message);
-    res.status(500).json({ error: "Falla al obtener documentos", details: err.message });
+    res.status(500).json({ error: "Falla al obtener documentos" });
   }
 };
 
@@ -311,6 +311,10 @@ export const syncInventory = async (req: Request, res: Response) => {
                     <div class="info-label">Fecha Cierre</div>
                     <div class="info-value">${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</div>
                   </div>
+                  <div class="info-item">
+                    <div class="info-label">Tipo de Plan</div>
+                    <div class="info-value">${docL.plan_type || docL.planType || 'PLAN NORMAL'}</div>
+                  </div>
                </div>
             </div>
 
@@ -348,6 +352,7 @@ export const syncInventory = async (req: Request, res: Response) => {
             const XLSX = await import('xlsx');
             const excelData = items.map((it: any) => ({
                  'SKU': it.articleId?.trim() || it.article_id?.trim() || '',
+                 'Tipo de Plan': docL.plan_type || docL.planType || 'PLAN NORMAL',
                  'Cant (Orig)': Number(it.expectedQty || it.expected_qty || 0),
                  'Conteo 1': Number(it.count1 || it.count_1 || 0),
                  'Conteo 2 (Final)': Number(it.count2 || it.countedQty || it.count_2 || 0),
@@ -402,7 +407,7 @@ export const syncInventory = async (req: Request, res: Response) => {
     console.error('Stack:', err.stack);
     console.error('Data recibida:', { docId, user, isPartial, itemsCount: items?.length });
     console.error('-------------------------------------------');
-    res.status(500).json({ error: "Error de sincronización", details: err.message, stack: err.stack });
+    res.status(500).json({ error: "Error de sincronización. Contacte soporte técnico." });
   } finally {
     if (client) client.release();
   }
@@ -611,7 +616,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[M7-DOC-BULK] Error:', err.message);
-    res.status(500).json({ error: "Error en carga masiva", details: err.message });
+    res.status(500).json({ error: "Error en carga masiva" });
   } finally {
     client.release();
   }
@@ -823,7 +828,7 @@ export const processDocumentLPayment = async (req: Request, res: Response) => {
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[M7-PAY-PROCESS-ERR]', err.message);
-    res.status(500).json({ error: "Error procesando pagos", details: err.message });
+    res.status(500).json({ error: "Error procesando pagos" });
   } finally {
     client.release();
   }
@@ -853,7 +858,7 @@ export const deleteDocument = async (req: Request, res: Response) => {
     res.json({ success: true, message: "Documento eliminado correctamente" });
   } catch (err: any) {
     console.error('[M7-DELETE-DOC-ERR]', err.message);
-    res.status(500).json({ error: "Falla al eliminar documento", details: err.message });
+    res.status(500).json({ error: "Falla al eliminar documento" });
   }
 };
 
@@ -1157,7 +1162,7 @@ export const getInventoryLog = async (req: Request, res: Response) => {
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-INV-LOG-ERR]', err.message);
-    res.status(500).json({ error: 'Error al obtener log de existencias', details: err.message });
+    res.status(500).json({ error: 'Error al obtener log de existencias' });
   }
 };
 
@@ -1241,7 +1246,7 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-MASTERSUITE-ERR]', err.message);
-    res.status(500).json({ error: 'Error al generar informe Mastersuite', details: err.message });
+    res.status(500).json({ error: 'Error al generar informe Mastersuite' });
   }
 };
 

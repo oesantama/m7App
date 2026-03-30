@@ -115,6 +115,33 @@ const healSchema = async (client: any) => {
     await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS geocoding_cache_address_key_idx ON geocoding_cache (address_key)`);
   } catch (e) {}
 
+  // ─── Índices de rendimiento crítico (agregados en auditoría Sprint 1) ──────────
+  const performanceIndexes = [
+    // document_items: join más frecuente en toda la app
+    `CREATE INDEX IF NOT EXISTS idx_document_items_document_id ON document_items (document_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_document_items_article_id  ON document_items (article_id)`,
+    // documents_l: filtros por cliente y fecha en listados
+    `CREATE INDEX IF NOT EXISTS idx_documents_l_client_id   ON documents_l (client_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_documents_l_status       ON documents_l (status)`,
+    `CREATE INDEX IF NOT EXISTS idx_documents_l_created_at   ON documents_l (created_at DESC)`,
+    // vehicle_locations: vista v_latest_vehicle_locations la usa constantemente
+    `CREATE INDEX IF NOT EXISTS idx_vehicle_locations_vehicle_id  ON vehicle_locations (vehicle_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_vehicle_locations_updated_at  ON vehicle_locations (updated_at DESC)`,
+    // articles: búsquedas por cliente y SKU
+    `CREATE INDEX IF NOT EXISTS idx_articles_client_id ON articles (client_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_articles_sku       ON articles (sku)`,
+    // dispatch/picking: lookups por invoice
+    `CREATE INDEX IF NOT EXISTS idx_dispatch_assignments_invoice_id ON dispatch_assignments (invoice_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_picking_assignments_invoice_id  ON picking_assignments  (invoice_id)`,
+    // assignments: búsqueda de vehículos por conductor
+    `CREATE INDEX IF NOT EXISTS idx_assignments_driver_id  ON assignments (driver_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_assignments_vehicle_id ON assignments (vehicle_id)`,
+  ];
+  for (const idxSql of performanceIndexes) {
+    try { await client.query(idxSql); } catch (e) {}
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   try {
     await client.query(`
       CREATE OR REPLACE VIEW v_latest_vehicle_locations AS

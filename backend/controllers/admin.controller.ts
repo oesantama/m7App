@@ -127,6 +127,10 @@ export const saveRecord = async (req: any, res: Response) => {
 
     const keys = Object.keys(data);
     const values = Object.values(data);
+
+    // Validar nombres de columna para prevenir inyección SQL via nombres de campo
+    const invalidCol = keys.find(k => !/^[a-zA-Z0-9_]+$/.test(k));
+    if (invalidCol) return res.status(400).json({ error: `Nombre de columna inválido: ${invalidCol}` });
     
     // Check if it's an UPDATE (has 'id') or INSERT
     // We assume 'id' column exists for updates. 
@@ -159,7 +163,7 @@ export const saveRecord = async (req: any, res: Response) => {
 
   } catch (err: any) {
     console.error('[ADMIN-SAVE]', err.message);
-    res.status(500).json({ error: "Error al guardar registro", details: err.message });
+    res.status(500).json({ error: "Error al guardar registro" });
   }
 };
 
@@ -180,7 +184,7 @@ export const deleteRecord = async (req: any, res: Response) => {
     res.json({ success: true, action: 'DELETE' });
   } catch (err: any) {
     console.error('[ADMIN-DELETE]', err.message);
-    res.status(500).json({ error: "Error al eliminar registro", details: err.message });
+    res.status(500).json({ error: "Error al eliminar registro" });
   }
 };
 
@@ -203,7 +207,7 @@ export const bulkDeleteRecords = async (req: any, res: Response) => {
     res.json({ success: true, action: 'BULK_DELETE', count: ids.length });
   } catch (err: any) {
     console.error('[ADMIN-BULK-DELETE]', err.message);
-    res.status(500).json({ error: "Error al eliminar registros masivamente", details: err.message });
+    res.status(500).json({ error: "Error al eliminar registros masivamente" });
   }
 };
 
@@ -269,6 +273,6 @@ export const getTableSchema = async (req: any, res: Response) => {
 
     } catch (err: any) {
         console.error('[ADMIN-SCHEMA]', err.message);
-        res.status(500).json({ error: "Error al obtener esquema", details: err.message });
+        res.status(500).json({ error: "Error al obtener esquema" });
     }
 };

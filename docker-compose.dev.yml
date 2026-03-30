@@ -1,0 +1,123 @@
+##############################################################################
+# M7 APP — ENTORNO DE DESARROLLO CON HOT-RELOAD
+# Uso: docker compose -f docker-compose.dev.yml up
+#
+# • Backend:  tsx watch → recarga automática al guardar cualquier .ts
+# • Frontend: Vite HMR  → recarga automática al guardar cualquier .tsx/.ts/.css
+# • DB:       mismo volumen persistente que producción (no se borra entre reinicios)
+#
+# NO usar en producción. Para producción usar docker-compose.yml
+##############################################################################
+
+services:
+
+  # ─────────────────────────────────────────────
+  # BACKEND — Node.js + tsx watch (hot-reload TS)
+  # ─────────────────────────────────────────────
+  backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend.dev
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - TZ=America/Bogota
+      - NODE_OPTIONS=--max-old-space-size=1024
+    volumes:
+      # Montar código fuente del backend en el contenedor
+      - ./backend:/app/backend
+      # Montar tipos y servicios compartidos
+      - ./types.ts:/app/types.ts
+      - ./services:/app/services
+      - ./utils:/app/utils
+      - ./config:/app/config
+      # Preservar node_modules del contenedor (no sobrescribir con el host)
+      - /app/node_modules
+      # .env y WhatsApp auth
+      - ./.env:/app/.env
+      - ./.wwebjs_auth:/app/.wwebjs_auth
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - m7-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ─────────────────────────────────────────────
+  # FRONTEND — Vite dev server (HMR)
+  # ─────────────────────────────────────────────
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.dev
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    environment:
+      - VITE_API_URL=http://localhost:8080/api
+      - NODE_OPTIONS=--max-old-space-size=1024
+    volumes:
+      # Montar TODO el código fuente frontend
+      - ./components:/app/components
+      - ./pages:/app/pages
+      - ./services:/app/services
+      - ./stores:/app/stores
+      - ./utils:/app/utils
+      - ./config:/app/config
+      - ./hooks:/app/hooks
+      - ./types.ts:/app/types.ts
+      - ./constants.tsx:/app/constants.tsx
+      # Archivos de configuración raíz
+      - ./vite.config.ts:/app/vite.config.ts
+      - ./tailwind.config.ts:/app/tailwind.config.ts
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./index.html:/app/index.html
+      - ./src:/app/src
+      # Preservar node_modules del contenedor
+      - /app/node_modules
+    depends_on:
+      - backend-dev
+    restart: unless-stopped
+    networks:
+      - m7-dev-network
+
+  # ─────────────────────────────────────────────
+  # POSTGRES — misma instancia para dev y prod
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-m7_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-m7_master_password}
+      - POSTGRES_DB=${POSTGRES_DB:-m7_logistica}
+    volumes:
+      - m7_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-m7_admin} -d ${POSTGRES_DB:-m7_logistica}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - m7-dev-network
+
+networks:
+  m7-dev-network:
+    driver: bridge
+
+volumes:
+  m7_dev_data:
+    # Usar volumen nombrado separado para dev (no afecta el de producción)
+    name: m7_logistica_dev_data

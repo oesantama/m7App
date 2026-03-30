@@ -8,8 +8,8 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const isDemo = import.meta.env.VITE_APP_DEMO_MODE === 'true';
+  // Solo guardamos el email — nunca la contraseña en localStorage (riesgo de seguridad)
   const savedEmail = localStorage.getItem('m7_remember_email');
-  const savedPass = localStorage.getItem('m7_remember_pass');
 
   const [email, setEmail] = useState(() => {
     if (savedEmail) return savedEmail;
@@ -18,13 +18,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   });
 
   const [password, setPassword] = useState(() => {
-    if (savedPass) return savedPass;
     if (isDemo) return import.meta.env.VITE_APP_DEMO_PASSWORD || '';
     return '';
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(!!savedEmail);
+  // Limpiar contraseña guardada anteriormente (migración de sesiones antiguas)
+  localStorage.removeItem('m7_remember_pass');
   const [view, setView] = useState<'login' | 'forgot' | '2fa'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,10 +97,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       if (result.success) {
         if (rememberMe) {
           localStorage.setItem('m7_remember_email', email.trim().toLowerCase());
-          localStorage.setItem('m7_remember_pass', password);
         } else {
           localStorage.removeItem('m7_remember_email');
-          localStorage.removeItem('m7_remember_pass');
         }
 
         setError(null);
@@ -297,7 +296,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 if (data.success) {
                   if (rememberMe) {
                     localStorage.setItem('m7_remember_email', email.trim().toLowerCase());
-                    localStorage.setItem('m7_remember_pass', password);
                   }
                   window.location.reload();
                 } else {

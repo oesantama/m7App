@@ -5,12 +5,10 @@ import { signAccessToken } from '../utils/jwt.util.js';
 
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  console.log(`[LOGIN-DEBUG] Solicitud de login recibida para el identificador: ${email}`);
-  
+
   try {
     const identifier = email?.trim().toLowerCase();
-    console.log(`[LOGIN-DEBUG] Ejecutando consulta de usuario en BD...`);
-    
+
     const result = await pool.query(
       `SELECT id, email, password, name, role_id, client_ids, two_factor_enabled, two_factor_secret 
        FROM users 
@@ -18,17 +16,13 @@ export const login = async (req: Request, res: Response) => {
       [identifier]
     );
 
-    console.log(`[LOGIN-DEBUG] Resultado de consulta: ${result.rows.length} usuarios encontrados.`);
     const user = result.rows[0];
-    
+
     if (!user) {
-        console.log(`[LOGIN-DEBUG] Rechazado: Usuario no encontrado.`);
         return res.status(401).json({ success: false, error: 'Usuario no registrado o identificador incorrecto' });
     }
 
-    console.log(`[LOGIN-DEBUG] Verificando contraseña con bcrypt...`);
     const match = await bcrypt.compare(password, user.password);
-    console.log(`[LOGIN-DEBUG] Resultado de bcrypt: ${match}`);
     
     if (!match) {
         return res.status(401).json({ success: false, error: 'Contraseña incorrecta' });

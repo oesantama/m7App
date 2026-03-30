@@ -45,5 +45,9 @@ export const cleanSkuM7 = (raw: string): string => {
   // N (sin tilde) = ENTER en teclado ES con layout EN en algunos modelos Android
   code = code.replace(/[Ñ\t\n]/g, '');
 
+  // 5. Eliminar ':' al final (algunos scanners envían el código terminado en ':' sin datos siguientes)
+  // Ejemplo: "D702401LS4:" → "D702401LS4"
+  code = code.replace(/:+$/, '');
+
   return code.trim();
 };

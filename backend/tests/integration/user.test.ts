@@ -1,15 +1,33 @@
+// @vitest-environment node
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-
-const API_URL = 'http://localhost:8080/api/users';
+const AUTH_URL = 'http://localhost:8080/api/auth';
+const API_URL  = 'http://localhost:8080/api/users';
 const TEST_USER_ID = 'USR-TEST-VITEST';
+
+let authToken = '';
+
+// Login antes de todos los tests para obtener el token de admin
+beforeAll(async () => {
+    const res = await fetch(`${AUTH_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@millasiete.com', password: 'admin123' })
+    });
+    const data = await res.json();
+    authToken = data.token;
+});
+
+const authHeader = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${authToken}`
+});
 
 describe('User Integration Tests', () => {
 
     it('should create a new user', async () => {
         const response = await fetch(`${API_URL}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeader(),
             body: JSON.stringify({
                 id: TEST_USER_ID,
                 email: 'testuser@millasiete.com',
@@ -28,12 +46,14 @@ describe('User Integration Tests', () => {
 
         const data = await response.json();
         console.log('Create User Response:', JSON.stringify(data));
-        expect(response.status).toBe(200); // Controller returns 200 for success
+        expect(response.status).toBe(200);
         expect(data.success).toBe(true);
     });
 
     it('should get all users and find the created user', async () => {
-        const response = await fetch(`${API_URL}`);
+        const response = await fetch(`${API_URL}`, {
+            headers: authHeader()
+        });
         expect(response.status).toBe(200);
         const users = await response.json();
         expect(Array.isArray(users)).toBe(true);
@@ -44,13 +64,12 @@ describe('User Integration Tests', () => {
 
     it('should update the user', async () => {
         const response = await fetch(`${API_URL}`, {
-            method: 'POST', // saveUser handles update too
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST',
+            headers: authHeader(),
             body: JSON.stringify({
                 id: TEST_USER_ID,
                 email: 'testuser_updated@millasiete.com',
                 name: 'Test User Updated',
-                // password not sent, should keep old one
                 roleId: 'ROL-01',
                 statusId: 'EST-01',
                 clientIds: ['CLI-TEST-01']
@@ -62,8 +81,7 @@ describe('User Integration Tests', () => {
         expect(response.status).toBe(200);
         expect(data.success).toBe(true);
 
-        // Verify update
-        const verifyResponse = await fetch(`${API_URL}`);
+        const verifyResponse = await fetch(`${API_URL}`, { headers: authHeader() });
         const users = await verifyResponse.json();
         const found = users.find((u: any) => u.id === TEST_USER_ID);
         expect(found.name).toBe('Test User Updated');
@@ -72,7 +90,8 @@ describe('User Integration Tests', () => {
 
     it('should delete the user', async () => {
         const response = await fetch(`${API_URL}/${TEST_USER_ID}?deletedBy=VITEST`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: authHeader()
         });
 
         const data = await response.json();
@@ -80,8 +99,7 @@ describe('User Integration Tests', () => {
         expect(response.status).toBe(200);
         expect(data.success).toBe(true);
 
-        // Verify deletion
-        const verifyResponse = await fetch(`${API_URL}`);
+        const verifyResponse = await fetch(`${API_URL}`, { headers: authHeader() });
         const users = await verifyResponse.json();
         const found = users.find((u: any) => u.id === TEST_USER_ID);
         expect(found).toBeUndefined();

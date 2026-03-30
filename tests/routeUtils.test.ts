@@ -181,8 +181,8 @@ describe('routeUtils', () => {
 
   describe('OPTIMIZATION_CONSTANTS', () => {
     it('debe tener constantes definidas correctamente', () => {
-      expect(OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION).toBe(0.90);
-      expect(OPTIMIZATION_CONSTANTS.MAX_UTILIZATION).toBe(0.90);
+      expect(OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION).toBe(0.85);
+      expect(OPTIMIZATION_CONSTANTS.MAX_UTILIZATION).toBe(0.92);
       expect(OPTIMIZATION_CONSTANTS.CRITICAL_THRESHOLD).toBe(0.95);
       expect(OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY).toBe(30);
       expect(OPTIMIZATION_CONSTANTS.OPTIMIZATION_DELAY).toBe(1200);

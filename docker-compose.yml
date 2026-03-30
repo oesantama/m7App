@@ -115,6 +115,43 @@ services:
     networks:
       - m7-network
 
+  # ─── Backup automático de Postgres ───────────────────────────────────────────
+  # Corre pg_dump cada día a las 2:00 AM (America/Bogota)
+  # Mantiene los últimos 7 días de backups en el volumen m7_backups
+  # Para restaurar manualmente: docker exec m7-backup ls /backups
+  db-backup:
+    image: postgres:15-alpine
+    container_name: m7-backup
+    restart: always
+    environment:
+      - PGPASSWORD=m7_master_password
+      - TZ=America/Bogota
+    volumes:
+      - m7_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - m7-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    # Cron: dump diario + limpieza de backups con más de 7 días
+    entrypoint: >
+      sh -c "
+        echo 'Backup service started';
+        while true; do
+          BACKUP_FILE=/backups/m7_logistica_$$(date +%Y%m%d_%H%M%S).sql.gz;
+          pg_dump -h postgres -U m7_admin -d m7_logistica | gzip > $$BACKUP_FILE;
+          echo \"[M7-BACKUP] Backup creado: $$BACKUP_FILE ($$(du -sh $$BACKUP_FILE | cut -f1))\";
+          find /backups -name '*.sql.gz' -mtime +7 -delete;
+          echo '[M7-BACKUP] Backups antiguos eliminados. Próximo backup en 24h.';
+          sleep 86400;
+        done
+      "
+  # ─────────────────────────────────────────────────────────────────────────────
+
 networks:
   m7-network:
     driver: bridge
@@ -123,3 +160,4 @@ volumes:
   m7_logistica_data:
   evolution_instances:
   evolution_store:
+  m7_backups:    # Volumen persistente para backups diarios

@@ -24,7 +24,7 @@ export const getNovedades = async (req: Request, res: Response) => {
         `, [docId]);
         res.json(result.rows);
     } catch (err: any) {
-        res.status(500).json({ error: "Error al obtener novedades", details: err.message });
+        res.status(500).json({ error: "Error al obtener novedades" });
     }
 };
 
@@ -58,7 +58,7 @@ export const saveNovedad = async (req: Request, res: Response) => {
             return res.json({ success: true, message: "Novedad registrada correctamente" });
         }
     } catch (err: any) {
-        res.status(500).json({ error: "Error al guardar novedad", details: err.message });
+        res.status(500).json({ error: "Error al guardar novedad" });
     }
 };
 
@@ -216,6 +216,6 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         res.json({ success: true, message: "Reporte enviado correctamente con PDF adjunto" });
     } catch (err: any) {
         console.error('[REPORT-ERROR]', err);
-        res.status(500).json({ error: "Error al enviar reporte", details: err.message });
+        res.status(500).json({ error: "Error al enviar reporte" });
     }
 };

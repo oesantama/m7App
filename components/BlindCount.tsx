@@ -866,6 +866,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     const dataToExport = groupedItems.map(item => ({
       'Artículo / SKU': item.articleId,
       'Descripción': (item as any).articleName || (masterArticulo.find(m => m.id === item.articleId) as any)?.name || 'Sin descripción',
+      'Tipo de Plan': docL.planType || 'PLAN NORMAL',
       'Estado': (counts[item.articleId] || 0) > 0 ? 'Conteo' : 'Pendiente',
       'Cant. Auditada': counts[item.articleId] || 0,
       'U.M.': item.unit || 'UND',

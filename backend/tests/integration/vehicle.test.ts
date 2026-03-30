@@ -1,16 +1,39 @@
+// @vitest-environment node
 
-import { describe, it, expect } from 'vitest';
-
-const API_URL = 'http://localhost:8080/api/vehicles';
+const AUTH_URL = 'http://localhost:8080/api/auth';
+const API_URL  = 'http://localhost:8080/api/vehicles';
 const TEST_VEHICLE_ID = 'VEH-TEST-VITEST';
 const TEST_PLATE = 'VIT-999';
+
+let authToken = '';
+
+beforeAll(async () => {
+    const res = await fetch(`${AUTH_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@millasiete.com', password: 'admin123' })
+    });
+    const data = await res.json();
+    authToken = data.token;
+
+    // Limpieza preventiva: eliminar vehículo de test si quedó de una ejecución anterior
+    await fetch(`${API_URL}/${TEST_VEHICLE_ID}?deletedBy=VITEST-CLEANUP`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
+    }).catch(() => {});
+});
+
+const authHeader = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${authToken}`
+});
 
 describe('Vehicle Integration Tests', () => {
 
     it('should create a new vehicle', async () => {
         const response = await fetch(`${API_URL}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeader(),
             body: JSON.stringify({
                 id: TEST_VEHICLE_ID,
                 plate: TEST_PLATE,
@@ -32,7 +55,9 @@ describe('Vehicle Integration Tests', () => {
     });
 
     it('should get all vehicles and find the created vehicle', async () => {
-        const response = await fetch(`${API_URL}`);
+        const response = await fetch(`${API_URL}`, {
+            headers: authHeader()
+        });
         expect(response.status).toBe(200);
         const vehicles = await response.json();
         expect(Array.isArray(vehicles)).toBe(true);
@@ -44,7 +69,7 @@ describe('Vehicle Integration Tests', () => {
     it('should update the vehicle', async () => {
         const response = await fetch(`${API_URL}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeader(),
             body: JSON.stringify({
                 id: TEST_VEHICLE_ID,
                 plate: TEST_PLATE,
@@ -61,8 +86,7 @@ describe('Vehicle Integration Tests', () => {
         expect(response.status).toBe(200);
         expect(data.success).toBe(true);
 
-        // Verify update
-        const verifyResponse = await fetch(`${API_URL}`);
+        const verifyResponse = await fetch(`${API_URL}`, { headers: authHeader() });
         const vehicles = await verifyResponse.json();
         const found = vehicles.find((v: any) => v.id === TEST_VEHICLE_ID);
         expect(found.brand).toBe('Chevrolet Updated');
@@ -71,7 +95,8 @@ describe('Vehicle Integration Tests', () => {
 
     it('should soft delete the vehicle', async () => {
         const response = await fetch(`${API_URL}/${TEST_VEHICLE_ID}?deletedBy=VITEST`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: authHeader()
         });
 
         const data = await response.json();
@@ -79,8 +104,7 @@ describe('Vehicle Integration Tests', () => {
         expect(response.status).toBe(200);
         expect(data.success).toBe(true);
 
-        // Verify deletion (getVehicles filters out deleted ones)
-        const verifyResponse = await fetch(`${API_URL}`);
+        const verifyResponse = await fetch(`${API_URL}`, { headers: authHeader() });
         const vehicles = await verifyResponse.json();
         const found = vehicles.find((v: any) => v.id === TEST_VEHICLE_ID);
         expect(found).toBeUndefined();

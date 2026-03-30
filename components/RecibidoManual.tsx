@@ -34,8 +34,9 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredDocs = useMemo(() => {
-    return documents.filter(d => 
-      (!selectedClientId || String(d.clientId) === String(selectedClientId)) && 
+    return documents.filter(d =>
+      d.id?.startsWith('L-MAN-') &&
+      (!selectedClientId || String(d.clientId) === String(selectedClientId)) &&
       (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING || String(d.status).toUpperCase() === 'PENDIENTE') &&
       (d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase()) || (d.vehicleData || '').toLowerCase().includes(searchTerm.toLowerCase()))
     );

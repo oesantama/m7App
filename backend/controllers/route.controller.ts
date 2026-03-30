@@ -49,7 +49,7 @@ export const getRoutes = async (req: Request, res: Response) => {
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-GET-ROUTES-ERR]', err);
-    res.status(500).json({ error: "Error al obtener rutas", details: err.message });
+    res.status(500).json({ error: "Error al obtener rutas" });
   }
 };
 
@@ -124,7 +124,7 @@ export const saveRoute = async (req: Request, res: Response) => {
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[M7-ROUTE-CTRL] Error:', err.message);
-    res.status(500).json({ error: "Error al guardar la ruta", details: err.message });
+    res.status(500).json({ error: "Error al guardar la ruta" });
   } finally {
     client.release();
   }

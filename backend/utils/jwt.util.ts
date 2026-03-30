@@ -26,7 +26,7 @@ export const signAccessToken = (payload: any): string => {
     };
     return sign(enrichedPayload, PRIVATE_KEY, {
         algorithm: 'RS256',
-        expiresIn: '365d' // Expiración extendida a 365 días por solicitud de Oscar
+        expiresIn: '30d' // Reducido a 30d por seguridad (tokens robados quedan válidos menos tiempo)
     });
 };
 

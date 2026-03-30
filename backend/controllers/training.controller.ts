@@ -157,10 +157,9 @@ export const saveSession = async (req: Request, res: Response) => {
     res.json({ success: true, tracking_token });
   } catch (err: any) {
     console.error("[TRAINING-CTRL] ERROR CRÍTICO AL GUARDAR SESIÓN:", err);
-    res.status(500).json({ 
-        error: "Error al guardar sesión de capacitación", 
-        details: err.message,
-        hint: "Verifique que las tablas existan y las fechas sean válidas" 
+    res.status(500).json({
+        error: "Error al guardar sesión de capacitación",
+        hint: "Verifique que las tablas existan y las fechas sean válidas"
     });
   }
 };

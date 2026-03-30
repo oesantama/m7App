@@ -7,6 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { randomUUID } from 'crypto';
 import apiRoutes from './routes/index.js';
 import { initDeliveryTables } from './controllers/dispatch.controller.js';
 import { initScheduler } from './services/scheduler.service.js';
@@ -19,9 +20,33 @@ app.set('trust proxy', 1);
 // Middlewares de Seguridad Crítica (Hallazgos QA)
 app.use(helmet({
   contentSecurityPolicy: false, // Permitir iframes y scripts en el manual si es necesario
-})); 
-app.use(cors());
-app.use(express.json({ limit: '100mb' }));
+}));
+
+// CORS restrictivo: solo dominios conocidos en producción
+const allowedOrigins = [
+  'https://orbitm7.m7apps.com',
+  'https://www.orbitm7.m7apps.com',
+];
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? (origin, callback) => {
+        // Permitir requests sin origin (mobile apps, Postman, server-to-server)
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error(`CORS: Origen no permitido — ${origin}`));
+      }
+    : true,
+  credentials: true,
+}));
+
+// Limit request body a 10MB (antes 100MB — superficie de ataque innecesaria)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Request-ID middleware: cada request lleva un ID único para trazabilidad en logs
+app.use((req: any, _res, next) => {
+  req.requestId = (req.headers['x-request-id'] as string) || randomUUID();
+  next();
+});
 
 // Servir archivos estáticos públicos (Manual Técnico, logos, etc.)
 import path from 'path';
@@ -33,10 +58,10 @@ const projectRoot = path.resolve(__dirname, '..');
 // Servir la carpeta public desde la raíz del proyecto
 app.use(express.static(path.join(projectRoot, 'public')));
 
-// Limitador de Intentos de Login (Hallazgo QA) 15 peticiones por 15 min por IP
+// Limitador de Intentos de Login — solo estricto en producción
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 15,
+  max: process.env.NODE_ENV === 'production' ? 15 : 1000,
   message: { error: 'Demasiados intentos de acceso desde esta IP. Intente en 15 minutos.' }
 });
 
@@ -55,20 +80,7 @@ import { authenticateToken } from './middleware/auth.middleware.js';
 // Montaje de API Modular
 app.use('/api/auth/login', loginLimiter); 
 
-// Endpoint de diagnóstico RAÍZ absoluto (Omitir cualquier middleware de /api)
-app.get('/health-sec', (req, res) => {
-  const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-  const keys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
-  
-  res.json({ 
-    status: 'UP', 
-    version: '1.9.54-ULTRA-SLIM',
-    keys_in_pool: keys.length,
-    key_lengths: keys.map(k => k.length),
-    key_detected: keys.length > 0,
-    env: process.env.NODE_ENV
-  });
-});
+// REMOVIDO: /health-sec exponía claves API sin autenticación — ver audit Sprint 1
 
 // Estado de arranque: false hasta que migraciones terminen
 let systemReady = false;
@@ -118,6 +130,17 @@ app.use((req, res) => {
   });
 });
 
+// Handler global de errores Express — nunca exponer stack al cliente
+app.use((err: any, req: any, res: any, _next: any) => {
+  const reqId = req.requestId || 'no-id';
+  console.error(`[ORBIT-ERROR] [${reqId}] ${req.method} ${req.url} — ${err.message}`);
+  res.status(err.status || 500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' ? 'Error interno del servidor.' : err.message,
+    code: err.status || 500
+  });
+});
+
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
@@ -153,4 +176,14 @@ app.listen(PORT, () => {
       // Marcar como listo igual para no bloquear indefinidamente en caso de error no crítico
       systemReady = true;
     });
+});
+
+// Handlers globales de Node — evitan crash silencioso en promesas no capturadas
+process.on('unhandledRejection', (reason: any) => {
+  console.error('[ORBIT-UNHANDLED-REJECTION]', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err: any) => {
+  console.error('[ORBIT-UNCAUGHT-EXCEPTION] Proceso en estado inestable, reiniciando:', err.message);
+  process.exit(1); // Docker/PM2 reiniciará el contenedor limpiamente
 });
