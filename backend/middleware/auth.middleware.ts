@@ -41,6 +41,8 @@ const ID_MAP: Record<string, string> = {
     'CAPACITACIONES': 'PAG-32', // PAG-32 = GESTIÓN ASISTENCIAS (training-ops)
     'PAG-33': 'PAG-33',         // PAG-33 = CURSOS Y TALLERES (capacitaciones)
     'PAG-35': 'PAG-35',         // PAG-35 = DASHBOARD AJOVER
+    'CONCILIACION': 'PAG-36',   // PAG-36 = CONCILIACIÓN FACTURAS
+    'PAG-36': 'PAG-36',
 };
 
 export const requirePermission = (moduleName: string, action: string) => {

@@ -52,6 +52,7 @@ const MastersuiteReport = lazyWithRetry(() => import('./components/MastersuiteRe
 const TrainingAdmin = lazyWithRetry(() => import('./components/TrainingAdmin'));
 const AjoverDashboard = lazyWithRetry(() => import('./components/AjoverDashboard'));
 const PublicAttendanceForm = lazyWithRetry(() => import('./components/PublicAttendanceForm'));
+const ConciliacionFacturas = lazyWithRetry(() => import('./components/ConciliacionFacturas'));
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
 import { useAppStore } from './stores/useAppStore';
@@ -889,6 +890,8 @@ const App: React.FC = () => {
             clients={allMasterData.masterClientes || []}
           />
         );
+      case 'conciliacion':
+        return <ConciliacionFacturas user={user!} />;
       case 'capacitaciones':
         return <CentroCapacitaciones user={user!} />;
       case 'chatbot':
