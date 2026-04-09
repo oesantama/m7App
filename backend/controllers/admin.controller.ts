@@ -222,38 +222,39 @@ export const getTableSchema = async (req: any, res: Response) => {
              return res.status(400).json({ error: "Nombre de tabla inválido" });
         }
 
-        // Complex query to get columns, types, nullability, defaults, PKs, FKs, and comments
+        // Query de columnas usando pg_catalog directamente (evita ambigüedades de information_schema)
         const query = `
-            SELECT 
-                c.column_name, 
-                c.data_type, 
-                c.is_nullable,
-                c.character_maximum_length,
-                c.column_default,
-                pg_catalog.col_description(format('%s.%s', c.table_schema, c.table_name)::regclass::oid, c.ordinal_position) as column_description,
-                CASE WHEN pk.column_name IS NOT NULL THEN 'YES' ELSE 'NO' END as is_primary_key,
-                case when fk.column_name is not null then 'YES' else 'NO' end as is_foreign_key,
+            SELECT
+                a.attname                                          AS column_name,
+                pg_catalog.format_type(a.atttypid, a.atttypmod)   AS data_type,
+                CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END   AS is_nullable,
+                NULL::integer                                      AS character_maximum_length,
+                pg_catalog.pg_get_expr(d.adbin, d.adrelid)        AS column_default,
+                pg_catalog.col_description(c.oid, a.attnum)       AS column_description,
+                CASE WHEN pk.attname IS NOT NULL THEN 'YES' ELSE 'NO' END AS is_primary_key,
+                CASE WHEN fk.column_name IS NOT NULL THEN 'YES' ELSE 'NO' END AS is_foreign_key,
                 fk.foreign_table_name,
                 fk.foreign_column_name
-            FROM information_schema.columns c
+            FROM pg_catalog.pg_class c
+            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+            LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum
             LEFT JOIN (
-                SELECT kcu.table_schema, kcu.table_name, kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-                WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_name = $1
-            ) pk ON c.table_schema = pk.table_schema AND c.table_name = pk.table_name AND c.column_name = pk.column_name
+                SELECT a2.attname
+                FROM pg_catalog.pg_index i
+                JOIN pg_catalog.pg_attribute a2 ON a2.attrelid = i.indrelid AND a2.attnum = ANY(i.indkey)
+                WHERE i.indrelid = (SELECT oid FROM pg_class WHERE relname = $1 AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public'))
+                  AND i.indisprimary
+            ) pk ON pk.attname = a.attname
             LEFT JOIN (
-                SELECT 
-                    kcu.table_schema, kcu.table_name, kcu.column_name, 
-                    ccu.table_name AS foreign_table_name, 
-                    ccu.column_name AS foreign_column_name
+                SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name
                 FROM information_schema.table_constraints tc
                 JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
                 JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-                WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1
-            ) fk ON c.table_schema = fk.table_schema AND c.table_name = fk.table_name AND c.column_name = fk.column_name
-            WHERE c.table_name = $1
-            ORDER BY c.ordinal_position;
+                WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1 AND tc.table_schema = 'public'
+            ) fk ON fk.column_name = a.attname
+            WHERE c.relname = $1 AND n.nspname = 'public' AND c.relkind = 'r'
+            ORDER BY a.attnum;
         `;
         
         const result = await pool.query(query, [tableName]);
