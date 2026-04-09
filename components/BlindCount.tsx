@@ -451,7 +451,12 @@ const BlindCount: React.FC<BlindCountProps> = ({
         const planIds = groupedItems.map(it => it.articleId.toUpperCase()).sort((a,b) => b.length - a.length);
         for (const id of planIds) {
             // Solo buscar SKUs de longitud decente para evitar matches erróneos
-            if (id.length >= 4 && input.includes(id)) {
+            // FIX M7: Verificar que el carácter inmediatamente después del match NO sea alfanumérico.
+            // Esto evita que "D650702" coincida dentro de "D650702T" (son artículos distintos).
+            const matchIdx = id.length >= 4 ? input.indexOf(id) : -1;
+            const charAfter = matchIdx !== -1 ? input[matchIdx + id.length] : undefined;
+            const isWordBoundaryMatch = matchIdx !== -1 && (charAfter === undefined || !/[A-Z0-9]/i.test(charAfter));
+            if (isWordBoundaryMatch) {
                 const targetId = id;
                 setCounts(prev => {
                   const newQty = (Number(prev[targetId]) || 0) + 1;
