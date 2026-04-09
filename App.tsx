@@ -7,6 +7,12 @@ import PortalLayout from './components/portal/PortalLayout';
 import ClientLogin from './components/portal/ClientLogin';
 import OrderTracking from './components/portal/OrderTracking';
 import { api } from './services/api';
+import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
+import { Toaster, toast } from 'sonner';
+import { useAppStore } from './stores/useAppStore';
+import { useAppData } from './hooks/useAppData';
+import { normalizeData } from './utils/normalize';
+import { hasPermission } from './utils/permissions';
 
 // ========== LAZY LOADING (CODE SPLITTING CHUNKS) ==========
 // Wrapper para auto-recargar la PWA si un chunk falla por cambio de nombre
@@ -53,12 +59,6 @@ const TrainingAdmin = lazyWithRetry(() => import('./components/TrainingAdmin'));
 const AjoverDashboard = lazyWithRetry(() => import('./components/AjoverDashboard'));
 const PublicAttendanceForm = lazyWithRetry(() => import('./components/PublicAttendanceForm'));
 const ConciliacionFacturas = lazyWithRetry(() => import('./components/ConciliacionFacturas'));
-import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
-import { Toaster, toast } from 'sonner';
-import { useAppStore } from './stores/useAppStore';
-import { useAppData } from './hooks/useAppData';
-import { normalizeData } from './utils/normalize';
-import { hasPermission } from './utils/permissions';
 
 
 // Import Admin Module
