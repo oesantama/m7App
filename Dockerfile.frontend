@@ -12,10 +12,12 @@ RUN rm -f package-lock.json && \
     npm cache clean --force
 
 COPY . .
-# Forzamos a Vite a no generar sourcemaps para no agotar la RAM (ahorra ~500MB)
-ENV NODE_OPTIONS="--max-old-space-size=1024" \
+# Forzamos a Vite a no generar sourcemaps ni workers paralelos para no agotar la RAM
+# max-old-space-size=640: deja ~360MB libres para OS + Docker en un droplet de 1GB
+ENV NODE_OPTIONS="--max-old-space-size=640 --optimize-for-size" \
     GENERATE_SOURCEMAP=false \
-    VITE_BUILD_SOURCEMAP=false
+    VITE_BUILD_SOURCEMAP=false \
+    NODE_ENV=production
 RUN npm run build
 
 # Producción

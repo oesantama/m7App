@@ -47,6 +47,7 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
 
     // Modal de Confirmación Adicionar
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [mobileTab, setMobileTab] = useState<'form' | 'list'>('form');
 
     const filteredDocs = useMemo(() => {
         const now = new Date();
@@ -231,19 +232,35 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
         return (
             <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
                 {/* Cabecera del Documento Seleccionado */}
-                <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0 border-b border-white/5">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setSelectedDoc(null)} className="p-2 hover:bg-white/10 rounded-lg transition-all"><Icons.ChevronRight className="rotate-180 w-5 h-5" /></button>
-                        <div>
-                            <h2 className="text-lg font-black uppercase tracking-tight leading-none">{selectedDoc.externalDocId}</h2>
-                            <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Novedades | {selectedDoc.vehicleData || 'SIN PLACA'}</p>
+                <div className="bg-slate-900 p-3 sm:p-4 text-white flex justify-between items-center shrink-0 border-b border-white/5">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <button onClick={() => setSelectedDoc(null)} className="p-2 hover:bg-white/10 rounded-lg transition-all shrink-0"><Icons.ChevronRight className="rotate-180 w-4 h-4 sm:w-5 sm:h-5" /></button>
+                        <div className="min-w-0">
+                            <h2 className="text-sm sm:text-lg font-black uppercase tracking-tight leading-none truncate">{selectedDoc.externalDocId}</h2>
+                            <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-widest mt-1 truncate">Novedades | {selectedDoc.vehicleData || 'SIN PLACA'}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 flex flex-col lg:flex-row p-2 md:p-4 gap-4 overflow-y-auto lg:overflow-hidden custom-scrollbar">
+                {/* Tabs de navegación móvil */}
+                <div className="lg:hidden flex shrink-0 bg-white border-b border-slate-200 shadow-sm">
+                    <button
+                        onClick={() => setMobileTab('form')}
+                        className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 flex items-center justify-center gap-2 ${mobileTab === 'form' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+                    >
+                        <Icons.Plus className="w-3 h-3" /> Nueva Novedad
+                    </button>
+                    <button
+                        onClick={() => setMobileTab('list')}
+                        className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 flex items-center justify-center gap-2 ${mobileTab === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+                    >
+                        <Icons.Package className="w-3 h-3" /> Registros {novedades.length > 0 && <span className="bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">{novedades.length}</span>}
+                    </button>
+                </div>
+
+                <div className="flex-1 flex flex-col lg:flex-row p-2 sm:p-3 md:p-4 gap-3 sm:gap-4 overflow-y-auto lg:overflow-hidden custom-scrollbar">
                     {/* Formulario Izquierda */}
-                    <div className="w-full lg:w-5/12 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 flex flex-col space-y-4 shrink-0 lg:overflow-y-auto custom-scrollbar">
+                    <div className={`w-full lg:w-5/12 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 flex flex-col space-y-4 shrink-0 lg:overflow-y-auto custom-scrollbar ${mobileTab === 'list' ? 'hidden lg:flex' : 'flex'}`}>
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight border-b border-slate-50 pb-2">Nueva Novedad</h3>
                         
                         <div className="space-y-4">
@@ -350,53 +367,53 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                     </div>
 
                     {/* Listado Derecha */}
-                    <div className="w-full lg:w-7/12 flex flex-col space-y-4">
-                        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Reporte Actual ({novedades.length})</h3>
-                            <button 
+                    <div className={`w-full lg:w-7/12 flex flex-col space-y-4 ${mobileTab === 'form' ? 'hidden lg:flex' : 'flex'}`}>
+                        <div className="flex justify-between items-center border-b border-slate-200 pb-2 gap-2">
+                            <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-tight truncate">Reporte Actual ({novedades.length})</h3>
+                            <button
                                 onClick={handleOpenReportModal}
                                 disabled={novedades.length === 0 || isLoading}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-20"
+                                className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md hover:bg-blue-700 transition-all flex items-center gap-1.5 sm:gap-2 disabled:opacity-20 shrink-0"
                             >
-                                <Icons.Send className="w-3 h-3" /> ENVIAR REPORTE
+                                <Icons.Send className="w-3 h-3" /> <span className="hidden xs:inline">ENVIAR</span> REPORTE
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1 sm:pr-2">
                             {novedades.map(n => (
-                                <div key={n.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-3">
-                                    <div className="flex justify-between items-start">
-                                        <div>
+                                <div key={n.id} className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-2 sm:space-y-3">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div className="min-w-0">
                                             <p className="text-[9px] font-black text-blue-600 uppercase">{n.article_sku}</p>
-                                            <p className="text-xs font-black text-slate-900 uppercase leading-none mt-1">{n.article_name || 'Sin descripción'}</p>
+                                            <p className="text-xs font-black text-slate-900 uppercase leading-none mt-1 truncate">{n.article_name || 'Sin descripción'}</p>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-right shrink-0">
                                             <p className="text-base font-black text-slate-900 leading-none">{n.quantity}</p>
-                                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Unidades</p>
+                                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Uds.</p>
                                         </div>
                                     </div>
-                                    <p className="text-[10px] text-slate-600 font-bold uppercase leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 italic">"{n.observation}"</p>
+                                    <p className="text-[10px] text-slate-600 font-bold uppercase leading-relaxed bg-slate-50 p-2 sm:p-3 rounded-lg border border-slate-100 italic">"{n.observation}"</p>
                                     {n.photo_urls && n.photo_urls.length > 0 && (
                                         <div className="flex gap-2 overflow-x-auto pb-1">
                                             {n.photo_urls.map((url, i) => (
-                                                <img 
-                                                    key={i} 
-                                                    src={url} 
-                                                    className="w-16 h-16 object-cover rounded-lg border border-slate-200 hover:scale-105 transition-all cursor-zoom-in"
+                                                <img
+                                                    key={i}
+                                                    src={url}
+                                                    className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-slate-200 hover:scale-105 transition-all cursor-zoom-in shrink-0"
                                                     onClick={() => window.open(url, '_blank')}
                                                 />
                                             ))}
                                         </div>
                                     )}
-                                    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                                        <p className="text-[7px] text-slate-400 font-black uppercase">{n.user_name}</p>
-                                        <p className="text-[7px] text-slate-400 font-black uppercase">{new Date(n.created_at).toLocaleString()}</p>
+                                    <div className="flex justify-between items-center pt-1.5 sm:pt-2 border-t border-slate-100">
+                                        <p className="text-[7px] text-slate-400 font-black uppercase truncate">{n.user_name}</p>
+                                        <p className="text-[7px] text-slate-400 font-black uppercase shrink-0 ml-2">{new Date(n.created_at).toLocaleString()}</p>
                                     </div>
                                 </div>
                             ))}
                             {novedades.length === 0 && (
-                                <div className="h-full flex flex-col items-center justify-center text-center opacity-20 py-20">
-                                    <Icons.Plus className="w-20 h-20 text-slate-400 mb-4" />
+                                <div className="h-full flex flex-col items-center justify-center text-center opacity-20 py-12 sm:py-20">
+                                    <Icons.Plus className="w-14 h-14 sm:w-20 sm:h-20 text-slate-400 mb-4" />
                                     <p className="text-slate-400 font-black uppercase text-xs">No hay novedades registradas</p>
                                 </div>
                             )}
@@ -538,16 +555,16 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     }
     
     return (
-        <div className="p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
-            <div className="max-w-full mx-auto w-full flex flex-col h-full space-y-4 animate-in fade-in duration-500">
+        <div className="p-3 sm:p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
+            <div className="max-w-full mx-auto w-full flex flex-col h-full space-y-3 sm:space-y-4 animate-in fade-in duration-500">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-2xl border border-white/10 ring-4 ring-slate-900/5 animate-pulse-slow">
-                            <Icons.Alert className="w-6 h-6 text-emerald-400" />
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-900 text-white rounded-xl sm:rounded-2xl flex items-center justify-center shadow-2xl border border-white/10 ring-4 ring-slate-900/5 animate-pulse-slow shrink-0">
+                            <Icons.Alert className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Gestión de Novedades</h2>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-2">
+                            <h2 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Gestión de Novedades</h2>
+                            <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 sm:mt-1.5 flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
                                 {filteredDocs.length} documentos encontrados
                             </p>
@@ -555,20 +572,20 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex-1 flex flex-col min-h-0 overflow-hidden">
-                    <div className="relative mb-6">
-                        <Icons.Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                        <input 
-                            type="text" 
+                <div className="bg-white rounded-2xl p-3 sm:p-4 md:p-6 shadow-sm border border-slate-200 flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div className="relative mb-3 sm:mb-6">
+                        <Icons.Search className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                        <input
+                            type="text"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             placeholder="DOCUMENTO O PLACA..."
-                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-black text-xs outline-none focus:border-blue-600 transition-all shadow-inner"
+                            className="w-full pl-11 sm:pl-12 pr-4 sm:pr-6 py-3 sm:py-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-black text-xs outline-none focus:border-blue-600 transition-all shadow-inner"
                         />
                     </div>
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-3 pb-10">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 sm:pr-3 pb-6 sm:pb-10">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {filteredDocs.map(doc => {
                             const nCounts = Number((doc as any).newsCount || 0);
                             const displayDate = doc.createdAt || doc.inventoryDate || (doc as any).receivingDate || doc.updatedAt;
@@ -577,62 +594,62 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                 <button
                                     key={doc.id}
                                     onClick={() => handleSelectDoc(doc)}
-                                    className="w-full bg-white hover:bg-slate-50 border-2 border-slate-100 rounded-3xl text-left transition-all group flex items-center gap-4 p-5 shadow-md hover:shadow-xl hover:-translate-y-1 border-l-[8px] border-l-slate-200 hover:border-l-blue-600 duration-500 relative overflow-hidden"
+                                    className="w-full bg-white hover:bg-slate-50 border-2 border-slate-100 rounded-2xl sm:rounded-3xl text-left transition-all group flex items-center gap-3 sm:gap-4 p-3 sm:p-5 shadow-md hover:shadow-xl hover:-translate-y-1 border-l-[6px] sm:border-l-[8px] border-l-slate-200 hover:border-l-blue-600 duration-500 relative overflow-hidden"
                                 >
                                     {/* Glassmorphism accent */}
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-600/20 transition-all duration-700"></div>
 
-                                    <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform duration-500 shrink-0 shadow-xl relative z-10">
-                                        <Icons.Package className="w-7 h-7" />
+                                    <div className="relative w-11 h-11 sm:w-14 sm:h-14 bg-slate-900 rounded-xl sm:rounded-2xl flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform duration-500 shrink-0 shadow-xl z-10">
+                                        <Icons.Package className="w-5 h-5 sm:w-7 sm:h-7" />
                                         {nCounts > 0 && (
-                                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black border-2 border-white shadow-lg animate-bounce-subtle">
+                                            <div className="absolute -top-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-red-600 text-white rounded-full flex items-center justify-center text-[8px] sm:text-[9px] font-black border-2 border-white shadow-lg animate-bounce-subtle">
                                                 {nCounts}
                                             </div>
                                         )}
                                     </div>
 
                                     <div className="min-w-0 flex-1 space-y-1 relative z-10">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[9px] font-black text-blue-600 bg-blue-100/50 px-2.5 py-1 rounded-full uppercase tracking-widest border border-blue-200 truncate">
+                                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                            <span className="text-[8px] sm:text-[9px] font-black text-blue-600 bg-blue-100/50 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full uppercase tracking-widest border border-blue-200 truncate max-w-[130px] sm:max-w-none">
                                                 {doc.externalDocId}
                                             </span>
-                                            <div className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border shrink-0 ${
+                                            <div className={`px-1.5 py-0.5 rounded-lg text-[7px] sm:text-[8px] font-black uppercase tracking-widest border shrink-0 ${
                                                 doc.status === DocStatus.INVENTORED ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
                                             }`}>
                                                 {doc.status}
                                             </div>
                                         </div>
-                                        
-                                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter truncate leading-tight group-hover:text-blue-900 transition-colors">
+
+                                        <h3 className="text-sm sm:text-lg font-black text-slate-900 uppercase tracking-tighter truncate leading-tight group-hover:text-blue-900 transition-colors">
                                             {doc.vehicleData || 'SIN PLACA'}
                                         </h3>
 
-                                        <div className="flex items-center gap-2 pt-0.5">
-                                            <Icons.History className="w-3 h-3 text-slate-400" />
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">
-                                                {displayDate ? 
-                                                    new Date(displayDate).toLocaleString('es-CO', { 
+                                        <div className="flex items-center gap-1.5 sm:gap-2">
+                                            <Icons.History className="w-3 h-3 text-slate-400 shrink-0" />
+                                            <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">
+                                                {displayDate ?
+                                                    new Date(displayDate).toLocaleString('es-CO', {
                                                         day: '2-digit', month: 'short', year: 'numeric',
                                                         hour: '2-digit', minute: '2-digit', hour12: true
-                                                    }) 
+                                                    })
                                                     : 'S/A'}
                                             </p>
                                         </div>
                                     </div>
 
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-200 group-hover:text-blue-600 group-hover:bg-blue-100/50 transition-all shrink-0 border-2 border-transparent group-hover:border-blue-200">
-                                        <Icons.ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-200 group-hover:text-blue-600 group-hover:bg-blue-100/50 transition-all shrink-0 border-2 border-transparent group-hover:border-blue-200">
+                                        <Icons.ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                                     </div>
                                 </button>
                             );
                         })}
                         </div>
                         {filteredDocs.length === 0 && (
-                            <div className="h-full flex flex-col items-center justify-center text-center opacity-30 py-32 space-y-4">
-                                <Icons.Package className="w-24 h-24 text-slate-300" />
+                            <div className="h-full flex flex-col items-center justify-center text-center opacity-30 py-16 sm:py-32 space-y-4">
+                                <Icons.Package className="w-16 h-16 sm:w-24 sm:h-24 text-slate-300" />
                                 <div className="space-y-1">
-                                    <p className="font-black uppercase text-xl text-slate-900">Sin correspondencias</p>
-                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No hay documentos con ese criterio</p>
+                                    <p className="font-black uppercase text-base sm:text-xl text-slate-900">Sin correspondencias</p>
+                                    <p className="text-xs sm:text-sm font-bold text-slate-400 uppercase tracking-widest">No hay documentos con ese criterio</p>
                                 </div>
                             </div>
                         )}

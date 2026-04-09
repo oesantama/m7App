@@ -60,17 +60,23 @@ export default defineConfig(({ mode }) => {
     outDir: 'dist',
     minify: 'esbuild',
     sourcemap: false,
-    chunkSizeWarningLimit: 2000,
+    chunkSizeWarningLimit: 2500,
     rollupOptions: {
+      // Un solo worker para reducir el pico de RAM en servidores con poca memoria
+      maxParallelFileOps: 1,
       output: {
         manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('xlsx')) return 'vendor-excel';
-            if (id.includes('jspdf') || id.includes('html2canvas')) return 'vendor-pdf';
-            if (id.includes('leaflet')) return 'vendor-maps';
-            if (id.includes('lucide-react') || id.includes('framer-motion')) return 'vendor-ui';
-            return 'vendor';
-          }
+          if (!id.includes('node_modules')) return undefined;
+          // Librerias muy pesadas en chunks propios para que Rollup las procese por separado
+          if (id.includes('pdfjs-dist')) return 'vendor-pdfjs';
+          if (id.includes('xlsx')) return 'vendor-excel';
+          if (id.includes('jspdf') || id.includes('html2canvas')) return 'vendor-pdf';
+          if (id.includes('leaflet')) return 'vendor-maps';
+          if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
+          if (id.includes('lucide-react')) return 'vendor-icons';
+          if (id.includes('react-dom')) return 'vendor-react-dom';
+          if (id.includes('react')) return 'vendor-react';
+          return 'vendor';
         }
       }
     }
