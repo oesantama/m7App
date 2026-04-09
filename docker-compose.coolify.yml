@@ -21,6 +21,9 @@ services:
         condition: service_healthy
     networks:
       - m7-network
+    # Límite de RAM: deja margen para el build del frontend durante el redeploy
+    mem_limit: 320m
+    memswap_limit: 320m
 
   # Frontend
   frontend:
@@ -33,31 +36,35 @@ services:
         condition: service_started
     networks:
       - m7-network
+    mem_limit: 48m
+    memswap_limit: 48m
 
   # Evolution API (WhatsApp)
-  evolution:
-    image: atendai/evolution-api:v1.8.2
-    container_name: m7-evolution
-    restart: always
-    environment:
-      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
-      - SERVER_URL=${EVOLUTION_API_URL}
-      - DOCKER_ENV=true
-      - LOG_LEVEL=error
-      - DEL_INSTANCE=false
-      - STORE_MESSAGES=true
-      - STORE_MESSAGE_UP=true
-      - DATABASE_ENABLED=true
-      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
-      - DATABASE_SAVE_DATA_INSTANCE=true
-      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
-    volumes:
-      - evolution_instances:/evolution/instances
-      - evolution_store:/evolution/store
-    depends_on:
-      - postgres
-    networks:
-      - m7-network
+  # DESHABILITADO TEMPORALMENTE: consume ~300MB en un servidor de 1GB.
+  # Para rehabilitar: quitar el bloque de comentario y hacer redeploy.
+  # evolution:
+  #   image: atendai/evolution-api:v1.8.2
+  #   container_name: m7-evolution
+  #   restart: always
+  #   environment:
+  #     - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+  #     - SERVER_URL=${EVOLUTION_API_URL}
+  #     - DOCKER_ENV=true
+  #     - LOG_LEVEL=error
+  #     - DEL_INSTANCE=false
+  #     - STORE_MESSAGES=true
+  #     - STORE_MESSAGE_UP=true
+  #     - DATABASE_ENABLED=true
+  #     - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+  #     - DATABASE_SAVE_DATA_INSTANCE=true
+  #     - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+  #   volumes:
+  #     - evolution_instances:/evolution/instances
+  #     - evolution_store:/evolution/store
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - m7-network
 
   # Database
   postgres:
@@ -77,6 +84,8 @@ services:
       retries: 5
     networks:
       - m7-network
+    mem_limit: 192m
+    memswap_limit: 192m
 
 networks:
   m7-network:
