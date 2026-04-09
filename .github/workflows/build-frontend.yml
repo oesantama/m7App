@@ -7,7 +7,6 @@ on:
   push:
     branches: [main]
     paths:
-      # Solo rebuilda si cambian archivos del frontend
       - 'components/**'
       - 'services/**'
       - 'utils/**'
@@ -20,6 +19,7 @@ on:
       - 'tailwind.config.*'
       - 'Dockerfile.frontend'
       - 'nginx.conf'
+      - '.github/workflows/build-frontend.yml'
 
 env:
   REGISTRY: ghcr.io
@@ -43,6 +43,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Extraer metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
@@ -52,9 +55,6 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
 
-      - name: Configurar Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Build y Push imagen frontend
         uses: docker/build-push-action@v5
         with:
@@ -63,9 +63,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Cache entre builds: acelera builds incrementales
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # GitHub Actions tiene 7GB RAM — sin límite artificial
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
+
+      # Hace el paquete público automáticamente para que Coolify pueda
+      # hacer docker pull sin necesidad de credenciales.
+      - name: Hacer paquete público en GHCR
+        run: |
+          PACKAGE_NAME="m7-frontend"
+          curl -s -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/user/packages/container/${PACKAGE_NAME}" \
+            -d '{"visibility":"public"}' | cat

@@ -14,7 +14,7 @@ RUN rm -f package-lock.json && \
 COPY . .
 # Forzamos a Vite a no generar sourcemaps ni workers paralelos para no agotar la RAM
 # max-old-space-size=640: deja ~360MB libres para OS + Docker en un droplet de 1GB
-ENV NODE_OPTIONS="--max-old-space-size=512 --optimize-for-size" \
+ENV NODE_OPTIONS="--max-old-space-size=512" \
     GENERATE_SOURCEMAP=false \
     VITE_BUILD_SOURCEMAP=false \
     NODE_ENV=production
