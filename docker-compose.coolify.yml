@@ -25,11 +25,11 @@ services:
     mem_limit: 320m
     memswap_limit: 320m
 
-  # Frontend
+  # Frontend — usa imagen pre-construida desde GitHub Actions (GHCR)
+  # El build ocurre en GitHub (7GB RAM), el servidor solo hace docker pull.
+  # Para actualizar: hacer push a main → GH Actions construye → Coolify redeploy.
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: ghcr.io/oesantama/m7-frontend:latest
     restart: always
     depends_on:
       m7app-backend:

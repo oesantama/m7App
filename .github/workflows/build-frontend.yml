@@ -1,0 +1,71 @@
+name: Build & Push Frontend Image
+
+# Se ejecuta en cada push a main — construye la imagen del frontend
+# en GitHub Actions (7GB RAM disponibles) y la sube a GHCR.
+# El servidor solo hace "docker pull", eliminando el OOM durante el deploy.
+on:
+  push:
+    branches: [main]
+    paths:
+      # Solo rebuilda si cambian archivos del frontend
+      - 'components/**'
+      - 'services/**'
+      - 'utils/**'
+      - 'types/**'
+      - 'constants.tsx'
+      - 'App.tsx'
+      - 'index.html'
+      - 'package.json'
+      - 'vite.config.ts'
+      - 'tailwind.config.*'
+      - 'Dockerfile.frontend'
+      - 'nginx.conf'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/m7-frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extraer metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build y Push imagen frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache entre builds: acelera builds incrementales
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # GitHub Actions tiene 7GB RAM — sin límite artificial
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
