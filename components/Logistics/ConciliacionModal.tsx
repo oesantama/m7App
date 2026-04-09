@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../../constants';
-import api from '../../services/api';
+import { api } from '../../services/api';
 import { toast } from 'sonner';
 
 type FormaPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'CONSIGNACION' | 'CHEQUE' | 'DEVOLUCION';

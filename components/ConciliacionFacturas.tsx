@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Icons } from '../constants';
-import api from '../services/api';
+import { api } from '../services/api';
 import { toast } from 'sonner';
 import ConciliacionModal from './Logistics/ConciliacionModal';
 
