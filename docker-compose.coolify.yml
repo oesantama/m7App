@@ -71,13 +71,14 @@ services:
   postgres:
     image: postgres:15-alpine
     restart: always
-    # Tuning para servidor 1GB: shared_buffers bajo, conexiones limitadas, work_mem conservador
+    # Tuning para servidor 1GB: shared_buffers bajo, work_mem conservador
+    # max_connections=50 cubre el pool del backend (20) + migraciones + margen
     command: >
       postgres
       -c shared_buffers=48MB
       -c work_mem=2MB
       -c maintenance_work_mem=32MB
-      -c max_connections=20
+      -c max_connections=50
       -c effective_cache_size=128MB
       -c checkpoint_completion_target=0.9
       -c wal_buffers=4MB
