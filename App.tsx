@@ -263,6 +263,48 @@ const App: React.FC = () => {
     localStorage.setItem('m7_active_tab', activeTab);
   }, [activeTab]);
 
+  // Auto-refresh al navegar entre páginas — garantiza datos frescos sin F5
+  // Solo refresca datos operativos (documentos, facturas, rutas, vehículos), NO los maestros
+  // para no hacer un request masivo en cada clic de navegación
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const hasPerm = (mod: string) => hasPermission(user, mod, 'view');
+    const clientId = user.clientId || (user.clientIds && user.clientIds[0]) || 'CLI-01';
+    const isSuper = (user as any).roleId === 'ROL-01' || (user as any).email === 'admin@millasiete.com';
+
+    // Páginas que NO requieren refresh operativo (son maestros o configuración)
+    const staticTabs = ['dashboard', 'master', 'admin', 'seguridad', 'capacitaciones', 'formacion'];
+    if (staticTabs.includes(activeTab)) return;
+
+    const refreshOperational = async () => {
+      try {
+        const fetches: Promise<any>[] = [];
+
+        if (hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) {
+          fetches.push(
+            api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => {}),
+            api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => {})
+          );
+        }
+        if (hasPerm('RUTAS') || hasPerm('ASIGNACIONES')) {
+          fetches.push(
+            api.getRoutes().then(r => useAppStore.setState({ routes: r || [] })).catch(() => {}),
+            api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => {})
+          );
+        }
+        if (hasPerm('VEHICULOS') || hasPerm('RUTAS')) {
+          fetches.push(
+            api.getVehicles().then(v => useAppStore.setState({ vehicles: v || [] })).catch(() => {})
+          );
+        }
+
+        await Promise.all(fetches);
+      } catch { /* silencioso — no interrumpir navegación */ }
+    };
+
+    refreshOperational();
+  }, [activeTab, activePageId]);
+
 
 
   // Polling global para indicador
