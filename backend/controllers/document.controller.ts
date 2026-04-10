@@ -1281,3 +1281,24 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
   }
 };
 
+// ─── Parse PDF: extrae remisiones/facturas del texto del PDF ─────────────────
+export const parsePdfRemisiones = async (req: any, res: Response) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se subió ningún PDF' });
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfParse = require('pdf-parse');
+    const data = await pdfParse(req.file.buffer);
+    const text: string = data.text || '';
+
+    // Extraer todos los tokens que coincidan con patrón de remisión (ej: AFE7604474)
+    const REMISION_RE = /\b[A-Z]{2,5}\d{5,}\b/g;
+    const tokens = [...new Set((text.match(REMISION_RE) || []).map((t: string) => t.toUpperCase()))];
+
+    res.json({ success: true, remisiones: tokens, totalPages: data.numpages });
+  } catch (err: any) {
+    console.error('[M7-PARSE-PDF-ERR]', err.message);
+    res.status(500).json({ error: 'Error al procesar el PDF: ' + err.message });
+  }
+};
+

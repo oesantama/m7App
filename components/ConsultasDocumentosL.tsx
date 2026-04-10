@@ -8,10 +8,6 @@ import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
 import { formatCurrency, formatDate } from '../utils/formatting';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 interface ConsultasDocumentosLProps {
   documents: DocumentL[];
@@ -283,54 +279,48 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const handlePdfVerification = async (file: File, targetDoc: DocumentL) => {
     setPdfVerifying(true);
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      // Enviar el PDF al backend para que lo parsee con pdf-parse (Node.js)
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // Extraer todo el texto del PDF como tokens planos
-      const allTokens: string[] = [];
-      for (let p = 1; p <= pdf.numPages; p++) {
-        const page = await pdf.getPage(p);
-        const content = await page.getTextContent();
-        for (const item of content.items as any[]) {
-          const t = (item.str || '').trim();
-          if (t) allTokens.push(t);
-        }
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+      const resp = await fetch('/api/documents/parse-pdf', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        toast.error('Error al leer el PDF: ' + (err.error || resp.statusText));
+        return;
       }
 
-      // Construir el set de facturas del documento para comparación rápida
+      const { remisiones } = await resp.json() as { remisiones: string[]; totalPages: number };
+
+      if (!remisiones || remisiones.length === 0) {
+        toast.error('No se encontraron remisiones en el PDF');
+        return;
+      }
+
+      // Comparar contra las facturas del documento seleccionado
       const docInvoices = new Set(
         (targetDoc.items || [])
           .map((it: any) => (it.invoice || '').toUpperCase().trim())
           .filter(Boolean)
       );
 
-      // Extraer todos los tokens que coincidan con el patrón de remisión/factura
-      // del documento (misma longitud y prefijo que las facturas del doc)
-      // Usamos el patrón genérico: letras seguidas de dígitos (ej: AFE7604474)
-      const REMISION_PATTERN = /^[A-Z]{2,5}\d{5,}$/i;
-
-      const pdfRemisiones = [...new Set(
-        allTokens.filter(t => REMISION_PATTERN.test(t)).map(t => t.toUpperCase())
-      )];
-
-      if (pdfRemisiones.length === 0) {
-        toast.error('No se encontraron remisiones en el PDF');
-        setPdfVerifying(false);
-        return;
-      }
-
-      const rows = pdfRemisiones.map(remision => ({
+      const rows = remisiones.map(remision => ({
         remision,
-        coincide: docInvoices.has(remision)
+        coincide: docInvoices.has(remision.toUpperCase())
       }));
 
-      // Ordenar: primero los que coinciden
       rows.sort((a, b) => (b.coincide ? 1 : 0) - (a.coincide ? 1 : 0));
 
       setPdfResults({ rows, fileName: file.name, docExtId: targetDoc.externalDocId });
     } catch (err) {
       console.error(err);
-      toast.error('Error al procesar el PDF');
+      toast.error('Error de conexión al procesar el PDF');
     } finally {
       setPdfVerifying(false);
       if (pdfInputRef.current) pdfInputRef.current.value = '';
@@ -354,6 +344,19 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           if (pdfInputRef.current) pdfInputRef.current.value = '';
         }}
       />
+
+      {/* Loading overlay PDF */}
+      {pdfVerifying && (
+        <div className="fixed inset-0 z-[700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] p-12 flex flex-col items-center gap-6 shadow-2xl border border-slate-100 max-w-xs w-full mx-4">
+            <div className="w-16 h-16 rounded-full border-4 border-violet-200 border-t-violet-600 animate-spin" />
+            <div className="text-center space-y-2">
+              <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Analizando PDF</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Extrayendo remisiones del documento...</p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1">
