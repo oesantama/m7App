@@ -152,6 +152,11 @@ const healSchema = async (client: any) => {
     // invoice_conciliations: filtros por placa y fecha
     `CREATE INDEX IF NOT EXISTS idx_invoice_conciliations_plate ON invoice_conciliations (plate)`,
     `CREATE INDEX IF NOT EXISTS idx_invoice_conciliations_created_at ON invoice_conciliations (created_at DESC)`,
+    // grupo_inter: join entre pedidos e ítems/historico (getOrders usa CTEs sobre estas)
+    `CREATE INDEX IF NOT EXISTS idx_grupo_inter_items_pedido_id ON grupo_inter_pedidos_items (pedido_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_grupo_inter_historico_pedido_id ON grupo_inter_pedidos_historico (pedido_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_f_ultimo_corte ON grupo_inter_pedidos (f_ultimo_corte DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_estado ON grupo_inter_pedidos (estado)`,
   ];
   for (const idxSql of performanceIndexes) {
     try { await client.query(idxSql); } catch (e) {}

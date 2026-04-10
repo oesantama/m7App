@@ -718,67 +718,92 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 export const getOrders = async (req: Request, res: Response): Promise<void> => {
     try {
         const { search, status, client, fechaCorteDesde, fechaCorteHasta } = req.query;
-        let query = `
-            SELECT 
-                p.*,
-                (SELECT string_agg(DISTINCT i.producto, ', ') FROM grupo_inter_pedidos_items i WHERE i.pedido_id::TEXT = p.id::TEXT) as producto,
-                
-                
-                
-                (SELECT json_agg(h ORDER BY h.fecha DESC) FROM grupo_inter_pedidos_historico h WHERE h.pedido_id::TEXT = p.id::TEXT) as historico
-            FROM grupo_inter_pedidos p
-            WHERE 1=1
-        `;
         const values: any[] = [];
         let paramIdx = 1;
 
+        // Filtros de la cláusula WHERE
+        const whereClauses: string[] = ['1=1'];
+
         if (search) {
-            query += ` AND (
-                p.numero_documento::TEXT ILIKE $${paramIdx} OR 
-                p.cliente::TEXT ILIKE $${paramIdx} OR 
-                p.nit::TEXT ILIKE $${paramIdx} OR 
-                p.numero_planilla::TEXT ILIKE $${paramIdx} OR 
-                p.placa::TEXT ILIKE $${paramIdx} OR 
+            whereClauses.push(`(
+                p.numero_documento::TEXT ILIKE $${paramIdx} OR
+                p.cliente::TEXT ILIKE $${paramIdx} OR
+                p.nit::TEXT ILIKE $${paramIdx} OR
+                p.numero_planilla::TEXT ILIKE $${paramIdx} OR
+                p.placa::TEXT ILIKE $${paramIdx} OR
                 p.municipio_destino::TEXT ILIKE $${paramIdx} OR
                 p.estado::TEXT ILIKE $${paramIdx} OR
                 p.no_factura_m7::TEXT ILIKE $${paramIdx}
-            )`;
+            )`);
             values.push(`%${search}%`);
             paramIdx++;
         }
         if (status) {
-            query += ` AND p.estado = $${paramIdx}`;
+            whereClauses.push(`p.estado = $${paramIdx}`);
             values.push(status);
             paramIdx++;
         }
         if (client) {
-            query += ` AND p.cliente ILIKE $${paramIdx}`;
+            whereClauses.push(`p.cliente ILIKE $${paramIdx}`);
             values.push(`%${client}%`);
             paramIdx++;
         }
-        
+
         // M7-EXT: Filtro de fecha (Solo si no hay búsqueda global activa)
         if (!search) {
             if (fechaCorteDesde) {
-                query += ` AND p.f_ultimo_corte >= $${paramIdx}`;
+                whereClauses.push(`p.f_ultimo_corte >= $${paramIdx}`);
                 values.push(fechaCorteDesde);
                 paramIdx++;
             } else {
-                // Filtro por defecto de 8 días si no hay nada
-                query += ` AND (p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`;
+                whereClauses.push(`(p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`);
             }
-
             if (fechaCorteHasta) {
-                query += ` AND p.f_ultimo_corte <= $${paramIdx}`;
+                whereClauses.push(`p.f_ultimo_corte <= $${paramIdx}`);
                 values.push(fechaCorteHasta);
                 paramIdx++;
             }
         }
 
-        query += ' ORDER BY p.f_ultimo_corte DESC, p.create_at DESC LIMIT 500';
+        const whereStr = whereClauses.join(' AND ');
+
+        // Reemplaza subconsultas correlacionadas (N×2 queries) por CTEs + JOIN lateral
+        // Ahora es una sola pasada por Postgres: mucho más eficiente con grandes rangos de fecha
+        const query = `
+            WITH pedidos_filtrados AS (
+                SELECT p.*
+                FROM grupo_inter_pedidos p
+                WHERE ${whereStr}
+                ORDER BY p.f_ultimo_corte DESC, p.create_at DESC
+                LIMIT 500
+            ),
+            items_agg AS (
+                SELECT i.pedido_id::TEXT AS pid,
+                       string_agg(DISTINCT i.producto, ', ') AS producto
+                FROM grupo_inter_pedidos_items i
+                WHERE i.pedido_id::TEXT IN (SELECT id::TEXT FROM pedidos_filtrados)
+                GROUP BY i.pedido_id
+            ),
+            historico_agg AS (
+                SELECT h.pedido_id::TEXT AS pid,
+                       json_agg(h ORDER BY h.fecha DESC) AS historico
+                FROM grupo_inter_pedidos_historico h
+                WHERE h.pedido_id::TEXT IN (SELECT id::TEXT FROM pedidos_filtrados)
+                GROUP BY h.pedido_id
+            )
+            SELECT pf.*,
+                   ia.producto,
+                   ha.historico
+            FROM pedidos_filtrados pf
+            LEFT JOIN items_agg      ia ON ia.pid = pf.id::TEXT
+            LEFT JOIN historico_agg  ha ON ha.pid = pf.id::TEXT
+            ORDER BY pf.f_ultimo_corte DESC, pf.create_at DESC
+        `;
+
         const result = await pool.query(query, values);
         res.json(result.rows);
-    } catch (error) {
+    } catch (error: any) {
+        console.error('[M7-ERR] getOrders:', error?.message || error);
         res.status(500).json({ message: 'Error al obtener pedidos' });
     }
 };
