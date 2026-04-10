@@ -57,11 +57,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
 
   // PDF Verification states
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const pdfVerifyTargetRef = useRef<DocumentL | null>(null);
+  const [pdfVerifyTarget, setPdfVerifyTarget] = useState<DocumentL | null>(null);
   const [pdfVerifying, setPdfVerifying] = useState(false);
   const [pdfResults, setPdfResults] = useState<{
     matched: { pdfPedido: string; pdfRemision: string; docId: string; docExtId: string; matchField: 'pedido' | 'factura' }[];
     unmatched: { pdfPedido: string; pdfRemision: string }[];
     fileName: string;
+    docExtId: string;
   } | null>(null);
 
   const isAuthorizedToDelete = useMemo(() => {
@@ -280,7 +283,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     setCurrentPage(1);
   };
 
-  const handlePdfVerification = async (file: File) => {
+  const handlePdfVerification = async (file: File, targetDoc: DocumentL) => {
     setPdfVerifying(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -376,34 +379,31 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
         arr.findIndex(x => x.pedido === e.pedido && x.remision === e.remision) === i
       );
 
-      // Cross-reference with all documents' items
+      // Cross-reference only against the target document's items
       const matched: { pdfPedido: string; pdfRemision: string; docId: string; docExtId: string; matchField: 'pedido' | 'factura' }[] = [];
       const unmatched: { pdfPedido: string; pdfRemision: string }[] = [];
 
       for (const entry of uniqueEntries) {
         let found = false;
-        for (const doc of documents) {
-          for (const item of doc.items || []) {
-            const orderMatch = entry.pedido && (item.orderNumber || '').toUpperCase() === entry.pedido.toUpperCase();
-            const invoiceMatch = entry.remision && ((item as any).invoice || '').toUpperCase() === entry.remision.toUpperCase();
-            if (orderMatch || invoiceMatch) {
-              matched.push({
-                pdfPedido: entry.pedido,
-                pdfRemision: entry.remision,
-                docId: doc.id,
-                docExtId: doc.externalDocId,
-                matchField: orderMatch ? 'pedido' : 'factura'
-              });
-              found = true;
-              break;
-            }
+        for (const item of targetDoc.items || []) {
+          const orderMatch = entry.pedido && (item.orderNumber || '').toUpperCase() === entry.pedido.toUpperCase();
+          const invoiceMatch = entry.remision && ((item as any).invoice || '').toUpperCase() === entry.remision.toUpperCase();
+          if (orderMatch || invoiceMatch) {
+            matched.push({
+              pdfPedido: entry.pedido,
+              pdfRemision: entry.remision,
+              docId: targetDoc.id,
+              docExtId: targetDoc.externalDocId,
+              matchField: orderMatch ? 'pedido' : 'factura'
+            });
+            found = true;
+            break;
           }
-          if (found) break;
         }
         if (!found) unmatched.push(entry);
       }
 
-      setPdfResults({ matched, unmatched, fileName: file.name });
+      setPdfResults({ matched, unmatched, fileName: file.name, docExtId: targetDoc.externalDocId });
     } catch (err) {
       console.error(err);
       toast.error('Error al procesar el PDF');
@@ -418,6 +418,18 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
 
   return (
     <div className="space-y-6 animate-in fade-in p-4 md:p-6">
+      {/* Input global para verificación PDF — un solo elemento para todas las filas */}
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={e => {
+          const f = e.target.files?.[0];
+          if (f && pdfVerifyTargetRef.current) handlePdfVerification(f, pdfVerifyTargetRef.current);
+          if (pdfInputRef.current) pdfInputRef.current.value = '';
+        }}
+      />
       <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1">
@@ -441,21 +453,6 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           </div>
         </div>
         <div className="flex justify-end gap-3 flex-wrap">
-          <input
-            ref={pdfInputRef}
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfVerification(f); }}
-          />
-          <button
-            onClick={() => pdfInputRef.current?.click()}
-            disabled={pdfVerifying}
-            className="px-6 py-3 bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-md flex items-center gap-2 disabled:opacity-60"
-          >
-            <Icons.Upload className="w-4 h-4" />
-            {pdfVerifying ? 'Procesando...' : 'Verificar PDF'}
-          </button>
           <button onClick={() => exportToExcel(filteredDocs, "M7_Historial")} className="px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md flex items-center gap-2">
             <Icons.Excel className="w-4 h-4" /> Exportar
           </button>
@@ -489,6 +486,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => { pdfVerifyTargetRef.current = doc; setPdfVerifyTarget(doc); pdfInputRef.current?.click(); }}
+                        disabled={pdfVerifying}
+                        className="p-3 bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all disabled:opacity-50"
+                        title="Verificar PDF"
+                      >
+                        <Icons.Upload className="w-4 h-4" />
+                      </button>
                       <button onClick={() => setSelectedDoc(doc)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all" title="Ver Detalle"><Icons.Eye className="w-4 h-4" /></button>
                       
                       {doc.status === DocStatus.INVENTORED && (
@@ -826,7 +831,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                 <div className="w-8 h-8 bg-violet-400 rounded-lg flex items-center justify-center"><Icons.Upload className="w-4 h-4 text-violet-900" /></div>
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-tight">Verificación de PDF</h3>
-                  <p className="text-[8px] font-bold text-violet-300 uppercase tracking-widest truncate max-w-[300px]">{pdfResults.fileName}</p>
+                  <p className="text-[8px] font-bold text-violet-300 uppercase tracking-widest truncate max-w-[300px]">Doc: {pdfResults.docExtId} — {pdfResults.fileName}</p>
                 </div>
               </div>
               <button onClick={() => setPdfResults(null)} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-2xl font-thin">×</button>
