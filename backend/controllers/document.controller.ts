@@ -1,8 +1,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
-import { createRequire } from 'module';
-const _require = createRequire(import.meta.url);
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ─── Caché en memoria para getInvoices ───────────────────────────────────────
 // TTL de 45 segundos: reduce carga en Postgres en refrescos frecuentes
@@ -1290,20 +1289,40 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Parse PDF: extrae remisiones/facturas del texto del PDF ─────────────────
+// ─── Parse PDF: extrae remisiones/facturas via Gemini Vision AI ──────────────
 export const parsePdfRemisiones = async (req: any, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún PDF' });
 
-    const pdfParse = _require('pdf-parse');
-    const data = await pdfParse(req.file.buffer);
-    const text: string = data.text || '';
+    const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+    const apiKey = rawKeys.split(',').map((k: string) => k.trim()).find((k: string) => k.length > 0);
+    if (!apiKey) return res.status(500).json({ error: 'No hay API key de Gemini configurada' });
 
-    // Extraer todos los tokens que coincidan con patrón de remisión (ej: AFE7604474)
-    const REMISION_RE = /\b[A-Z]{2,5}\d{5,}\b/g;
-    const tokens = [...new Set((text.match(REMISION_RE) || []).map((t: string) => t.toUpperCase()))];
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: process.env.AI_MODEL || 'gemini-1.5-flash' });
 
-    res.json({ success: true, remisiones: tokens, totalPages: data.numpages });
+    const pdfBase64 = req.file.buffer.toString('base64');
+
+    const prompt = `Eres un motor OCR de logística. Analiza este PDF y extrae TODOS los códigos de remisión/factura.
+Los códigos tienen el patrón: 2-5 letras mayúsculas seguidas de 5 o más dígitos (ejemplos: AFE7604474, TRF12345, REM98765).
+Responde ÚNICAMENTE con un JSON estricto sin formato markdown:
+{"remisiones": ["AFE7604474", "TRF12345"]}
+Si no encuentras ninguno, responde: {"remisiones": []}`;
+
+    const result = await model.generateContent([
+      { text: prompt },
+      { inlineData: { data: pdfBase64, mimeType: 'application/pdf' } },
+    ]);
+
+    const textResponse = result.response.text().trim();
+    const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Gemini no devolvió JSON válido: ' + textResponse.substring(0, 200));
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const remisiones: string[] = [...new Set((parsed.remisiones || []).map((r: string) => r.toUpperCase().trim()).filter(Boolean))] as string[];
+
+    console.log(`[M7-PARSE-PDF] Encontradas ${remisiones.length} remisiones:`, remisiones);
+    res.json({ success: true, remisiones });
   } catch (err: any) {
     console.error('[M7-PARSE-PDF-ERR]', err.message);
     res.status(500).json({ error: 'Error al procesar el PDF: ' + err.message });
