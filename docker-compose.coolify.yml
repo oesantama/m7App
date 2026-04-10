@@ -30,6 +30,7 @@ services:
   # Para actualizar: hacer push a main → GH Actions construye → Coolify redeploy.
   frontend:
     image: ghcr.io/oesantama/m7-frontend:latest
+    pull_policy: always
     restart: always
     depends_on:
       m7app-backend:
