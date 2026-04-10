@@ -112,9 +112,15 @@ export const syncInventory = async (req: Request, res: Response) => {
     const inventoryDate = isPartial ? null : new Date();
 
     // 1. Actualizar Metadatos del Documento
+    // inventory_start: se llena la primera vez que alguien toca el inventario (parcial o final)
     await client.query(`
-      UPDATE documents_l 
-      SET status = $1, inventory_date = COALESCE($2, inventory_date), inventory_user = $3, inventory_observation = $4, inventory_notes = $4
+      UPDATE documents_l
+      SET status = $1,
+          inventory_date = COALESCE($2, inventory_date),
+          inventory_start = COALESCE(inventory_start, CURRENT_TIMESTAMP),
+          inventory_user = $3,
+          inventory_observation = $4,
+          inventory_notes = $4
       WHERE id = $5
     `, [newStatus, inventoryDate, user, notes || '', docId]);
 
@@ -153,10 +159,17 @@ export const syncInventory = async (req: Request, res: Response) => {
       }
     }
     // 3. Actualizar CONSOLIDADO (Donde se ven los conteos en Auditoría)
-    // Obtener expected_qty acumulado para este SKU en el documento (Casting explícito para evitar error 500 de pg)
     for (const sku in skuAggregates) {
       const expQtyRes = await client.query('SELECT SUM(expected_qty) as total FROM document_items WHERE document_id = $1::text AND article_id = $2::text', [docId, sku]);
       const expectedQty = Number(expQtyRes.rows[0]?.total || 0);
+      const newCount2 = Number(skuAggregates[sku].count2 || 0);
+
+      // Leer old count_2 ANTES de actualizar el consolidado, para calcular el delta correcto en inventario
+      const oldConsolidated = await client.query(
+        'SELECT count_2 FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
+        [String(docId), String(sku)]
+      );
+      const oldCount2 = Number(oldConsolidated.rows[0]?.count_2 || 0);
 
       await client.query(`
         INSERT INTO document_consolidated_items (document_id, article_id, count_1, count_2, inventory_user, inventory_observation, expected_qty)
@@ -167,17 +180,19 @@ export const syncInventory = async (req: Request, res: Response) => {
         expected_qty = EXCLUDED.expected_qty,
         inventory_user = EXCLUDED.inventory_user,
         inventory_observation = EXCLUDED.inventory_observation
-      `, [String(docId), String(sku), Number(skuAggregates[sku].count1 || 0), Number(skuAggregates[sku].count2 || 0), user, skuAggregates[sku].observation || notes || '', expectedQty]);
+      `, [String(docId), String(sku), Number(skuAggregates[sku].count1 || 0), newCount2, user, skuAggregates[sku].observation || notes || '', expectedQty]);
 
       if (!isPartial) {
+        // delta = diferencia neta de este documento → inventario_clientes acumula correctamente entre documentos y no duplica en re-sync
+        const delta = newCount2 - oldCount2;
         await client.query(`
           INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
           VALUES ($1::text, $2::text, $3::text, $4::numeric, $5::text, CURRENT_TIMESTAMP)
           ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-          quantity = EXCLUDED.quantity,
+          quantity = GREATEST(0, inventario_clientes.quantity + $4::numeric),
           last_user = EXCLUDED.last_user,
           last_updated = CURRENT_TIMESTAMP
-        `, [clientId, sku, skuAggregates[sku].batch, Number(skuAggregates[sku].count2 || 0), user]);
+        `, [clientId, sku, skuAggregates[sku].batch, delta, user]);
       }
     }
 
@@ -323,11 +338,11 @@ export const syncInventory = async (req: Request, res: Response) => {
                     <div class="info-value">${user || 'Sistema'}</div>
                   </div>
                   <div class="info-item">
-                    <div class="info-label">Fecha Inicio</div>
-                    <div class="info-value">${new Date(docL.created_at || new Date()).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</div>
+                    <div class="info-label">Inicio Conteo</div>
+                    <div class="info-value">${docL.inventory_start ? new Date(docL.inventory_start).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</div>
                   </div>
                   <div class="info-item">
-                    <div class="info-label">Fecha Cierre</div>
+                    <div class="info-label">Cierre Conteo</div>
                     <div class="info-value">${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</div>
                   </div>
                   <div class="info-item">
@@ -1010,11 +1025,11 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
                 <div class="info-value">${docL.inventory_user || 'S/I'}</div>
               </div>
               <div class="info-item">
-                <div class="info-label">Fecha Inicio Conteo</div>
-                <div class="info-value">${docL.created_at ? new Date(docL.created_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'S/I'}</div>
+                <div class="info-label">Inicio Conteo</div>
+                <div class="info-value">${docL.inventory_start ? new Date(docL.inventory_start).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'S/I'}</div>
               </div>
               <div class="info-item">
-                <div class="info-label">Fecha Final Conteo</div>
+                <div class="info-label">Cierre Conteo</div>
                 <div class="info-value">${docL.inventory_date ? new Date(docL.inventory_date).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : 'S/I'}</div>
               </div>
               <div class="info-item">
@@ -1286,6 +1301,72 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[M7-MASTERSUITE-ERR]', err.message);
     res.status(500).json({ error: 'Error al generar informe Mastersuite' });
+  }
+};
+
+// ─── Editar count_2 de un item consolidado (solo si hay diferencia) ───────────
+export const updateConsolidatedCount2 = async (req: any, res: Response) => {
+  const { docId, articleId, newCount2, observation } = req.body;
+  if (!docId || !articleId || newCount2 === undefined || newCount2 === null) {
+    return res.status(400).json({ error: 'Faltan parámetros: docId, articleId, newCount2' });
+  }
+  if (!observation || !String(observation).trim()) {
+    return res.status(400).json({ error: 'La observación es obligatoria al modificar el conteo' });
+  }
+  const user = req.user?.name || req.user?.email || 'Sistema';
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Leer estado actual del consolidado
+    const current = await client.query(
+      'SELECT count_2, document_id FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
+      [String(docId), String(articleId)]
+    );
+    if (current.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Item consolidado no encontrado' });
+    }
+    const oldCount2 = Number(current.rows[0].count_2 || 0);
+    const delta = Number(newCount2) - oldCount2;
+
+    // Actualizar consolidado
+    await client.query(
+      `UPDATE document_consolidated_items
+       SET count_2 = $1::numeric, inventory_observation = $2::text, inventory_user = $3::text
+       WHERE document_id = $4::text AND article_id = $5::text`,
+      [Number(newCount2), String(observation).trim(), user, String(docId), String(articleId)]
+    );
+
+    // Ajustar inventario_clientes con delta (suma o resta)
+    if (delta !== 0) {
+      const docInfo = await client.query(
+        'SELECT client_id FROM documents_l WHERE id = $1', [docId]
+      );
+      if (docInfo.rows.length > 0) {
+        const clientId = docInfo.rows[0].client_id;
+        const batchRes = await client.query(
+          'SELECT batch FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
+          [String(docId), String(articleId)]
+        );
+        const batch = batchRes.rows[0]?.batch || 'S/L';
+        await client.query(
+          `UPDATE inventario_clientes
+           SET quantity = GREATEST(0, quantity + $1::numeric), last_user = $2, last_updated = CURRENT_TIMESTAMP
+           WHERE client_id = $3::text AND article_id = $4::text AND batch = $5::text`,
+          [delta, user, clientId, String(articleId), batch]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, oldCount2, newCount2: Number(newCount2), delta });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-UPD-COUNT2-ERR]', err.message);
+    res.status(500).json({ error: 'Error al actualizar conteo: ' + err.message });
+  } finally {
+    client.release();
   }
 };
 

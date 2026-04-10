@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones } from '../controllers/document.controller.js';
+import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2 } from '../controllers/document.controller.js';
 import multer from 'multer';
 
 import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
@@ -72,5 +72,6 @@ router.get('/mastersuite-report', (req, res, next) => {
 
 
 router.post('/parse-pdf', authenticateToken, upload.single('file'), parsePdfRemisiones);
+router.patch('/consolidated-count2', requireAuditEdit, updateConsolidatedCount2);
 
 export default router;

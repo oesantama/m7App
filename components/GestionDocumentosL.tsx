@@ -67,6 +67,52 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<DocumentL | null>(null);
 
+  // Estados para edición de count_2 en auditoría
+  const [editingAuditItem, setEditingAuditItem] = useState<any | null>(null);
+  const [editCount2, setEditCount2] = useState<string>('');
+  const [editObservation, setEditObservation] = useState<string>('');
+  const [editAuditLoading, setEditAuditLoading] = useState(false);
+  const [editAuditError, setEditAuditError] = useState<string | null>(null);
+
+  const canEditAudit = user.roleId === 'ROL-01' || user.role === 'ADMIN' ||
+    user.permissions?.some((p: any) =>
+      (p.module === 'PAG-17' || p.module === 'PAG-16' || p.module === 'PAG-30') &&
+      p.actions.includes('edit')
+    );
+
+  const handleSaveAuditCount2 = async () => {
+    if (!editingAuditItem || !selectedPendingDoc) return;
+    const obs = editObservation.trim();
+    if (!obs) { setEditAuditError('La observación es obligatoria'); return; }
+    const newVal = Number(editCount2);
+    if (isNaN(newVal) || newVal < 0) { setEditAuditError('Ingrese un número válido mayor o igual a 0'); return; }
+    setEditAuditLoading(true);
+    setEditAuditError(null);
+    try {
+      const token = localStorage.getItem('token') || '';
+      const resp = await fetch('/api/documents/consolidated-count2', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ docId: selectedPendingDoc.id, articleId: editingAuditItem.articleId, newCount2: newVal, observation: obs }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Error al guardar');
+      // Actualizar localmente el item en consolidatedItems
+      const updated = { ...selectedPendingDoc };
+      (updated as any).consolidatedItems = ((updated as any).consolidatedItems || []).map((it: any) =>
+        it.articleId === editingAuditItem.articleId
+          ? { ...it, count2: newVal, inventoryObservation: obs }
+          : it
+      );
+      setSelectedPendingDoc(updated);
+      setEditingAuditItem(null);
+    } catch (e: any) {
+      setEditAuditError(e.message);
+    } finally {
+      setEditAuditLoading(false);
+    }
+  };
+
   // Utilidad para exportar a Excel
   const exportToExcel = (data: any[], fileName: string) => {
     const ws = XLSX.utils.json_to_sheet(data);
@@ -1092,19 +1138,38 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                   <th className="py-6 px-4 font-black text-center min-w-[100px]">ALISTADO</th>
                                   <th className="py-6 px-4 font-black text-center min-w-[100px]">DESPACHADO</th>
                                   <th className="py-6 px-4 font-black text-right min-w-[200px]">OBS. INVENTARIO</th>
+                                  {canEditAudit && <th className="py-6 px-4 font-black text-center min-w-[80px]"></th>}
                                 </tr>
                               </thead>
                                <tbody className="divide-y divide-slate-100">
                                  {paginatedModalItems.map((it:any, idx:number) => (
-                                  <tr key={idx} className="text-[9px] hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
-                                    <td className="py-2 px-4 font-black text-slate-900 uppercase truncate">{it.articleId}</td>
-                                    <td className="py-2 px-4 text-center font-bold text-slate-900">{it.expectedQty}</td>
-                                    <td className="py-2 px-4 text-center font-black text-emerald-600 bg-emerald-50/30">{it.count1 || 0}</td>
-                                    <td className="py-2 px-4 text-center font-black text-amber-600 bg-amber-50/30">{it.count2 || 0}</td>
-                                    <td className="py-2 px-4 text-center text-slate-500">{it.pickedQty || 0}</td>
-                                    <td className="py-2 px-4 text-center text-slate-500">{it.dispatchedQty || 0}</td>
-                                    <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[200px]" title={it.inventoryObservation}>{it.inventoryObservation || 'SIN NOVEDAD'}</td>
-                                  </tr>
+                                  {(() => {
+                                    const hasDiff = Number(it.count2 || 0) !== Number(it.expectedQty || 0);
+                                    return (
+                                      <tr key={idx} className={`text-[9px] hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${hasDiff ? 'bg-red-50/30' : ''}`}>
+                                        <td className="py-2 px-4 font-black text-slate-900 uppercase truncate">{it.articleId}</td>
+                                        <td className="py-2 px-4 text-center font-bold text-slate-900">{it.expectedQty}</td>
+                                        <td className="py-2 px-4 text-center font-black text-emerald-600 bg-emerald-50/30">{it.count1 || 0}</td>
+                                        <td className={`py-2 px-4 text-center font-black bg-amber-50/30 ${hasDiff ? 'text-red-600' : 'text-amber-600'}`}>{it.count2 || 0}</td>
+                                        <td className="py-2 px-4 text-center text-slate-500">{it.pickedQty || 0}</td>
+                                        <td className="py-2 px-4 text-center text-slate-500">{it.dispatchedQty || 0}</td>
+                                        <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[200px]" title={it.inventoryObservation}>{it.inventoryObservation || 'SIN NOVEDAD'}</td>
+                                        {canEditAudit && (
+                                          <td className="py-2 px-4 text-center">
+                                            {hasDiff && (
+                                              <button
+                                                onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(it.inventoryObservation || ''); setEditAuditError(null); }}
+                                                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
+                                                title="Corregir Conteo 2"
+                                              >
+                                                EDITAR
+                                              </button>
+                                            )}
+                                          </td>
+                                        )}
+                                      </tr>
+                                    );
+                                  })()}
                                 ))}
                                 {paginatedModalItems.length === 0 && (
                                   <tr>
@@ -1169,6 +1234,53 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                 <button onClick={()=>setSelectedPendingDoc(null)} className="px-12 py-5 bg-slate-900 text-white rounded-[1.8rem] font-black text-xs uppercase hover:bg-emerald-600 transition-all shadow-xl">Cerrar Auditorí­a</button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Modal Edición Count2 Auditoría */}
+      {editingAuditItem && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => !editAuditLoading && setEditingAuditItem(null)} />
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
+            <div className="h-2 bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500" />
+            <div className="p-8 flex flex-col gap-5">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1">Corrección de Conteo</p>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{editingAuditItem.articleId}</h3>
+                <p className="text-[10px] text-slate-400 mt-1">Cant. Plan: <span className="font-black text-slate-700">{editingAuditItem.expectedQty}</span> · Conteo 1: <span className="font-black text-emerald-600">{editingAuditItem.count1 || 0}</span> · Conteo 2 actual: <span className="font-black text-red-500">{editingAuditItem.count2 || 0}</span></p>
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block mb-1">Nuevo Conteo 2</label>
+                <input
+                  type="number" min={0} value={editCount2}
+                  onChange={e => setEditCount2(e.target.value)}
+                  className="w-full border-2 border-amber-200 rounded-xl px-4 py-3 text-lg font-black text-amber-700 focus:outline-none focus:border-amber-500 bg-amber-50"
+                  disabled={editAuditLoading}
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block mb-1">Observación <span className="text-red-500">*</span></label>
+                <textarea
+                  rows={3} value={editObservation}
+                  onChange={e => setEditObservation(e.target.value)}
+                  placeholder="Explique el motivo de la corrección..."
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 focus:outline-none focus:border-amber-400 resize-none"
+                  disabled={editAuditLoading}
+                />
+              </div>
+              {editAuditError && <p className="text-[10px] font-black text-red-500 bg-red-50 px-4 py-2 rounded-xl">{editAuditError}</p>}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEditingAuditItem(null)} disabled={editAuditLoading}
+                  className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-500 font-black text-xs uppercase hover:bg-slate-50 transition-all">
+                  Cancelar
+                </button>
+                <button onClick={handleSaveAuditCount2} disabled={editAuditLoading || !editObservation.trim()}
+                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black text-xs uppercase transition-all shadow-lg">
+                  {editAuditLoading ? 'Guardando...' : 'Guardar Corrección'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
