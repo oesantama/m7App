@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones } from '../controllers/document.controller.js';
 import multer from 'multer';
 
-import { requirePermission } from '../middleware/auth.middleware.js';
+import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -71,6 +71,6 @@ router.get('/mastersuite-report', (req, res, next) => {
 }, getMastersuiteReport);
 
 
-router.post('/parse-pdf', upload.single('file'), parsePdfRemisiones);
+router.post('/parse-pdf', authenticateToken, upload.single('file'), parsePdfRemisiones);
 
 export default router;

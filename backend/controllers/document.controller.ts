@@ -1,6 +1,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
+import pdfParse from 'pdf-parse';
 
 // ─── Caché en memoria para getInvoices ───────────────────────────────────────
 // TTL de 45 segundos: reduce carga en Postgres en refrescos frecuentes
@@ -32,12 +33,19 @@ export const getDocuments = async (req: Request, res: Response) => {
       d.created_at as "createdAt",
       (SELECT COUNT(*) FROM document_l_payments p WHERE p.document_id = d.id) as "paymentsCount",
       (SELECT json_agg(item_with_payment) FROM (
-        SELECT i.*, 
-               p.metodo_pago as "paymentMethod", 
-               p.vmetodo as "paymentValue", 
-               p.client_ref as "paymentRef",
-               c.count_1 as "count1",
-               c.count_2 as "count2",
+        SELECT i.*,
+               i.article_id      as "articleId",
+               i.order_number    as "orderNumber",
+               i.item_status     as "itemStatus",
+               i.expected_qty    as "expectedQty",
+               i.received_qty    as "receivedQty",
+               i.un_code         as "unCode",
+               i.client_ref      as "clientRef",
+               p.metodo_pago     as "paymentMethod",
+               p.vmetodo         as "paymentValue",
+               p.client_ref      as "paymentRef",
+               c.count_1         as "count1",
+               c.count_2         as "count2",
                c.inventory_observation as "inventoryNote"
         FROM document_items i
         LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND TRIM(UPPER(i.invoice)) = TRIM(UPPER(p.invoice))
@@ -1286,8 +1294,6 @@ export const parsePdfRemisiones = async (req: any, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún PDF' });
 
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pdfParse = require('pdf-parse');
     const data = await pdfParse(req.file.buffer);
     const text: string = data.text || '';
 
