@@ -21,9 +21,9 @@ services:
         condition: service_healthy
     networks:
       - m7-network
-    # Límite de RAM: deja margen para el build del frontend durante el redeploy
-    mem_limit: 320m
-    memswap_limit: 512m
+    # Servidor 4GB: backend tiene 1GB holgado
+    mem_limit: 1g
+    memswap_limit: 1g
 
   # Frontend — usa imagen pre-construida desde GitHub Actions (GHCR)
   # El build ocurre en GitHub (7GB RAM), el servidor solo hace docker pull.
@@ -37,8 +37,8 @@ services:
         condition: service_started
     networks:
       - m7-network
-    mem_limit: 48m
-    memswap_limit: 48m
+    mem_limit: 128m
+    memswap_limit: 128m
 
   # Evolution API (WhatsApp)
   # DESHABILITADO TEMPORALMENTE: consume ~300MB en un servidor de 1GB.
@@ -71,18 +71,18 @@ services:
   postgres:
     image: postgres:15-alpine
     restart: always
-    # Tuning para servidor 1GB: shared_buffers bajo, work_mem conservador
-    # max_connections=50 cubre el pool del backend (20) + migraciones + margen
+    # Tuning para servidor 4GB (2 vCPUs): aprovecha la RAM disponible
     command: >
       postgres
-      -c shared_buffers=48MB
-      -c work_mem=2MB
-      -c maintenance_work_mem=32MB
-      -c max_connections=50
-      -c effective_cache_size=128MB
+      -c shared_buffers=512MB
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c max_connections=100
+      -c effective_cache_size=2GB
       -c checkpoint_completion_target=0.9
-      -c wal_buffers=4MB
+      -c wal_buffers=16MB
       -c synchronous_commit=off
+      -c max_parallel_workers_per_gather=2
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -97,8 +97,8 @@ services:
       retries: 5
     networks:
       - m7-network
-    mem_limit: 192m
-    memswap_limit: 384m
+    mem_limit: 1500m
+    memswap_limit: 1500m
 
 networks:
   m7-network:
