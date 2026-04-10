@@ -1,7 +1,6 @@
 
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
-import pdfParse from 'pdf-parse';
 
 // ─── Caché en memoria para getInvoices ───────────────────────────────────────
 // TTL de 45 segundos: reduce carga en Postgres en refrescos frecuentes
@@ -1294,6 +1293,7 @@ export const parsePdfRemisiones = async (req: any, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún PDF' });
 
+    const { default: pdfParse } = await import('pdf-parse') as any;
     const data = await pdfParse(req.file.buffer);
     const text: string = data.text || '';
 
