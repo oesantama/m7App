@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Icons } from '../constants';
 import { DocumentL, User, DocStatus, MasterRecord, Invoice } from '../types';
 import { api } from '../services/api';
@@ -8,6 +8,12 @@ import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
 import { formatCurrency, formatDate } from '../utils/formatting';
+import * as pdfjsLib from 'pdfjs-dist';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
 
 interface ConsultasDocumentosLProps {
   documents: DocumentL[];
@@ -48,6 +54,15 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [resendTarget, setResendTarget] = useState<DocumentL | null>(null);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
+
+  // PDF Verification states
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const [pdfVerifying, setPdfVerifying] = useState(false);
+  const [pdfResults, setPdfResults] = useState<{
+    matched: { pdfPedido: string; pdfRemision: string; docId: string; docExtId: string; matchField: 'pedido' | 'factura' }[];
+    unmatched: { pdfPedido: string; pdfRemision: string }[];
+    fileName: string;
+  } | null>(null);
 
   const isAuthorizedToDelete = useMemo(() => {
     if (user.roleId === 'ROL-01' || user.id === 'USR-01') return true;
@@ -265,6 +280,139 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     setCurrentPage(1);
   };
 
+  const handlePdfVerification = async (file: File) => {
+    setPdfVerifying(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      // Extract all text items with their x positions to reconstruct columns
+      const allRows: { x: number; y: number; text: string; page: number }[] = [];
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        for (const item of content.items as any[]) {
+          if (item.str?.trim()) {
+            allRows.push({ x: item.transform[4], y: item.transform[5], text: item.str.trim(), page: p });
+          }
+        }
+      }
+
+      // Find header row to locate column x-positions for PEDIDO # and REMISIÓN # TRANSFER #
+      // Sort by page then y descending (top to bottom) then x
+      const sorted = [...allRows].sort((a, b) => a.page - b.page || b.y - a.y || a.x - b.x);
+
+      // Group items by approximate y (same row = within 3px)
+      const rows: { y: number; page: number; items: { x: number; text: string }[] }[] = [];
+      for (const item of sorted) {
+        const existing = rows.find(r => r.page === item.page && Math.abs(r.y - item.y) <= 3);
+        if (existing) {
+          existing.items.push({ x: item.x, text: item.text });
+          existing.items.sort((a, b) => a.x - b.x);
+        } else {
+          rows.push({ y: item.y, page: item.page, items: [{ x: item.x, text: item.text }] });
+        }
+      }
+
+      // Find header row (contains "PEDIDO" and "REMIS")
+      let pedidoX = -1;
+      let remisionX = -1;
+      for (const row of rows) {
+        const texts = row.items.map(i => i.text.toUpperCase());
+        const combined = texts.join(' ');
+        if (combined.includes('PEDIDO') && (combined.includes('REMIS') || combined.includes('TRANSFER'))) {
+          for (const item of row.items) {
+            const t = item.text.toUpperCase();
+            if (t.includes('PEDIDO')) pedidoX = item.x;
+            if (t.includes('REMIS') || t.includes('TRANSFER')) remisionX = item.x;
+          }
+          break;
+        }
+      }
+
+      // Fallback: try to detect column positions from data patterns (AFE/AJV prefixes)
+      const pdfEntries: { pedido: string; remision: string }[] = [];
+
+      if (pedidoX >= 0 && remisionX >= 0) {
+        const tolerance = 40;
+        for (const row of rows) {
+          const pedidoItem = row.items.find(i => Math.abs(i.x - pedidoX) <= tolerance);
+          const remisionItem = row.items.find(i => Math.abs(i.x - remisionX) <= tolerance);
+          const pedidoText = pedidoItem?.text || '';
+          const remisionText = remisionItem?.text || '';
+          // Only include data rows (not header, not empty, not total rows)
+          if ((pedidoText.match(/^[A-Z]{2,4}\d{5,}/i) || pedidoText.match(/^\d{6,}/)) &&
+              (remisionText.match(/^[A-Z]{2,4}\d{5,}/i) || remisionText === '')) {
+            pdfEntries.push({ pedido: pedidoText.trim(), remision: remisionText.trim() });
+          }
+          // Also capture rows where only pedido has a value (multi-order per remision rows)
+          if (pedidoText.match(/^[A-Z]{2,4}\d{5,}/i) && !remisionText) {
+            const last = pdfEntries[pdfEntries.length - 1];
+            if (last) pdfEntries.push({ pedido: pedidoText.trim(), remision: last.remision });
+          }
+        }
+      }
+
+      // Fallback: scan for AJV/AFE-pattern values heuristically
+      if (pdfEntries.length === 0) {
+        for (const row of rows) {
+          const rowTexts = row.items.map(i => i.text);
+          const pedidoCands = rowTexts.filter(t => /^AJV\d{7}/i.test(t));
+          const remisionCands = rowTexts.filter(t => /^AFE\d{7}/i.test(t));
+          for (const ped of pedidoCands) {
+            pdfEntries.push({ pedido: ped, remision: remisionCands[0] || '' });
+          }
+        }
+      }
+
+      if (pdfEntries.length === 0) {
+        toast.error('No se encontraron datos de Pedido/Remisión en el PDF');
+        setPdfVerifying(false);
+        return;
+      }
+
+      // Deduplicate entries
+      const uniqueEntries = pdfEntries.filter((e, i, arr) =>
+        arr.findIndex(x => x.pedido === e.pedido && x.remision === e.remision) === i
+      );
+
+      // Cross-reference with all documents' items
+      const matched: { pdfPedido: string; pdfRemision: string; docId: string; docExtId: string; matchField: 'pedido' | 'factura' }[] = [];
+      const unmatched: { pdfPedido: string; pdfRemision: string }[] = [];
+
+      for (const entry of uniqueEntries) {
+        let found = false;
+        for (const doc of documents) {
+          for (const item of doc.items || []) {
+            const orderMatch = entry.pedido && (item.orderNumber || '').toUpperCase() === entry.pedido.toUpperCase();
+            const invoiceMatch = entry.remision && ((item as any).invoice || '').toUpperCase() === entry.remision.toUpperCase();
+            if (orderMatch || invoiceMatch) {
+              matched.push({
+                pdfPedido: entry.pedido,
+                pdfRemision: entry.remision,
+                docId: doc.id,
+                docExtId: doc.externalDocId,
+                matchField: orderMatch ? 'pedido' : 'factura'
+              });
+              found = true;
+              break;
+            }
+          }
+          if (found) break;
+        }
+        if (!found) unmatched.push(entry);
+      }
+
+      setPdfResults({ matched, unmatched, fileName: file.name });
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al procesar el PDF');
+    } finally {
+      setPdfVerifying(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+    }
+  };
+
   const inputClass = "w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all placeholder:text-slate-300";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block";
 
@@ -292,7 +440,22 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
             </select>
           </div>
         </div>
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 flex-wrap">
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfVerification(f); }}
+          />
+          <button
+            onClick={() => pdfInputRef.current?.click()}
+            disabled={pdfVerifying}
+            className="px-6 py-3 bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-md flex items-center gap-2 disabled:opacity-60"
+          >
+            <Icons.Upload className="w-4 h-4" />
+            {pdfVerifying ? 'Procesando...' : 'Verificar PDF'}
+          </button>
           <button onClick={() => exportToExcel(filteredDocs, "M7_Historial")} className="px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md flex items-center gap-2">
             <Icons.Excel className="w-4 h-4" /> Exportar
           </button>
@@ -651,6 +814,109 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           onClose={() => { setShowPaymentModal(false); setPaymentTarget(null); }}
           onSuccess={() => { if (onRefresh) onRefresh(); }}
         />
+      )}
+
+      {/* DIÁLOGO VERIFICACIÓN PDF */}
+      {pdfResults && (
+        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-200">
+            {/* Header */}
+            <div className="bg-violet-900 p-5 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-violet-400 rounded-lg flex items-center justify-center"><Icons.Upload className="w-4 h-4 text-violet-900" /></div>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-tight">Verificación de PDF</h3>
+                  <p className="text-[8px] font-bold text-violet-300 uppercase tracking-widest truncate max-w-[300px]">{pdfResults.fileName}</p>
+                </div>
+              </div>
+              <button onClick={() => setPdfResults(null)} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-2xl font-thin">×</button>
+            </div>
+
+            {/* Summary badges */}
+            <div className="flex gap-4 p-5 bg-slate-50 border-b border-slate-100 shrink-0">
+              <div className="flex-1 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-black text-emerald-600">{pdfResults.matched.length}</p>
+                <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">Encontrados</p>
+              </div>
+              <div className="flex-1 bg-rose-50 border border-rose-200 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-black text-rose-600">{pdfResults.unmatched.length}</p>
+                <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest mt-0.5">No encontrados</p>
+              </div>
+              <div className="flex-1 bg-slate-100 border border-slate-200 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-black text-slate-700">{pdfResults.matched.length + pdfResults.unmatched.length}</p>
+                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">Total PDF</p>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto flex-1 custom-scrollbar">
+              {/* Matched */}
+              {pdfResults.matched.length > 0 && (
+                <div className="p-5">
+                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Coincidencias encontradas
+                  </p>
+                  <div className="overflow-x-auto rounded-2xl border border-emerald-100">
+                    <table className="w-full text-[9px]">
+                      <thead className="bg-emerald-800 text-white">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left font-black uppercase tracking-widest">Pedido # (PDF)</th>
+                          <th className="px-4 py-2.5 text-left font-black uppercase tracking-widest">Remisión # (PDF)</th>
+                          <th className="px-4 py-2.5 text-left font-black uppercase tracking-widest">Documento</th>
+                          <th className="px-4 py-2.5 text-center font-black uppercase tracking-widest">Coincidió por</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-emerald-50">
+                        {pdfResults.matched.map((r, i) => (
+                          <tr key={i} className="hover:bg-emerald-50 transition-colors">
+                            <td className="px-4 py-2 font-black text-slate-800">{r.pdfPedido || '—'}</td>
+                            <td className="px-4 py-2 font-bold text-slate-600">{r.pdfRemision || '—'}</td>
+                            <td className="px-4 py-2 font-black text-emerald-700 uppercase">{r.docExtId}</td>
+                            <td className="px-4 py-2 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase border ${r.matchField === 'pedido' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                                {r.matchField === 'pedido' ? 'Pedido' : 'Factura'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Unmatched */}
+              {pdfResults.unmatched.length > 0 && (
+                <div className="p-5 pt-0">
+                  <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> No encontrados en los documentos cargados
+                  </p>
+                  <div className="overflow-x-auto rounded-2xl border border-rose-100">
+                    <table className="w-full text-[9px]">
+                      <thead className="bg-rose-800 text-white">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left font-black uppercase tracking-widest">Pedido # (PDF)</th>
+                          <th className="px-4 py-2.5 text-left font-black uppercase tracking-widest">Remisión # (PDF)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-rose-50">
+                        {pdfResults.unmatched.map((r, i) => (
+                          <tr key={i} className="hover:bg-rose-50 transition-colors">
+                            <td className="px-4 py-2 font-black text-slate-800">{r.pedido || '—'}</td>
+                            <td className="px-4 py-2 font-bold text-slate-600">{r.remision || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t bg-white flex justify-end shrink-0">
+              <button onClick={() => setPdfResults(null)} className="px-10 py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-violet-700 transition-all shadow-xl">Cerrar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal de Confirmación de Eliminación */}
