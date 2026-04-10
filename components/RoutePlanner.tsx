@@ -11,7 +11,10 @@ import {
   estimateStopArrival,
   estimateRouteReturn,
   parseDetectedTimeToMinutes,
-  rebalanceSingleRoute
+  rebalanceSingleRoute,
+  haversineKm,
+  hasDefaultCoords,
+  twoOptImprove
 } from '../utils/routeUtils';
 import {
   ORBIT_HUB_ORIGIN,
@@ -52,8 +55,37 @@ interface RoutePlannerProps {
 }
 
 
-const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-  return Math.sqrt(Math.pow(Number(lat1 || 0) - Number(lat2 || 0), 2) + Math.pow(Number(lng1 || 0) - Number(lng2 || 0), 2));
+// MEJORA 1: Haversine reemplaza distancia euclidiana — más precisa para rutas reales
+const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  return haversineKm(Number(lat1 || 0), Number(lng1 || 0), Number(lat2 || 0), Number(lng2 || 0));
+};
+
+// MEJORA 6: Clustering espacial para cadenas de almacenes
+// Agrupa facturas cercanas entre sí usando un threshold de distancia (km).
+// Evita rutas en zigzag cuando hay sucursales muy dispersas.
+const clusterByProximity = (invoices: Invoice[], thresholdKm = 8): Invoice[][] => {
+  if (invoices.length === 0) return [];
+  const clusters: Invoice[][] = [];
+  const assigned = new Set<string>();
+
+  for (const inv of invoices) {
+    if (assigned.has(inv.id)) continue;
+    const cluster = [inv];
+    assigned.add(inv.id);
+    for (const other of invoices) {
+      if (assigned.has(other.id)) continue;
+      const d = haversineKm(
+        Number(inv.lat || 0), Number(inv.lng || 0),
+        Number(other.lat || 0), Number(other.lng || 0)
+      );
+      if (d <= thresholdKm) {
+        cluster.push(other);
+        assigned.add(other.id);
+      }
+    }
+    clusters.push(cluster);
+  }
+  return clusters;
 };
 
 interface RoutingPattern {
@@ -448,7 +480,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         .filter(inv => inv && typeof inv === 'object') // Guardia extra
         .map(inv => ({ ...inv }));
 
-      // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA ---
+      // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA (MEJORA 6: clustering espacial) ---
       const retailGroups: { [key: string]: Invoice[] } = {};
       RETAIL_CHAIN_KEYWORDS.forEach(chain => {
         const matches = availableInvoices.filter(inv =>
@@ -461,24 +493,32 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const totalChainVol = chainInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
 
         if (totalChainVol >= RETAIL_CHAIN_MIN_VOLUME_M3 && availableVehicles.length > 0) {
-           const bestVeh = [...availableVehicles]
-             .filter(v => !usedVehicleIds.has(v.id))
-             .sort((a,b) => Math.abs(Number(a.capacityM3) - totalChainVol) - Math.abs(Number(b.capacityM3) - totalChainVol))[0];
+          // MEJORA 6: Agrupar por proximidad antes de asignar vehículos
+          const clusters = clusterByProximity(chainInvoices, 8);
 
-           if (bestVeh) {
+          clusters.forEach((cluster, clusterIdx) => {
+            const clusterVol = cluster.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
+            if (clusterVol < 1) return; // Ignorar clusters triviales
+
+            const bestVeh = [...availableVehicles]
+              .filter(v => !usedVehicleIds.has(v.id))
+              .sort((a, b) => Math.abs(Number(a.capacityM3) - clusterVol) - Math.abs(Number(b.capacityM3) - clusterVol))[0];
+
+            if (bestVeh) {
               const vCap = Number(bestVeh.capacityM3) || 25;
               suggestions.push({
-                id: `route-iq-retail-${chain}-${Date.now()}`,
+                id: `route-iq-retail-${chain}-${clusterIdx}-${Date.now()}`,
                 vehicle: bestVeh,
-                assignedInvoices: chainInvoices,
-                totalVolume: Number(Number(totalChainVol).toFixed(2)),
-                utilization: Math.round((totalChainVol / vCap) * 100),
-                city: (chainInvoices[0]?.city || 'LOGÍSTICA ESPECIAL')
+                assignedInvoices: cluster,
+                totalVolume: Number(clusterVol.toFixed(2)),
+                utilization: Math.round((clusterVol / vCap) * 100),
+                city: (cluster[0]?.city || 'LOGÍSTICA ESPECIAL')
               });
               usedVehicleIds.add(bestVeh.id);
-              const chainIds = new Set(chainInvoices.map(i => i.id));
-              availableInvoices = availableInvoices.filter(i => !chainIds.has(i.id));
-           }
+              const clusterIds = new Set(cluster.map(i => i.id));
+              availableInvoices = availableInvoices.filter(i => !clusterIds.has(i.id));
+            }
+          });
         }
       });
 
@@ -502,14 +542,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         inv.isPriority = priorityKeywords.some(kw => notes.includes(kw)) || !!timeMatch;
         // @ts-ignore
         inv.cityKey = (String(inv.city || 'SIN_CIUDAD')).toUpperCase().trim();
-        
+
         const rawAddr = (String(inv.address || '')).toUpperCase();
-        // REGLA M7: Extraemos la dirección rellenando los números con ceros a la izquierda 
-        // para un ordenamiento numérico perfecto (ej. CL 10 vs CL 103 -> CL00010 vs CL00103)
         // @ts-ignore
-        inv.startAddressForSort = rawAddr.replace(/\d+/g, num => num.padStart(5, '0')).replace(/[^0-9A-Z]/g, ''); 
+        inv.startAddressForSort = rawAddr.replace(/\d+/g, num => num.padStart(5, '0')).replace(/[^0-9A-Z]/g, '');
         // @ts-ignore
         inv.neighborhoodKey = (String(inv.neighborhood || 'SIN_BARRIO')).toUpperCase().trim();
+
+        // MEJORA 2: Detectar coordenadas default (sin geocodificar)
+        const lat = Number(inv.lat || 0);
+        const lng = Number(inv.lng || 0);
+        // @ts-ignore
+        inv.hasDefaultCoords = (lat === 0 && lng === 0) || hasDefaultCoords(lat, lng);
       });
 
       // 3. Ordenamiento Global
@@ -548,11 +592,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const absoluteMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION;
         const isLargeVehicle = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
 
-        const affinity = learningPatterns.find(p => p.vehicle_id === vehicle.id);
+        // MEJORA 5: Afinidad ordenada por strength (mayor primero)
+        const affinity = [...learningPatterns]
+          .filter(p => p.vehicle_id === vehicle.id)
+          .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         const targetCity = affinity ? affinity.city : null;
 
         let currentLat = ORBIT_HUB_ORIGIN.lat;
         let currentLng = ORBIT_HUB_ORIGIN.lng;
+        let stopIndex = 0; // Para estimación de ventana horaria (MEJORA 3)
 
         let i = 0;
         while (i < availableInvoices.length && currentLoadVolume < targetMaxCapacity) {
@@ -562,14 +610,38 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           for (let j = 0; j < availableInvoices.length; j++) {
               const inv = availableInvoices[j];
               const invVol = Number(inv.volumeM3) || 0;
-              
+
               // @ts-ignore
               const nKey = inv.neighborhoodKey || '';
               const isRestricted = isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(nKey);
               if (isRestricted) continue;
 
               if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
-                  const dist = getDistance(currentLat, currentLng, Number(inv.lat || 0), Number(inv.lng || 0));
+                  const invLat = Number(inv.lat || 0);
+                  const invLng = Number(inv.lng || 0);
+
+                  // MEJORA 1: Haversine (ya integrada en getDistance)
+                  let dist = getDistance(currentLat, currentLng, invLat, invLng);
+
+                  // MEJORA 2: Penalizar facturas sin geocodificar (coords default)
+                  // @ts-ignore
+                  if ((inv as any).hasDefaultCoords) dist *= 5;
+
+                  // MEJORA 3: Penalizar si la hora estimada de llegada supera la ventana
+                  // @ts-ignore
+                  const timeWindow = (inv as any).timeWindowMinutes;
+                  if (timeWindow != null) {
+                    const estimatedArrivalMin = ORBIT_HUB_ORIGIN.lat && stopIndex > 0
+                      ? (8 * 60) + stopIndex * 25 // 8 AM + 25min/parada
+                      : 8 * 60;
+                    if (estimatedArrivalMin > timeWindow) {
+                      // Penalización proporcional al retraso: 10% extra por cada 15 min de retraso
+                      const delayMin = estimatedArrivalMin - timeWindow;
+                      dist *= (1 + Math.min(delayMin / 150, 2)); // Máx ×3
+                    }
+                  }
+
+                  // MEJORA 5: Descuento por ciudad favorita del vehículo (patrón más fuerte)
                   // @ts-ignore
                   const cKey = inv.cityKey || '';
                   const affinityBonus = (targetCity && cKey === targetCity) ? 0.8 : 1.0;
@@ -589,10 +661,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               currentLat = Number(inv.lat || currentLat);
               currentLng = Number(inv.lng || currentLng);
               availableInvoices.splice(bestNextIdx, 1);
-              i = 0; 
+              stopIndex++;
+              i = 0;
           } else {
-              break; 
+              break;
           }
+        }
+
+        // MEJORA 4: Optimización 2-opt post-greedy
+        if (load.length >= 4) {
+          const optimized = twoOptImprove(load, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
+          load.length = 0;
+          load.push(...optimized);
         }
 
         if (load.length > 0) {
