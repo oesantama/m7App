@@ -51,6 +51,7 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
             ${where}
             GROUP BY dl.id
             HAVING COUNT(DISTINCT di.invoice) > 0
+              AND COUNT(DISTINCT di.invoice) - COUNT(DISTINCT ic.invoice_number) > 0
             ORDER BY dl.created_at DESC
         `, params);
 
