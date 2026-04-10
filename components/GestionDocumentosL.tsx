@@ -1142,35 +1142,33 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                 </tr>
                               </thead>
                                <tbody className="divide-y divide-slate-100">
-                                 {paginatedModalItems.map((it:any, idx:number) => (
-                                  {(() => {
-                                    const hasDiff = Number(it.count2 || 0) !== Number(it.expectedQty || 0);
-                                    return (
-                                      <tr key={idx} className={`text-[9px] hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${hasDiff ? 'bg-red-50/30' : ''}`}>
-                                        <td className="py-2 px-4 font-black text-slate-900 uppercase truncate">{it.articleId}</td>
-                                        <td className="py-2 px-4 text-center font-bold text-slate-900">{it.expectedQty}</td>
-                                        <td className="py-2 px-4 text-center font-black text-emerald-600 bg-emerald-50/30">{it.count1 || 0}</td>
-                                        <td className={`py-2 px-4 text-center font-black bg-amber-50/30 ${hasDiff ? 'text-red-600' : 'text-amber-600'}`}>{it.count2 || 0}</td>
-                                        <td className="py-2 px-4 text-center text-slate-500">{it.pickedQty || 0}</td>
-                                        <td className="py-2 px-4 text-center text-slate-500">{it.dispatchedQty || 0}</td>
-                                        <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[200px]" title={it.inventoryObservation}>{it.inventoryObservation || 'SIN NOVEDAD'}</td>
-                                        {canEditAudit && (
-                                          <td className="py-2 px-4 text-center">
-                                            {hasDiff && (
-                                              <button
-                                                onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(it.inventoryObservation || ''); setEditAuditError(null); }}
-                                                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
-                                                title="Corregir Conteo 2"
-                                              >
-                                                EDITAR
-                                              </button>
-                                            )}
-                                          </td>
-                                        )}
-                                      </tr>
-                                    );
-                                  })()}
-                                ))}
+                                 {paginatedModalItems.map((it:any, idx:number) => {
+                                  const hasDiff = Number(it.count2 || 0) !== Number(it.expectedQty || 0);
+                                  return (
+                                    <tr key={idx} className={`text-[9px] hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${hasDiff ? 'bg-red-50/30' : ''}`}>
+                                      <td className="py-2 px-4 font-black text-slate-900 uppercase truncate">{it.articleId}</td>
+                                      <td className="py-2 px-4 text-center font-bold text-slate-900">{it.expectedQty}</td>
+                                      <td className="py-2 px-4 text-center font-black text-emerald-600 bg-emerald-50/30">{it.count1 || 0}</td>
+                                      <td className={`py-2 px-4 text-center font-black bg-amber-50/30 ${hasDiff ? 'text-red-600' : 'text-amber-600'}`}>{it.count2 || 0}</td>
+                                      <td className="py-2 px-4 text-center text-slate-500">{it.pickedQty || 0}</td>
+                                      <td className="py-2 px-4 text-center text-slate-500">{it.dispatchedQty || 0}</td>
+                                      <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[200px]" title={it.inventoryObservation}>{it.inventoryObservation || 'SIN NOVEDAD'}</td>
+                                      {canEditAudit && (
+                                        <td className="py-2 px-4 text-center">
+                                          {hasDiff && (
+                                            <button
+                                              onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(it.inventoryObservation || ''); setEditAuditError(null); }}
+                                              className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
+                                              title="Corregir Conteo 2"
+                                            >
+                                              EDITAR
+                                            </button>
+                                          )}
+                                        </td>
+                                      )}
+                                    </tr>
+                                  );
+                                })}
                                 {paginatedModalItems.length === 0 && (
                                   <tr>
                                     <td colSpan={7} className="py-10 text-center text-slate-500 text-[10px] italic">
