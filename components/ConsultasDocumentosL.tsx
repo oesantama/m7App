@@ -378,21 +378,21 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       );
 
       // Cross-reference only against the target document's items
-      const matched: { pdfPedido: string; pdfRemision: string; docId: string; docExtId: string; matchField: 'pedido' | 'factura' }[] = [];
+      const matched: { pdfPedido: string; pdfRemision: string; docId: string; docExtId: string; matchField: 'pedido' | 'factura' | 'ambos' }[] = [];
       const unmatched: { pdfPedido: string; pdfRemision: string }[] = [];
 
       for (const entry of uniqueEntries) {
         let found = false;
         for (const item of targetDoc.items || []) {
-          const orderMatch = entry.pedido && (item.orderNumber || '').toUpperCase() === entry.pedido.toUpperCase();
-          const invoiceMatch = entry.remision && ((item as any).invoice || '').toUpperCase() === entry.remision.toUpperCase();
+          const orderMatch = !!(entry.pedido && (item.orderNumber || '').toUpperCase() === entry.pedido.toUpperCase());
+          const invoiceMatch = !!(entry.remision && ((item as any).invoice || '').toUpperCase() === entry.remision.toUpperCase());
           if (orderMatch || invoiceMatch) {
             matched.push({
               pdfPedido: entry.pedido,
               pdfRemision: entry.remision,
               docId: targetDoc.id,
               docExtId: targetDoc.externalDocId,
-              matchField: orderMatch ? 'pedido' : 'factura'
+              matchField: orderMatch && invoiceMatch ? 'ambos' : orderMatch ? 'pedido' : 'factura'
             });
             found = true;
             break;
@@ -875,8 +875,12 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                             <td className="px-4 py-2 font-bold text-slate-600">{r.pdfRemision || '—'}</td>
                             <td className="px-4 py-2 font-black text-emerald-700 uppercase">{r.docExtId}</td>
                             <td className="px-4 py-2 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase border ${r.matchField === 'pedido' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
-                                {r.matchField === 'pedido' ? 'Pedido' : 'Factura'}
+                              <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase border ${
+                                r.matchField === 'ambos'   ? 'bg-emerald-100 text-emerald-700 border-emerald-300' :
+                                r.matchField === 'pedido'  ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                                             'bg-amber-50 text-amber-600 border-amber-200'
+                              }`}>
+                                {r.matchField === 'ambos' ? 'Pedido y Factura' : r.matchField === 'pedido' ? 'Pedido' : 'Factura'}
                               </span>
                             </td>
                           </tr>
@@ -922,7 +926,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     'PEDIDO # (PDF)': r.pdfPedido || '—',
                     'REMISIÓN # (PDF)': r.pdfRemision || '—',
                     'DOCUMENTO': r.docExtId,
-                    'COINCIDIÓ POR': r.matchField === 'pedido' ? 'Pedido' : 'Factura',
+                    'COINCIDIÓ POR': r.matchField === 'ambos' ? 'Pedido y Factura' : r.matchField === 'pedido' ? 'Pedido' : 'Factura',
                     'RESULTADO': 'ENCONTRADO'
                   }));
                   const unmatchedRows = pdfResults!.unmatched.map(r => ({
