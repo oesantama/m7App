@@ -2,6 +2,17 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 
+// ─── Caché en memoria para getInvoices ───────────────────────────────────────
+// TTL de 45 segundos: reduce carga en Postgres en refrescos frecuentes
+const invoicesCache = new Map<string, { data: any[]; ts: number }>();
+const INVOICES_CACHE_TTL_MS = 45_000;
+
+function getCacheKey(query: Record<string, any>): string {
+  // Incluye solo los params que afectan el resultado
+  return JSON.stringify({ clientId: query.clientId, history: query.history, routeId: query.routeId });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const getDocuments = async (req: Request, res: Response) => {
   try {
     const { clientId } = req.query;
@@ -629,6 +640,7 @@ export const updateStatus = async (req: Request, res: Response) => {
     await pool.query(`
       UPDATE documents_l SET status = $1 WHERE id = $2
     `, [status, id]);
+    invoicesCache.clear(); // Invalidar caché al cambiar estado de documentos
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: "Error al actualizar estado" });
@@ -638,6 +650,17 @@ export const updateStatus = async (req: Request, res: Response) => {
 export const getInvoices = async (req: Request, res: Response) => {
   try {
     const { clientId, ids, history, search, id, routeId } = req.query;
+
+    // Caché solo para consultas generales (sin ids/search/id específicos)
+    const canCache = !ids && !search && !id;
+    if (canCache) {
+      const cKey = getCacheKey(req.query as any);
+      const cached = invoicesCache.get(cKey);
+      if (cached && Date.now() - cached.ts < INVOICES_CACHE_TTL_MS) {
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(cached.data);
+      }
+    }
     const queryParams: any[] = [];
     
     const sqlIdGen = `CONCAT(TRIM(document_items.document_id), '_', TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number, 'NA')))`;
@@ -756,6 +779,14 @@ export const getInvoices = async (req: Request, res: Response) => {
 
     const result = await pool.query(query, queryParams);
     console.log(`[M7-SUCCESS] getInvoices: Enviando ${result.rows.length} facturas.`);
+
+    // Guardar en caché si aplica
+    if (canCache) {
+      const cKey = getCacheKey(req.query as any);
+      invoicesCache.set(cKey, { data: result.rows, ts: Date.now() });
+      res.setHeader('X-Cache', 'MISS');
+    }
+
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-CRITICAL-ERR] getInvoices:', err.message);

@@ -23,7 +23,7 @@ services:
       - m7-network
     # Límite de RAM: deja margen para el build del frontend durante el redeploy
     mem_limit: 320m
-    memswap_limit: 320m
+    memswap_limit: 512m
 
   # Frontend — usa imagen pre-construida desde GitHub Actions (GHCR)
   # El build ocurre en GitHub (7GB RAM), el servidor solo hace docker pull.
@@ -71,6 +71,17 @@ services:
   postgres:
     image: postgres:15-alpine
     restart: always
+    # Tuning para servidor 1GB: shared_buffers bajo, conexiones limitadas, work_mem conservador
+    command: >
+      postgres
+      -c shared_buffers=48MB
+      -c work_mem=2MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=20
+      -c effective_cache_size=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=4MB
+      -c synchronous_commit=off
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -86,7 +97,7 @@ services:
     networks:
       - m7-network
     mem_limit: 192m
-    memswap_limit: 192m
+    memswap_limit: 384m
 
 networks:
   m7-network:

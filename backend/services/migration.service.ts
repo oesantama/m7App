@@ -141,6 +141,17 @@ const healSchema = async (client: any) => {
     // assignments: búsqueda de vehículos por conductor
     `CREATE INDEX IF NOT EXISTS idx_assignments_driver_id  ON assignments (driver_id)`,
     `CREATE INDEX IF NOT EXISTS idx_assignments_vehicle_id ON assignments (vehicle_id)`,
+    // geocoding_cache: join crítico en getInvoices (una búsqueda por cada factura)
+    `CREATE INDEX IF NOT EXISTS idx_geocoding_cache_address_key ON geocoding_cache (address_key)`,
+    // document_items: invoice usado en joins con payments y dispatch
+    `CREATE INDEX IF NOT EXISTS idx_document_items_invoice ON document_items (invoice)`,
+    // composite para el subquery de ítems agrupados
+    `CREATE INDEX IF NOT EXISTS idx_document_items_doc_invoice ON document_items (document_id, invoice)`,
+    // document_l_payments: lookup por invoice en join de facturas
+    `CREATE INDEX IF NOT EXISTS idx_document_l_payments_invoice ON document_l_payments (invoice)`,
+    // invoice_conciliations: filtros por placa y fecha
+    `CREATE INDEX IF NOT EXISTS idx_invoice_conciliations_plate ON invoice_conciliations (plate)`,
+    `CREATE INDEX IF NOT EXISTS idx_invoice_conciliations_created_at ON invoice_conciliations (created_at DESC)`,
   ];
   for (const idxSql of performanceIndexes) {
     try { await client.query(idxSql); } catch (e) {}
