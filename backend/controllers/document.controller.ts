@@ -1290,6 +1290,8 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
 };
 
 // ─── Parse PDF: extrae remisiones/facturas via Gemini Vision AI ──────────────
+const PDF_FALLBACK_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+
 export const parsePdfRemisiones = async (req: any, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún PDF' });
@@ -1298,31 +1300,50 @@ export const parsePdfRemisiones = async (req: any, res: Response) => {
     const apiKey = rawKeys.split(',').map((k: string) => k.trim()).find((k: string) => k.length > 0);
     if (!apiKey) return res.status(500).json({ error: 'No hay API key de Gemini configurada' });
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: process.env.AI_MODEL || 'gemini-1.5-flash' });
-
     const pdfBase64 = req.file.buffer.toString('base64');
-
     const prompt = `Eres un motor OCR de logística. Analiza este PDF y extrae TODOS los códigos de remisión/factura.
 Los códigos tienen el patrón: 2-5 letras mayúsculas seguidas de 5 o más dígitos (ejemplos: AFE7604474, TRF12345, REM98765).
 Responde ÚNICAMENTE con un JSON estricto sin formato markdown:
 {"remisiones": ["AFE7604474", "TRF12345"]}
 Si no encuentras ninguno, responde: {"remisiones": []}`;
 
-    const result = await model.generateContent([
-      { text: prompt },
-      { inlineData: { data: pdfBase64, mimeType: 'application/pdf' } },
-    ]);
+    const primaryModel = process.env.AI_MODEL || 'gemini-1.5-flash';
+    const modelsToTry = [primaryModel, ...PDF_FALLBACK_MODELS.filter(m => m !== primaryModel)];
 
-    const textResponse = result.response.text().trim();
-    const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Gemini no devolvió JSON válido: ' + textResponse.substring(0, 200));
+    let lastError: any;
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`[M7-PARSE-PDF] Intentando con modelo: ${modelName}`);
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: modelName });
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    const remisiones: string[] = [...new Set((parsed.remisiones || []).map((r: string) => r.toUpperCase().trim()).filter(Boolean))] as string[];
+        const result = await model.generateContent([
+          { text: prompt },
+          { inlineData: { data: pdfBase64, mimeType: 'application/pdf' } },
+        ]);
 
-    console.log(`[M7-PARSE-PDF] Encontradas ${remisiones.length} remisiones:`, remisiones);
-    res.json({ success: true, remisiones });
+        const textResponse = result.response.text().trim();
+        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Gemini no devolvió JSON válido: ' + textResponse.substring(0, 200));
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        const remisiones: string[] = [...new Set(
+          (parsed.remisiones || []).map((r: string) => r.toUpperCase().trim()).filter(Boolean)
+        )] as string[];
+
+        console.log(`[M7-PARSE-PDF] Modelo ${modelName} — ${remisiones.length} remisiones encontradas:`, remisiones);
+        return res.json({ success: true, remisiones });
+      } catch (err: any) {
+        const errStr = (err.toString() + (err.message || '')).toLowerCase();
+        const isRetryable = errStr.includes('503') || errStr.includes('unavailable') || errStr.includes('overloaded') || errStr.includes('429');
+        lastError = err;
+        console.warn(`[M7-PARSE-PDF] Modelo ${modelName} falló (${isRetryable ? 'reintentable' : 'fatal'}):`, err.message);
+        if (!isRetryable) break; // error no recuperable, no seguir intentando
+      }
+    }
+
+    console.error('[M7-PARSE-PDF-ERR] Todos los modelos fallaron:', lastError?.message);
+    res.status(500).json({ error: 'Servicio de IA temporalmente no disponible. Intente de nuevo en unos segundos.' });
   } catch (err: any) {
     console.error('[M7-PARSE-PDF-ERR]', err.message);
     res.status(500).json({ error: 'Error al procesar el PDF: ' + err.message });
