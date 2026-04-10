@@ -167,6 +167,10 @@ export const api = {
     const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
     return fetchJson(`${API_URL}/conciliation/pending${qs}`);
   },
+  getConciliationHistory: (params: { from?: string; to?: string; doc_id?: string; invoice?: string; plate?: string }) => {
+    const qs = '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v) as [string, string][])).toString();
+    return fetchJson(`${API_URL}/conciliation/history${qs}`);
+  },
   getConciliationByDocument: (documentId: string) =>
     fetchJson(`${API_URL}/conciliation/${encodeURIComponent(documentId)}`),
   saveConciliation: (data: {
@@ -177,6 +181,8 @@ export const api = {
   }) => fetchJson(`${API_URL}/conciliation/save`, { method: 'POST', body: JSON.stringify(data) }),
   generateConciliationReport: (documentId: string, targetEmail: string | string[]) =>
     fetchJson(`${API_URL}/conciliation/report`, { method: 'POST', body: JSON.stringify({ documentId, targetEmail }) }),
+  getConciliationPlanillaUrl: (plate: string, from: string, to: string) =>
+    `${API_URL}/conciliation/planilla?plate=${encodeURIComponent(plate)}&from=${from}&to=${to}`,
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO

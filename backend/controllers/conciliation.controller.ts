@@ -174,6 +174,141 @@ export const saveConciliation = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET /conciliation/history ───────────────────────────────────────────────
+// Facturas ya conciliadas con filtros opcionales (fecha_desde, fecha_hasta,
+// documento, factura, placa). Devuelve filas planas para la tabla de historial.
+export const getConciliationHistory = async (req: Request, res: Response) => {
+    try {
+        const { from, to, doc_id, invoice, plate } = req.query;
+        const params: any[] = [];
+        let p = 1;
+        const conds: string[] = ['ic.forma_pago IS NOT NULL'];
+
+        if (from)    { conds.push(`ic.created_at >= $${p++}`); params.push(from); }
+        if (to)      { conds.push(`ic.created_at <= $${p++} + interval '1 day'`); params.push(to); }
+        if (doc_id)  { conds.push(`dl.external_doc_id ILIKE $${p++}`); params.push(`%${doc_id}%`); }
+        if (invoice) { conds.push(`ic.invoice_number ILIKE $${p++}`); params.push(`%${invoice}%`); }
+        if (plate)   { conds.push(`ic.vehicle_plate ILIKE $${p++}`); params.push(`%${plate}%`); }
+
+        const where = conds.join(' AND ');
+
+        const result = await pool.query(`
+            SELECT
+                ic.id,
+                ic.invoice_number,
+                ic.document_id,
+                dl.external_doc_id,
+                ic.vehicle_plate,
+                ic.conductor_name,
+                ic.forma_pago,
+                ic.valor,
+                ic.banco,
+                ic.comprobante,
+                ic.numero_cheque,
+                ic.fecha_pago,
+                ic.es_devolucion,
+                ic.created_at          AS conciliado_at,
+                u.name                 AS conciliado_por_nombre,
+                di.customer_name,
+                di.city
+            FROM invoice_conciliations ic
+            JOIN documents_l dl ON dl.id = ic.document_id
+            LEFT JOIN users u ON u.id = ic.conciliado_por
+            LEFT JOIN (
+                SELECT DISTINCT ON (document_id, invoice) document_id, invoice, customer_name, city
+                FROM document_items WHERE invoice IS NOT NULL
+            ) di ON di.document_id = ic.document_id AND di.invoice = ic.invoice_number
+            WHERE ${where}
+            ORDER BY ic.created_at DESC
+            LIMIT 500
+        `, params);
+
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[CONCILIATION] getConciliationHistory error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── GET /conciliation/planilla ───────────────────────────────────────────────
+// Genera y descarga un Excel con la ruta completa de una placa en un rango
+// de fechas: documentos, facturas, clientes, estado de conciliación y totales.
+export const downloadPlanilla = async (req: Request, res: Response) => {
+    try {
+        const { plate, from, to } = req.query;
+        if (!plate || !from || !to) {
+            return res.status(400).json({ success: false, error: 'plate, from y to son requeridos' });
+        }
+
+        const result = await pool.query(`
+            SELECT
+                dl.external_doc_id                          AS "Documento",
+                dl.vehicle_plate                            AS "Placa",
+                dl.delivery_date                            AS "Fecha Entrega",
+                ic.conductor_name                           AS "Conductor",
+                di.invoice                                  AS "Factura",
+                di.customer_name                            AS "Cliente",
+                di.city                                     AS "Ciudad",
+                di.address                                  AS "Dirección",
+                SUM(COALESCE(di.expected_qty, 0))           AS "Cant. Artículos",
+                ic.forma_pago                               AS "Forma de Pago",
+                ic.banco                                    AS "Banco",
+                ic.valor                                    AS "Valor Recaudado",
+                ic.comprobante                              AS "No. Comprobante",
+                ic.fecha_pago                               AS "Fecha Pago",
+                ic.numero_cheque                            AS "No. Cheque",
+                CASE WHEN ic.es_devolucion THEN 'SÍ' ELSE 'NO' END AS "Es Devolución",
+                CASE WHEN ic.forma_pago IS NOT NULL THEN 'CONCILIADA' ELSE 'PENDIENTE' END AS "Estado"
+            FROM documents_l dl
+            JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
+            LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
+            WHERE dl.vehicle_plate ILIKE $1
+              AND dl.delivery_date >= $2
+              AND dl.delivery_date <= $3
+              AND dl.plan_type ILIKE '%plan r%'
+            GROUP BY dl.external_doc_id, dl.vehicle_plate, dl.delivery_date,
+                     ic.conductor_name, di.invoice, di.customer_name, di.city, di.address,
+                     ic.forma_pago, ic.banco, ic.valor, ic.comprobante, ic.fecha_pago,
+                     ic.numero_cheque, ic.es_devolucion
+            ORDER BY dl.delivery_date, dl.external_doc_id, di.invoice
+        `, [`%${plate}%`, from, to]);
+
+        const rows = result.rows;
+        if (!rows.length) {
+            return res.status(404).json({ success: false, error: 'No se encontraron datos para los filtros indicados' });
+        }
+
+        // Resumen por forma de pago
+        const resumen: Record<string, { facturas: number; total: number }> = {};
+        for (const r of rows) {
+            const fp = r['Forma de Pago'] || 'PENDIENTE';
+            if (!resumen[fp]) resumen[fp] = { facturas: 0, total: 0 };
+            resumen[fp].facturas++;
+            resumen[fp].total += Number(r['Valor Recaudado']) || 0;
+        }
+        const resumenRows = Object.entries(resumen).map(([fp, v]) => ({
+            'Forma de Pago': fp, 'Facturas': v.facturas,
+            'Total Recaudado': v.total
+        }));
+
+        const XLSX = await import('xlsx');
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Planilla Ruta');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows), 'Resumen Pago');
+        const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+        const plateClean = String(plate).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const filename = `Planilla_${plateClean}_${from}_${to}.xlsx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buf);
+    } catch (err: any) {
+        console.error('[CONCILIATION] downloadPlanilla error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
 // ─── POST /conciliation/report ────────────────────────────────────────────────
 // Genera el Excel multi-hoja y lo envía por correo.
 export const generateAndSendReport = async (req: Request, res: Response) => {
