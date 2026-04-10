@@ -43,6 +43,23 @@ const BlindCount: React.FC<BlindCountProps> = ({
   useEffect(() => {
     localStorage.setItem(`m7_extras_${docL.id}`, JSON.stringify(extraItems));
   }, [extraItems, docL.id]);
+
+  // Bloquear pull-to-refresh móvil durante todo el tiempo que el conteo esté montado.
+  // Evita que el operario recargue la página accidentalmente al hacer scroll hacia arriba.
+  useEffect(() => {
+    document.body.style.overscrollBehavior = 'none';
+
+    const blockRefresh = (e: TouchEvent) => {
+      // Bloquear solo cuando se está en el tope del scroll (posición 0)
+      if (window.scrollY === 0) e.preventDefault();
+    };
+    document.addEventListener('touchstart', blockRefresh, { passive: false });
+
+    return () => {
+      document.body.style.overscrollBehavior = '';
+      document.removeEventListener('touchstart', blockRefresh);
+    };
+  }, []);
   // ESTADOS DE INVENTARIO M7
   const [counts, setCounts] = useState<{ [articleId: string]: number }>(() => {
     // M7 V16 FIX: Prevenir "Ghost Deletion" hidratando primero desde LocalStorage antes que de la base de datos (Cloud)

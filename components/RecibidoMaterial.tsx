@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
@@ -30,6 +30,35 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   onUpdateDocuments, onAddArticleToMaster, onAddNotificationToMaster, onUpdateNotificationEmail
 }) => {
   const [selectedDocForCount, setSelectedDocForCount] = useState<DocumentL | null>(null);
+
+  // Bloquear pull-to-refresh y overscroll del navegador móvil mientras el conteo está activo.
+  // Sin esto, al deslizar hacia arriba en el celular durante el escaneo se recarga la página
+  // y se pierde el conteo en curso.
+  useEffect(() => {
+    if (!selectedDocForCount) return;
+
+    const originalOverscroll = document.body.style.overscrollBehavior;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overscrollBehavior = 'none';
+    document.body.style.touchAction = 'pan-x pan-y'; // permite scroll pero bloquea pull-to-refresh
+
+    // Prevenir el gesto de refresh en Chrome Android (touchstart en top 10px)
+    const blockPullToRefresh = (e: TouchEvent) => {
+      if (window.scrollY === 0 && e.touches[0].clientY > 0) {
+        // Si el usuario hace scroll hacia abajo desde el tope, lo bloqueamos
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('touchstart', blockPullToRefresh, { passive: false });
+
+    return () => {
+      document.body.style.overscrollBehavior = originalOverscroll;
+      document.body.style.touchAction = originalTouchAction;
+      document.removeEventListener('touchstart', blockPullToRefresh);
+    };
+  }, [selectedDocForCount]);
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [manualEmail, setManualEmail] = useState('');
