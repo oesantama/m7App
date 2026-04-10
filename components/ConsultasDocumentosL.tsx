@@ -915,7 +915,32 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
               )}
             </div>
 
-            <div className="p-5 border-t bg-white flex justify-end shrink-0">
+            <div className="p-5 border-t bg-white flex justify-between items-center shrink-0">
+              <button
+                onClick={() => {
+                  const matchedRows = pdfResults!.matched.map(r => ({
+                    'PEDIDO # (PDF)': r.pdfPedido || '—',
+                    'REMISIÓN # (PDF)': r.pdfRemision || '—',
+                    'DOCUMENTO': r.docExtId,
+                    'COINCIDIÓ POR': r.matchField === 'pedido' ? 'Pedido' : 'Factura',
+                    'RESULTADO': 'ENCONTRADO'
+                  }));
+                  const unmatchedRows = pdfResults!.unmatched.map(r => ({
+                    'PEDIDO # (PDF)': r.pedido || '—',
+                    'REMISIÓN # (PDF)': r.remision || '—',
+                    'DOCUMENTO': '—',
+                    'COINCIDIÓ POR': '—',
+                    'RESULTADO': 'NO ENCONTRADO'
+                  }));
+                  const ws = XLSX.utils.json_to_sheet([...matchedRows, ...unmatchedRows]);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, 'Verificacion_PDF');
+                  XLSX.writeFile(wb, `Verificacion_${pdfResults!.docExtId}_${Date.now()}.xlsx`);
+                }}
+                className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md flex items-center gap-2"
+              >
+                <Icons.Excel className="w-4 h-4" /> Exportar Excel
+              </button>
               <button onClick={() => setPdfResults(null)} className="px-10 py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-violet-700 transition-all shadow-xl">Cerrar</button>
             </div>
           </div>
