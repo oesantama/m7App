@@ -3,7 +3,7 @@ import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 
-type FormaPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'CONSIGNACION' | 'CHEQUE' | 'DEVOLUCION';
+type FormaPago = 'TRANSFERENCIA' | 'CONSIGNACION';
 
 interface InvoiceRow {
     invoice_number: string;
@@ -25,6 +25,8 @@ interface InvoiceRow {
     vehicle_plate?: string;
     conciliado_at?: string;
     conciliado_por_nombre?: string;
+    invoice_value?: number;
+    invoice_banco?: string;
 }
 
 interface ConciliacionModalProps {
@@ -40,19 +42,13 @@ interface ConciliacionModalProps {
 }
 
 const FORMAS_PAGO: { value: FormaPago; label: string; icon: string; color: string }[] = [
-    { value: 'EFECTIVO',      label: 'Efectivo',      icon: '💵', color: 'emerald' },
-    { value: 'TRANSFERENCIA', label: 'Transferencia', icon: '📱', color: 'blue'    },
-    { value: 'CONSIGNACION',  label: 'Consignación',  icon: '🏦', color: 'violet'  },
-    { value: 'CHEQUE',        label: 'Cheque',        icon: '📄', color: 'amber'   },
-    { value: 'DEVOLUCION',    label: 'Devolución',    icon: '🔄', color: 'rose'    },
+    { value: 'TRANSFERENCIA', label: 'Transferencia', icon: '📱', color: 'blue'   },
+    { value: 'CONSIGNACION',  label: 'Consignación',  icon: '🏦', color: 'violet' },
 ];
 
 const COLOR_MAP: Record<string, { active: string; inactive: string }> = {
-    emerald: { active: 'bg-emerald-500 border-emerald-500 text-white', inactive: 'border-slate-200 text-slate-600 hover:border-emerald-400' },
-    blue:    { active: 'bg-blue-500 border-blue-500 text-white',       inactive: 'border-slate-200 text-slate-600 hover:border-blue-400'    },
-    violet:  { active: 'bg-violet-600 border-violet-600 text-white',   inactive: 'border-slate-200 text-slate-600 hover:border-violet-400'  },
-    amber:   { active: 'bg-amber-500 border-amber-500 text-white',     inactive: 'border-slate-200 text-slate-600 hover:border-amber-400'   },
-    rose:    { active: 'bg-rose-500 border-rose-500 text-white',       inactive: 'border-slate-200 text-slate-600 hover:border-rose-400'    },
+    blue:   { active: 'bg-blue-500 border-blue-500 text-white',     inactive: 'border-slate-200 text-slate-600 hover:border-blue-400'   },
+    violet: { active: 'bg-violet-600 border-violet-600 text-white', inactive: 'border-slate-200 text-slate-600 hover:border-violet-400' },
 };
 
 const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
@@ -64,28 +60,36 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
     const [valor, setValor]         = useState('');
     const [comprobante, setComprobante] = useState('');
     const [fechaPago, setFechaPago] = useState('');
-    const [numeroCheque, setNumeroCheque] = useState('');
     const [saving, setSaving]       = useState(false);
 
-    // Precargar si ya estaba conciliado
+    // Precargar datos: si ya está conciliado usa esos valores,
+    // si es nueva conciliación pre-carga desde los datos de pago de la factura
     useEffect(() => {
         if (isOpen && invoice) {
-            setFormaPago((invoice.forma_pago as FormaPago) || (invoice.es_devolucion ? 'DEVOLUCION' : ''));
-            setBanco(invoice.banco || '');
-            setValor(invoice.valor != null ? String(invoice.valor) : '');
-            setComprobante(invoice.comprobante || '');
-            setFechaPago(invoice.fecha_pago ? invoice.fecha_pago.slice(0, 10) : new Date().toISOString().slice(0, 10));
-            setNumeroCheque(invoice.numero_cheque || '');
+            const yaConciliado = !!invoice.conciliation_id;
+            if (yaConciliado) {
+                setFormaPago((invoice.forma_pago as FormaPago) || '');
+                setBanco(invoice.banco || '');
+                setValor(invoice.valor != null ? String(invoice.valor) : '');
+                setComprobante(invoice.comprobante || '');
+                setFechaPago(invoice.fecha_pago ? invoice.fecha_pago.slice(0, 10) : new Date().toISOString().slice(0, 10));
+                setNumeroCheque(invoice.numero_cheque || '');
+            } else {
+                // Nueva conciliación — pre-cargar desde datos de pago de la factura
+                setFormaPago('TRANSFERENCIA');
+                setBanco(invoice.invoice_banco || '');
+                setValor(invoice.invoice_value != null ? String(invoice.invoice_value) : '');
+                setComprobante('');
+                setFechaPago(new Date().toISOString().slice(0, 10));
+                setNumeroCheque('');
+            }
         }
     }, [isOpen, invoice]);
 
     if (!isOpen) return null;
 
-    const isDevolucion  = formaPago === 'DEVOLUCION';
-    const needsCheque   = formaPago === 'CHEQUE';
-    const needsBanco    = formaPago === 'CONSIGNACION' || formaPago === 'TRANSFERENCIA' || formaPago === 'CHEQUE';
-    const needsValor    = !isDevolucion;
-    const canSave       = formaPago !== '' && (isDevolucion || (valor.trim() !== '' && Number(valor) > 0));
+    const needsBanco = true; // Siempre aplica para transferencia y consignación
+    const canSave    = formaPago !== '' && valor.trim() !== '' && Number(valor) > 0;
 
     const handleSave = async () => {
         if (!canSave) return;
@@ -95,12 +99,11 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                 documentId,
                 invoiceNumber:  invoice.invoice_number,
                 banco:          banco || undefined,
-                valor:          needsValor ? Number(valor) : 0,
+                valor:          Number(valor),
                 comprobante:    comprobante || undefined,
                 fechaPago:      fechaPago || undefined,
                 formaPago:      formaPago as FormaPago,
-                numeroCheque:   needsCheque ? numeroCheque : undefined,
-                esDevolucion:   isDevolucion,
+                esDevolucion:   false,
                 conciliadoPor:  currentUserId,
                 vehiclePlate,
                 conductorId,
@@ -154,17 +157,17 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                         <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
                             Forma de Pago <span className="text-rose-500">*</span>
                         </p>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                             {FORMAS_PAGO.map(fp => {
                                 const active = formaPago === fp.value;
                                 return (
                                     <button
                                         key={fp.value}
                                         onClick={() => setFormaPago(fp.value)}
-                                        className={`flex flex-col items-center gap-1 py-3 rounded-2xl border-2 transition-all text-[8px] font-black uppercase tracking-wide
+                                        className={`flex flex-col items-center gap-1.5 py-4 rounded-2xl border-2 transition-all text-[9px] font-black uppercase tracking-wide
                                             ${COLOR_MAP[fp.color][active ? 'active' : 'inactive']}`}
                                     >
-                                        <span className="text-lg">{fp.icon}</span>
+                                        <span className="text-2xl">{fp.icon}</span>
                                         {fp.label}
                                     </button>
                                 );
@@ -173,67 +176,47 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                     </div>
 
                     {/* Valor */}
-                    {!isDevolucion && (
-                        <div>
-                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                                Valor Recaudado <span className="text-rose-500">*</span>
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">$</span>
-                                <input
-                                    type="number" min={0} step="0.01"
-                                    value={valor}
-                                    onChange={e => setValor(e.target.value)}
-                                    placeholder="0"
-                                    className="w-full pl-7 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-2xl text-sm font-black text-slate-900 outline-none transition-all"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Banco (cuando aplica) */}
-                    {needsBanco && (
-                        <div>
-                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Banco</label>
+                    <div>
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                            Valor Recaudado <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">$</span>
                             <input
-                                type="text"
-                                value={banco}
-                                onChange={e => setBanco(e.target.value)}
-                                placeholder="Ej: Bancolombia, Davivienda..."
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
+                                type="number" min={0} step="0.01"
+                                value={valor}
+                                onChange={e => setValor(e.target.value)}
+                                placeholder="0"
+                                className="w-full pl-7 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-2xl text-sm font-black text-slate-900 outline-none transition-all"
                             />
                         </div>
-                    )}
+                    </div>
 
-                    {/* No. Cheque */}
-                    {needsCheque && (
-                        <div>
-                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">No. Cheque</label>
-                            <input
-                                type="text"
-                                value={numeroCheque}
-                                onChange={e => setNumeroCheque(e.target.value)}
-                                placeholder="Número del cheque"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-amber-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
-                            />
-                        </div>
-                    )}
+                    {/* Banco */}
+                    <div>
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Banco / Entidad</label>
+                        <input
+                            type="text"
+                            value={banco}
+                            onChange={e => setBanco(e.target.value)}
+                            placeholder="Ej: Bancolombia, Davivienda..."
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
+                        />
+                    </div>
 
                     {/* Comprobante */}
-                    {!isDevolucion && (
-                        <div>
-                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                                No. Comprobante / Referencia
-                            </label>
-                            <input
-                                type="text"
-                                value={comprobante}
-                                onChange={e => setComprobante(e.target.value)}
-                                placeholder="Ej: 0012345678, REF-987..."
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-slate-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
-                            />
-                        </div>
-                    )}
+                    <div>
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                            No. Comprobante / Referencia
+                        </label>
+                        <input
+                            type="text"
+                            value={comprobante}
+                            onChange={e => setComprobante(e.target.value)}
+                            placeholder="Ej: 0012345678, REF-987..."
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-slate-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
+                        />
+                    </div>
 
                     {/* Fecha de pago */}
                     <div>
@@ -245,15 +228,6 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-slate-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
                         />
                     </div>
-
-                    {/* Nota de devolución */}
-                    {isDevolucion && (
-                        <div className="bg-rose-50 border border-rose-100 rounded-2xl px-4 py-3">
-                            <p className="text-[10px] font-bold text-rose-700 leading-relaxed">
-                                🔄 Esta factura se marcará como <strong>devolución</strong>. No se registrará valor de pago.
-                            </p>
-                        </div>
-                    )}
                 </div>
 
                 {/* Footer */}

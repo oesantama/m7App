@@ -82,7 +82,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
 
         const doc = docRes.rows[0];
 
-        // Facturas únicas del documento con sus ítems
+        // Facturas únicas del documento con sus ítems y datos de pago precargados
         const invoicesRes = await pool.query(`
             SELECT
                 di.invoice                                  AS invoice_number,
@@ -103,11 +103,16 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 ic.conductor_name,
                 ic.vehicle_plate,
                 ic.created_at                               AS conciliado_at,
-                u.name                                      AS conciliado_por_nombre
+                u.name                                      AS conciliado_por_nombre,
+                -- Valor e información de pago pre-cargada desde document_l_payments
+                MAX(p.vmetodo)                              AS invoice_value,
+                MAX(p.metodo_pago)                          AS invoice_banco
             FROM document_items di
             LEFT JOIN invoice_conciliations ic
                 ON ic.document_id = $1 AND ic.invoice_number = di.invoice
             LEFT JOIN users u ON u.id = ic.conciliado_por
+            LEFT JOIN document_l_payments p
+                ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
             WHERE di.document_id = $1
               AND di.invoice IS NOT NULL
               AND di.invoice <> ''
