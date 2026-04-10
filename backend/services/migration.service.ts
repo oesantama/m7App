@@ -150,7 +150,7 @@ const healSchema = async (client: any) => {
     // document_l_payments: lookup por invoice en join de facturas
     `CREATE INDEX IF NOT EXISTS idx_document_l_payments_invoice ON document_l_payments (invoice)`,
     // invoice_conciliations: filtros por placa y fecha
-    `CREATE INDEX IF NOT EXISTS idx_invoice_conciliations_plate ON invoice_conciliations (plate)`,
+    `CREATE INDEX IF NOT EXISTS idx_invoice_conciliations_plate ON invoice_conciliations (vehicle_plate)`,
     `CREATE INDEX IF NOT EXISTS idx_invoice_conciliations_created_at ON invoice_conciliations (created_at DESC)`,
     // grupo_inter: join entre pedidos e ítems/historico (getOrders usa CTEs sobre estas)
     `CREATE INDEX IF NOT EXISTS idx_grupo_inter_items_pedido_id ON grupo_inter_pedidos_items (pedido_id)`,
