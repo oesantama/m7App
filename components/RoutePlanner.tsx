@@ -258,17 +258,43 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         map.fitBounds(L.latLngBounds(points), { padding: [24, 24] });
 
         // Intentar ruta real por calles via OSRM
+        // OSRM público limita a ~10 waypoints por petición → chunking para rutas largas
+        const MAX_WP_PER_CALL = 9; // 9 stops + 1 overlap = 10 per chunk
+        const wpArray = points.map(p => ({ lat: p.lat, lng: p.lng }));
+        let allCoords: [number, number][] = [];
+        let osrmOk = false;
+
         try {
-          const waypoints = points.map(p => ({ lat: p.lat, lng: p.lng }));
-          const roadData = await api.getRoadRoute(waypoints);
-          if (!cancelled && roadData?.coordinates?.length > 1) {
-            const latlngs = roadData.coordinates.map(([lng, lat]: [number, number]) => L.latLng(lat, lng));
+          if (wpArray.length <= MAX_WP_PER_CALL + 1) {
+            // Ruta corta: una sola llamada
+            const roadData = await api.getRoadRoute(wpArray);
+            if (roadData?.coordinates?.length > 1) {
+              allCoords = roadData.coordinates;
+              osrmOk = true;
+            }
+          } else {
+            // Ruta larga: dividir en chunks con overlap de 1 punto
+            for (let ci = 0; ci < wpArray.length - 1; ci += MAX_WP_PER_CALL) {
+              const chunk = wpArray.slice(ci, ci + MAX_WP_PER_CALL + 1);
+              try {
+                const rd = await api.getRoadRoute(chunk);
+                if (rd?.coordinates?.length > 1) {
+                  allCoords = [...allCoords, ...rd.coordinates];
+                  osrmOk = true;
+                } else { osrmOk = false; break; }
+              } catch { osrmOk = false; break; }
+            }
+          }
+        } catch { osrmOk = false; }
+
+        if (!cancelled) {
+          if (osrmOk && allCoords.length > 1) {
+            const latlngs = allCoords.map(([lng, lat]: [number, number]) => L.latLng(lat, lng));
             L.polyline(latlngs, { color: dotColor, weight: 3.5, opacity: 0.85 }).addTo(map);
           } else {
+            // Fallback: línea recta entre paradas (indicado con guiones)
             L.polyline(points, { color: dotColor, weight: 2.5, opacity: 0.7, dashArray: '8,5' }).addTo(map);
           }
-        } catch {
-          if (!cancelled) L.polyline(points, { color: dotColor, weight: 2.5, opacity: 0.7, dashArray: '8,5' }).addTo(map);
         }
       }
       routePreviewMapRef.current = map;
@@ -554,6 +580,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const lng = Number(inv.lng || 0);
         // @ts-ignore
         inv.hasDefaultCoords = (lat === 0 && lng === 0) || hasDefaultCoords(lat, lng);
+
+        // MEJORA 7: Zona geográfica para evitar zigzag entre corredores
+        // Valle de Aburrá: norte (Bello/Copacabana+) → centro (Medellín) → sur (Itagüí/Envigado/Caldas+)
+        const cUpper = (inv as any).cityKey || '';
+        const northCities = ['BELLO', 'COPACABANA', 'GIRARDOTA', 'BARBOSA', 'DONMATÍAS', 'DON MATÍAS', 'SANTO DOMINGO'];
+        const southCities = ['ITAGÜÍ', 'ITAGUI', 'SABANETA', 'LA ESTRELLA', 'CALDAS', 'ENVIGADO', 'EL RETIRO'];
+        let geoZone = 'CENTRO';
+        if (northCities.some(c => cUpper.includes(c)) || lat > 6.32) geoZone = 'NORTE';
+        else if (southCities.some(c => cUpper.includes(c)) || lat < 6.13) geoZone = 'SUR';
+        else if (lat > 6.27) geoZone = 'CENTRO_NORTE';
+        // @ts-ignore
+        inv.geoZone = geoZone;
       });
 
       // 3. Ordenamiento Global
@@ -602,10 +640,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         let currentLng = ORBIT_HUB_ORIGIN.lng;
         let stopIndex = 0; // Para estimación de ventana horaria (MEJORA 3)
 
+        // MEJORA 7: rastrear zona dominante de la carga actual
+        const loadZoneCounts: Record<string, number> = {};
+
         let i = 0;
         while (i < availableInvoices.length && currentLoadVolume < targetMaxCapacity) {
           let bestNextIdx = -1;
           let minDist = Infinity;
+
+          // Zona dominante: calculada solo cuando hay >= 2 paradas cargadas
+          const dominantZone = load.length >= 2
+            ? Object.entries(loadZoneCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+            : null;
 
           for (let j = 0; j < availableInvoices.length; j++) {
               const inv = availableInvoices[j];
@@ -645,7 +691,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   // @ts-ignore
                   const cKey = inv.cityKey || '';
                   const affinityBonus = (targetCity && cKey === targetCity) ? 0.8 : 1.0;
-                  const finalDist = dist * affinityBonus;
+
+                  // MEJORA 7: Penalizar cambio de zona geográfica (evita zigzag norte↔sur)
+                  // @ts-ignore
+                  const invZone = (inv as any).geoZone || 'CENTRO';
+                  const zonePenalty = (dominantZone && invZone !== dominantZone) ? 2.5 : 1.0;
+
+                  const finalDist = dist * affinityBonus * zonePenalty;
 
                   if (finalDist < minDist) {
                       minDist = finalDist;
@@ -662,6 +714,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               currentLng = Number(inv.lng || currentLng);
               availableInvoices.splice(bestNextIdx, 1);
               stopIndex++;
+              // MEJORA 7: registrar zona de la parada añadida
+              // @ts-ignore
+              const addedZone = (inv as any).geoZone || 'CENTRO';
+              loadZoneCounts[addedZone] = (loadZoneCounts[addedZone] || 0) + 1;
               i = 0;
           } else {
               break;
@@ -1574,102 +1630,99 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   return (
     <div className="flex flex-col gap-4 min-h-screen animate-in fade-in duration-500 pb-20">
       {/* HEADER COMPACTO */}
-      <div className="bg-white p-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col xl:flex-row justify-between items-center gap-4 shrink-0 transition-all">
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto justify-center">
-          <div className="w-12 h-12 bg-slate-950 text-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
-            <Icons.Route className="w-6 h-6" />
+      <div className="bg-white p-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col gap-3 shrink-0 transition-all">
+        {/* Fila 1: icono + título + KPIs */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-10 h-10 bg-slate-950 text-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
+            <Icons.Route className="w-5 h-5" />
           </div>
-          <div className="space-y-1 text-center md:text-left">
-            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">OrbitM7 Intelligence</h2>
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+          <div className="flex flex-col min-w-0">
+            <h2 className="text-base sm:text-xl font-black text-slate-900 tracking-tighter uppercase leading-none">OrbitM7 Intelligence</h2>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <span className="px-2 py-0.5 bg-emerald-500 text-slate-950 rounded-md text-[8px] font-black uppercase tracking-widest shadow-sm">Optimización 90%</span>
               <select
                 value={selectedClient}
                 onChange={(e) => { setSelectedClient(e.target.value); setSuggestedRoutes([]); }}
-                className="bg-slate-50 border border-slate-200 px-3 py-0.5 rounded-md text-[9px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm"
+                className="bg-slate-50 border border-slate-200 px-3 py-0.5 rounded-md text-[9px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm max-w-[160px]"
               >
                 {isSuperAdmin && <option value="GLOBAL">FLOTA GLOBAL ORBIT</option>}
                 {allowedClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+            </div>
+          </div>
 
-              {/* KPI BADGES INTEGRADOS (V2) */}
-              <div className="flex items-center gap-1.5 ml-2 border-l border-slate-200 pl-4 h-6">
-                <div className="flex flex-col items-center">
-                  <p className="text-[12px] font-black text-slate-900 leading-none">{validInvoices.length}</p>
-                  <p className="text-[6px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">Aptas</p>
-                </div>
-                <div className="w-px h-4 bg-slate-100 mx-1"></div>
-                <div className="flex flex-col items-center">
-                  <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.onBase}</p>
-                  <p className="text-[6px] font-black text-blue-500 uppercase tracking-widest mt-0.5">Base</p>
-                </div>
-                <div className="w-px h-4 bg-slate-100 mx-1"></div>
-                <div className="flex flex-col items-center">
-                  <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.assigned}</p>
-                  <p className="text-[6px] font-black text-indigo-500 uppercase tracking-widest mt-0.5">Asig</p>
-                </div>
-                <div className="w-px h-4 bg-slate-100 mx-1"></div>
-                <div className="flex flex-col items-center">
-                  <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.inRoute}</p>
-                  <p className="text-[6px] font-black text-amber-500 uppercase tracking-widest mt-0.5">Ruta</p>
-                </div>
-              </div>
+          {/* KPI BADGES */}
+          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3 ml-auto shrink-0">
+            <div className="flex flex-col items-center">
+              <p className="text-[12px] font-black text-slate-900 leading-none">{validInvoices.length}</p>
+              <p className="text-[6px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">Aptas</p>
+            </div>
+            <div className="w-px h-4 bg-slate-100 mx-1"></div>
+            <div className="flex flex-col items-center">
+              <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.onBase}</p>
+              <p className="text-[6px] font-black text-blue-500 uppercase tracking-widest mt-0.5">Base</p>
+            </div>
+            <div className="w-px h-4 bg-slate-100 mx-1"></div>
+            <div className="flex flex-col items-center">
+              <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.assigned}</p>
+              <p className="text-[6px] font-black text-indigo-500 uppercase tracking-widest mt-0.5">Asig</p>
+            </div>
+            <div className="w-px h-4 bg-slate-100 mx-1"></div>
+            <div className="flex flex-col items-center">
+              <p className="text-[12px] font-black text-slate-900 leading-none">{fleetGeneralMetrics.inRoute}</p>
+              <p className="text-[6px] font-black text-amber-500 uppercase tracking-widest mt-0.5">Ruta</p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center gap-2 w-full xl:w-auto">
-          <div className="bg-slate-100 p-1 rounded-2xl flex shadow-inner h-10 relative w-full md:w-auto">
-            <button onClick={() => setViewMode('intelligence')} className={`flex-1 md:flex-none px-6 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewMode === 'intelligence' ? 'text-slate-900' : 'text-slate-400'}`}>Sugerencias de Ruta</button>
-            <div className="absolute top-1 bottom-1 left-1 w-[calc(100%-8px)] bg-white rounded-xl shadow-md transition-all"></div>
-          </div>
-
-          <div className="relative group">
+        {/* Fila 2: controles de acción — scroll horizontal en móvil */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1" style={{ scrollbarWidth: 'none' }}>
+          <div className="relative shrink-0 group">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Icons.Search className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+              <Icons.Search className="h-3.5 w-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
             </div>
             <input
               type="text"
-              placeholder="Buscar placa o conductor..."
+              placeholder="Placa o conductor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-white border-0 rounded-2xl pl-10 pr-4 py-3 text-[10px] font-bold uppercase tracking-wide focus:ring-2 focus:ring-indigo-500 shadow-sm w-48 md:w-64"
+              className="bg-slate-50 border border-slate-100 rounded-xl pl-9 pr-3 py-2.5 text-[10px] font-bold uppercase tracking-wide focus:ring-2 focus:ring-indigo-500 shadow-sm w-36 sm:w-52 shrink-0"
             />
           </div>
 
           <button
-            onClick={handleGeneralReadjustment}
-            disabled={isOptimizing || suggestedRoutes.length === 0}
-            className="w-full md:w-auto px-4 py-3 bg-amber-50 text-amber-600 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap"
+            onClick={() => runOrbitOptimization(undefined)}
+            disabled={isOptimizing || validInvoices.length === 0}
+            className="shrink-0 bg-slate-900 text-emerald-500 px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-[0.15em] shadow-xl hover:bg-emerald-500 hover:text-slate-900 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 whitespace-nowrap"
           >
-            REAJUSTE
+            {isOptimizing ? <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent animate-spin rounded-full"></div> : <Icons.Scan className="w-3.5 h-3.5" />}
+            {isOptimizing ? '...' : (suggestedRoutes.length > 0 ? 'RECALCULAR' : 'GENERAR')}
           </button>
 
           <button
             onClick={handleMassAssign}
             disabled={isSaving || suggestedRoutes.length === 0}
-            className="w-full md:w-auto bg-emerald-500 text-slate-950 px-6 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-xl hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 disabled:opacity-20 active:scale-95 whitespace-nowrap"
+            className="shrink-0 bg-emerald-500 text-slate-950 px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-xl hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 disabled:opacity-20 active:scale-95 whitespace-nowrap"
           >
-            <Icons.CheckCircle className="w-4 h-4" />
+            <Icons.CheckCircle className="w-3.5 h-3.5" />
             {isSaving ? '...' : 'CONFIRMAR TODO'}
+          </button>
+
+          <button
+            onClick={handleGeneralReadjustment}
+            disabled={isOptimizing || suggestedRoutes.length === 0}
+            className="shrink-0 px-4 py-2.5 bg-amber-50 text-amber-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap"
+          >
+            REAJUSTE
           </button>
 
           <button
             onClick={() => setManualRouteModal(true)}
             disabled={remainingVehicles.length === 0}
-            className="w-full md:w-auto px-4 py-3 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap flex items-center gap-2"
+            className="shrink-0 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap flex items-center gap-1.5"
           >
             <Icons.Plus className="w-3 h-3" />
             RUTA MANUAL
-          </button>
-
-          <button
-            onClick={() => runOrbitOptimization(undefined)}
-            disabled={isOptimizing || validInvoices.length === 0}
-            className="w-full md:w-auto bg-slate-900 text-emerald-500 px-6 py-3 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-500 hover:text-slate-900 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95 whitespace-nowrap"
-          >
-            {isOptimizing ? <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent animate-spin rounded-full"></div> : <Icons.Scan className="w-4 h-4" />}
-            {isOptimizing ? '...' : (suggestedRoutes.length > 0 ? 'RECALCULAR' : 'GENERAR')}
           </button>
         </div>
       </div>

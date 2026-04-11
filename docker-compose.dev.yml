@@ -28,17 +28,16 @@ services:
       - NODE_OPTIONS=--max-old-space-size=1024
     volumes:
       # Montar código fuente del backend en el contenedor
-      - ./backend:/app/backend
+      - ./backend:/app/backend:z
       # Montar tipos y servicios compartidos
-      - ./types.ts:/app/types.ts
-      - ./services:/app/services
-      - ./utils:/app/utils
-      - ./config:/app/config
+      - ./types.ts:/app/types.ts:z
+      - ./services:/app/services:z
+      - ./utils:/app/utils:z
+      - ./config:/app/config:z
       # Preservar node_modules del contenedor (no sobrescribir con el host)
       - /app/node_modules
       # .env y WhatsApp auth
-      - ./.env:/app/.env
-      - ./.wwebjs_auth:/app/.wwebjs_auth
+      - ./.env:/app/.env:z
     restart: unless-stopped
     depends_on:
       postgres:
@@ -68,21 +67,21 @@ services:
       - NODE_OPTIONS=--max-old-space-size=1024
     volumes:
       # Montar TODO el código fuente frontend
-      - ./components:/app/components
-      - ./pages:/app/pages
-      - ./services:/app/services
-      - ./stores:/app/stores
-      - ./utils:/app/utils
-      - ./config:/app/config
-      - ./hooks:/app/hooks
-      - ./types.ts:/app/types.ts
-      - ./constants.tsx:/app/constants.tsx
+      - ./components:/app/components:z
+      - ./pages:/app/pages:z
+      - ./services:/app/services:z
+      - ./stores:/app/stores:z
+      - ./utils:/app/utils:z
+      - ./config:/app/config:z
+      - ./hooks:/app/hooks:z
+      - ./types.ts:/app/types.ts:z
+      - ./constants.tsx:/app/constants.tsx:z
       # Archivos de configuración raíz
-      - ./vite.config.ts:/app/vite.config.ts
-      - ./tailwind.config.ts:/app/tailwind.config.ts
-      - ./tsconfig.json:/app/tsconfig.json
-      - ./index.html:/app/index.html
-      - ./src:/app/src
+      - ./vite.config.ts:/app/vite.config.ts:z
+      - ./tailwind.config.ts:/app/tailwind.config.ts:z
+      - ./tsconfig.json:/app/tsconfig.json:z
+      - ./index.html:/app/index.html:z
+      - ./src:/app/src:z
       # Preservar node_modules del contenedor
       - /app/node_modules
     depends_on:
@@ -95,7 +94,7 @@ services:
   # POSTGRES — misma instancia para dev y prod
   # ─────────────────────────────────────────────
   postgres:
-    image: postgres:15-alpine
+    image: docker.io/library/postgres:15-alpine
     restart: unless-stopped
     ports:
       - "5432:5432"
