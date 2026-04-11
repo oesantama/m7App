@@ -81,7 +81,7 @@ export const initDispatch = async (req: Request, res: Response) => {
              WHERE a.driver_id = $1 AND a.is_active = true LIMIT 1`,
             [driverId]
           );
-          const vehiclePlate = vehicleRes.rows[0]?.plate || vehicleId || 'S/P';
+          const vehiclePlate = vehicleRes.rows[0]?.plate || 'S/P';
           const driverName   = vehicleRes.rows[0]?.driver_name || createdBy || 'S/C';
 
           // Obtener ruta activa para esta factura
