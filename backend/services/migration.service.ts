@@ -52,12 +52,131 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'training_attendance': ['session_id', 'full_name', 'document_number', 'job_title', 'signature_b64', 'registered_at'],
   'geocoding_cache': ['address_key', 'address', 'city', 'lat', 'lng', 'created_at'],
   'payment_vouchers': ['invoice_id', 'dispatch_id', 'file_hash', 'file_name', 'file_type', 'file_data', 'payment_type', 'amount', 'bank_name', 'notes', 'uploaded_by', 'verified', 'verified_by', 'verified_at', 'created_at'],
-  'invoice_conciliations': ['document_id', 'invoice_number', 'banco', 'valor', 'comprobante', 'fecha_pago', 'forma_pago', 'numero_cheque', 'es_devolucion', 'conciliado_por', 'vehicle_plate', 'conductor_id', 'conductor_name', 'created_at', 'updated_at']
+  'invoice_conciliations': ['document_id', 'invoice_number', 'banco', 'valor', 'comprobante', 'fecha_pago', 'forma_pago', 'numero_cheque', 'es_devolucion', 'conciliado_por', 'vehicle_plate', 'conductor_id', 'conductor_name', 'created_at', 'updated_at'],
+
+  // ─── INVENTARIO DE VEHÍCULO ────────────────────────────────────────────────
+  // Stock actual por vehículo/conductor tras despacho. Se suma al cargar y se resta al entregar/devolver.
+  'vehicle_inventory': [
+    'vehicle_plate',    // placa del vehículo
+    'driver_id',        // conductor activo
+    'driver_name',      // nombre conductor (desnorm. para consultas rápidas)
+    'article_id',       // SKU del artículo
+    'article_name',     // nombre artículo (desnorm.)
+    'batch',            // lote
+    'client_id',        // cliente al que pertenece la mercancía
+    'quantity',         // cantidad actual en el vehículo
+    'route_id',         // ruta activa de referencia
+    'last_updated',     // última modificación
+    'last_user'         // quién hizo el último movimiento
+  ],
+
+  // ─── HISTÓRICO DE ASIGNACIÓN A RUTA (por artículo) ────────────────────────
+  // Registro inmutable de qué artículos/facturas se cargaron en cada ruta.
+  // Permite auditar lo que salió de bodega hacia cada vehículo.
+  'route_assignment_items': [
+    'route_id',         // ruta (FK routes)
+    'document_id',      // documento L de origen
+    'invoice',          // factura/remisión
+    'article_id',       // SKU
+    'article_name',     // nombre artículo (desnorm.)
+    'batch',            // lote
+    'client_id',        // cliente
+    'vehicle_plate',    // placa
+    'driver_id',        // conductor
+    'driver_name',      // nombre conductor
+    'assigned_qty',     // cantidad asignada al vehículo
+    'unit',             // unidad de medida
+    'customer_name',    // destinatario
+    'city',             // ciudad destino
+    'address',          // dirección destino
+    'assigned_by',      // usuario que confirmó despacho
+    'assigned_at',      // fecha/hora de asignación
+    'notes'             // observaciones
+  ],
+
+  // ─── DEVOLUCIONES A PROVEEDOR ─────────────────────────────────────────────
+  // Cabecera: cuando bodega devuelve mercancía al proveedor/origen.
+  // Descuenta de inventario_clientes.
+  'supplier_returns': [
+    'client_id',         // cliente dueño del inventario
+    'vehicle_plate',     // vehículo desde donde viene (si aplica)
+    'reference',         // referencia/remisión del proveedor
+    'return_reason',     // motivo de devolución
+    'total_items',       // número de artículos distintos
+    'total_qty',         // cantidad total devuelta
+    'status',            // borrador | confirmada | anulada
+    'notes',             // observaciones generales
+    'created_by',        // usuario que registró
+    'confirmed_by',      // usuario que confirmó
+    'created_at',        // fecha creación
+    'confirmed_at'       // fecha confirmación
+  ],
+
+  // ─── DETALLE DE DEVOLUCIONES A PROVEEDOR ──────────────────────────────────
+  'supplier_return_items': [
+    'return_id',         // FK supplier_returns
+    'article_id',        // SKU
+    'article_name',      // nombre artículo
+    'batch',             // lote
+    'quantity',          // cantidad devuelta
+    'unit',              // unidad
+    'notes'              // observación por ítem
+  ],
+
+  // ─── CABECERA DE CONCILIACIÓN ─────────────────────────────────────────────
+  // Una conciliación por conductor/vehículo/fecha. Agrupa todas las facturas del día.
+  // Valida: lo entregado vs lo recaudado vs lo devuelto vs lo en repique.
+  'conciliation_headers': [
+    'route_id',              // ruta de referencia
+    'vehicle_plate',         // placa
+    'driver_id',             // conductor
+    'driver_name',           // nombre conductor
+    'conciliation_date',     // fecha de cierre
+    'total_invoices',        // total facturas asignadas
+    'total_delivered',       // facturas entregadas (FULL)
+    'total_partial',         // facturas con entrega parcial
+    'total_returned',        // facturas devueltas totalmente
+    'total_repique',         // facturas en repique
+    'total_collected',       // valor total recaudado ($)
+    'total_pending_collect', // valor pendiente por recaudar ($)
+    'total_to_return',       // valor mercancía devuelta a bodega ($)
+    'status',                // borrador | cerrada | aprobada
+    'notes',                 // observaciones generales
+    'created_by',            // quien hizo la conciliación
+    'approved_by',           // quien aprobó
+    'created_at',
+    'updated_at',
+    'approved_at'
+  ],
+
+  // ─── TRANSACCIONES DE CONCILIACIÓN ────────────────────────────────────────
+  // Detalle por factura dentro de una conciliación: qué pasó con cada una.
+  'conciliation_transactions': [
+    'conciliation_id',      // FK conciliation_headers
+    'document_id',          // documento L
+    'invoice',              // factura/remisión
+    'article_id',           // artículo (si aplica desglose por ítem)
+    'customer_name',        // destinatario
+    'city',                 // ciudad
+    'transaction_type',     // entrega | devolucion | repique | parcial | pago
+    'delivery_qty',         // cantidad entregada
+    'returned_qty',         // cantidad devuelta
+    'repique_qty',          // cantidad en repique
+    'invoice_value',        // valor de la factura ($)
+    'collected_value',      // valor recaudado ($)
+    'payment_method',       // forma de pago
+    'payment_ref',          // referencia de pago
+    'banco',                // banco (si transferencia/cheque)
+    'comprobante',          // número de comprobante
+    'return_reason',        // motivo de devolución
+    'notes',                // observaciones
+    'created_at'
+  ]
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
@@ -94,7 +213,7 @@ const healSchema = async (client: any) => {
           let type = 'TEXT';
           if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at' || col === 'f_ultimo_corte' || col === 'fecha_carge' || col === 'fecha_entregado' || col === 'create_at' || col === 'update_at') type = 'TIMESTAMP WITH TIME ZONE';
           if (col === 'permissions' || col.endsWith('_ids') || col.includes('items') || col === 'scanned_items' || col === 'helper_ids' || col === 'recent_assignments' || col === 'record_data' || col === 'history') type = 'JSONB';
-          if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod') type = 'NUMERIC DEFAULT 0';
+          if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repique' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repique_qty' || col === 'invoice_value' || col === 'collected_value') type = 'NUMERIC DEFAULT 0';
           if (col === 'client_ids') type = 'TEXT[]';
           if (col === 'permissions' || col === 'record_data') type = 'JSONB';
           if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved') || col === 'aceptapolitica' || col === 'aprobada' || col === 'signed' || col === 'es_devolucion') type = 'BOOLEAN DEFAULT FALSE';
@@ -157,6 +276,28 @@ const healSchema = async (client: any) => {
     `CREATE INDEX IF NOT EXISTS idx_grupo_inter_historico_pedido_id ON grupo_inter_pedidos_historico (pedido_id)`,
     `CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_f_ultimo_corte ON grupo_inter_pedidos (f_ultimo_corte DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_estado ON grupo_inter_pedidos (estado)`,
+    // document_items: item_status para filtro planificador (solo pendiente/repique)
+    `CREATE INDEX IF NOT EXISTS idx_document_items_item_status ON document_items (item_status)`,
+    // vehicle_inventory: consultas por placa y artículo
+    `CREATE INDEX IF NOT EXISTS idx_vehicle_inventory_plate       ON vehicle_inventory (vehicle_plate)`,
+    `CREATE INDEX IF NOT EXISTS idx_vehicle_inventory_article     ON vehicle_inventory (article_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_vehicle_inventory_plate_art   ON vehicle_inventory (vehicle_plate, article_id, batch)`,
+    // route_assignment_items: búsquedas por ruta y factura
+    `CREATE INDEX IF NOT EXISTS idx_route_assignment_items_route   ON route_assignment_items (route_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_route_assignment_items_invoice ON route_assignment_items (invoice)`,
+    `CREATE INDEX IF NOT EXISTS idx_route_assignment_items_plate   ON route_assignment_items (vehicle_plate)`,
+    // supplier_returns: filtro por cliente y fecha
+    `CREATE INDEX IF NOT EXISTS idx_supplier_returns_client_id  ON supplier_returns (client_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_supplier_returns_created_at ON supplier_returns (created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_supplier_return_items_return_id ON supplier_return_items (return_id)`,
+    // conciliation_headers: búsqueda por conductor/fecha
+    `CREATE INDEX IF NOT EXISTS idx_conciliation_headers_plate      ON conciliation_headers (vehicle_plate)`,
+    `CREATE INDEX IF NOT EXISTS idx_conciliation_headers_driver     ON conciliation_headers (driver_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_conciliation_headers_date       ON conciliation_headers (conciliation_date DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_conciliation_transactions_conc  ON conciliation_transactions (conciliation_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_conciliation_transactions_inv   ON conciliation_transactions (invoice)`,
+    // unique: un inventario por vehículo/artículo/lote
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_vehicle_inventory ON vehicle_inventory (vehicle_plate, article_id, batch)`,
   ];
   for (const idxSql of performanceIndexes) {
     try { await client.query(idxSql); } catch (e) {}

@@ -42,6 +42,7 @@ import trainingRoutes from './training.routes.js';
 import inventoryNewsRoutes from './inventory-news.routes.js';
 import grupoInterRoutes from './grupoInter.routes.js';
 import conciliationRoutes from './conciliation.routes.js';
+import inventoryRoutes from './inventory.routes.js';
 
 
 
@@ -89,6 +90,7 @@ router.use('/geocode', geocodeRoutes);
 router.use('/admin/backup', backupRoutes); // DB Backup endpoint
 router.use('/grupo-inter', grupoInterRoutes);
 router.use('/conciliation', conciliationRoutes);
+router.use('/inventory', inventoryRoutes);
 
 export default router;
 

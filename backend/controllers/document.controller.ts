@@ -786,10 +786,10 @@ export const getInvoices = async (req: Request, res: Response) => {
       });
       if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;
     } else if (history !== 'true') {
-      query += ` AND (
-        documents_l.status NOT IN ('Finalizado', 'Entregado', 'ELIMINADO') 
-        OR documents_l.status IS NULL
-      )`;
+      // Planificador: solo facturas pendientes o en repique a bodega
+      // EST-01 = pendiente inicial | EST-15 = repique (devuelto para re-entrega)
+      query += ` AND document_items.item_status IN ('EST-01', 'EST-15')
+        AND documents_l.status NOT IN ('ELIMINADO')`;
     }
 
     query += ` GROUP BY 
