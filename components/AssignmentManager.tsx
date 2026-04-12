@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { Icons, INITIAL_CLIENTS } from '../constants';
-import { Vehicle, Driver, VehicleAssignment, User, VehicleStatus, MasterRecord } from '../types';
+import { Icons } from '../constants';
+import { Vehicle, Driver, VehicleAssignment, User, MasterRecord } from '../types';
 
 interface AssignmentManagerProps {
   vehicles: Vehicle[];
@@ -13,49 +13,37 @@ interface AssignmentManagerProps {
   onEndAssignment: (aId: string) => void;
 }
 
-const AssignmentManager: React.FC<AssignmentManagerProps> = ({ 
-  vehicles, drivers, assignments, user, clients, onAssign, onEndAssignment 
+const AssignmentManager: React.FC<AssignmentManagerProps> = ({
+  vehicles, drivers, assignments, user, clients, onAssign, onEndAssignment
 }) => {
-  // Estado local para almacenar la selección de cliente temporal por cada vehículo (fila)
-  // Clave: vehicleId, Valor: clientId seleccionado
-  const [rowClients, setRowClients] = useState<{[key: string]: string}>({});
-  
-  // Estado local para selección de conductor (fila)
-  const [rowDrivers, setRowDrivers] = useState<{[key: string]: string}>({});
-  const [driverSearch, setDriverSearch] = useState<{[key: string]: string}>({});
-  const [driverDropdownOpen, setDriverDropdownOpen] = useState<{[key: string]: boolean}>({});
-  
-  const [showHistory, setShowHistory] = useState(false);
+  const [rowClients, setRowClients]     = useState<Record<string, string>>({});
+  const [rowDrivers, setRowDrivers]     = useState<Record<string, string>>({});
+  const [driverSearch, setDriverSearch] = useState<Record<string, string>>({});
+  const [driverOpen, setDriverOpen]     = useState<Record<string, boolean>>({});
+  const [showHistory, setShowHistory]   = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
-  
-  // Filtros
   const [filterPlatePending, setFilterPlatePending] = useState('');
   const [filterClientActive, setFilterClientActive] = useState('');
-  const [filterPlateActive, setFilterPlateActive] = useState('');
+  const [filterPlateActive,  setFilterPlateActive]  = useState('');
 
-  // ... (perms and memo logic remains same)
-  const isSuperUser = user.roleId === 'ROL-01';
+  const isSuperUser    = user.roleId === 'ROL-01';
   const assignmentPerms = user.permissions.find(p => p.module === 'PAG-05');
-  const canCreate = isSuperUser || assignmentPerms?.actions.includes('create');
+  const canCreate      = isSuperUser || assignmentPerms?.actions.includes('create');
 
-  // No filtrar por clientId en el frontend por ahora para debuggear visibilidad
-  const activeAssignments = useMemo(() => 
+  const activeAssignments = useMemo(() =>
     assignments.filter(a => {
       const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
       if (!active) return false;
-
-      // Aplicar filtros
       const matchesClient = !filterClientActive || (a.clientId || (a as any).client_id) === filterClientActive;
       const vId = a.vehicleId || (a as any).vehicle_id;
-      const plateStr = (a as any).plate || vehicles.find(veh => veh.id === vId)?.plate || '';
+      const plateStr = (a as any).plate || vehicles.find(v => v.id === vId)?.plate || '';
       const matchesPlate = !filterPlateActive || plateStr.toLowerCase().includes(filterPlateActive.toLowerCase());
-
       return matchesClient && matchesPlate;
     }),
     [assignments, filterClientActive, filterPlateActive, vehicles]
   );
 
-  const historyAssignments = useMemo(() => 
+  const historyAssignments = useMemo(() =>
     assignments.filter(a => {
       const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
       return !active;
@@ -63,64 +51,47 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
     [assignments]
   );
 
-  // Vehículos pendientes: TODOS los que no tienen asignación activa actualmente
-  const pendingVehicles = useMemo(() => 
+  const pendingVehicles = useMemo(() =>
     vehicles.filter(v => {
-      const isPending = !activeAssignments.some(a => (a.vehicleId || (a as any).vehicle_id) === v.id);
-      const matchesPlate = !filterPlatePending || v.plate.toLowerCase().includes(filterPlatePending.toLowerCase());
-      return isPending && matchesPlate;
+      const isPending  = !activeAssignments.some(a => (a.vehicleId || (a as any).vehicle_id) === v.id);
+      const matchPlate = !filterPlatePending || v.plate.toLowerCase().includes(filterPlatePending.toLowerCase());
+      return isPending && matchPlate;
     }),
     [vehicles, activeAssignments, filterPlatePending]
   );
 
-  // Conductores disponibles: TODOS los activos y sin asignación
-  const availableDrivers = useMemo(() => 
-    drivers.filter(d => (d.status === 'Activo' || d.statusId === 'EST-01') && !activeAssignments.some(a => (a.driverId || (a as any).driver_id) === d.id)),
+  const availableDrivers = useMemo(() =>
+    drivers.filter(d =>
+      (d.status === 'Activo' || d.statusId === 'EST-01') &&
+      !activeAssignments.some(a => (a.driverId || (a as any).driver_id) === d.id)
+    ),
     [drivers, activeAssignments]
   );
 
-  const handleAssignClick = (vehicleId: string) => {
-    // Buscar cliente seleccionado para esa fila
-    const selectedClientId = rowClients[vehicleId];
-    const selectedDriverId = rowDrivers[vehicleId];
-    
-    // Si no ha seleccionado conductor
-    if (!selectedDriverId) {
-       alert("Por favor seleccione un CONDUCTOR para asignar.");
-       return;
-    }
-
-    // Si no ha seleccionado cliente, intentar usar el del vehículo o el del conductor como fallback
-    let finalClientId = selectedClientId;
-    if (!finalClientId) {
+  const handleAssign = (vehicleId: string) => {
+    const dId = rowDrivers[vehicleId];
+    if (!dId) { alert('Seleccione un CONDUCTOR.'); return; }
+    let cId = rowClients[vehicleId];
+    if (!cId) {
       const v = vehicles.find(x => x.id === vehicleId);
-      if (v && v.clientId) {
-         finalClientId = v.clientId;
-      } else {
-        alert("Por favor seleccione el CLIENTE para esta operación.");
-        return;
-      }
+      if (v?.clientId) cId = v.clientId;
+      else { alert('Seleccione el CLIENTE.'); return; }
     }
-    
-    onAssign(vehicleId, selectedDriverId, finalClientId);
-    
-    // Limpiar selección de esa fila
-    setRowDrivers(prev => { const n = {...prev}; delete n[vehicleId]; return n; });
-    setRowClients(prev => { const n = {...prev}; delete n[vehicleId]; return n; });
+    onAssign(vehicleId, dId, cId);
+    setRowDrivers(p => { const n = {...p}; delete n[vehicleId]; return n; });
+    setRowClients(p => { const n = {...p}; delete n[vehicleId]; return n; });
   };
 
   const handleAutoSuggest = () => {
     setIsSuggesting(true);
     setTimeout(() => {
       pendingVehicles.forEach(v => {
-        // Buscar última asignación exitosa en historial
-        const lastAssigned = historyAssignments.find(h => h.vehicleId === v.id);
-        if (lastAssigned) {
-          const driverStillAvailable = availableDrivers.find(d => d.id === lastAssigned.driverId);
-          if (driverStillAvailable) {
-             // Usar el mismo cliente que tenía en el historial
-             onAssign(v.id, driverStillAvailable.id, lastAssigned.clientId);
-          }
+        const last = historyAssignments.find(h => (h.vehicleId || (h as any).vehicle_id) === v.id);
+        if (last) {
+          const dId = last.driverId || (last as any).driver_id;
+          const cId = last.clientId || (last as any).client_id;
+          const driverOk = availableDrivers.find(d => d.id === dId);
+          if (driverOk) onAssign(v.id, dId, cId);
         }
       });
       setIsSuggesting(false);
@@ -128,235 +99,291 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in h-full">
-      {/* Barra de Acciones Superior Compacta */}
-      <div className="flex flex-wrap items-center gap-4 bg-white/50 p-4 rounded-3xl border border-slate-100 backdrop-blur-sm">
-        <div className="flex items-center gap-3 px-4 border-r border-slate-200">
-           <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-emerald-500 shadow-lg">
-              <Icons.Link className="w-5 h-5" />
-           </div>
-           <span className="font-black text-slate-800 uppercase tracking-tighter text-sm">Operativa de Vínculos</span>
+    <div className="flex flex-col gap-4 animate-in fade-in">
+
+      {/* ── HEADER ─────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-emerald-500 shadow-md">
+            <Icons.Link className="w-4 h-4" />
+          </div>
+          <span className="font-black text-slate-800 uppercase tracking-tighter text-sm">Operativa de Vínculos</span>
         </div>
 
-        <div className="flex flex-1 gap-2 justify-end">
-            {canCreate && !showHistory && (
-              <button 
-                onClick={handleAutoSuggest}
-                disabled={isSuggesting || pendingVehicles.length === 0}
-                className="bg-emerald-500 text-slate-900 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all flex items-center gap-2 disabled:opacity-30"
-              >
-                {isSuggesting ? <div className="w-3 h-3 border-2 border-slate-900 border-t-transparent animate-spin rounded-full"></div> : <Icons.Scan className="w-4 h-4" />}
-                SUGERIR POR HISTORIAL
-              </button>
-            )}
-
-            <button 
-              onClick={() => setShowHistory(!showHistory)}
-              className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 shadow-lg transition-all"
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          {canCreate && !showHistory && (
+            <button
+              onClick={handleAutoSuggest}
+              disabled={isSuggesting || pendingVehicles.length === 0}
+              className="flex items-center gap-2 bg-emerald-500 text-slate-900 px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md hover:bg-emerald-400 transition-all disabled:opacity-30 whitespace-nowrap"
             >
-              {showHistory ? 'Volver al Plan' : 'Ver Histórico'}
+              {isSuggesting
+                ? <div className="w-3 h-3 border-2 border-slate-900 border-t-transparent animate-spin rounded-full" />
+                : <Icons.Scan className="w-3.5 h-3.5" />}
+              Sugerir por Historial
             </button>
+          )}
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="bg-slate-900 text-white px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-700 shadow-md transition-all whitespace-nowrap"
+          >
+            {showHistory ? 'Volver al Plan' : 'Ver Histórico'}
+          </button>
         </div>
       </div>
 
+      {/* ── CONTENIDO ──────────────────────────────────────────────── */}
+      {!showHistory ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
+          {/* ── COLUMNA PENDIENTES ─────────────────────────── */}
+          <div className="flex flex-col gap-3">
+            {/* Título + filtro */}
+            <div className="flex flex-col gap-2 bg-white rounded-2xl border border-slate-100 p-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Vehículos sin Tripulación
+                </span>
+                <span className="ml-auto bg-slate-100 text-slate-600 text-[9px] font-black px-2 py-0.5 rounded-full">
+                  {pendingVehicles.length}
+                </span>
+              </div>
+              <div className="relative">
+                <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por placa..."
+                  value={filterPlatePending}
+                  onChange={e => setFilterPlatePending(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 pl-9 pr-3 py-2 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
+                />
+              </div>
+            </div>
 
-        {!showHistory ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Columna Pendientes */}
-            <div className="space-y-6">
-              <div className="flex flex-col gap-4 px-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Vehículos sin Tripulación ({pendingVehicles.length})</h3>
-                  <div className="h-1 flex-1 ml-6 bg-slate-100 rounded-full"></div>
+            {/* Lista */}
+            <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
+              {pendingVehicles.length === 0 && (
+                <p className="text-center py-12 text-xs font-bold text-slate-300 uppercase tracking-widest">
+                  Toda la flota está vinculada ✓
+                </p>
+              )}
+              {pendingVehicles.map(v => (
+                <div key={v.id} className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-4 flex flex-col gap-3 hover:border-emerald-400 transition-all group">
+                  {/* Info vehículo */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-100 group-hover:bg-slate-900 rounded-xl flex items-center justify-center font-black text-[10px] text-slate-500 group-hover:text-white transition-all shrink-0">
+                      {v.plate.slice(0, 3)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-black text-slate-900 uppercase text-sm truncate">{v.plate}</p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase">{v.brand} · {v.capacityM3}m³</p>
+                    </div>
+                  </div>
+
+                  {/* Selects + botón */}
+                  <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Cliente */}
+                      <select
+                        value={rowClients[v.id] || v.clientId || ''}
+                        onChange={e => setRowClients(p => ({...p, [v.id]: e.target.value}))}
+                        className="bg-slate-50 border border-slate-200 px-2 py-2.5 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all w-full"
+                      >
+                        <option value="">1. Cliente...</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+
+                      {/* Conductor searchable */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setDriverOpen(p => ({...p, [v.id]: !p[v.id]}))}
+                          className="w-full bg-slate-50 border border-slate-200 px-2 py-2.5 rounded-xl text-[9px] font-black uppercase text-left flex items-center justify-between gap-1 focus:border-emerald-500 transition-all"
+                        >
+                          <span className={`truncate ${rowDrivers[v.id] ? 'text-slate-900' : 'text-slate-400'}`}>
+                            {rowDrivers[v.id]
+                              ? availableDrivers.find(d => d.id === rowDrivers[v.id])?.name?.split(' ')[0] || '2. Conductor...'
+                              : '2. Conductor...'}
+                          </span>
+                          <Icons.ChevronRight className="w-3 h-3 text-slate-400 shrink-0 rotate-90" />
+                        </button>
+                        {driverOpen[v.id] && (
+                          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
+                            <div className="p-2 border-b border-slate-100">
+                              <input
+                                autoFocus
+                                type="text"
+                                placeholder="Buscar..."
+                                value={driverSearch[v.id] || ''}
+                                onChange={e => setDriverSearch(p => ({...p, [v.id]: e.target.value}))}
+                                onClick={e => e.stopPropagation()}
+                                className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px] font-bold uppercase outline-none focus:border-emerald-400"
+                              />
+                            </div>
+                            <div className="max-h-44 overflow-y-auto">
+                              {availableDrivers
+                                .filter(d => d.name.toUpperCase().includes((driverSearch[v.id] || '').toUpperCase()))
+                                .map(d => (
+                                  <button key={d.id} type="button"
+                                    onClick={() => {
+                                      setRowDrivers(p => ({...p, [v.id]: d.id}));
+                                      setDriverOpen(p => ({...p, [v.id]: false}));
+                                      setDriverSearch(p => ({...p, [v.id]: ''}));
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-[9px] font-black uppercase hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                                  >
+                                    {d.name}
+                                  </button>
+                                ))}
+                              {availableDrivers.filter(d => d.name.toUpperCase().includes((driverSearch[v.id] || '').toUpperCase())).length === 0 && (
+                                <p className="px-3 py-3 text-[9px] text-slate-400 font-bold uppercase text-center">Sin resultados</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleAssign(v.id)}
+                      className="w-full bg-slate-900 text-white py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-500 hover:text-slate-900 transition-all shadow-sm"
+                    >
+                      Confirmar Asignación
+                    </button>
+                  </div>
                 </div>
-                {/* Filtro por Placa */}
+              ))}
+            </div>
+          </div>
+
+          {/* ── COLUMNA ACTIVOS ────────────────────────────── */}
+          <div className="flex flex-col gap-3">
+            {/* Título + filtros */}
+            <div className="flex flex-col gap-2 bg-white rounded-2xl border border-emerald-100 p-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-emerald-600 uppercase tracking-widest">
+                  Plan de Operación Activo
+                </span>
+                <span className="ml-auto bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
+                  {activeAssignments.length}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={filterClientActive}
+                  onChange={e => setFilterClientActive(e.target.value)}
+                  className="bg-white border border-emerald-100 px-2 py-2 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
+                >
+                  <option value="">Todos los clientes</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
                 <div className="relative">
-                  <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
+                  <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-400" />
+                  <input
                     type="text"
-                    placeholder="BUSCAR POR PLACA..."
-                    value={filterPlatePending}
-                    onChange={(e) => setFilterPlatePending(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 pl-11 pr-4 py-3 rounded-2xl text-[10px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
+                    placeholder="Placa..."
+                    value={filterPlateActive}
+                    onChange={e => setFilterPlateActive(e.target.value)}
+                    className="w-full bg-white border border-emerald-100 pl-8 pr-2 py-2 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
                   />
                 </div>
               </div>
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {pendingVehicles.map(v => (
-                  <div key={v.id} className="bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col gap-4 group hover:bg-white hover:border-emerald-500 transition-all">
-                    <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 font-black text-xs shadow-sm group-hover:bg-slate-900 group-hover:text-white transition-all shrink-0">{v.plate.slice(0,3)}</div>
-                       <div>
-                          <p className="font-black text-slate-900 uppercase">{v.plate}</p>
-                          <p className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">{v.brand} • {v.capacityM3}m³</p>
-                       </div>
-                    </div>
-                    
-                    {/* CONTROLES DE ASIGNACIÓN EN FILA (USER REQUEST) */}
-                    <div className="flex flex-col gap-2 w-full">
-                        <div className="flex gap-2">
-                            <select 
-                                value={rowClients[v.id] || (v.clientId || '')} 
-                                onChange={(e) => setRowClients(prev => ({...prev, [v.id]: e.target.value}))}
-                                className="flex-1 bg-white border border-slate-200 px-3 py-3 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
-                            >
-                                <option value="">1. CLIENTE...</option>
-                                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-
-                            {/* Conductor searchable dropdown */}
-                            <div className="flex-[1.5] relative">
-                              <button
-                                type="button"
-                                onClick={() => setDriverDropdownOpen(prev => ({...prev, [v.id]: !prev[v.id]}))}
-                                className="w-full bg-white border border-slate-200 px-3 py-3 rounded-xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all text-left flex items-center justify-between"
-                              >
-                                <span className={rowDrivers[v.id] ? 'text-slate-900' : 'text-slate-400'}>
-                                  {rowDrivers[v.id] ? availableDrivers.find(d => d.id === rowDrivers[v.id])?.name || '2. CONDUCTOR...' : '2. CONDUCTOR...'}
-                                </span>
-                                <Icons.ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0 rotate-90" />
-                              </button>
-                              {driverDropdownOpen[v.id] && (
-                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
-                                  <div className="p-2 border-b border-slate-100">
-                                    <input
-                                      autoFocus
-                                      type="text"
-                                      placeholder="Buscar conductor..."
-                                      value={driverSearch[v.id] || ''}
-                                      onChange={(e) => setDriverSearch(prev => ({...prev, [v.id]: e.target.value}))}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px] font-bold uppercase outline-none focus:border-emerald-400"
-                                    />
-                                  </div>
-                                  <div className="max-h-48 overflow-y-auto">
-                                    {availableDrivers
-                                      .filter(d => d.name.toUpperCase().includes((driverSearch[v.id] || '').toUpperCase()))
-                                      .map(d => (
-                                        <button
-                                          key={d.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setRowDrivers(prev => ({...prev, [v.id]: d.id}));
-                                            setDriverDropdownOpen(prev => ({...prev, [v.id]: false}));
-                                            setDriverSearch(prev => ({...prev, [v.id]: ''}));
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-[9px] font-black uppercase hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
-                                        >
-                                          {d.name}
-                                        </button>
-                                      ))
-                                    }
-                                    {availableDrivers.filter(d => d.name.toUpperCase().includes((driverSearch[v.id] || '').toUpperCase())).length === 0 && (
-                                      <p className="px-3 py-3 text-[9px] text-slate-400 font-bold uppercase text-center">Sin resultados</p>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => handleAssignClick(v.id)}
-                            className="w-full bg-slate-900 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
-                        >
-                            Confirmar Asignación
-                        </button>
-                    </div>
-                  </div>
-                ))}
-                {pendingVehicles.length === 0 && <p className="text-center py-10 text-xs font-bold text-slate-300 italic uppercase">Toda la flota está vinculada ✓</p>}
-              </div>
             </div>
 
-            {/* Columna Activos */}
-            <div className="space-y-6">
-              <div className="flex flex-col gap-4 px-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-emerald-500 uppercase tracking-widest">Plan de Operación Activo ({activeAssignments.length})</h3>
-                  <div className="h-1 flex-1 ml-6 bg-emerald-100 rounded-full"></div>
-                </div>
-                {/* Filtros Activos */}
-                <div className="grid grid-cols-2 gap-2">
-                  <select 
-                    value={filterClientActive}
-                    onChange={(e) => setFilterClientActive(e.target.value)}
-                    className="bg-white border border-emerald-100 px-3 py-3 rounded-2xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
-                  >
-                    <option value="">TODOS LOS CLIENTES</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                  <div className="relative">
-                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-emerald-500" />
-                    <input 
-                      type="text"
-                      placeholder="PLACA..."
-                      value={filterPlateActive}
-                      onChange={(e) => setFilterPlateActive(e.target.value)}
-                      className="w-full bg-white border border-emerald-100 pl-8 pr-3 py-3 rounded-2xl text-[9px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
-                    />
+            {/* Lista activos */}
+            <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
+              {activeAssignments.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 gap-2">
+                  <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center">
+                    <Icons.Truck className="w-6 h-6 text-slate-200" />
                   </div>
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Sin vínculos activos</p>
                 </div>
-              </div>
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {activeAssignments.map(a => {
-                  // El API retorna snake_case; el store puede tener camelCase o snake_case
-                  const vId = a.vehicleId || (a as any).vehicle_id;
-                  const dId = a.driverId   || (a as any).driver_id;
-                  const cId = a.clientId   || (a as any).client_id;
-                  // Usar plate/driver_name del API directamente si están disponibles, sino buscar en arrays
-                  const plate      = (a as any).plate      || vehicles.find(veh => veh.id === vId)?.plate      || vId || 'S/P';
-                  const driverName = (a as any).driver_name || drivers.find(drv => drv.id === dId)?.name       || dId || 'S/C';
-                  const clientName = clients.find(c => c.id === cId)?.name || cId || 'S/C';
-                  return (
-                    <div key={a.id} className="bg-white p-6 rounded-3xl border-2 border-emerald-100 shadow-xl flex justify-between items-center group animate-in slide-in-from-right-4 relative overflow-hidden">
-                      <div className="flex items-center gap-6 relative z-10">
-                        <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg"><Icons.Truck /></div>
-                        <div>
-                          <p className="font-black text-slate-900 uppercase text-sm">{plate} <span className="text-emerald-500 mx-2">↔</span> {driverName.split(' ')[0]}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="px-2 py-0.5 bg-slate-900 text-white text-[8px] font-black rounded-md uppercase tracking-wider">
-                              {clientName}
-                            </span>
-                            <p className="text-[9px] text-slate-400 font-black uppercase">Vínculo Activo M7</p>
-                          </div>
-                        </div>
+              )}
+              {activeAssignments.map(a => {
+                const vId = a.vehicleId || (a as any).vehicle_id;
+                const dId = a.driverId  || (a as any).driver_id;
+                const cId = a.clientId  || (a as any).client_id;
+                const plate      = (a as any).plate       || vehicles.find(v => v.id === vId)?.plate || 'S/P';
+                const driverName = (a as any).driver_name || drivers.find(d => d.id === dId)?.name   || 'S/C';
+                const clientName = clients.find(c => c.id === cId)?.name || 'S/C';
+                const createdAt  = (a as any).created_at  ? new Date((a as any).created_at).toLocaleString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
+                return (
+                  <div key={a.id} className="bg-white rounded-2xl border-2 border-emerald-100 shadow-sm p-4 flex items-center gap-3 group hover:border-emerald-400 transition-all">
+                    <div className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
+                      <Icons.Truck className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-slate-900 uppercase text-sm leading-tight truncate">
+                        {plate} <span className="text-emerald-500 mx-1">↔</span> {driverName.split(' ').slice(0, 2).join(' ')}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className="px-2 py-0.5 bg-slate-900 text-white text-[8px] font-black rounded-md uppercase truncate max-w-[120px]">
+                          {clientName}
+                        </span>
+                        {createdAt && (
+                          <span className="text-[8px] text-slate-400 font-bold">{createdAt}</span>
+                        )}
                       </div>
-                      <button 
-                        onClick={() => onEndAssignment(a.id)} 
-                        className="relative z-10 w-10 h-10 bg-red-100 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
-                        title="Finalizar Turno"
-                      >
-                        <Icons.X className="w-5 h-5" />
-                      </button>
                     </div>
-                  );
-                })}
-              </div>
+                    <button
+                      onClick={() => onEndAssignment(a.id)}
+                      className="w-9 h-9 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center shrink-0 shadow-sm"
+                      title="Finalizar Turno"
+                    >
+                      <Icons.X className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        ) : (
-          <div className="bg-slate-50 p-10 rounded-[3rem] border-2 border-dashed border-slate-200">
-             <div className="space-y-4">
-                {historyAssignments.length === 0 ? <p className="text-slate-400 text-center py-20 font-black uppercase text-xs tracking-widest">Sin registros históricos</p> : historyAssignments.map(a => (
-                  <div key={a.id} className="bg-white p-6 rounded-2xl border border-slate-100 flex justify-between items-center opacity-60">
-                    <div>
-                      <p className="font-black text-slate-900 uppercase text-xs">
-                        {(a as any).plate || vehicles.find(v => v.id === (a.vehicleId || (a as any).vehicle_id))?.plate || 'S/P'}
-                        <span className="text-slate-300 mx-4">|</span>
-                        {(a as any).driver_name || drivers.find(d => d.id === (a.driverId || (a as any).driver_id))?.name || 'S/C'}
-                      </p>
-                      <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">
-                        {clients.find(c => c.id === (a.clientId || (a as any).client_id))?.name || 'Cliente Desconocido'}
-                      </p>
-                    </div>
-                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Cierre: {new Date(a.updatedAt || (a as any).updated_at).toLocaleDateString()}</p>
-                  </div>
-                ))}
-             </div>
+        </div>
+
+      ) : (
+        /* ── HISTÓRICO ─────────────────────────────────────────────── */
+        <div className="flex flex-col gap-3">
+          <div className="bg-white rounded-2xl border border-slate-100 p-3 shadow-sm flex items-center gap-2">
+            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Historial de Vínculos</span>
+            <span className="ml-auto bg-slate-100 text-slate-600 text-[9px] font-black px-2 py-0.5 rounded-full">
+              {historyAssignments.length}
+            </span>
           </div>
-        )}
-      </div>
+
+          {historyAssignments.length === 0 ? (
+            <p className="text-center py-16 text-xs font-bold text-slate-300 uppercase tracking-widest">Sin registros históricos</p>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-[65vh] overflow-y-auto pr-1">
+              {historyAssignments.map(a => {
+                const vId = a.vehicleId || (a as any).vehicle_id;
+                const dId = a.driverId  || (a as any).driver_id;
+                const cId = a.clientId  || (a as any).client_id;
+                const plate      = (a as any).plate       || vehicles.find(v => v.id === vId)?.plate || 'S/P';
+                const driverName = (a as any).driver_name || drivers.find(d => d.id === dId)?.name   || 'S/C';
+                const clientName = clients.find(c => c.id === cId)?.name || 'S/C';
+                const closed     = a.updatedAt || (a as any).updated_at;
+                return (
+                  <div key={a.id} className="bg-white rounded-xl border border-slate-100 p-3 flex flex-wrap items-center gap-3 opacity-70 hover:opacity-100 transition-all">
+                    <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
+                      <Icons.Truck className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-slate-800 uppercase text-xs truncate">
+                        {plate} <span className="text-slate-300 mx-1">|</span> {driverName}
+                      </p>
+                      <p className="text-[9px] text-emerald-600 font-bold uppercase mt-0.5">{clientName}</p>
+                    </div>
+                    <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest whitespace-nowrap shrink-0">
+                      {closed ? new Date(closed).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 

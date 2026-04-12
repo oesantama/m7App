@@ -846,47 +846,30 @@ const App: React.FC = () => {
             user={user!}
             clients={allMasterData.masterClientes || []}
             onAssign={async (vId, dId, cId) => {
-              const tempId = `temp-${Date.now()}`;
-              const newAssign = { 
-                id: tempId, 
-                vehicleId: vId, 
-                driverId: dId, 
-                clientId: cId, 
-                isActive: true, 
-                createdAt: new Date().toISOString(), 
-                updatedAt: new Date().toISOString() 
-              };
-              // @ts-ignore
-              addAssignment(newAssign); // Actualización optimista con ID temporal
-              
               try {
-                const res = await api.saveAssignment(newAssign);
-                if (res.success && res.id) {
-                    // Actualizar el ID temporal por el real en el store
-                    useAppStore.setState(state => ({
-                        assignments: state.assignments.map(a => a.id === tempId ? { ...a, id: res.id } : a)
-                    }));
+                const res = await api.saveAssignment({ vehicleId: vId, driverId: dId, clientId: cId });
+                if (res?.success) {
+                  toast.success('Asignación guardada con éxito');
+                } else {
+                  toast.error('Error al guardar asignación', { description: res?.error || res?.message || 'Error desconocido' });
                 }
-                toast.success("Asignación guardada con éxito");
-                // refreshAppData(); No es estrictamente necesario recargar todo si ya actualizamos el ID, pero ayuda a la consistencia
               } catch (e: any) {
-                console.error("Error saving assignment:", e);
-                // Revertir cambio optimista si falla
-                useAppStore.setState(state => ({
-                    assignments: state.assignments.filter(a => a.id !== tempId)
-                }));
-                toast.error("Error en asignación", { description: e.message || "Conflicto en el servidor" });
+                console.error('Error saving assignment:', e);
+                toast.error('Error en asignación', { description: e.message || 'Conflicto en el servidor' });
+              } finally {
+                // Siempre recargar desde el servidor para mantener estado real
+                api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => {});
               }
             }}
             onEndAssignment={async (aId) => {
-              endAssignment(aId); // Actualización optimista
               try {
                 await api.endAssignment(aId, user?.name);
-                toast.success("Asignación finalizada");
-                refreshAppData(); // Sincronización real
+                toast.success('Asignación finalizada');
               } catch (e) {
-                console.error("Error ending assignment:", e);
-                toast.error("Error al finalizar asignación");
+                console.error('Error ending assignment:', e);
+                toast.error('Error al finalizar asignación');
+              } finally {
+                api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => {});
               }
             }}
           />
