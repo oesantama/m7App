@@ -237,10 +237,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const timer = setTimeout(async () => {
       const container = document.getElementById('route-preview-map');
       if (!container || cancelled) return;
-      // Forzar dimensiones explícitas antes de inicializar Leaflet
-      container.style.height = container.parentElement
-        ? `${Math.max(container.parentElement.clientHeight || 400, 350)}px`
-        : '400px';
+      // Calcular altura disponible para el mapa: modal height - header height
+      const modalWrapEl = container.closest('[style*="min(90vh"]') as HTMLElement | null;
+      const allParents = [container.parentElement, container.parentElement?.parentElement, container.parentElement?.parentElement?.parentElement];
+      let bestH = 0;
+      for (const el of allParents) {
+        if (el) {
+          const h = (el as HTMLElement).getBoundingClientRect().height;
+          if (h > bestH) bestH = h;
+        }
+      }
+      const mapH = Math.max(bestH || window.innerHeight * 0.75, 320);
+      container.style.height = `${mapH}px`;
       container.style.width = '100%';
       if (routePreviewMapRef.current) {
         routePreviewMapRef.current.remove();
@@ -275,6 +283,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       setTimeout(() => { if (!cancelled) map.invalidateSize({ pan: false }); }, 50);
       setTimeout(() => { if (!cancelled) map.invalidateSize({ pan: false }); }, 300);
       setTimeout(() => { if (!cancelled) map.invalidateSize({ pan: false }); }, 700);
+      setTimeout(() => { if (!cancelled) { map.invalidateSize({ pan: false }); } }, 1200);
 
       // Hub marker
       const hubIcon = L.divIcon({
@@ -343,7 +352,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         }
       }
       routePreviewMapRef.current = map;
-    }, 400);
+      // Ajustar vista a todos los puntos una vez que el mapa esté estabilizado
+      if (points.length > 1) {
+        setTimeout(() => {
+          if (!cancelled && routePreviewMapRef.current) {
+            try { routePreviewMapRef.current.fitBounds(L.latLngBounds(points), { padding: [40, 40] }); } catch {}
+          }
+        }, 1300);
+      }
+    }, 600);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [routeMapModal.isOpen, routeMapModal.route]);
 
@@ -2862,7 +2879,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       {/* Modal Vista Previa de Ruta en Mapa */}
       {routeMapModal.isOpen && routeMapModal.route && (
         <div className="fixed inset-0 z-[700] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden" style={{ height: 'min(90vh, 680px)' }}>
             {/* Header */}
             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-950 rounded-t-[2.5rem] shrink-0">
               <div className="flex items-center gap-4">
@@ -2892,13 +2909,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               </div>
             </div>
 
-            {/* Map + Stop list: columna en móvil, fila en desktop */}
-            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-              {/* Leaflet map — toma todo el espacio disponible */}
-              <div id="route-preview-map" className="flex-1 z-0 relative" style={{ minHeight: 260 }} />
+            {/* Map + Stop list: fila siempre, mapa a la izquierda, lista a la derecha */}
+            <div className="flex flex-row flex-1 overflow-hidden min-h-0">
+              {/* Leaflet map — altura 100% del contenedor flex */}
+              <div id="route-preview-map" className="flex-1 z-0 relative min-h-0" style={{ minHeight: 300 }} />
 
-              {/* Stop list — scroll en móvil (max-h fija), scroll full en desktop */}
-              <div className="w-full md:w-64 shrink-0 overflow-y-auto custom-scrollbar bg-slate-50 border-t md:border-t-0 md:border-l border-slate-100 p-3 space-y-2 max-h-52 md:max-h-none">
+              {/* Stop list — panel derecho siempre visible con scroll */}
+              <div className="w-56 shrink-0 overflow-y-auto custom-scrollbar bg-slate-50 border-l border-slate-100 p-3 space-y-2">
                 {/* Hub */}
                 <div className="flex items-center gap-2 p-2 bg-slate-900 rounded-xl">
                   <div className="w-7 h-7 bg-emerald-500 text-slate-950 rounded-lg flex items-center justify-center font-black text-[9px] shadow-sm shrink-0">HUB</div>
