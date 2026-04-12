@@ -70,7 +70,7 @@ export const trackOrder = async (req: Request, res: Response) => {
             d.picking_date as time_picked,
             d.receiving_date as time_delivered,
             -- Ubicación (Solo si EN RUTA)
-            CASE WHEN d.status = 'EN RUTA' THEN 
+            CASE WHEN d.status IN ('EST-11', 'EN RUTA') THEN
                 (SELECT json_build_object('lat', l.latitude, 'lng', l.longitude) 
                  FROM vehicle_locations l 
                  WHERE l.vehicle_id = d.vehicle_plate 

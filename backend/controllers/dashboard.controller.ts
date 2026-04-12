@@ -108,19 +108,19 @@ export const getAjoverStats = async (req: Request, res: Response) => {
       pool.query(`
         SELECT
           COUNT(*) as total,
-          COUNT(*) FILTER (WHERE LOWER(status) IN ('activo','active','en ruta')) as active,
-          COUNT(*) FILTER (WHERE LOWER(status) IN ('completado','completed','finalizado')) as completed,
-          COUNT(*) FILTER (WHERE LOWER(status) IN ('pendiente','pending')) as pending
+          COUNT(*) FILTER (WHERE status_id IN ('EST-11') OR LOWER(status) IN ('activo','active','en ruta')) as active,
+          COUNT(*) FILTER (WHERE status_id IN ('EST-12','EST-07') OR LOWER(status) IN ('completado','completed','finalizado')) as completed,
+          COUNT(*) FILTER (WHERE status_id IN ('EST-10','EST-03') OR LOWER(status) IN ('pendiente','pending')) as pending
         FROM routes WHERE client_id = 'CLI-01' OR client_id IS NULL
       `),
       pool.query(`
         SELECT
           COUNT(*) as total,
-          COUNT(*) FILTER (WHERE LOWER(status) IN ('entregado','finalizado','delivered')) as delivered,
-          COUNT(*) FILTER (WHERE LOWER(status) IN ('en ruta','in route','despachado')) as in_route,
-          COUNT(*) FILTER (WHERE LOWER(status) IN ('pendiente','pending','procesando')) as pending,
-          COUNT(*) FILTER (WHERE LOWER(status) IN ('devuelto','returned','retorno')) as returned,
-          COALESCE(SUM(CASE WHEN LOWER(status) IN ('entregado','finalizado','delivered')
+          COUNT(*) FILTER (WHERE status IN ('EST-12','EST-14') OR LOWER(status) IN ('entregado','finalizado','delivered')) as delivered,
+          COUNT(*) FILTER (WHERE status IN ('EST-11') OR LOWER(status) IN ('en ruta','in route','despachado')) as in_route,
+          COUNT(*) FILTER (WHERE status IN ('EST-03','EST-04','EST-05') OR LOWER(status) IN ('pendiente','pending','procesando')) as pending,
+          COUNT(*) FILTER (WHERE status IN ('EST-13') OR LOWER(status) IN ('devuelto','returned','retorno')) as returned,
+          COALESCE(SUM(CASE WHEN status IN ('EST-12','EST-14') OR LOWER(status) IN ('entregado','finalizado','delivered')
             THEN (SELECT COALESCE(SUM(COALESCE(peso,0)),0) FROM document_items WHERE document_id = d.id) ELSE 0 END), 0) as delivered_weight
         FROM documents_l d WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
       `),

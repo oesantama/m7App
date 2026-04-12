@@ -42,11 +42,28 @@ const OrderTracking: React.FC = () => {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'ENTREGADO': return 'bg-emerald-500 text-slate-950';
-            case 'EN RUTA': return 'bg-blue-500 text-white';
-            case 'PENDIENTE': return 'bg-amber-500 text-slate-950';
-            default: return 'bg-slate-700 text-slate-300';
+            case 'EST-12': case 'EST-14': case 'ENTREGADO': return 'bg-emerald-500 text-slate-950';
+            case 'EST-11': case 'EN RUTA':    return 'bg-blue-500 text-white';
+            case 'EST-13': case 'DEVUELTO':   return 'bg-red-500 text-white';
+            case 'EST-10': case 'ASIGNADO':   return 'bg-indigo-500 text-white';
+            case 'EST-08': case 'INVENTARIADO': case 'EST-09': case 'ALISTADO': return 'bg-violet-500 text-white';
+            case 'EST-03': case 'PENDIENTE':  return 'bg-amber-500 text-slate-950';
+            default:                          return 'bg-slate-700 text-slate-300';
         }
+    };
+
+    const getStatusDisplay = (status: string) => {
+        const labels: Record<string, string> = {
+            'EST-03': 'Pendiente',    'EST-04': 'En Conteo',
+            'EST-05': 'Auditado',     'EST-06': 'Recibido',
+            'EST-07': 'Completado',   'EST-08': 'Inventariado',
+            'EST-09': 'Alistado',     'EST-10': 'Asignado',
+            'EST-11': 'En Ruta',      'EST-12': 'Entregado',
+            'EST-13': 'Devuelto',     'EST-14': 'Entrega Parcial',
+            'EST-15': 'Repique',      'EST-16': 'Eliminado',
+            'EST-17': 'Rechazado',
+        };
+        return labels[status] ?? status;
     };
 
     return (
@@ -81,7 +98,7 @@ const OrderTracking: React.FC = () => {
                             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{order.external_doc_id}</h2>
                         </div>
                         <div className={`px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest ${getStatusColor(order.status)}`}>
-                            {order.status}
+                            {getStatusDisplay(order.status)}
                         </div>
                     </div>
 
@@ -118,16 +135,16 @@ const OrderTracking: React.FC = () => {
                                 <span className={`text-[10px] font-bold uppercase tracking-widest ${order.picking_date ? 'text-emerald-600' : 'text-slate-300'}`}>Alistado</span>
                             </div>
                             <div className="flex flex-col items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center bg-white ${order.status === 'EN RUTA' || order.status === 'ENTREGADO' ? 'border-emerald-500' : 'border-slate-200'}`}>
-                                     {(order.status === 'EN RUTA' || order.status === 'ENTREGADO') && <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>}
+                                <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center bg-white ${['EST-11','EST-12','EST-13','EST-14','EN RUTA','ENTREGADO'].includes(order.status) ? 'border-emerald-500' : 'border-slate-200'}`}>
+                                     {['EST-11','EST-12','EST-13','EST-14','EN RUTA','ENTREGADO'].includes(order.status) && <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>}
                                 </div>
-                                <span className={`text-[10px] font-bold uppercase tracking-widest ${(order.status === 'EN RUTA' || order.status === 'ENTREGADO') ? 'text-emerald-600' : 'text-slate-300'}`}>En Ruta</span>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest ${['EST-11','EST-12','EST-13','EST-14','EN RUTA','ENTREGADO'].includes(order.status) ? 'text-emerald-600' : 'text-slate-300'}`}>En Ruta</span>
                             </div>
                             <div className="flex flex-col items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center bg-white ${order.status === 'ENTREGADO' ? 'border-emerald-500' : 'border-slate-200'}`}>
-                                     {order.status === 'ENTREGADO' && <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>}
+                                <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center bg-white ${['EST-12','EST-14','ENTREGADO'].includes(order.status) ? 'border-emerald-500' : 'border-slate-200'}`}>
+                                     {['EST-12','EST-14','ENTREGADO'].includes(order.status) && <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>}
                                 </div>
-                                <span className={`text-[10px] font-bold uppercase tracking-widest ${order.status === 'ENTREGADO' ? 'text-emerald-600' : 'text-slate-300'}`}>Entregado</span>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest ${['EST-12','EST-14','ENTREGADO'].includes(order.status) ? 'text-emerald-600' : 'text-slate-300'}`}>Entregado</span>
                             </div>
                         </div>
                     </div>

@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
-import { DocumentL, User, DocStatus, MasterRecord, Invoice, UserRole } from '../types';
+import { DocumentL, User, DocStatus, MasterRecord, Invoice, UserRole, getStatusLabel } from '../types';
 import { api } from '../services/api';
 import ConsultasDocumentosL from './ConsultasDocumentosL';
 import ProcessPaymentLModal from './ProcessPaymentLModal';
@@ -154,9 +154,9 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       }
     });
 
-    const list = Array.from(uniqueMap.values()).filter((d: any) => 
-      (d.statusId === 'EST-03' || d.status === DocStatus.PENDING || d.status === 'Pendiente') && 
-      d.status !== 'ELIMINADO'
+    const list = Array.from(uniqueMap.values()).filter((d: any) =>
+      (d.status === DocStatus.PENDING || d.status === 'PENDIENTE' || d.status === 'Pendiente') &&
+      d.status !== 'EST-16' && d.status !== 'ELIMINADO'
     );
     
     if (!searchTerm) return list;
@@ -767,8 +767,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                 {(doc.createdAt || (doc as any).created_at) ? new Date(doc.createdAt || (doc as any).created_at).toLocaleDateString() : 'SIN FECHA'}
                               </p>
                               <div className="flex justify-between items-center group/status">
-                                  <p><span className="text-slate-900">ESTADO:</span> {doc.status}</p>
-                                  {(doc.status === DocStatus.PENDING || doc.status === 'Pendiente') && (
+                                  <p><span className="text-slate-900">ESTADO:</span> {getStatusLabel(doc.status || '')}</p>
+                                  {(doc.status === DocStatus.PENDING || doc.status === 'PENDIENTE' || doc.status === 'Pendiente') && (
                                      <button 
                                        onClick={(e) => { e.stopPropagation(); setDocToChangeStatus(doc); setSelectedStatus(doc.status || ''); }}
                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-blue-500 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all shadow-sm opacity-0 group-hover/status:opacity-100"

@@ -37,7 +37,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
     return documents.filter(d =>
       d.id?.startsWith('L-MAN-') &&
       (!selectedClientId || String(d.clientId) === String(selectedClientId)) &&
-      (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING || String(d.status).toUpperCase() === 'PENDIENTE') &&
+      (d.status === DocStatus.PENDING || d.status === DocStatus.COUNTING || d.status === 'PENDIENTE' || d.status === 'EN CONTEO') &&
       (d.externalDocId.toLowerCase().includes(searchTerm.toLowerCase()) || (d.vehicleData || '').toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [documents, selectedClientId, searchTerm]);

@@ -377,7 +377,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       // FILTRO 2: Estados aptos para despacho Orbit
       const s = String(inv.status || '').toUpperCase();
-      const validStatuses = ['PENDIENTE', 'AUDITADO', 'INVENTARIADO', 'EN CONTEO'];
+      // IDs EST-XX + texto legado (compatibilidad retroactiva mientras migra la BD)
+      const validStatuses = ['EST-03','EST-04','EST-05','EST-08','PENDIENTE','AUDITADO','INVENTARIADO','EN CONTEO'];
       return validStatuses.includes(s);
     });
 

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
-import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem } from '../types';
+import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem, getStatusLabel } from '../types';
 import BlindCount from './BlindCount';
 import PickingView from './PickingView';
 import PickingHistory from './PickingHistory';
@@ -76,16 +76,20 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+  const isPendingOrCounting = (s: string) =>
+    s === DocStatus.PENDING || s === DocStatus.COUNTING ||
+    s === 'PENDIENTE' || s === 'EN CONTEO';
+
+  const isInventored = (s: string) =>
+    s === DocStatus.INVENTORED || s === 'INVENTARIADO';
+
   const pendingRecibo = useMemo(() =>
-    documents.filter(d => 
-      String(d.status).toUpperCase() === DocStatus.PENDING.toUpperCase() || 
-      String(d.status).toUpperCase() === DocStatus.COUNTING.toUpperCase()
-    ),
+    documents.filter(d => isPendingOrCounting(d.status || '')),
     [documents]
   );
 
   const completedRecibo = useMemo(() =>
-    documents.filter(d => String(d.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase()),
+    documents.filter(d => isInventored(d.status || '')),
     [documents]
   );
 
@@ -474,9 +478,9 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
             <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
               {paginatedDocs.map(doc => {
                 const metrics = getDocMetrics(doc);
-                const isCountingStatus = String(doc.status).toUpperCase() === DocStatus.COUNTING.toUpperCase();
-                const isInventoredStatus = String(doc.status).toUpperCase() === DocStatus.INVENTORED.toUpperCase();
-                const isPending = String(doc.status).toUpperCase() === DocStatus.PENDING.toUpperCase();
+                const isCountingStatus = doc.status === DocStatus.COUNTING || doc.status === 'EN CONTEO';
+                const isInventoredStatus = doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO';
+                const isPending = doc.status === DocStatus.PENDING || doc.status === 'PENDIENTE';
                 const isManual = String(doc.planType || '').toUpperCase().includes('MANUAL');
                 const planLabel = isManual ? 'MANUAL' : (String(doc.planType || '').toUpperCase().includes('PLAN R') ? 'PLAN R' : 'PLAN NORMAL');
 
@@ -506,7 +510,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                         {/* BADGES */}
                         <div className="flex flex-col items-end gap-1.5 shrink-0">
                           <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${isCountingStatus ? 'bg-blue-50 text-blue-600 border border-blue-100' : isInventoredStatus ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
-                            {doc.status}
+                            {getStatusLabel(doc.status || '')}
                           </span>
                           <span className={`px-2.5 py-1 rounded-lg text-[7px] font-black uppercase tracking-widest ${isManual ? 'bg-slate-900 text-emerald-400 border border-emerald-500/20' : planLabel === 'PLAN R' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
                             {planLabel}

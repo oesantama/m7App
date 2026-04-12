@@ -724,7 +724,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             points.push(pos);
 
             // Color: verde=entregado, slate=pendiente, ámbar=ubicación aproximada
-            const isDelivered = ['EST-12', 'EST-14', 'COMPLETED', 'Entregado'].includes(inv.status);
+            const isDelivered = ['EST-12', 'EST-13', 'EST-14', 'COMPLETED', 'ENTREGADO', 'Entregado'].includes(inv.status);
             const isApprox    = !exact;
             const markerColor = isDelivered ? '#10b981' : isApprox ? '#f59e0b' : '#1e293b';
             const borderColor = isDelivered ? '#059669' : isApprox ? '#d97706' : '#10b981';
@@ -1305,7 +1305,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     return sv + Number(inv?.volumeM3 || 0);
                                 }, 0);
                             }, 0);
-                            const delivered = invoices.filter(i => ['EST-12','EST-14'].includes(i.status as string)).length;
+                            const delivered = invoices.filter(i => ['EST-12','EST-13','EST-14'].includes(i.status as string)).length;
                             const pct = totalInvoices > 0 ? Math.round((delivered / totalInvoices) * 100) : 0;
                             return (
                                 <div className="bg-slate-900 rounded-2xl p-3 mb-1 space-y-2">

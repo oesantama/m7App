@@ -61,7 +61,7 @@ export const getDocuments = async (req: Request, res: Response) => {
         FROM document_consolidated_items WHERE document_id = d.id
       ) item_mapped) as "consolidatedItems"
       FROM documents_l d
-      WHERE d.status != 'ELIMINADO'
+      WHERE d.status NOT IN ('EST-16', 'ELIMINADO')
     `;
 
     const queryParams: any[] = [];
@@ -104,13 +104,13 @@ export const syncInventory = async (req: Request, res: Response) => {
     }
 
     const currentStatus = checkStatus.rows[0].status;
-    if (currentStatus === 'INVENTARIADO' && !isPartial) {
+    if ((currentStatus === 'INVENTARIADO' || currentStatus === 'EST-08') && !isPartial) {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: "Documento ya finalizado" });
     }
 
     const docL = checkStatus.rows[0];
-    const newStatus = isPartial ? 'PENDIENTE' : 'INVENTARIADO';
+    const newStatus = isPartial ? 'EST-03' : 'EST-08'; // EST-03=PENDIENTE, EST-08=INVENTARIADO
     const inventoryDate = isPartial ? null : new Date();
 
     // 1. Actualizar Metadatos del Documento
@@ -473,7 +473,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             WHERE client_id = $1 
             AND external_doc_id = $2 
             AND vehicle_plate = $3
-            AND status != 'ELIMINADO'
+            AND status NOT IN ('EST-16', 'ELIMINADO')
             LIMIT 1
           `, [doc.clientId, extId, plate]);
 
@@ -517,7 +517,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
         doc.codplan || doc.un_orig || 'S/I',
         doc.planType || doc.plan_type || 'N/A',
         deliveryDate,
-        (doc.status ? String(doc.status).toUpperCase().trim() : 'PENDIENTE'),
+        (doc.status ? (doc.status.startsWith('EST-') ? doc.status : 'EST-03') : 'EST-03'),
         doc.createdAt || new Date().toISOString(),
         pickingDate,
         receivingDate,
@@ -794,7 +794,7 @@ export const getInvoices = async (req: Request, res: Response) => {
       // EST-01 = pendiente inicial | EST-15 = repique (devuelto para re-entrega)
       // NULL = registros legacy antes del backfill (compatibilidad con producción)
       query += ` AND (document_items.item_status IN ('EST-01', 'EST-08', 'EST-15') OR document_items.item_status IS NULL)
-        AND documents_l.status NOT IN ('ELIMINADO', 'ENTREGADO', 'COMPLETADO', 'RECHAZADO')`;
+        AND documents_l.status NOT IN ('EST-16','EST-12','EST-07','EST-17','ELIMINADO','ENTREGADO','COMPLETADO','RECHAZADO')`;
     }
 
     query += ` GROUP BY 
@@ -900,7 +900,7 @@ export const deleteDocument = async (req: Request, res: Response) => {
   try {
     await pool.query(`
       UPDATE documents_l 
-      SET status = 'ELIMINADO', 
+      SET status = 'EST-16',
           external_doc_id = external_doc_id || '_DEL_' || extract(epoch from now()),
           inventory_user = $1, 
           inventory_date = CURRENT_TIMESTAMP 
@@ -910,7 +910,7 @@ export const deleteDocument = async (req: Request, res: Response) => {
     // Opcional: También actualizar el item_status de los items para consistencia en ruteo
     await pool.query(`
       UPDATE document_items 
-      SET item_status = 'ELIMINADO' 
+      SET item_status = 'EST-16'
       WHERE document_id = $1
     `, [id]);
 
@@ -1140,7 +1140,7 @@ export const createManualDocument = async (req: Request, res: Response) => {
 
     if (existing.rows.length > 0) {
        // Si existe y no está eliminado, lo devolvemos
-       if (existing.rows[0].status !== 'ELIMINADO') {
+       if (existing.rows[0].status !== 'EST-16' && existing.rows[0].status !== 'ELIMINADO') {
           const docId = existing.rows[0].id;
           const fullDoc = await client.query('SELECT *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData", plan_type as "planType" FROM documents_l WHERE id = $1', [docId]);
           return res.json({ success: true, document: fullDoc.rows[0], message: "Documento ya existía, continuando..." });
@@ -1151,7 +1151,7 @@ export const createManualDocument = async (req: Request, res: Response) => {
     const docId = `L-MAN-${Date.now()}`;
     const result = await client.query(`
       INSERT INTO documents_l (id, external_doc_id, client_id, vehicle_plate, status, plan_type, created_by, created_at)
-      VALUES ($1, $2, $3, $4, 'PENDIENTE', $5, $6, NOW())
+      VALUES ($1, $2, $3, $4, 'EST-03', $5, $6, NOW())
       RETURNING *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData", plan_type as "planType"
     `, [docId, externalDocId, clientId, vehiclePlate, planType || 'MANUAL', user]);
 

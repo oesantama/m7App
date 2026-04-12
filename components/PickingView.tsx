@@ -53,8 +53,9 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
         // Solo mostrar facturas cuyos documentos maestros estén en proceso de Auditoría/Conteo o Inventariado o estén Pendientes
         const pickingDocIds = (documents || [])
             .filter(d => {
-                const s = String(d.status || '').toUpperCase();
-                return s === 'EN CONTEO' || s === 'INVENTARIADO' || s === 'PENDIENTE';
+                const s = d.status || '';
+                return s === 'EST-04' || s === 'EST-08' || s === 'EST-03' ||
+                       s === 'EN CONTEO' || s === 'INVENTARIADO' || s === 'PENDIENTE';
             })
             .map(d => String(d.id));
 
@@ -339,7 +340,8 @@ const PickingView: React.FC<PickingViewProps> = ({ user, documents }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 content-start">
                     {filteredInvoices.map((inv, idx) => {
                         const isDispatched = inv.status === 'EST-11' || inv.status === 'Entregado';
-                        const isInventored = (documents || []).find(d => d.id === inv.docLId)?.status?.toUpperCase() === 'INVENTARIADO';
+                        const docStatus = (documents || []).find(d => d.id === inv.docLId)?.status || '';
+                        const isInventored = docStatus === 'EST-08' || docStatus.toUpperCase() === 'INVENTARIADO';
                         
                         return (
                             <div 

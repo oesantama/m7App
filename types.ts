@@ -14,15 +14,61 @@ export enum VehicleStatus {
 }
 
 export enum DocStatus {
-  PENDING = 'Pendiente',
-  RECEIVED = 'Recibido',
-  COUNTING = 'En Conteo',
-  COMPLETED = 'Completado',
-  IN_ROUTE = 'En ruta',
-  DELIVERED = 'Entregado',
-  PARTIAL = 'Entregado parcial',
-  RETURNED = 'Devolución',
-  INVENTORED = 'Inventariado'
+  PENDING    = 'EST-03',
+  RECEIVED   = 'EST-06',
+  COUNTING   = 'EST-04',
+  AUDITED    = 'EST-05',
+  COMPLETED  = 'EST-07',
+  INVENTORED = 'EST-08',
+  ALISTADO   = 'EST-09',
+  ASSIGNED   = 'EST-10',
+  IN_ROUTE   = 'EST-11',
+  DELIVERED  = 'EST-12',
+  RETURNED   = 'EST-13',
+  PARTIAL    = 'EST-14',
+  REPIQUE    = 'EST-15',
+  ELIMINATED = 'EST-16',
+  REJECTED   = 'EST-17',
+}
+
+/** Convierte un status_id a etiqueta legible para mostrar al usuario */
+export const DOC_STATUS_LABELS: Record<string, string> = {
+  'EST-03': 'Pendiente',
+  'EST-04': 'En Conteo',
+  'EST-05': 'Auditado',
+  'EST-06': 'Recibido',
+  'EST-07': 'Completado',
+  'EST-08': 'Inventariado',
+  'EST-09': 'Alistado',
+  'EST-10': 'Asignado',
+  'EST-11': 'En Ruta',
+  'EST-12': 'Entregado',
+  'EST-13': 'Devuelto',
+  'EST-14': 'Entrega Parcial',
+  'EST-15': 'Repique',
+  'EST-16': 'Eliminado',
+  'EST-17': 'Rechazado',
+  // Compatibilidad retroactiva (texto legado → label)
+  'PENDIENTE':       'Pendiente',
+  'EN CONTEO':       'En Conteo',
+  'AUDITADO':        'Auditado',
+  'RECIBIDO':        'Recibido',
+  'COMPLETADO':      'Completado',
+  'FINALIZADO':      'Completado',
+  'INVENTARIADO':    'Inventariado',
+  'ALISTADO':        'Alistado',
+  'ASIGNADO':        'Asignado',
+  'EN RUTA':         'En Ruta',
+  'ENTREGADO':       'Entregado',
+  'DEVUELTO':        'Devuelto',
+  'ENTREGA PARCIAL': 'Entrega Parcial',
+  'REPIQUE':         'Repique',
+  'ELIMINADO':       'Eliminado',
+  'RECHAZADO':       'Rechazado',
+};
+
+export function getStatusLabel(status: string): string {
+  return DOC_STATUS_LABELS[status] ?? DOC_STATUS_LABELS[status?.toUpperCase()] ?? status;
 }
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'active';
