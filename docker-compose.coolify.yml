@@ -32,6 +32,8 @@ services:
     image: ghcr.io/oesantama/m7-frontend:latest
     pull_policy: always
     restart: always
+    expose:
+      - "80"
     depends_on:
       m7app-backend:
         condition: service_started
