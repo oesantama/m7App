@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Icons } from '../constants';
-import { DocumentL, User, DocStatus, MasterRecord, Invoice } from '../types';
+import { DocumentL, User, DocStatus, MasterRecord, Invoice, getStatusLabel } from '../types';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import ProcessPaymentLModal from './ProcessPaymentLModal';
@@ -423,7 +423,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
             <label className={labelClass}>Estado</label>
             <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })} className={inputClass}>
               <option value="">TODOS</option>
-              {Object.values(DocStatus).map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+              {Object.values(DocStatus).map(s => <option key={s} value={s}>{getStatusLabel(s).toUpperCase()}</option>)}
             </select>
           </div>
         </div>
@@ -457,7 +457,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                   <td className="px-6 py-5 font-bold text-slate-600 text-[10px] uppercase">{doc.codplan || doc.planType || 'MANUAL'}</td>
                   <td className="px-6 py-5 font-bold text-slate-400 text-[9px] uppercase">{doc.deliveryDate}</td>
                   <td className="px-6 py-5 text-center">
-                    <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border shadow-inner ${doc.status === DocStatus.INVENTORED ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>{doc.status}</span>
+                    <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border shadow-inner ${
+                      (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO') ? 'bg-emerald-500 text-white border-emerald-400' :
+                      (doc.status === DocStatus.IN_ROUTE || doc.status === 'EN RUTA')        ? 'bg-blue-500 text-white border-blue-400' :
+                      (doc.status === DocStatus.DELIVERED || doc.status === 'ENTREGADO')     ? 'bg-emerald-600 text-white border-emerald-500' :
+                      (doc.status === DocStatus.RETURNED || doc.status === 'DEVUELTO')       ? 'bg-red-500 text-white border-red-400' :
+                      (doc.status === DocStatus.ELIMINATED || doc.status === 'ELIMINADO')    ? 'bg-slate-400 text-white border-slate-300' :
+                      'bg-amber-50 text-amber-600 border-amber-100'
+                    }`}>{getStatusLabel(doc.status || '')}</span>
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-1.5">
@@ -549,8 +556,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
               <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
                 <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm">
                   <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Estado</p>
-                  <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase border ${selectedDoc.status === DocStatus.INVENTORED ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                    {selectedDoc.status}
+                  <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase border ${
+                    (selectedDoc.status === DocStatus.INVENTORED || selectedDoc.status === 'INVENTARIADO') ? 'bg-emerald-500 text-white border-emerald-400' :
+                    (selectedDoc.status === DocStatus.IN_ROUTE   || selectedDoc.status === 'EN RUTA')      ? 'bg-blue-500 text-white border-blue-400' :
+                    (selectedDoc.status === DocStatus.DELIVERED  || selectedDoc.status === 'ENTREGADO')    ? 'bg-emerald-600 text-white border-emerald-500' :
+                    (selectedDoc.status === DocStatus.RETURNED   || selectedDoc.status === 'DEVUELTO')     ? 'bg-red-500 text-white border-red-400' :
+                    'bg-amber-50 text-amber-600 border-amber-100'
+                  }`}>
+                    {getStatusLabel(selectedDoc.status || '')}
                   </span>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">

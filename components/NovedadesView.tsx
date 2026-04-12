@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
-import { DocumentL, MasterRecord, User, DocStatus, Article } from '../types';
+import { DocumentL, MasterRecord, User, DocStatus, Article, getStatusLabel } from '../types';
 
 interface Novedad {
     id: number;
@@ -614,9 +614,9 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                                 {doc.externalDocId}
                                             </span>
                                             <div className={`px-1.5 py-0.5 rounded-lg text-[7px] sm:text-[8px] font-black uppercase tracking-widest border shrink-0 ${
-                                                doc.status === DocStatus.INVENTORED ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+                                                (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
                                             }`}>
-                                                {doc.status}
+                                                {getStatusLabel(doc.status || '')}
                                             </div>
                                         </div>
 

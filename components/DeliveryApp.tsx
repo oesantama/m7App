@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Icons } from '../constants';
-import { Invoice, DocStatus, Route } from '../types';
+import { Invoice, DocStatus, Route, getStatusLabel } from '../types';
 
 interface DeliveryAppProps {
   route: Route;
@@ -123,7 +123,7 @@ const DeliveryApp: React.FC<DeliveryAppProps> = ({ route, invoices, onUpdateInvo
               </div>
               <span className={`text-[10px] font-black uppercase tracking-widest ${
                 inv.status === DocStatus.DELIVERED ? 'text-emerald-500' : 'text-amber-500'
-              }`}>{inv.status}</span>
+              }`}>{getStatusLabel(inv.status || '')}</span>
             </div>
           </button>
         ))}
