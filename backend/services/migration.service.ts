@@ -375,6 +375,22 @@ const healSchema = async (client: any) => {
     console.error('[M7-DB-IQ-ERROR] No se pudo reparar automáticamente las tablas de capacitación:', err.message);
   }
 
+  // FASE: LIMPIAR ASIGNACIONES ACTIVAS DUPLICADAS (vehículo/conductor con >1 is_active=true)
+  // Conserva solo la más reciente como activa; el resto queda como historial (is_active=false)
+  try {
+    await client.query(`
+      UPDATE assignments a
+      SET is_active = false, updated_at = NOW()
+      WHERE is_active = true
+        AND id NOT IN (
+          SELECT DISTINCT ON (vehicle_id) id
+          FROM assignments
+          WHERE is_active = true
+          ORDER BY vehicle_id, created_at DESC
+        )
+    `);
+  } catch (e) {}
+
   // FASE ESPECIAL: LIMPIEZA DE DUPLICADOS PARA ON CONFLICT (ESTABILIDAD NUCLEAR)
   try {
     console.log('[M7-DB-HEAL] Limpiando duplicados para estabilidad ON CONFLICT...');

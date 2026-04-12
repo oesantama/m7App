@@ -20,35 +20,22 @@ export const getAssignments = async (req: Request, res: Response) => {
 export const saveAssignment = async (req: Request, res: Response) => {
   const { id, vehicleId, driverId, clientId } = req.body;
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
 
-    // 1. Bloqueo FOR UPDATE para evitar doble asignación del mismo vehículo
-    const vehicleCheck = await client.query('SELECT status_id FROM vehicles WHERE id = $1 FOR UPDATE', [vehicleId]);
-    
-    // 2. Verificar disponibilidad del conductor
-    const driverCheck = await client.query('SELECT status_id FROM drivers WHERE id = $1 FOR UPDATE', [driverId]);
-
-    // 3. Verificar si ya hay una asignación activa para este vehículo o conductor
-    const activeCheck = await client.query(`
-      SELECT id FROM assignments 
+    // 1. Cerrar cualquier asignación activa previa del mismo vehículo o conductor
+    //    Esto conserva el historial (is_active=false) y permite reasignar
+    await client.query(`
+      UPDATE assignments
+      SET is_active = false, updated_at = NOW()
       WHERE (vehicle_id = $1 OR driver_id = $2) AND is_active = true
-      FOR UPDATE
     `, [vehicleId, driverId]);
 
-    if (activeCheck.rows.length > 0) {
-      await client.query('ROLLBACK');
-      return res.status(409).json({ 
-        error: "Conflicto de Asignación", 
-        message: "El vehículo o el conductor ya tienen una asignación activa." 
-      });
-    }
-
-    // Insert usando MAX(id)+1 manual para evitar conflicto de secuencia desincronizada
+    // 2. Crear la nueva asignación activa
     const insertRes = await client.query(`
-      INSERT INTO assignments (id, vehicle_id, driver_id, client_id, is_active)
-      SELECT COALESCE(MAX(id), 0) + 1, $1, $2, $3, true
+      INSERT INTO assignments (id, vehicle_id, driver_id, client_id, is_active, created_at, updated_at)
+      SELECT COALESCE(MAX(id), 0) + 1, $1, $2, $3, true, NOW(), NOW()
       FROM assignments
       RETURNING id
     `, [vehicleId, driverId, clientId]);
