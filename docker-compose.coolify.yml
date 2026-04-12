@@ -5,6 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     restart: always
+    expose:
+      - "8080"
     environment:
       - PORT=8080
       - DB_HOST=postgres
@@ -19,15 +21,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - m7-network
-    # Servidor 4GB: backend tiene 1GB holgado
     mem_limit: 1g
     memswap_limit: 1g
 
-  # Frontend — usa imagen pre-construida desde GitHub Actions (GHCR)
-  # El build ocurre en GitHub (7GB RAM), el servidor solo hace docker pull.
-  # Para actualizar: hacer push a main → GH Actions construye → Coolify redeploy.
+  # Frontend — imagen pre-construida desde GitHub Actions (GHCR)
   frontend:
     image: ghcr.io/oesantama/m7-frontend:latest
     pull_policy: always
@@ -37,43 +34,13 @@ services:
     depends_on:
       m7app-backend:
         condition: service_started
-    networks:
-      - m7-network
     mem_limit: 128m
     memswap_limit: 128m
-
-  # Evolution API (WhatsApp)
-  # DESHABILITADO TEMPORALMENTE: consume ~300MB en un servidor de 1GB.
-  # Para rehabilitar: quitar el bloque de comentario y hacer redeploy.
-  # evolution:
-  #   image: atendai/evolution-api:v1.8.2
-  #   container_name: m7-evolution
-  #   restart: always
-  #   environment:
-  #     - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
-  #     - SERVER_URL=${EVOLUTION_API_URL}
-  #     - DOCKER_ENV=true
-  #     - LOG_LEVEL=error
-  #     - DEL_INSTANCE=false
-  #     - STORE_MESSAGES=true
-  #     - STORE_MESSAGE_UP=true
-  #     - DATABASE_ENABLED=true
-  #     - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
-  #     - DATABASE_SAVE_DATA_INSTANCE=true
-  #     - DATABASE_SAVE_DATA_NEW_MESSAGE=true
-  #   volumes:
-  #     - evolution_instances:/evolution/instances
-  #     - evolution_store:/evolution/store
-  #   depends_on:
-  #     - postgres
-  #   networks:
-  #     - m7-network
 
   # Database
   postgres:
     image: postgres:15-alpine
     restart: always
-    # Tuning para servidor 4GB (2 vCPUs): aprovecha la RAM disponible
     command: >
       postgres
       -c shared_buffers=512MB
@@ -97,14 +64,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - m7-network
     mem_limit: 1500m
     memswap_limit: 1500m
-
-networks:
-  m7-network:
-    driver: bridge
 
 volumes:
   m7_logistica_data:
