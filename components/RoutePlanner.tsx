@@ -230,6 +230,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       const map = L.map(container, { zoomControl: true }).setView([centerLat, centerLng], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+      // Forzar recalculo de tamaño después de que el DOM haya establecido las dimensiones del flex container
+      setTimeout(() => map.invalidateSize(), 100);
 
       // Hub marker
       const hubIcon = L.divIcon({
@@ -1255,7 +1257,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const PW = pdf.internal.pageSize.getWidth();
     const PH = pdf.internal.pageSize.getHeight();
-    const ML = 10, MR = 10, CW = PW - ML - MR;
+    const ML = 6, MR = 6, CW = PW - ML - MR;
     let y = ML;
 
     // ── HEADER BAR ──────────────────────────────────────────────────────────
@@ -1336,36 +1338,40 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     y += 8;
 
     // ── INVOICES TABLE ────────────────────────────────────────────────────────
+    // Columnas: # | U.NEG | DOC L | FACTURA | PEDIDO | CANT | REF | VALOR | PAG | CLIENTE / DIRECCION
+    // Anchos (landscape A4, CW≈285mm): 8+12+26+26+24+10+18+26+12 = 162 → CLIENTE ocupa resto ≈123mm
     autoTable(pdf, {
       startY: y, margin: { left: ML, right: MR },
-      head: [['#', 'U.NEG', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
+      head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
       body: route.assignedInvoices.map((inv, idx) => {
         const fi = (inv.items?.[0] || {}) as any;
         const method = String((inv as any).paymentMethod || fi.paymentMethod || '-').toUpperCase();
         return [
           String(idx + 1),
           String(inv.unCode || fi.unCode || fi.un_code || '-'),
+          String(inv.docLId || '-'),
           inv.invoiceNumber,
-          String(inv.orderNumber || inv.docLId || '-'),
+          String(inv.orderNumber || '-'),
           String(inv.totalItems || '-'),
           String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
           fmtCOP(inv.invoiceValue || 0),
           method,
-          `${inv.customerName || ''}\n${inv.address} - ${inv.city}`,
+          `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
         ];
       }),
-      styles: { fontSize: 7, cellPadding: 2.5 },
-      headStyles: { fillColor: [241,245,249], textColor: [15,23,42], fontStyle: 'bold', fontSize: 7 },
+      styles: { fontSize: 6.5, cellPadding: 2 },
+      headStyles: { fillColor: [15,23,42], textColor: [255,255,255], fontStyle: 'bold', fontSize: 6.5 },
       columnStyles: {
-        0: { cellWidth: 9,  halign: 'center' },
-        1: { cellWidth: 13, halign: 'center' },
-        2: { cellWidth: 28, halign: 'center', fontStyle: 'bold' },
-        3: { cellWidth: 26, halign: 'center' },
-        4: { cellWidth: 11, halign: 'center' },
-        5: { cellWidth: 20, halign: 'center' },
-        6: { cellWidth: 28, halign: 'right' },
-        7: { cellWidth: 13, halign: 'center', fontStyle: 'bold' },
-        8: { cellWidth: 105, halign: 'left' },
+        0: { cellWidth: 8,  halign: 'center' },
+        1: { cellWidth: 12, halign: 'center' },
+        2: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+        3: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+        4: { cellWidth: 24, halign: 'center' },
+        5: { cellWidth: 10, halign: 'center' },
+        6: { cellWidth: 18, halign: 'center' },
+        7: { cellWidth: 26, halign: 'right' },
+        8: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
+        9: { halign: 'left' },
       },
       theme: 'grid',
       didParseCell: (data: any) => {
@@ -1391,24 +1397,36 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
       pdf.text('CONSOLIDADO DE MERCANCIA (RESUMEN DE CARGA)', ML, y);
       y += 4;
+      // 3 grupos por fila: ID | DESCRIPCIÓN | CANT | NOTAS  ×3
+      // Anchos por grupo (CW≈285mm / 3 = 95mm): id=18, desc=47, cant=11, notas=19 = 95mm
       const cargoRows: string[][] = [];
-      for (let i = 0; i < cargoItems.length; i += 2) {
-        const a = cargoItems[i], b = cargoItems[i + 1];
-        cargoRows.push([a.id, a.name.substring(0,32), String(a.total), b?b.id:'', b?b.name.substring(0,32):'', b?String(b.total):'']);
+      for (let i = 0; i < cargoItems.length; i += 3) {
+        const a = cargoItems[i], b = cargoItems[i + 1], c = cargoItems[i + 2];
+        cargoRows.push([
+          a.id, a.name.substring(0, 28), String(a.total), '',
+          b ? b.id : '', b ? b.name.substring(0, 28) : '', b ? String(b.total) : '', '',
+          c ? c.id : '', c ? c.name.substring(0, 28) : '', c ? String(c.total) : '', '',
+        ]);
       }
       autoTable(pdf, {
         startY: y, margin: { left: ML, right: MR },
-        head: [['ID','DESCRIPCION','CANT','ID','DESCRIPCION','CANT']],
+        head: [['ID','DESCRIPCION','CANT','NOTAS','ID','DESCRIPCION','CANT','NOTAS','ID','DESCRIPCION','CANT','NOTAS']],
         body: cargoRows,
         styles: { fontSize: 6, cellPadding: 2 },
-        headStyles: { fillColor: [241,245,249], textColor: [15,23,42], fontStyle: 'bold', fontSize: 6 },
+        headStyles: { fillColor: [15,23,42], textColor: [255,255,255], fontStyle: 'bold', fontSize: 6 },
         columnStyles: {
-          0: { cellWidth: 17, halign: 'center' },
-          1: { cellWidth: 55 },
-          2: { cellWidth: 13, halign: 'center', fontStyle: 'bold' },
-          3: { cellWidth: 17, halign: 'center' },
-          4: { cellWidth: 55 },
-          5: { cellWidth: 13, halign: 'center', fontStyle: 'bold' },
+          0:  { cellWidth: 18, halign: 'center' },
+          1:  { cellWidth: 47 },
+          2:  { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
+          3:  { cellWidth: 19 },
+          4:  { cellWidth: 18, halign: 'center' },
+          5:  { cellWidth: 47 },
+          6:  { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
+          7:  { cellWidth: 19 },
+          8:  { cellWidth: 18, halign: 'center' },
+          9:  { cellWidth: 47 },
+          10: { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
+          11: { cellWidth: 19 },
         },
         theme: 'grid',
       });
@@ -2797,7 +2815,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             {/* Map + Stop list side by side */}
             <div className="flex flex-1 overflow-hidden">
               {/* Leaflet map */}
-              <div id="route-preview-map" className="flex-1 z-0" />
+              <div id="route-preview-map" className="flex-1 z-0" style={{ minHeight: 320 }} />
 
               {/* Stop list */}
               <div className="w-64 shrink-0 overflow-y-auto custom-scrollbar bg-slate-50 border-l border-slate-100 p-3 space-y-2">
