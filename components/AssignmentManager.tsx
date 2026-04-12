@@ -46,8 +46,9 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
 
       // Aplicar filtros
       const matchesClient = !filterClientActive || (a.clientId || (a as any).client_id) === filterClientActive;
-      const v = vehicles.find(veh => veh.id === a.vehicleId);
-      const matchesPlate = !filterPlateActive || v?.plate.toLowerCase().includes(filterPlateActive.toLowerCase());
+      const vId = a.vehicleId || (a as any).vehicle_id;
+      const plateStr = (a as any).plate || vehicles.find(veh => veh.id === vId)?.plate || '';
+      const matchesPlate = !filterPlateActive || plateStr.toLowerCase().includes(filterPlateActive.toLowerCase());
 
       return matchesClient && matchesPlate;
     }),
@@ -65,7 +66,7 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
   // Vehículos pendientes: TODOS los que no tienen asignación activa actualmente
   const pendingVehicles = useMemo(() => 
     vehicles.filter(v => {
-      const isPending = !activeAssignments.some(a => a.vehicleId === v.id);
+      const isPending = !activeAssignments.some(a => (a.vehicleId || (a as any).vehicle_id) === v.id);
       const matchesPlate = !filterPlatePending || v.plate.toLowerCase().includes(filterPlatePending.toLowerCase());
       return isPending && matchesPlate;
     }),
@@ -74,7 +75,7 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
 
   // Conductores disponibles: TODOS los activos y sin asignación
   const availableDrivers = useMemo(() => 
-    drivers.filter(d => (d.status === 'Activo' || d.statusId === 'EST-01') && !activeAssignments.some(a => a.driverId === d.id)),
+    drivers.filter(d => (d.status === 'Activo' || d.statusId === 'EST-01') && !activeAssignments.some(a => (a.driverId || (a as any).driver_id) === d.id)),
     [drivers, activeAssignments]
   );
 
@@ -299,17 +300,23 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
               </div>
               <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 {activeAssignments.map(a => {
-                  const v = vehicles.find(veh => veh.id === a.vehicleId);
-                  const d = drivers.find(drv => drv.id === a.driverId);
+                  // El API retorna snake_case; el store puede tener camelCase o snake_case
+                  const vId = a.vehicleId || (a as any).vehicle_id;
+                  const dId = a.driverId   || (a as any).driver_id;
+                  const cId = a.clientId   || (a as any).client_id;
+                  // Usar plate/driver_name del API directamente si están disponibles, sino buscar en arrays
+                  const plate      = (a as any).plate      || vehicles.find(veh => veh.id === vId)?.plate      || vId || 'S/P';
+                  const driverName = (a as any).driver_name || drivers.find(drv => drv.id === dId)?.name       || dId || 'S/C';
+                  const clientName = clients.find(c => c.id === cId)?.name || cId || 'S/C';
                   return (
                     <div key={a.id} className="bg-white p-6 rounded-3xl border-2 border-emerald-100 shadow-xl flex justify-between items-center group animate-in slide-in-from-right-4 relative overflow-hidden">
                       <div className="flex items-center gap-6 relative z-10">
                         <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg"><Icons.Truck /></div>
                         <div>
-                          <p className="font-black text-slate-900 uppercase text-sm">{v?.plate} <span className="text-emerald-500 mx-2">↔</span> {d?.name.split(' ')[0]}</p>
+                          <p className="font-black text-slate-900 uppercase text-sm">{plate} <span className="text-emerald-500 mx-2">↔</span> {driverName.split(' ')[0]}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="px-2 py-0.5 bg-slate-900 text-white text-[8px] font-black rounded-md uppercase tracking-wider">
-                              {clients.find(c => c.id === (a.clientId || (a as any).client_id))?.name || 'S/C'}
+                              {clientName}
                             </span>
                             <p className="text-[9px] text-slate-400 font-black uppercase">Vínculo Activo M7</p>
                           </div>
@@ -334,10 +341,16 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({
                 {historyAssignments.length === 0 ? <p className="text-slate-400 text-center py-20 font-black uppercase text-xs tracking-widest">Sin registros históricos</p> : historyAssignments.map(a => (
                   <div key={a.id} className="bg-white p-6 rounded-2xl border border-slate-100 flex justify-between items-center opacity-60">
                     <div>
-                      <p className="font-black text-slate-900 uppercase text-xs">{vehicles.find(v => v.id === a.vehicleId)?.plate} <span className="text-slate-300 mx-4">|</span> {drivers.find(d => d.id === a.driverId)?.name}</p>
-                      <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">{clients.find(c => c.id === (a.clientId || (a as any).client_id))?.name || 'Cliente Desconocido'}</p>
+                      <p className="font-black text-slate-900 uppercase text-xs">
+                        {(a as any).plate || vehicles.find(v => v.id === (a.vehicleId || (a as any).vehicle_id))?.plate || 'S/P'}
+                        <span className="text-slate-300 mx-4">|</span>
+                        {(a as any).driver_name || drivers.find(d => d.id === (a.driverId || (a as any).driver_id))?.name || 'S/C'}
+                      </p>
+                      <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">
+                        {clients.find(c => c.id === (a.clientId || (a as any).client_id))?.name || 'Cliente Desconocido'}
+                      </p>
                     </div>
-                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Cierre: {new Date(a.updatedAt).toLocaleDateString()}</p>
+                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Cierre: {new Date(a.updatedAt || (a as any).updated_at).toLocaleDateString()}</p>
                   </div>
                 ))}
              </div>
