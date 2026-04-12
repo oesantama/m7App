@@ -419,9 +419,109 @@ const healSchema = async (client: any) => {
     console.log('[M7-DB-IQ] Configurando restricciones de Aprendizaje Granular...');
     await client.query(`
       DROP INDEX IF EXISTS unq_routing_patterns_city_veh;
-      CREATE UNIQUE INDEX IF NOT EXISTS unq_routing_patterns_granular 
+      CREATE UNIQUE INDEX IF NOT EXISTS unq_routing_patterns_granular
       ON routing_patterns (city, vehicle_id, neighborhood);
     `);
+
+    // ── NORMALIZACIÓN document_items.item_status ─────────────────────────────
+    // Los registros legacy tienen nombres descriptivos ("entregado sin verificar")
+    // en lugar de los IDs EST-XX que usa el planificador/despacho.
+    // Mapeamos por ILIKE para cubrir variantes de mayúsculas/minúsculas.
+    const needsNorm = await client.query(`
+      SELECT COUNT(*) FROM document_items
+      WHERE item_status IS NULL
+         OR item_status NOT LIKE 'EST-%'
+         AND item_status != 'ELIMINADO'
+    `);
+    if (parseInt(needsNorm.rows[0].count) > 0) {
+      console.log(`[M7-DB-HEAL] Normalizando item_status: ${needsNorm.rows[0].count} filas con nombres → IDs EST-XX...`);
+      await client.query(`
+        UPDATE document_items
+        SET item_status = CASE
+          WHEN item_status ILIKE '%pendiente%'                               THEN 'EST-01'
+          WHEN item_status ILIKE '%auditado%'                                THEN 'EST-01'
+          WHEN item_status ILIKE '%recibido%'                                THEN 'EST-01'
+          WHEN item_status ILIKE '%en conteo%'                               THEN 'EST-01'
+          WHEN item_status ILIKE '%activo%'                                  THEN 'EST-01'
+          WHEN item_status ILIKE '%inventariado%'                            THEN 'EST-08'
+          WHEN item_status ILIKE '%alistado%'                                THEN 'EST-09'
+          WHEN item_status ILIKE '%asignado%'                                THEN 'EST-10'
+          WHEN item_status ILIKE '%en ruta%'                                 THEN 'EST-11'
+          WHEN item_status ILIKE '%entregado%'                               THEN 'EST-12'
+          WHEN item_status ILIKE '%entrega%' AND item_status NOT ILIKE '%parcial%' THEN 'EST-12'
+          WHEN item_status ILIKE '%devuelto%'                                THEN 'EST-13'
+          WHEN item_status ILIKE '%devoluci%'                                THEN 'EST-13'
+          WHEN item_status ILIKE '%parcial%'                                 THEN 'EST-14'
+          WHEN item_status ILIKE '%repique%'                                 THEN 'EST-15'
+          WHEN item_status ILIKE '%inactivo%'                                THEN 'EST-02'
+          WHEN item_status ILIKE '%elimina%'                                 THEN 'ELIMINADO'
+          ELSE item_status
+        END
+        WHERE item_status IS NOT NULL
+          AND item_status NOT LIKE 'EST-%'
+          AND item_status != 'ELIMINADO'
+      `);
+
+      await client.query(`
+        UPDATE document_items di
+        SET item_status = CASE
+          WHEN dl.status IN ('ENTREGADO', 'COMPLETADO', 'FINALIZADO') THEN 'EST-12'
+          WHEN dl.status IN ('EN RUTA')                               THEN 'EST-11'
+          WHEN dl.status IN ('ELIMINADO', 'RECHAZADO')                THEN 'ELIMINADO'
+          ELSE 'EST-01'
+        END
+        FROM documents_l dl
+        WHERE di.document_id = dl.id
+          AND di.item_status IS NULL
+      `);
+
+      await client.query(`
+        UPDATE document_items SET item_status = 'EST-01'
+        WHERE item_status IS NULL
+      `);
+      console.log('[M7-DB-HEAL] Normalización item_status completada.');
+    }
+
+    // ── NORMALIZACIÓN documents_l.status ─────────────────────────────────────
+    // El código (frontend + backend) usa texto estándar ('PENDIENTE', 'ENTREGADO', etc.)
+    // Normalizamos variantes/errores tipográficos pero MANTENEMOS texto (no convertimos a EST-XX
+    // porque todo el código depende de estos nombres de texto).
+    const docNorm = await client.query(`
+      SELECT COUNT(*) FROM documents_l
+      WHERE status IS NOT NULL
+        AND status NOT IN ('PENDIENTE','AUDITADO','RECIBIDO','EN CONTEO','INVENTARIADO',
+                           'EN RUTA','ENTREGADO','DEVUELTO','ENTREGA PARCIAL',
+                           'ELIMINADO','RECHAZADO','COMPLETADO','FINALIZADO','ASIGNADO')
+    `);
+    if (parseInt(docNorm.rows[0].count) > 0) {
+      console.log(`[M7-DB-HEAL] Normalizando documents_l.status: ${docNorm.rows[0].count} filas con variantes...`);
+      await client.query(`
+        UPDATE documents_l
+        SET status = CASE
+          WHEN status ILIKE '%pendiente%'                  THEN 'PENDIENTE'
+          WHEN status ILIKE '%auditado%'                   THEN 'AUDITADO'
+          WHEN status ILIKE '%recibido%'                   THEN 'RECIBIDO'
+          WHEN status ILIKE '%en conteo%'                  THEN 'EN CONTEO'
+          WHEN status ILIKE '%inventariado%'               THEN 'INVENTARIADO'
+          WHEN status ILIKE '%asignado%'                   THEN 'ASIGNADO'
+          WHEN status ILIKE '%en ruta%'                    THEN 'EN RUTA'
+          WHEN status ILIKE '%parcial%'                    THEN 'ENTREGA PARCIAL'
+          WHEN status ILIKE '%entregado%'                  THEN 'ENTREGADO'
+          WHEN status ILIKE '%entrega%' AND status NOT ILIKE '%parcial%' THEN 'ENTREGADO'
+          WHEN status ILIKE '%devuelto%'                   THEN 'DEVUELTO'
+          WHEN status ILIKE '%devoluci%'                   THEN 'DEVUELTO'
+          WHEN status ILIKE '%finalizado%'                 THEN 'COMPLETADO'
+          WHEN status ILIKE '%completa%'                   THEN 'COMPLETADO'
+          WHEN status ILIKE '%rechaz%'                     THEN 'RECHAZADO'
+          WHEN status ILIKE '%elimina%'                    THEN 'ELIMINADO'
+          ELSE status
+        END
+        WHERE status NOT IN ('PENDIENTE','AUDITADO','RECIBIDO','EN CONTEO','INVENTARIADO',
+                             'EN RUTA','ENTREGADO','DEVUELTO','ENTREGA PARCIAL',
+                             'ELIMINADO','RECHAZADO','COMPLETADO','FINALIZADO','ASIGNADO')
+      `);
+      console.log('[M7-DB-HEAL] Normalización documents_l.status completada.');
+    }
 
   } catch (e: any) {
     console.error('[M7-DB-HEAL] Error en fase de estabilidad nuclear:', e.message);
@@ -460,9 +560,16 @@ export const restoreSystem = async () => {
 
     await client.query(`
       INSERT INTO estados (id, name, status_id) VALUES
-      ('EST-01', 'ACTIVO', 'EST-01'), ('EST-02', 'INACTIVO', 'EST-01'), ('EST-08', 'INVENTARIADO', 'EST-01'),
-      ('EST-10', 'ASIGNADO', 'EST-01'), ('EST-11', 'EN RUTA', 'EST-01'), ('EST-12', 'ENTREGADO', 'EST-01'),
-      ('EST-13', 'DEVUELTO', 'EST-01'), ('EST-14', 'ENTREGA PARCIAL', 'EST-01')
+      ('EST-01', 'ACTIVO',          'EST-01'),
+      ('EST-02', 'INACTIVO',        'EST-01'),
+      ('EST-08', 'INVENTARIADO',    'EST-01'),
+      ('EST-09', 'ALISTADO',        'EST-01'),
+      ('EST-10', 'ASIGNADO',        'EST-01'),
+      ('EST-11', 'EN RUTA',         'EST-01'),
+      ('EST-12', 'ENTREGADO',       'EST-01'),
+      ('EST-13', 'DEVUELTO',        'EST-01'),
+      ('EST-14', 'ENTREGA PARCIAL', 'EST-01'),
+      ('EST-15', 'REPIQUE',         'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
     `);
 

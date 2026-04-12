@@ -37,6 +37,7 @@ export const getDocuments = async (req: Request, res: Response) => {
                i.article_id      as "articleId",
                i.order_number    as "orderNumber",
                i.item_status     as "itemStatus",
+               e_i.name          as "itemStatusName",
                i.expected_qty    as "expectedQty",
                i.received_qty    as "receivedQty",
                i.un_code         as "unCode",
@@ -48,6 +49,7 @@ export const getDocuments = async (req: Request, res: Response) => {
                c.count_2         as "count2",
                c.inventory_observation as "inventoryNote"
         FROM document_items i
+        LEFT JOIN estados e_i ON e_i.id = i.item_status
         LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND TRIM(UPPER(i.invoice)) = TRIM(UPPER(p.invoice))
         LEFT JOIN document_consolidated_items c ON i.document_id = c.document_id AND TRIM(UPPER(i.article_id)) = TRIM(UPPER(c.article_id))
         WHERE i.document_id = d.id
@@ -102,13 +104,13 @@ export const syncInventory = async (req: Request, res: Response) => {
     }
 
     const currentStatus = checkStatus.rows[0].status;
-    if (currentStatus === 'Inventariado' && !isPartial) {
+    if (currentStatus === 'INVENTARIADO' && !isPartial) {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: "Documento ya finalizado" });
     }
 
     const docL = checkStatus.rows[0];
-    const newStatus = isPartial ? 'Pendiente' : 'Inventariado';
+    const newStatus = isPartial ? 'PENDIENTE' : 'INVENTARIADO';
     const inventoryDate = isPartial ? null : new Date();
 
     // 1. Actualizar Metadatos del Documento
@@ -515,7 +517,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
         doc.codplan || doc.un_orig || 'S/I',
         doc.planType || doc.plan_type || 'N/A',
         deliveryDate,
-        doc.status || 'Pendiente',
+        (doc.status ? String(doc.status).toUpperCase().trim() : 'PENDIENTE'),
         doc.createdAt || new Date().toISOString(),
         pickingDate,
         receivingDate,
@@ -708,6 +710,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(documents_l.vehicle_plate) as "plate",
         MAX(documents_l.status) as "status",
         MAX(document_items.item_status) as "itemStatus",
+        MAX(est_item.name) as "itemStatusName",
         MAX(da.id) as "dispatchId",
         MAX(da.status) as "dispatchStatus",
         MAX(pa.leader_id) as "pickerLeader",
@@ -751,6 +754,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         pa.invoice_id = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
         OR pa.invoice_id = ${sqlIdGen}
       )
+      LEFT JOIN estados est_item ON est_item.id = document_items.item_status
       WHERE 1=1
     `;
 
@@ -788,8 +792,9 @@ export const getInvoices = async (req: Request, res: Response) => {
     } else if (history !== 'true') {
       // Planificador: solo facturas pendientes o en repique a bodega
       // EST-01 = pendiente inicial | EST-15 = repique (devuelto para re-entrega)
-      query += ` AND document_items.item_status IN ('EST-01', 'EST-15')
-        AND documents_l.status NOT IN ('ELIMINADO')`;
+      // NULL = registros legacy antes del backfill (compatibilidad con producción)
+      query += ` AND (document_items.item_status IN ('EST-01', 'EST-08', 'EST-15') OR document_items.item_status IS NULL)
+        AND documents_l.status NOT IN ('ELIMINADO', 'ENTREGADO', 'COMPLETADO', 'RECHAZADO')`;
     }
 
     query += ` GROUP BY 
@@ -1146,7 +1151,7 @@ export const createManualDocument = async (req: Request, res: Response) => {
     const docId = `L-MAN-${Date.now()}`;
     const result = await client.query(`
       INSERT INTO documents_l (id, external_doc_id, client_id, vehicle_plate, status, plan_type, created_by, created_at)
-      VALUES ($1, $2, $3, $4, 'Pendiente', $5, $6, NOW())
+      VALUES ($1, $2, $3, $4, 'PENDIENTE', $5, $6, NOW())
       RETURNING *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData", plan_type as "planType"
     `, [docId, externalDocId, clientId, vehiclePlate, planType || 'MANUAL', user]);
 

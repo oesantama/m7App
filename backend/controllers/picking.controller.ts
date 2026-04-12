@@ -108,7 +108,7 @@ export const signPicking = async (req: Request, res: Response) => {
             // Opcionalmente actualizar estado de ítems
             const assignRes = await pool.query('SELECT invoice_id FROM picking_assignments WHERE id = $1', [pickingId]);
             const invId = assignRes.rows[0].invoice_id;
-            await pool.query("UPDATE document_items SET item_status = 'ALISTADO' WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = $1 OR COALESCE(NULLIF(invoice, ''), order_number) = $1", [invId]);
+            await pool.query("UPDATE document_items SET item_status = 'EST-09' WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = $1 OR COALESCE(NULLIF(invoice, ''), order_number) = $1", [invId]);
         }
 
         await pool.query('COMMIT');
