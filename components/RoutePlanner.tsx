@@ -26,6 +26,41 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// ── Zonas geográficas Valle de Aburrá (7 corredores) ─────────────────────────
+// Cada zona define un corredor de reparto. Las zonas adyacentes pueden mezclarse
+// solo si la carga está muy vacía; zonas no adyacentes se excluyen completamente.
+const GEO_ZONES_ADJACENT: Record<string, string[]> = {
+  'NORTE_LEJANO':    ['NORTE'],
+  'NORTE':           ['NORTE_LEJANO', 'CENTRO_NORTE'],
+  'CENTRO_NORTE':    ['NORTE', 'CENTRO', 'CENTRO_OCC'],
+  'CENTRO':          ['CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO_SUR'],
+  'CENTRO_OCC':      ['CENTRO_NORTE', 'CENTRO', 'CENTRO_SUR'],
+  'CENTRO_SUR':      ['CENTRO', 'CENTRO_OCC', 'SUR'],
+  'SUR':             ['CENTRO_SUR', 'SUR_LEJANO'],
+  'SUR_LEJANO':      ['SUR'],
+};
+
+function classifyGeoZone(lat: number, lng: number, cityUpper: string): string {
+  // Norte lejano: Girardota, Barbosa, Don Matías, Santo Domingo (+)
+  const nFar = ['GIRARDOTA','BARBOSA','DON MATÍAS','DONMATÍAS','SANTO DOMINGO'];
+  if (nFar.some(c => cityUpper.includes(c)) || lat > 6.42) return 'NORTE_LEJANO';
+  // Norte: Bello, Copacabana
+  if (['BELLO','COPACABANA'].some(c => cityUpper.includes(c)) || lat > 6.31) return 'NORTE';
+  // Centro-norte Medellín (Castilla, Aranjuez, Robledo norte)
+  if (lat > 6.265) return 'CENTRO_NORTE';
+  // Centro Medellín: split por corredor occidente (San Javier, Laureles, Belén)
+  if (lat > 6.205) return lng < -75.595 ? 'CENTRO_OCC' : 'CENTRO';
+  // Sur: Envigado, Itagüí, Sabaneta
+  const sCities = ['ITAGÜÍ','ITAGUI','SABANETA','ENVIGADO'];
+  if (sCities.some(c => cityUpper.includes(c)) || lat > 6.135) return 'SUR';
+  // Sur lejano: Caldas, La Estrella, El Retiro
+  return 'SUR_LEJANO';
+}
+
+// Radio máximo de dispersión geográfica por ruta (km)
+// Una ruta no debería cubrir más de este radio desde su centroide
+const MAX_ROUTE_RADIUS_KM = 18;
+
 // ── Helpers de visualización ──────────────────────────────────────────────────
 const CITY_PALETTE = ['#6366f1','#8b5cf6','#06b6d4','#14b8a6','#f43f5e','#f97316','#22c55e','#3b82f6','#ec4899','#84cc16'];
 const getCityDotColor = (city: string): string => {
@@ -584,36 +619,31 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // @ts-ignore
         inv.hasDefaultCoords = (lat === 0 && lng === 0) || hasDefaultCoords(lat, lng);
 
-        // MEJORA 7: Zona geográfica para evitar zigzag entre corredores
-        // Valle de Aburrá: norte (Bello/Copacabana+) → centro (Medellín) → sur (Itagüí/Envigado/Caldas+)
+        // MEJORA 7 v2: Zona geográfica granular (7 corredores Valle de Aburrá)
         const cUpper = (inv as any).cityKey || '';
-        const northCities = ['BELLO', 'COPACABANA', 'GIRARDOTA', 'BARBOSA', 'DONMATÍAS', 'DON MATÍAS', 'SANTO DOMINGO'];
-        const southCities = ['ITAGÜÍ', 'ITAGUI', 'SABANETA', 'LA ESTRELLA', 'CALDAS', 'ENVIGADO', 'EL RETIRO'];
-        let geoZone = 'CENTRO';
-        if (northCities.some(c => cUpper.includes(c)) || lat > 6.32) geoZone = 'NORTE';
-        else if (southCities.some(c => cUpper.includes(c)) || lat < 6.13) geoZone = 'SUR';
-        else if (lat > 6.27) geoZone = 'CENTRO_NORTE';
         // @ts-ignore
-        inv.geoZone = geoZone;
+        inv.geoZone = classifyGeoZone(lat, lng, cUpper);
       });
 
-      // 3. Ordenamiento Global
+      // 3. Ordenamiento Global — prioridad → ventana horaria → ZONA GEOGRÁFICA → ciudad → barrio
+      const ZONE_ORDER = ['NORTE_LEJANO','NORTE','CENTRO_NORTE','CENTRO_OCC','CENTRO','CENTRO_SUR','SUR','SUR_LEJANO'];
       availableInvoices.sort((a, b) => {
         // @ts-ignore
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
-        // Ventana horaria: entregas con hora límite más temprana primero
-        // @ts-ignore
         const aTime = (a as any).timeWindowMinutes ?? Infinity;
-        // @ts-ignore
         const bTime = (b as any).timeWindowMinutes ?? Infinity;
         if (aTime !== bTime) return aTime - bTime;
+        // Zona geográfica primero (agrupa corredores)
+        const zA = ZONE_ORDER.indexOf((a as any).geoZone || 'CENTRO');
+        const zB = ZONE_ORDER.indexOf((b as any).geoZone || 'CENTRO');
+        if (zA !== zB) return zA - zB;
         // @ts-ignore
         if (a.cityKey !== b.cityKey) return (a.cityKey || '').localeCompare(b.cityKey || '');
         // @ts-ignore
         if (a.neighborhoodKey !== b.neighborhoodKey) return (a.neighborhoodKey || '').localeCompare(b.neighborhoodKey || '');
-        // @ts-ignore
-        if (a.startAddressForSort !== b.startAddressForSort) return (a.startAddressForSort || '').localeCompare(b.startAddressForSort || '');
-        return (Number(b.volumeM3) || 0) - (Number(a.volumeM3) || 0);
+        // Dentro del mismo barrio, ordenar por lat/lng (nearest-neighbor natural)
+        if (Number(a.lat) !== Number(b.lat)) return Number(a.lat) - Number(b.lat);
+        return Number(a.lng) - Number(b.lng);
       });
 
       const prioritizedFleet = [...availableVehicles]
@@ -656,6 +686,16 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             ? Object.entries(loadZoneCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
             : null;
 
+          // Centroide de la carga actual (para restricción de radio)
+          let centLat = 0, centLng = 0;
+          if (load.length >= 2) {
+            const validLoad = load.filter(inv => !inv.hasDefaultCoords && Number(inv.lat) > 0);
+            if (validLoad.length >= 2) {
+              centLat = validLoad.reduce((s, inv) => s + Number(inv.lat), 0) / validLoad.length;
+              centLng = validLoad.reduce((s, inv) => s + Number(inv.lng), 0) / validLoad.length;
+            }
+          }
+
           for (let j = 0; j < availableInvoices.length; j++) {
               const inv = availableInvoices[j];
               const invVol = Number(inv.volumeM3) || 0;
@@ -668,37 +708,53 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
                   const invLat = Number(inv.lat || 0);
                   const invLng = Number(inv.lng || 0);
+                  const invZone = (inv as any).geoZone || 'CENTRO';
+                  const hasDefCoords = (inv as any).hasDefaultCoords;
 
-                  // MEJORA 1: Haversine (ya integrada en getDistance)
-                  let dist = getDistance(currentLat, currentLng, invLat, invLng);
-
-                  // MEJORA 2: Penalizar facturas sin geocodificar (coords default)
-                  // @ts-ignore
-                  if ((inv as any).hasDefaultCoords) dist *= 5;
-
-                  // MEJORA 3: Penalizar si la hora estimada de llegada supera la ventana
-                  // @ts-ignore
-                  const timeWindow = (inv as any).timeWindowMinutes;
-                  if (timeWindow != null) {
-                    const estimatedArrivalMin = ORBIT_HUB_ORIGIN.lat && stopIndex > 0
-                      ? (8 * 60) + stopIndex * 25 // 8 AM + 25min/parada
-                      : 8 * 60;
-                    if (estimatedArrivalMin > timeWindow) {
-                      // Penalización proporcional al retraso: 10% extra por cada 15 min de retraso
-                      const delayMin = estimatedArrivalMin - timeWindow;
-                      dist *= (1 + Math.min(delayMin / 150, 2)); // Máx ×3
+                  // ── RESTRICCIÓN GEOGRÁFICA DURA (después de 3 paradas) ──────────
+                  // Una vez establecida la zona dominante, excluir zonas incompatibles.
+                  // Permitido: misma zona + zonas adyacentes.
+                  // Bloqueado: cualquier otra zona → skip total (no penalidad, exclusión).
+                  if (dominantZone && load.length >= 3 && !hasDefCoords) {
+                    const adjacent = GEO_ZONES_ADJACENT[dominantZone] || [];
+                    if (invZone !== dominantZone && !adjacent.includes(invZone)) {
+                      continue; // Corredor incompatible — saltar completamente
                     }
                   }
 
-                  // MEJORA 5: Descuento por ciudad favorita del vehículo (patrón más fuerte)
-                  // @ts-ignore
-                  const cKey = inv.cityKey || '';
+                  // ── RESTRICCIÓN DE RADIO (centroide) ────────────────────────────
+                  // La ruta no puede dispersarse más de MAX_ROUTE_RADIUS_KM desde
+                  // el centroide de las paradas ya cargadas.
+                  if (centLat > 0 && !hasDefCoords && invLat > 0) {
+                    const distFromCentroid = getDistance(centLat, centLng, invLat, invLng);
+                    if (distFromCentroid > MAX_ROUTE_RADIUS_KM) continue;
+                  }
+
+                  // ── CÁLCULO DE DISTANCIA PONDERADA ──────────────────────────────
+                  let dist = getDistance(currentLat, currentLng, invLat, invLng);
+
+                  // Penalizar coords default (sin geocodificar)
+                  if (hasDefCoords) dist *= 5;
+
+                  // Penalizar llegada fuera de ventana horaria
+                  const timeWindow = (inv as any).timeWindowMinutes;
+                  if (timeWindow != null) {
+                    const estimatedArrivalMin = stopIndex > 0 ? (8 * 60) + stopIndex * 25 : 8 * 60;
+                    if (estimatedArrivalMin > timeWindow) {
+                      const delayMin = estimatedArrivalMin - timeWindow;
+                      dist *= (1 + Math.min(delayMin / 150, 2));
+                    }
+                  }
+
+                  // Bonus por ciudad favorita del vehículo (patrón histórico)
+                  const cKey = (inv as any).cityKey || '';
                   const affinityBonus = (targetCity && cKey === targetCity) ? 0.8 : 1.0;
 
-                  // MEJORA 7: Penalizar cambio de zona geográfica (evita zigzag norte↔sur)
-                  // @ts-ignore
-                  const invZone = (inv as any).geoZone || 'CENTRO';
-                  const zonePenalty = (dominantZone && invZone !== dominantZone) ? 2.5 : 1.0;
+                  // Penalidad de zona (aplica principalmente antes de las 3 paradas
+                  // donde todavía no hay restricción dura)
+                  const zonePenalty = (!dominantZone || invZone === dominantZone) ? 1.0
+                    : (GEO_ZONES_ADJACENT[dominantZone] || []).includes(invZone) ? 2.0
+                    : 8.0; // Zona no adyacente — penalidad muy alta antes del hard-skip
 
                   const finalDist = dist * affinityBonus * zonePenalty;
 
