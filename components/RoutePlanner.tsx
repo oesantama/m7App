@@ -449,6 +449,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       return {
         ...v,
+        capacityM3: Number(v.capacityM3 || (v as any).capacity_m3 || 0),
         driverName: d.name,
         driverId: d.id,
         assignmentId: link.id
@@ -743,7 +744,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         if (remainingCells.every(c => c.invoices.length === 0)) return;
         if (usedVehicleIds.has(vehicle.id)) return;
 
-        const vCap = Number(vehicle.capacityM3) || 0;
+        const vCap = Number(vehicle.capacityM3 || (vehicle as any).capacity_m3) || 0;
         const nominalCapacity = vCap > 0 ? vCap : OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
         const absoluteMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION;
         const isLargeVehicle = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
@@ -906,7 +907,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }
 
     // Recalculate using fallback capacity
-    const realCapacity = Number(route.vehicle.capacityM3) > 0 ? Number(route.vehicle.capacityM3) : OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+    const realCapacity = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) > 0 ? Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) : OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
     const newVol = route.assignedInvoices.reduce((acc, curr) => acc + Number(curr.volumeM3 || (curr as any).volume_m3 || 0), 0);
     route.totalVolume = Number(Number(newVol).toFixed(4));
     route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
@@ -955,7 +956,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }, ...prev]);
 
     // Advertencia si vehículo grande entra a barrio restringido
-    const nominalCapacity = Number(route.vehicle.capacityM3) || 0;
+    const nominalCapacity = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) || 0;
     const isLarge = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
     const neighborhood = ((data.invoice as any).neighborhood || '').toUpperCase().trim();
     if (isLarge && RESTRICTED_NEIGHBORHOODS.includes(neighborhood)) {
@@ -973,7 +974,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const route = newSuggestions[addInvoiceModal.routeIndex];
 
     route.assignedInvoices.push(invoice);
-    const realCapacity = Number(route.vehicle.capacityM3) > 0 ? Number(route.vehicle.capacityM3) : 30; // Fallback
+    const realCapacity = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) > 0 ? Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) : 30; // Fallback
     const newVol = route.assignedInvoices.reduce((acc, curr) => acc + Number(curr.volumeM3 || (curr as any).volume_m3 || 0), 0);
     route.totalVolume = Number(Number(newVol).toFixed(4));
     route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
@@ -1974,11 +1975,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         <div className="text-right flex items-center gap-3">
                           <div className="text-right">
                             <p className="text-xs font-black text-white">
-                              <span className={(Number(route.totalVolume) || 0) > (Number(route.vehicle.capacityM3) || 30) ? 'text-red-400' : 'text-emerald-400'}>
+                              <span className={(Number(route.totalVolume) || 0) > (Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) || 30) ? 'text-red-400' : 'text-emerald-400'}>
                                 {(Number(route.totalVolume) || 0).toFixed(2)}
                               </span>
                               <span className="text-slate-500 mx-1">/</span>
-                              {(Number(route.vehicle.capacityM3) || 0).toFixed(2)}m³
+                              {(Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) || 0).toFixed(2)}m³
                             </p>
                             <div className="mt-1 h-1.5 bg-white/10 rounded-full overflow-hidden w-20 ml-auto">
                               <div
