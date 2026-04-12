@@ -422,79 +422,84 @@ const FleetManager: React.FC<FleetManagerProps> = ({
   return (
     <div className="flex flex-col gap-4 animate-in fade-in h-full overflow-hidden relative">
       {/* HEADER COMPACTO */}
-      <div className="bg-white px-6 py-4 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
-        <div className="flex items-center gap-4 shrink-0">
-          <div className="w-10 h-10 bg-slate-900 rounded-[1.2rem] flex items-center justify-center text-emerald-500 shadow-md">
-            {viewTab === 'vehicles' ? <Icons.Truck /> : <Icons.Users />}
-          </div>
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">
-                {viewTab === 'vehicles' ? 'Vehículos' : 'Conductores'}
-              </h2>
-              <button 
-                onClick={handleAnalyze} 
-                disabled={analyzing}
-                className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-500 hover:text-white transition-all group shadow-sm active:scale-95"
-              >
-                <Icons.Sparkles className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin' : 'text-emerald-500 group-hover:text-white'}`} />
-                <span className="text-[9px] font-black uppercase tracking-widest">{analyzing ? 'Analizando...' : 'Analizar Salud'}</span>
-              </button>
+      <div className="bg-white px-4 py-3 rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col gap-3 shrink-0">
+        {/* Fila 1: ícono + título + analizar */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-slate-900 rounded-[1.2rem] flex items-center justify-center text-emerald-500 shadow-md shrink-0">
+              {viewTab === 'vehicles' ? <Icons.Truck /> : <Icons.Users />}
             </div>
+            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter leading-none truncate">
+              {viewTab === 'vehicles' ? 'Vehículos' : viewTab === 'drivers' ? 'Conductores' : 'Salud Flota'}
+            </h2>
+            <button
+              onClick={handleAnalyze}
+              disabled={analyzing}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-500 hover:text-white transition-all group shadow-sm active:scale-95 shrink-0"
+            >
+              <Icons.Sparkles className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin' : 'text-emerald-500 group-hover:text-white'}`} />
+              <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">{analyzing ? 'Analizando...' : 'Analizar Salud'}</span>
+            </button>
           </div>
-        </div>
-
-        <div className="flex flex-1 max-w-xl bg-slate-50 px-5 py-2.5 rounded-2xl items-center gap-3 border border-slate-100 focus-within:border-emerald-500 transition-all">
-          <Icons.Search className="text-slate-300 w-4 h-4" />
-          <input 
-            type="text" 
-            placeholder={`Filtrar ${viewTab === 'vehicles' ? 'vehículos' : 'conductores'}...`} 
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
-            className="bg-transparent outline-none font-black text-[10px] uppercase w-full placeholder:text-slate-300" 
-          />
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-11 relative">
+          {/* Tabs en desktop */}
+          <div className="bg-slate-100 p-1 rounded-2xl items-center shadow-inner h-11 relative hidden lg:flex">
             <button onClick={() => setViewTab('vehicles')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewTab === 'vehicles' ? 'text-slate-900' : 'text-slate-400'}`}>Vehículos</button>
             <button onClick={() => setViewTab('drivers')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewTab === 'drivers' ? 'text-slate-900' : 'text-slate-400'}`}>Conductores</button>
             <button onClick={() => setViewTab('health')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all relative z-10 ${viewTab === 'health' ? 'text-emerald-600' : 'text-slate-400'}`}>Salud Flota</button>
             <div className={`absolute top-1 bottom-1 bg-white rounded-xl shadow-md transition-all duration-300 ${viewTab === 'vehicles' ? 'left-1 w-[80px]' : viewTab === 'drivers' ? 'left-[84px] w-[95px]' : 'left-[184px] w-[90px]'}`}></div>
           </div>
+        </div>
 
-          <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-11 relative">
-            <button onClick={() => setDisplayType('table')} className={`p-2.5 rounded-xl transition-all relative z-10 ${displayType === 'table' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.List /></button>
-            <button onClick={() => setDisplayType('grid')} className={`p-2.5 rounded-xl transition-all relative z-10 ${displayType === 'grid' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.Grid /></button>
-            <div className={`absolute top-1 bottom-1 w-[40px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayType === 'table' ? 'left-1' : 'left-[44px]'}`}></div>
+        {/* Fila 2: Búsqueda + Tabs móvil */}
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 bg-slate-50 px-4 py-2.5 rounded-2xl items-center gap-2 border border-slate-100 focus-within:border-emerald-500 transition-all min-w-0">
+            <Icons.Search className="text-slate-300 w-4 h-4 shrink-0" />
+            <input
+              type="text"
+              placeholder={`Filtrar ${viewTab === 'vehicles' ? 'vehículos' : 'conductores'}...`}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="bg-transparent outline-none font-black text-[10px] uppercase w-full placeholder:text-slate-300 min-w-0"
+            />
+          </div>
+          {/* Tabs compactos en móvil */}
+          <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-10 relative lg:hidden shrink-0">
+            <button onClick={() => setViewTab('vehicles')} className={`px-2.5 py-1.5 rounded-xl text-[8px] font-black uppercase transition-all relative z-10 ${viewTab === 'vehicles' ? 'text-slate-900' : 'text-slate-400'}`}>Veh</button>
+            <button onClick={() => setViewTab('drivers')} className={`px-2.5 py-1.5 rounded-xl text-[8px] font-black uppercase transition-all relative z-10 ${viewTab === 'drivers' ? 'text-slate-900' : 'text-slate-400'}`}>Cond</button>
+            <button onClick={() => setViewTab('health')} className={`px-2.5 py-1.5 rounded-xl text-[8px] font-black uppercase transition-all relative z-10 ${viewTab === 'health' ? 'text-emerald-600' : 'text-slate-400'}`}>Salud</button>
+            <div className={`absolute top-1 bottom-1 bg-white rounded-xl shadow-md transition-all duration-300 ${viewTab === 'vehicles' ? 'left-1 w-[38px]' : viewTab === 'drivers' ? 'left-[42px] w-[42px]' : 'left-[87px] w-[42px]'}`}></div>
+          </div>
+        </div>
+
+        {/* Fila 3: Acciones — scroll horizontal en móvil */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+          <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner h-10 relative shrink-0">
+            <button onClick={() => setDisplayType('table')} className={`p-2 rounded-xl transition-all relative z-10 ${displayType === 'table' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.List /></button>
+            <button onClick={() => setDisplayType('grid')} className={`p-2 rounded-xl transition-all relative z-10 ${displayType === 'grid' ? 'text-slate-900' : 'text-slate-400'}`}><Icons.Grid /></button>
+            <div className={`absolute top-1 bottom-1 w-[36px] bg-white rounded-xl shadow-md transition-all duration-300 ${displayType === 'table' ? 'left-1' : 'left-[40px]'}`}></div>
           </div>
 
-          <button onClick={handleExportExcel} className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 hover:scale-110 active:scale-95 transition-all shadow-lg hover:shadow-xl group relative" title="Exportar a Excel">
+          <button onClick={handleExportExcel} className="p-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 active:scale-95 transition-all shadow-lg shrink-0" title="Exportar a Excel">
             <Icons.Excel className="w-4 h-4" />
           </button>
 
           {canCreate && (
-            <div className="relative group">
-              <button 
-                onClick={() => setIsImportOpen(true)}
-                title="Importación Masiva Excel"
-                className="p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 hover:scale-110 active:scale-95 transition-all shadow-lg flex items-center gap-2"
-              >
-                <Icons.Upload className="w-4 h-4" />
-                <span className="text-[9px] font-black uppercase tracking-widest hidden lg:block">Importar</span>
-              </button>
-              <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 hidden group-hover:block bg-slate-900 text-white text-[8px] font-black uppercase py-2 px-3 rounded-xl whitespace-nowrap shadow-2xl z-50">
-                📥 IMPORTACIÓN MASIVA (Excel)
-              </div>
-            </div>
+            <button
+              onClick={() => setIsImportOpen(true)}
+              title="Importación Masiva Excel"
+              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shrink-0"
+            >
+              <Icons.Upload className="w-4 h-4" />
+              <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Importar</span>
+            </button>
           )}
 
           {canCreate && (
-            <button 
-              onClick={() => { setModalMode('single'); setFormData({ statusId: 'EST-01', clientId: user.clientId || INITIAL_CLIENTS[0].id }); setAiError(null); setIsModalOpen(true); }} 
-              className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all active:scale-95"
+            <button
+              onClick={() => { setModalMode('single'); setFormData({ statusId: 'EST-01', clientId: user.clientId || INITIAL_CLIENTS[0].id }); setAiError(null); setIsModalOpen(true); }}
+              className="flex-1 lg:flex-none bg-slate-900 text-white px-6 py-2.5 rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all active:scale-95 whitespace-nowrap shrink-0"
             >
-              NUEVO
+              + NUEVO
             </button>
           )}
         </div>
@@ -562,27 +567,27 @@ const FleetManager: React.FC<FleetManagerProps> = ({
 
       {/* LISTADO */}
       <div className="flex-1 bg-white rounded-[3rem] shadow-2xl border border-slate-100 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-auto custom-scrollbar">
           {displayType === 'table' ? (
-             <table className="w-full text-left">
+             <table className="w-full min-w-[560px] text-left">
                 <thead className="sticky top-0 z-10 bg-slate-900 text-white font-black uppercase tracking-widest text-[8px]">
                    <tr>
-                    <th className="px-8 py-4">Identificación</th>
-                    <th className="px-8 py-4">Documentación</th>
-                    <th className="px-8 py-4 text-center">Estado</th>
-                    <th className="px-8 py-4 text-right pr-12">Opciones</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Identificación</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Documentación</th>
+                    <th className="px-6 py-4 text-center whitespace-nowrap">Estado</th>
+                    <th className="px-6 py-4 text-right whitespace-nowrap">Opciones</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {activeData.map((item: any) => (
                     <tr key={item.id} className="hover:bg-slate-50 transition-all group">
-                      <td className="px-8 py-4">
-                         <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-[10px] shadow-sm ${viewTab === 'vehicles' ? 'bg-slate-800' : 'bg-emerald-500'}`}>
+                      <td className="px-6 py-4">
+                         <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-[10px] shadow-sm shrink-0 ${viewTab === 'vehicles' ? 'bg-slate-800' : 'bg-emerald-500'}`}>
                                {viewTab === 'vehicles' ? item.plate.slice(0,3) : item.name.slice(0,1)}
                             </div>
-                            <div>
-                               <p className="font-black text-slate-900 text-[12px] uppercase">
+                            <div className="min-w-0">
+                               <p className="font-black text-slate-900 text-[12px] uppercase truncate">
                                  {viewTab === 'vehicles' ? item.plate : item.name}
                                  {viewTab === 'drivers' && (item.licenseCategory || item.license_category) && (
                                    <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black border border-emerald-200">
@@ -590,37 +595,38 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                                    </span>
                                  )}
                                </p>
-                               <p className="text-[8px] text-slate-400 font-bold uppercase">{viewTab === 'vehicles' ? item.brand : item.documentNumber}</p>
+                               <p className="text-[8px] text-slate-400 font-bold uppercase truncate">{viewTab === 'vehicles' ? item.brand : item.documentNumber}</p>
                             </div>
                          </div>
                       </td>
-                      <td className="px-8 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                          <p className={`text-[9px] font-black uppercase ${!validateDate(item.soatExpiry || item.licenseExpiry) ? 'text-red-500' : 'text-slate-700'}`}>
                             VENCE: {viewTab === 'vehicles' ? (item.soatExpiry || 'PENDIENTE') : (item.licenseExpiry || 'N/A')}
                          </p>
                       </td>
-                      <td className="px-8 py-4 text-center">
-                         <span className={`px-4 py-1 rounded-full text-[8px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
+                         <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase border ${item.statusId === 'EST-01' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
                             {statusOptions.find(s => s.id === item.statusId)?.name || 'ACTIVO'}
                          </span>
                       </td>
-                       <td className="px-8 py-4 text-right pr-12 flex items-center justify-end gap-2">
-                          <button 
+                       <td className="px-6 py-4 whitespace-nowrap">
+                         <div className="flex items-center justify-end gap-2">
+                          <button
                             onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('detail'); setIsModalOpen(true); }}
-                            className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm" 
+                            className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                             title="Ver Detalles"
                           >
                              <Icons.Eye />
                           </button>
-                          <button 
-                            onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setIsModalOpen(true); }} 
+                          <button
+                            onClick={() => { setSelectedItem(item); setFormData({...item}); setModalMode('edit'); setIsModalOpen(true); }}
                             className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-md"
                             title="Editar"
                           >
                             <Icons.Audit />
                           </button>
                            {canDelete && (
-                            <button 
+                            <button
                               onClick={() => { setRecordToDelete(item); setShowDeleteConfirm(true); }}
                               className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-md"
                               title="Eliminar"
@@ -628,6 +634,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                               <Icons.Trash />
                             </button>
                           )}
+                         </div>
                        </td>
                     </tr>
                   ))}

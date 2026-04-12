@@ -360,18 +360,20 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     });
 
     const fleet = activeLinks.map(link => {
-      const v = vehicles.find(veh => veh.id === link.vehicleId);
-      const d = drivers.find(drv => drv.id === link.driverId);
+      const linkVId = link.vehicleId || (link as any).vehicle_id;
+      const linkDId = link.driverId || (link as any).driver_id;
+      const v = vehicles.find(veh => String(veh.id) === String(linkVId));
+      const d = drivers.find(drv => String(drv.id) === String(linkDId));
 
       if (!v || !d) return null;
 
-      // Validar estado 'Disponible'
-      const vStatus = String(v.status || '').toUpperCase();
-      const isAvailable = vStatus === 'DISPONIBLE' || String(v.statusId).toUpperCase() === 'EST-01';
+      // Validar estado 'Disponible' — soporta camelCase y snake_case
+      const vStatus = String(v.status || (v as any).status_id || '').toUpperCase();
+      const vStatusId = String(v.statusId || (v as any).status_id || '').toUpperCase();
+      const isAvailable = vStatus === 'DISPONIBLE' || vStatusId === 'EST-01';
       if (!isAvailable) return null;
 
       // Validar si está en despacho o ruta activa
-      // Normalización robusta para comparación de IDs
       const normalizeId = (id: any) => String(id || '').trim().toUpperCase();
       const vId = normalizeId(v.id);
 
@@ -381,7 +383,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       );
 
       // Regla estricta: Si el vehículo tiene estado ocupado en la BD, no se usa
-      if (['EST-10', 'EST-11', 'OCUPADO'].includes(vStatus) || isBusy) return null;
+      if (['EST-10', 'EST-11', 'OCUPADO'].includes(vStatusId) || isBusy) return null;
 
       return {
         ...v,
@@ -424,31 +426,30 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     let inRoute = 0;
 
     activeLinks.forEach(link => {
-      const v = vehicles.find(veh => veh.id === link.vehicleId);
+      const linkVId = link.vehicleId || (link as any).vehicle_id;
+      const v = vehicles.find(veh => String(veh.id) === String(linkVId));
       if (!v) return;
 
       const normalizeId = (id: any) => String(id || '').trim().toUpperCase();
       const vId = normalizeId(v.id);
 
-      const activeRoute = activeRoutes.find(r => 
+      const activeRoute = activeRoutes.find(r =>
         normalizeId(r.vehicleId || (r as any).vehicle_id) === vId &&
         ['EST-10', 'EST-11', 'ASSIGNED', 'IN ROUTE', 'EN_RUTA', 'ASIGNADA', 'EN RUTA', 'PENDIENTE', 'CONFIRMADA', 'PENDING_SIGNATURES'].includes(String(r.status || '').toUpperCase())
       );
 
       if (activeRoute) {
         const s = String(activeRoute.status || '').toUpperCase();
-        // EST-10 = Asignado (Ruta creada pero no despachada)
         if (s === 'EST-10' || s === 'ASSIGNED' || s === 'ASIGNADA') {
-            assigned++;
-        } 
-        // EST-11 = En Ruta (Ya salió)
-        else {
-            inRoute++;
+          assigned++;
+        } else {
+          inRoute++;
         }
       } else {
-        // Solo contar "En Base" si está Disponible Y NO tiene ruta
+        // Solo contar "En Base" si está Disponible Y NO tiene ruta activa
+        const vStatusId = String(v.statusId || (v as any).status_id || '').toUpperCase();
         const vStatus = String(v.status || '').toUpperCase();
-        if (vStatus === 'DISPONIBLE' || String(v.statusId).toUpperCase() === 'EST-01') {
+        if (vStatusId === 'EST-01' || vStatus === 'DISPONIBLE') {
           onBase++;
         }
       }
