@@ -89,7 +89,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
 export const getAjoverStats = async (req: Request, res: Response) => {
   try {
-    const [vehiclesRes, driversRes, routesRes, invoicesRes, returnsRes, topRoutesRes] = await Promise.all([
+    const [vehiclesRes, driversRes, routesRes, invoicesRes, returnsRes, topRoutesRes, vehicleEfficiencyRes] = await Promise.all([
       pool.query(`
         SELECT
           COUNT(*) as total,
@@ -145,6 +145,24 @@ export const getAjoverStats = async (req: Request, res: Response) => {
         WHERE r.client_id = 'CLI-01' OR r.client_id IS NULL
         GROUP BY r.name, r.status, v.plate, d.name
         ORDER BY active_count DESC LIMIT 10
+      `),
+      pool.query(`
+        SELECT
+          v.plate,
+          v.capacity_m3,
+          COUNT(r.id) as total_routes,
+          ROUND(AVG(COALESCE(r.utilization_pct, 0)), 1) as avg_utilization,
+          ROUND(AVG(COALESCE(r.total_volume_m3, 0)), 3) as avg_volume,
+          MAX(COALESCE(r.utilization_pct, 0)) as max_utilization,
+          SUM(COALESCE(r.total_volume_m3, 0)) as total_volume_dispatched
+        FROM routes r
+        JOIN vehicles v ON r.vehicle_id = v.id
+        WHERE r.created_at >= CURRENT_DATE - INTERVAL '30 days'
+          AND (r.client_id = 'CLI-01' OR r.client_id IS NULL)
+          AND COALESCE(r.utilization_pct, 0) > 0
+        GROUP BY v.plate, v.capacity_m3
+        ORDER BY avg_utilization DESC
+        LIMIT 20
       `)
     ]);
 
@@ -197,6 +215,15 @@ export const getAjoverStats = async (req: Request, res: Response) => {
         status: r.status,
         plate: r.plate,
         driver: r.driver_name,
+      })),
+      vehicleEfficiency: vehicleEfficiencyRes.rows.map(r => ({
+        plate: r.plate,
+        capacityM3: Number(r.capacity_m3),
+        totalRoutes: Number(r.total_routes),
+        avgUtilization: Number(r.avg_utilization),
+        avgVolume: Number(r.avg_volume),
+        maxUtilization: Number(r.max_utilization),
+        totalVolumeDispatched: Number(r.total_volume_dispatched),
       })),
     });
   } catch (err: any) {

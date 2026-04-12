@@ -243,9 +243,9 @@ export function rebalanceSingleRoute(
  */
 export const OPTIMIZATION_CONSTANTS = {
     TARGET_UTILIZATION: 0.85,  // 85% — objetivo de carga ideal (deja margen operativo)
-    MAX_UTILIZATION: 0.92,     // 92% — techo máximo antes de rechazar más facturas
-    CRITICAL_THRESHOLD: 0.95,  // 95% — bloqueo crítico de sobrecarga
-    WARN_THRESHOLD: 0.90,      // 90% — umbral de advertencia amarilla
+    MAX_UTILIZATION: 0.90,     // 90% — techo máximo (regla M7: no superar 90%)
+    CRITICAL_THRESHOLD: 0.92,  // 92% — bloqueo crítico de sobrecarga
+    WARN_THRESHOLD: 0.85,      // 85% — umbral de advertencia amarilla
     DEFAULT_CAPACITY: 30,      // m³ por defecto si el vehículo no tiene capacidad definida
     OPTIMIZATION_DELAY: 1200   // ms de delay para la animación de optimización
 };

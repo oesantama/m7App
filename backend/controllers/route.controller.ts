@@ -64,11 +64,18 @@ export const getRoutingPatterns = async (req: Request, res: Response) => {
 };
 
 export const saveRoute = async (req: Request, res: Response) => {
-  const { id, vehicleId, driverId, clientId, invoiceIds, createdBy } = req.body;
+  const { id, vehicleId, driverId, clientId, invoiceIds, createdBy, totalVolume, utilization, capacityM3 } = req.body;
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
+
+    // Asegurar columnas de eficiencia (idempotente — no falla si ya existen)
+    await client.query(`
+      ALTER TABLE routes ADD COLUMN IF NOT EXISTS total_volume_m3 NUMERIC(10,4) DEFAULT 0;
+      ALTER TABLE routes ADD COLUMN IF NOT EXISTS vehicle_capacity_m3 NUMERIC(10,2) DEFAULT 0;
+      ALTER TABLE routes ADD COLUMN IF NOT EXISTS utilization_pct INTEGER DEFAULT 0;
+    `);
 
     // AUTO-ASSIGN DRIVER IF MISSING (Requerimiento Crítico)
     let finalDriverId = driverId;
@@ -79,12 +86,15 @@ export const saveRoute = async (req: Request, res: Response) => {
       }
     }
 
-    // 1. Insertar Cabecera de Ruta
+    // 1. Insertar Cabecera de Ruta con datos de eficiencia
     const routeRes = await client.query(`
-      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status_id)
-      VALUES ($1, $2, $3, $4, 'EST-10')
+      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status_id, total_volume_m3, vehicle_capacity_m3, utilization_pct)
+      VALUES ($1, $2, $3, $4, 'EST-10', $5, $6, $7)
       RETURNING id
-    `, [vehicleId, finalDriverId, clientId, createdBy]);
+    `, [vehicleId, finalDriverId, clientId, createdBy,
+        Number(totalVolume) || 0,
+        Number(capacityM3) || 0,
+        Number(utilization) || 0]);
 
     const finalRouteId = routeRes.rows[0].id;
 

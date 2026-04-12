@@ -1072,7 +1072,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         driverId: link?.driverId || 'S/A',
         clientId: selectedClient,
         invoiceIds: route.assignedInvoices.map(i => i.id),
-        createdBy: user.name
+        createdBy: user.name,
+        totalVolume: route.totalVolume,
+        utilization: route.utilization,
+        capacityM3: Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3 || 0)
       });
 
       if (res.success) {
@@ -1306,7 +1309,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           driverId: link?.driverId || 'S/A',
           clientId: selectedClient,
           invoiceIds: route.assignedInvoices.map(i => i.id || i.invoiceNumber),
-          createdBy: user.name || 'SISTEMA'
+          createdBy: user.name || 'SISTEMA',
+          totalVolume: route.totalVolume,
+          utilization: route.utilization,
+          capacityM3: Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3 || 0)
         });
 
         if (res.success) {
