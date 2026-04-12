@@ -562,14 +562,14 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       Object.entries(retailGroups).forEach(([chain, chainInvoices]) => {
-        const totalChainVol = chainInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
+        const totalChainVol = chainInvoices.reduce((acc, inv) => acc + Number(inv.volumeM3 || (inv as any).volume_m3 || 0), 0);
 
         if (totalChainVol >= RETAIL_CHAIN_MIN_VOLUME_M3 && availableVehicles.length > 0) {
           // MEJORA 6: Agrupar por proximidad antes de asignar vehículos
           const clusters = clusterByProximity(chainInvoices, 8);
 
           clusters.forEach((cluster, clusterIdx) => {
-            const clusterVol = cluster.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
+            const clusterVol = cluster.reduce((acc, inv) => acc + Number(inv.volumeM3 || (inv as any).volume_m3 || 0), 0);
             if (clusterVol < 1) return; // Ignorar clusters triviales
 
             const bestVeh = [...availableVehicles]
@@ -654,144 +654,158 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         return Number(a.lng) - Number(b.lng);
       });
 
+      // ── ALGORITMO CLUSTER-FIRST ────────────────────────────────────────────
+      // 1. Agrupar todas las facturas en celdas de ~2.4km (0.022° × 0.022°)
+      // 2. Para cada vehículo: anclar en la celda más densa, llenar con celdas
+      //    cercanas hasta agotar capacidad. Overflow → siguiente vehículo.
+      // ──────────────────────────────────────────────────────────────────────
+
+      const CELL_SIZE = 0.022; // ~2.4km por celda
+      const MAX_CLUSTER_SPREAD_KM = 15; // distancia máxima del anchor
+
+      interface GeoCell {
+        key: string;
+        zone: string;
+        centerLat: number;
+        centerLng: number;
+        invoices: Invoice[];
+        totalVolume: number;
+      }
+
+      // Construir mapa de celdas
+      const cellMap = new Map<string, GeoCell>();
+      availableInvoices.forEach(inv => {
+        const invVol = Number(inv.volumeM3 || (inv as any).volume_m3 || 0);
+        const lat = Number(inv.lat || 0);
+        const lng = Number(inv.lng || 0);
+        const hasDefCoords = (inv as any).hasDefaultCoords;
+
+        // Facturas sin coordenadas → celda especial por ciudad/barrio
+        const cellKey = hasDefCoords || (lat === 0 && lng === 0)
+          ? `nogeo_${(inv as any).cityKey || 'SIN_CIUDAD'}_${(inv as any).neighborhoodKey || ''}`
+          : `${Math.floor(lat / CELL_SIZE)}_${Math.floor(lng / CELL_SIZE)}`;
+
+        if (!cellMap.has(cellKey)) {
+          const cLat = hasDefCoords ? 0 : lat;
+          const cLng = hasDefCoords ? 0 : lng;
+          cellMap.set(cellKey, {
+            key: cellKey,
+            zone: (inv as any).geoZone || 'CENTRO',
+            centerLat: cLat,
+            centerLng: cLng,
+            invoices: [],
+            totalVolume: 0,
+          });
+        }
+        const cell = cellMap.get(cellKey)!;
+        cell.invoices.push(inv);
+        cell.totalVolume += invVol;
+
+        // Recalcular centroide de la celda
+        const validInCell = cell.invoices.filter(i => Number(i.lat) > 0 && !(i as any).hasDefaultCoords);
+        if (validInCell.length > 0) {
+          cell.centerLat = validInCell.reduce((s, i) => s + Number(i.lat), 0) / validInCell.length;
+          cell.centerLng = validInCell.reduce((s, i) => s + Number(i.lng), 0) / validInCell.length;
+        }
+      });
+
+      // Ordenar celdas: primero por zona (ZONE_ORDER), luego por densidad desc
+      const ZONE_ORDER_CLUSTER = ['NORTE_LEJANO','NORTE','CENTRO_NORTE','CENTRO_OCC','CENTRO','CENTRO_SUR','SUR','SUR_LEJANO'];
+      let remainingCells = Array.from(cellMap.values()).sort((a, b) => {
+        const zA = ZONE_ORDER_CLUSTER.indexOf(a.zone);
+        const zB = ZONE_ORDER_CLUSTER.indexOf(b.zone);
+        if (zA !== zB) return zA - zB;
+        return b.invoices.length - a.invoices.length;
+      });
+
       const prioritizedFleet = [...availableVehicles]
         .filter(v => !usedVehicleIds.has(v.id))
         .sort((a, b) => (Number(b.capacityM3) || 0) - (Number(a.capacityM3) || 0));
 
       prioritizedFleet.forEach(vehicle => {
-        if (availableInvoices.length === 0) return;
+        if (remainingCells.every(c => c.invoices.length === 0)) return;
         if (usedVehicleIds.has(vehicle.id)) return;
-
-        const load: Invoice[] = [];
-        let currentLoadVolume = 0;
 
         const vCap = Number(vehicle.capacityM3) || 0;
         const nominalCapacity = vCap > 0 ? vCap : OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
-        const targetMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION;
         const absoluteMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION;
         const isLargeVehicle = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
 
-        // MEJORA 5: Afinidad ordenada por strength (mayor primero)
         const affinity = [...learningPatterns]
           .filter(p => p.vehicle_id === vehicle.id)
           .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         const targetCity = affinity ? affinity.city : null;
 
-        let currentLat = ORBIT_HUB_ORIGIN.lat;
-        let currentLng = ORBIT_HUB_ORIGIN.lng;
-        let stopIndex = 0; // Para estimación de ventana horaria (MEJORA 3)
+        // Encontrar celda ancla: primera celda no vacía con mayor densidad
+        const anchorCell = remainingCells.find(c => c.invoices.length > 0);
+        if (!anchorCell) return;
 
-        // MEJORA 7: rastrear zona dominante de la carga actual
-        const loadZoneCounts: Record<string, number> = {};
+        // Recopilar celdas candidatas: mismo zona + adyacentes + dentro de MAX_CLUSTER_SPREAD_KM
+        const anchorZone = anchorCell.zone;
+        const adjacentZones = GEO_ZONES_ADJACENT[anchorZone] || [];
+        const allowedZones = new Set([anchorZone, ...adjacentZones]);
 
-        let i = 0;
-        while (i < availableInvoices.length && currentLoadVolume < targetMaxCapacity) {
-          let bestNextIdx = -1;
-          let minDist = Infinity;
+        const candidateCells = remainingCells.filter(c => {
+          if (c.invoices.length === 0) return false;
+          if (!allowedZones.has(c.zone)) return false;
+          if (anchorCell.centerLat > 0 && c.centerLat > 0) {
+            return getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng) <= MAX_CLUSTER_SPREAD_KM;
+          }
+          return allowedZones.has(c.zone);
+        });
 
-          // Zona dominante: calculada solo cuando hay >= 2 paradas cargadas
-          const dominantZone = load.length >= 2
-            ? Object.entries(loadZoneCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
-            : null;
+        // Ordenar celdas candidatas por distancia al ancla
+        candidateCells.sort((a, b) => {
+          if (anchorCell.centerLat === 0) return 0;
+          const dA = a.centerLat > 0 ? getDistance(anchorCell.centerLat, anchorCell.centerLng, a.centerLat, a.centerLng) : 999;
+          const dB = b.centerLat > 0 ? getDistance(anchorCell.centerLat, anchorCell.centerLng, b.centerLat, b.centerLng) : 999;
+          return dA - dB;
+        });
 
-          // Centroide de la carga actual (para restricción de radio)
-          let centLat = 0, centLng = 0;
-          if (load.length >= 2) {
-            const validLoad = load.filter(inv => !inv.hasDefaultCoords && Number(inv.lat) > 0);
-            if (validLoad.length >= 2) {
-              centLat = validLoad.reduce((s, inv) => s + Number(inv.lat), 0) / validLoad.length;
-              centLng = validLoad.reduce((s, inv) => s + Number(inv.lng), 0) / validLoad.length;
+        // Llenar vehículo celda por celda
+        const load: Invoice[] = [];
+        let currentLoadVolume = 0;
+
+        for (const cell of candidateCells) {
+          if (currentLoadVolume >= absoluteMaxCapacity) break;
+
+          const toAdd: Invoice[] = [];
+          // Ordenar facturas dentro de la celda por prioridad → horario → lat/lng
+          const cellInvs = [...cell.invoices].sort((a, b) => {
+            if ((a as any).isPriority !== (b as any).isPriority) return (a as any).isPriority ? -1 : 1;
+            const aT = (a as any).timeWindowMinutes ?? Infinity;
+            const bT = (b as any).timeWindowMinutes ?? Infinity;
+            if (aT !== bT) return aT - bT;
+            if (targetCity) {
+              const aCity = ((a as any).cityKey || '') === targetCity ? -1 : 0;
+              const bCity = ((b as any).cityKey || '') === targetCity ? -1 : 0;
+              if (aCity !== bCity) return aCity - bCity;
+            }
+            return Number(a.lat) - Number(b.lat);
+          });
+
+          for (const inv of cellInvs) {
+            const invVol = Number(inv.volumeM3 || (inv as any).volume_m3 || 0);
+            const nKey = (inv as any).neighborhoodKey || '';
+            if (isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(nKey)) continue;
+            if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
+              toAdd.push(inv);
+              currentLoadVolume += invVol;
             }
           }
 
-          for (let j = 0; j < availableInvoices.length; j++) {
-              const inv = availableInvoices[j];
-              const invVol = Number(inv.volumeM3) || 0;
-
-              // @ts-ignore
-              const nKey = inv.neighborhoodKey || '';
-              const isRestricted = isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(nKey);
-              if (isRestricted) continue;
-
-              if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
-                  const invLat = Number(inv.lat || 0);
-                  const invLng = Number(inv.lng || 0);
-                  const invZone = (inv as any).geoZone || 'CENTRO';
-                  const hasDefCoords = (inv as any).hasDefaultCoords;
-
-                  // ── RESTRICCIÓN GEOGRÁFICA DURA (después de 3 paradas) ──────────
-                  // Una vez establecida la zona dominante, excluir zonas incompatibles.
-                  // Permitido: misma zona + zonas adyacentes.
-                  // Bloqueado: cualquier otra zona → skip total (no penalidad, exclusión).
-                  if (dominantZone && load.length >= 3 && !hasDefCoords) {
-                    const adjacent = GEO_ZONES_ADJACENT[dominantZone] || [];
-                    if (invZone !== dominantZone && !adjacent.includes(invZone)) {
-                      continue; // Corredor incompatible — saltar completamente
-                    }
-                  }
-
-                  // ── RESTRICCIÓN DE RADIO (centroide) ────────────────────────────
-                  // La ruta no puede dispersarse más de MAX_ROUTE_RADIUS_KM desde
-                  // el centroide de las paradas ya cargadas.
-                  if (centLat > 0 && !hasDefCoords && invLat > 0) {
-                    const distFromCentroid = getDistance(centLat, centLng, invLat, invLng);
-                    if (distFromCentroid > MAX_ROUTE_RADIUS_KM) continue;
-                  }
-
-                  // ── CÁLCULO DE DISTANCIA PONDERADA ──────────────────────────────
-                  let dist = getDistance(currentLat, currentLng, invLat, invLng);
-
-                  // Penalizar coords default (sin geocodificar)
-                  if (hasDefCoords) dist *= 5;
-
-                  // Penalizar llegada fuera de ventana horaria
-                  const timeWindow = (inv as any).timeWindowMinutes;
-                  if (timeWindow != null) {
-                    const estimatedArrivalMin = stopIndex > 0 ? (8 * 60) + stopIndex * 25 : 8 * 60;
-                    if (estimatedArrivalMin > timeWindow) {
-                      const delayMin = estimatedArrivalMin - timeWindow;
-                      dist *= (1 + Math.min(delayMin / 150, 2));
-                    }
-                  }
-
-                  // Bonus por ciudad favorita del vehículo (patrón histórico)
-                  const cKey = (inv as any).cityKey || '';
-                  const affinityBonus = (targetCity && cKey === targetCity) ? 0.8 : 1.0;
-
-                  // Penalidad de zona (aplica principalmente antes de las 3 paradas
-                  // donde todavía no hay restricción dura)
-                  const zonePenalty = (!dominantZone || invZone === dominantZone) ? 1.0
-                    : (GEO_ZONES_ADJACENT[dominantZone] || []).includes(invZone) ? 2.0
-                    : 8.0; // Zona no adyacente — penalidad muy alta antes del hard-skip
-
-                  const finalDist = dist * affinityBonus * zonePenalty;
-
-                  if (finalDist < minDist) {
-                      minDist = finalDist;
-                      bestNextIdx = j;
-                  }
-              }
-          }
-
-          if (bestNextIdx !== -1) {
-              const inv = availableInvoices[bestNextIdx];
-              load.push(inv);
-              currentLoadVolume += Number(inv.volumeM3) || 0;
-              currentLat = Number(inv.lat || currentLat);
-              currentLng = Number(inv.lng || currentLng);
-              availableInvoices.splice(bestNextIdx, 1);
-              stopIndex++;
-              // MEJORA 7: registrar zona de la parada añadida
-              // @ts-ignore
-              const addedZone = (inv as any).geoZone || 'CENTRO';
-              loadZoneCounts[addedZone] = (loadZoneCounts[addedZone] || 0) + 1;
-              i = 0;
-          } else {
-              break;
-          }
+          // Marcar las añadidas como consumidas de la celda
+          const addedIds = new Set(toAdd.map(i => i.id));
+          cell.invoices = cell.invoices.filter(i => !addedIds.has(i.id));
+          cell.totalVolume = cell.invoices.reduce((s, i) => s + Number(i.volumeM3 || (i as any).volume_m3 || 0), 0);
+          load.push(...toAdd);
         }
 
-        // MEJORA 4: Optimización 2-opt post-greedy
+        // También quitar las facturas usadas de availableInvoices (para consistencia)
+        const usedIds = new Set(load.map(i => i.id));
+        availableInvoices = availableInvoices.filter(i => !usedIds.has(i.id));
+
+        // Optimización 2-opt post-cluster
         if (load.length >= 4) {
           const optimized = twoOptImprove(load, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
           load.length = 0;
@@ -801,8 +815,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         if (load.length > 0) {
           const cityCounts: { [key: string]: number } = {};
           load.forEach(inv => {
-            // @ts-ignore
-            const c = inv.cityKey || 'SIN_CIUDAD';
+            const c = (inv as any).cityKey || 'SIN_CIUDAD';
             cityCounts[c] = (cityCounts[c] || 0) + 1;
           });
           const dominantCity = Object.keys(cityCounts).reduce((a, b) => cityCounts[a] > cityCounts[b] ? a : b, 'LOGÍSTICA');
@@ -811,12 +824,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             id: `route-${Date.now()}-${vehicle.plate}`,
             vehicle,
             assignedInvoices: load,
-            totalVolume: Number(Number(currentLoadVolume).toFixed(2)),
-            utilization: Math.round((Number(currentLoadVolume) / nominalCapacity) * 100),
+            totalVolume: Number(currentLoadVolume.toFixed(4)),
+            utilization: Math.round((currentLoadVolume / nominalCapacity) * 100),
             city: dominantCity
           });
           usedVehicleIds.add(vehicle.id);
         }
+
+        // Limpiar celdas vacías
+        remainingCells = remainingCells.filter(c => c.invoices.length > 0);
       });
 
       if (suggestions.length === 0) {
@@ -874,8 +890,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
     // Recalculate using fallback capacity
     const realCapacity = Number(route.vehicle.capacityM3) > 0 ? Number(route.vehicle.capacityM3) : OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
-    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + (Number(curr.volumeM3) || 0), 0);
-    route.totalVolume = Number(Number(newVol).toFixed(2));
+    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + Number(curr.volumeM3 || (curr as any).volume_m3 || 0), 0);
+    route.totalVolume = Number(Number(newVol).toFixed(4));
     route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
 
     // Rebalanceo incremental: si se removió una factura, intentar rellenar desde no asignadas
@@ -941,8 +957,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
     route.assignedInvoices.push(invoice);
     const realCapacity = Number(route.vehicle.capacityM3) > 0 ? Number(route.vehicle.capacityM3) : 30; // Fallback
-    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + (Number(curr.volumeM3) || 0), 0);
-    route.totalVolume = Number(Number(newVol).toFixed(2));
+    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + Number(curr.volumeM3 || (curr as any).volume_m3 || 0), 0);
+    route.totalVolume = Number(Number(newVol).toFixed(4));
     route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
 
     setSuggestedRoutes(newSuggestions);
@@ -960,7 +976,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }
 
     const newCapacity = newVehicle.capacityM3 > 0 ? newVehicle.capacityM3 : 30;
-    const loadVolume = route.assignedInvoices.reduce((acc, inv) => acc + (inv.volumeM3 || 0), 0);
+    const loadVolume = route.assignedInvoices.reduce((acc, inv) => acc + Number(inv.volumeM3 || (inv as any).volume_m3 || 0), 0);
     const utilization = (loadVolume / newCapacity) * 100;
 
     // REGLA DE CAPACIDAD M7
@@ -976,7 +992,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           const removedInvoices: Invoice[] = [];
           while (currentVol > targetVolume && route.assignedInvoices.length > 0) {
             const removed = route.assignedInvoices.pop()!;
-            currentVol -= (removed.volumeM3 || 0);
+            currentVol -= Number(removed.volumeM3 || (removed as any).volume_m3 || 0);
             removedInvoices.push(removed);
           }
           route.vehicle = newVehicle;
@@ -1161,7 +1177,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                  <div class="font-sans overflow-hidden rounded-2xl shadow-2xl border-0 min-w-[180px]">
                    <div class="px-3 py-2 text-white font-black text-[10px] uppercase tracking-widest flex justify-between items-center" style="background-color: ${routeColor}">
                      <span>Entrega #${iIdx + 1}</span>
-                     <span class="bg-white/20 px-1.5 py-0.5 rounded">${inv.volumeM3}m³</span>
+                     <span class="bg-white/20 px-1.5 py-0.5 rounded">${Number(inv.volumeM3 || (inv as any).volume_m3 || 0).toFixed(3)}m³</span>
                    </div>
                    <div class="p-3 bg-white">
                      <p class="font-black text-slate-900 text-xs mb-1 uppercase tracking-tighter line-clamp-2">${inv.customerName}</p>
@@ -2517,7 +2533,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     }
                     const entry = docMap.get(groupKey)!;
                     entry.invoices.push(inv);
-                    entry.volume += (inv.volumeM3 || 0);
+                    entry.volume += Number(inv.volumeM3 || (inv as any).volume_m3 || 0);
                   });
 
                   if (docMap.size === 0) {
