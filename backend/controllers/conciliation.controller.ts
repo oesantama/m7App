@@ -334,7 +334,7 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
             JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
             LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
             LEFT JOIN document_l_payments p ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
-            WHERE ${documentId ? 'dl.id = $1' : 'dl.vehicle_plate ILIKE $1 AND dl.delivery_date >= $2 AND dl.delivery_date <= $3'}
+            WHERE ${documentId ? 'dl.external_doc_id = $1' : 'dl.vehicle_plate ILIKE $1 AND dl.delivery_date >= $2 AND dl.delivery_date <= $3'}
               AND (dl.plan_type ILIKE '%plan r%' OR $1 IS NOT NULL) -- Ser más flexible si se pide por ID
             GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.delivery_date,
                      ic.vehicle_plate, ic.conductor_name, di.invoice, di.customer_name, di.city, di.address,
