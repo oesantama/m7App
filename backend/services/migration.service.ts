@@ -176,7 +176,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
@@ -185,11 +185,8 @@ const healSchema = async (client: any) => {
         const currentCols = checkCols.rows.map((r: any) => r.column_name);
         if (currentCols.length > 0) {
             const expectedCols = ['id', ...UNIVERSAL_SCHEMA[table]];
-            const hasExtraCols = currentCols.some((c: string) => !expectedCols.includes(c));
-            if (hasExtraCols) {
-                console.warn(`[M7-DB-NUCLEAR] Discrepancia detectada en ${table}. Limpiando tabla para réplica exacta...`);
-                await client.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
-            }
+         // M7-SAFETY: Bloque de borrado automático ELIMINADO permanentemente.
+         // Solo permitimos expansión de esquema, nunca destrucción.
         }
     } catch (e) {}
   }
@@ -749,6 +746,17 @@ export const restoreSystem = async () => {
       WHERE id IN ('PAG-13', 'PAG-15');
     `);
 
+    // LIMPIEZA DE DUPLICADOS Y UNICIDAD EN ROUTE_INVOICES
+    console.log('[M7-CLEANUP] Limpiando duplicados en route_invoices...');
+    await client.query(`
+        DELETE FROM route_invoices a USING route_invoices b 
+        WHERE a.id < b.id AND a.route_id = b.route_id AND a.invoice_id = b.invoice_id
+    `);
+    await client.query(`
+        ALTER TABLE route_invoices DROP CONSTRAINT IF EXISTS unq_route_invoice;
+        ALTER TABLE route_invoices ADD CONSTRAINT unq_route_invoice UNIQUE (route_id, invoice_id);
+    `);
+
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas
     await recoverOrphanedRoutes(client);
 
@@ -770,36 +778,49 @@ export const restoreSystem = async () => {
  */
 async function recoverOrphanedRoutes(client: any) {
     try {
-        console.log('[M7-RECOVERY] Iniciando rescate de datos hoy...');
+        console.log('[M7-RECOVERY] Iniciando rescate inteligente de datos...');
         
-        // 1. Reparar fechas nulas (esto las hace visibles en Despacho Logístico)
-        const dateFix = await client.query(`
-            UPDATE routes SET created_at = NOW() WHERE created_at IS NULL;
-            UPDATE route_invoices SET created_at = NOW() WHERE created_at IS NULL;
-        `);
+        // 1. Reparar fechas nulas
+        await client.query(`UPDATE routes SET created_at = NOW() WHERE created_at IS NULL`);
+        await client.query(`UPDATE route_invoices SET created_at = NOW() WHERE created_at IS NULL`);
         
-        // 2. Buscar rutas que existen en route_invoices pero NO en routes (huérfanas)
+        // 2. Buscar rutas huérfanas o con nombre genérico para recuperarlas
         const orphans = await client.query(`
             SELECT DISTINCT ri.route_id 
             FROM route_invoices ri 
             LEFT JOIN routes r ON r.id::text = ri.route_id::text 
-            WHERE r.id IS NULL
+            WHERE r.id IS NULL OR r.name = 'RUTA RECUPERADA'
         `);
         
         if (orphans.rows.length > 0) {
-            console.log(`[M7-RECOVERY] Detectadas ${orphans.rows.length} rutas huérfanas. Reconstruyendo encabezados...`);
+            console.log(`[M7-RECOVERY] Detectadas ${orphans.rows.length} rutas para reconstrucción inteligente.`);
             for (const row of orphans.rows) {
                 const rid = row.route_id;
-                // Creamos un registro base para que la asociación no sea inválida y aparezca en el UI
-                await client.query(`
-                    INSERT INTO routes (id, name, description, status_id, created_by, created_at)
-                    VALUES ($1, 'RUTA RECUPERADA', 'Rescatada automáticamente', 'EST-10', 'SYSTEM_RECOVERY', NOW())
-                    ON CONFLICT (id) DO NOTHING
+                
+                // Deducir Placa y Cliente de los documentos originales vinculados a esta ruta
+                const meta = await client.query(`
+                    SELECT dl.vehicle_plate, dl.client_id 
+                    FROM route_invoices ri
+                    JOIN documents_l dl ON dl.id::text = SPLIT_PART(ri.invoice_id, '_', 1)
+                    WHERE ri.route_id = $1
+                    LIMIT 1
                 `, [rid]);
+                
+                const plate = meta.rows[0]?.vehicle_plate || 'SIN PLACA';
+                const clientId = meta.rows[0]?.client_id || 'CLIENTE-GENERICO';
+
+                await client.query(`
+                    INSERT INTO routes (id, name, description, vehicle_id, client_id, status_id, created_by, created_at)
+                    VALUES ($1, $2, 'Rescatada automáticamente', $3, $4, 'EST-10', 'SYSTEM_RECOVERY', NOW())
+                    ON CONFLICT (id) DO UPDATE SET 
+                        vehicle_id = EXCLUDED.vehicle_id, 
+                        client_id = EXCLUDED.client_id,
+                        name = EXCLUDED.name
+                `, [rid, `RUTA ${plate}`, plate, clientId]);
             }
         }
-        console.log('[M7-RECOVERY] Limpieza y rescate finalizado.');
+        console.log('[M7-RECOVERY] Reconstrucción inteligente finalizada.');
     } catch (err: any) {
-        console.error('[M7-RECOVERY-ERROR] Falló el rescate:', err.message);
+        console.error('[M7-RECOVERY-ERROR]', err.message);
     }
 }
