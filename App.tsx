@@ -307,23 +307,20 @@ const App: React.FC = () => {
 
 
 
-  // Polling global para indicador
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
-    
-    // M7 FIX: Solo pollear si el usuario tiene permiso para WhatsApp
-    if (!hasPermission(user, 'WHATSAPP', 'view')) return;
-
-    const checkWa = async () => {
-      try {
-        const res = await api.getWhatsAppStatus(user.id);
-        setWaStatus(res.status === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED');
-      } catch { }
-    };
-    checkWa();
-    const timer = setInterval(checkWa, 30000);
-    return () => clearInterval(timer);
-  }, [isAuthenticated, user?.id, user?.permissions]);
+  // Polling global para indicador WhatsApp — DESACTIVADO hasta resolver servidor Evolution
+  // useEffect(() => {
+  //   if (!isAuthenticated || !user?.id) return;
+  //   if (!hasPermission(user, 'WHATSAPP', 'view')) return;
+  //   const checkWa = async () => {
+  //     try {
+  //       const res = await api.getWhatsAppStatus(user.id);
+  //       setWaStatus(res.status === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED');
+  //     } catch { }
+  //   };
+  //   checkWa();
+  //   const timer = setInterval(checkWa, 30000);
+  //   return () => clearInterval(timer);
+  // }, [isAuthenticated, user?.id, user?.permissions]);
 
   const handleLogin = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     try {

@@ -118,13 +118,13 @@ export const syncInventory = async (req: Request, res: Response) => {
     await client.query(`
       UPDATE documents_l
       SET status = $1,
-          inventory_date = COALESCE($2::timestamptz, inventory_date),
-          inventory_start = COALESCE(inventory_start, CURRENT_TIMESTAMP),
+          inventory_date = COALESCE($2::text, inventory_date::text)::text,
+          inventory_start = COALESCE(inventory_start::text, CURRENT_TIMESTAMP::text),
           inventory_user = $3,
           inventory_observation = $4,
           inventory_notes = $4
       WHERE id = $5
-    `, [newStatus, inventoryDate, user, notes || '', docId]);
+    `, [newStatus, inventoryDate ? inventoryDate.toISOString() : null, user, notes || '', docId]);
 
     // 2. Obtener cliente y AGREGAR CONTEOS por SKU
     const clientId = docL.client_id;
