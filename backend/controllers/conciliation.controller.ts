@@ -297,37 +297,39 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
         // ── 1. Datos del documento (placa, conductor, estado desde routes) ──────
         const docRes = await pool.query(`
             SELECT
-                dl.id,
+                dl.id::text                                                      AS id,
                 dl.external_doc_id,
-                dl.vehicle_plate     AS doc_plate,
+                dl.vehicle_plate                                                 AS doc_plate,
                 dl.delivery_date,
                 dl.plan_type,
                 dl.client_id,
-                c.name               AS client_name,
+                c.name                                                           AS client_name,
                 COALESCE(v.plate,    ic_head.vehicle_plate, dl.vehicle_plate)   AS placa,
-                COALESCE(v.capacity_m3::text, '—')                              AS capacidad_m3,
-                COALESCE(d.name,     ic_head.conductor_name, '—')               AS conductor,
-                COALESCE(e.name,     '—')                                        AS estado_ruta
+                COALESCE(v.capacity_m3::text, '—')                             AS capacidad_m3,
+                COALESCE(d.name,     ic_head.conductor_name, '—')              AS conductor,
+                COALESCE(e.name,     '—')                                       AS estado_ruta
             FROM documents_l dl
             LEFT JOIN clients c ON c.id = dl.client_id
-            -- Ruta asignada al documento (1 sola via LATERAL)
+            -- Ruta asignada al documento via route_invoices (JOIN seguro con cast en ambos lados)
             LEFT JOIN LATERAL (
-                SELECT r.vehicle_id, r.driver_id, r.status_id
+                SELECT r.vehicle_id::text AS vehicle_id,
+                       r.driver_id::text  AS driver_id,
+                       r.status_id::text  AS status_id
                 FROM route_invoices ri
-                JOIN routes r ON r.id = ri.route_id
+                JOIN routes r ON r.id::text = ri.route_id::text
                 WHERE ri.invoice_id = dl.external_doc_id
                    OR ri.invoice_id = dl.id::text
                 ORDER BY r.created_at DESC
                 LIMIT 1
             ) ruta ON true
-            LEFT JOIN vehicles v  ON v.id::text  = ruta.vehicle_id::text
-            LEFT JOIN drivers  d  ON d.id::text  = ruta.driver_id::text
-            LEFT JOIN estados  e  ON e.id        = ruta.status_id
+            LEFT JOIN vehicles v ON v.id::text = ruta.vehicle_id
+            LEFT JOIN drivers  d ON d.id::text = ruta.driver_id
+            LEFT JOIN estados  e ON e.id::text = ruta.status_id
             -- Fallback: datos de la primera conciliación del documento
             LEFT JOIN LATERAL (
                 SELECT vehicle_plate, conductor_name
                 FROM invoice_conciliations
-                WHERE document_id = dl.id
+                WHERE document_id::text = dl.id::text
                 LIMIT 1
             ) ic_head ON true
             WHERE ${documentId
@@ -341,7 +343,7 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
         }
 
         // ── 2. Facturas de todos los documentos encontrados ────────────────────
-        const docIds = docRes.rows.map(r => r.id);
+        const docIds = docRes.rows.map(r => r.id); // ya son strings (id::text)
 
         const invRes = await pool.query(`
             SELECT
@@ -361,13 +363,13 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
                 CASE WHEN ic.es_devolucion THEN 'SÍ' ELSE 'NO' END            AS "Es Devolución",
                 CASE WHEN ic.forma_pago IS NOT NULL THEN 'CONCILIADA' ELSE 'PENDIENTE' END AS "Estado"
             FROM document_items di
-            JOIN documents_l dl ON dl.id = di.document_id::integer
+            JOIN documents_l dl ON dl.id::text = di.document_id::text
             LEFT JOIN invoice_conciliations ic
-                   ON ic.document_id  = di.document_id
-                  AND ic.invoice_number = di.invoice
+                   ON ic.document_id::text = di.document_id::text
+                  AND ic.invoice_number    = di.invoice
             LEFT JOIN document_l_payments p
                    ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
-            WHERE di.document_id::integer = ANY($1::integer[])
+            WHERE di.document_id::text = ANY($1::text[])
               AND di.invoice IS NOT NULL AND di.invoice <> ''
             GROUP BY dl.external_doc_id, di.invoice, di.customer_name, di.city, di.address,
                      ic.forma_pago, ic.banco, ic.valor, ic.comprobante, ic.fecha_pago,
