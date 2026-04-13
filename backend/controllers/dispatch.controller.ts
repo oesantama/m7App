@@ -442,6 +442,36 @@ export const confirmDelivery = async (req: Request, res: Response) => {
           }
         }
 
+        // ── Actualizar status_id de la ruta si todas sus facturas ya finalizaron ──
+        try {
+            const routeRes = await pool.query(`
+                SELECT ri.route_id FROM route_invoices ri
+                JOIN document_items di ON TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+                    OR CONCAT(di.document_id, '_', COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+                WHERE ri.invoice_id = $1
+                LIMIT 1
+            `, [invoiceId]);
+
+            if (routeRes.rows.length > 0) {
+                const routeId = routeRes.rows[0].route_id;
+                // Contar facturas de la ruta que NO están en estado final
+                const pendingInRoute = await pool.query(`
+                    SELECT COUNT(*) FROM route_invoices ri
+                    JOIN document_items di ON TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+                        OR CONCAT(di.document_id, '_', COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+                    WHERE ri.route_id = $1
+                      AND di.item_status NOT IN ('EST-12','EST-13','EST-14','EST-15','EST-16','EST-17')
+                `, [routeId]);
+
+                if (parseInt(pendingInRoute.rows[0].count) === 0) {
+                    await pool.query(
+                        `UPDATE routes SET status_id = 'EST-12' WHERE id = $1`,
+                        [routeId]
+                    );
+                }
+            }
+        } catch (_) { /* No crítico — no bloquear la respuesta si falla */ }
+
         await pool.query('COMMIT');
 
         res.json({

@@ -10,13 +10,13 @@ interface LearningPatternData {
 export const getRoutes = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
-      SELECT 
+      SELECT
         r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text, r.created_by::text, r.status_id::text, r.created_at,
         v.plate, d.name as driver_name,
         COALESCE(
           (
-            SELECT json_agg(invoice_id) 
-            FROM route_invoices 
+            SELECT json_agg(invoice_id)
+            FROM route_invoices
             WHERE route_id::text = r.id::text
           ),
           '[]'::json
@@ -24,18 +24,20 @@ export const getRoutes = async (req: Request, res: Response) => {
       FROM routes r
       LEFT JOIN vehicles v ON r.vehicle_id::text = v.id::text
       LEFT JOIN drivers d ON r.driver_id::text = d.id::text
+      WHERE r.created_at >= CURRENT_DATE - INTERVAL '7 days'
+        AND r.status_id NOT IN ('EST-12', 'EST-13', 'EST-16', 'COMPLETADO', 'FINALIZADO')
 
       UNION ALL
 
-      SELECT 
-        da.id::text, 
-        COALESCE(a.vehicle_id::text, 'S/V') as vehicle_id, 
-        da.driver_id::text, 
-        'CLI-01' as client_id, 
-        da.created_by::text, 
-        da.status::text, 
+      SELECT
+        da.id::text,
+        COALESCE(a.vehicle_id::text, 'S/V') as vehicle_id,
+        da.driver_id::text,
+        'CLI-01' as client_id,
+        da.created_by::text,
+        da.status::text,
         da.created_at,
-        v.plate, 
+        v.plate,
         d.name as driver_name,
         json_build_array(da.invoice_id) as invoice_ids
       FROM dispatch_assignments da
@@ -43,7 +45,8 @@ export const getRoutes = async (req: Request, res: Response) => {
       LEFT JOIN vehicles v ON a.vehicle_id::text = v.id::text
       LEFT JOIN drivers d ON da.driver_id::text = d.id::text
       WHERE da.status IN ('PENDING_SIGNATURES', 'EN_RUTA', 'En repart', 'PENDING')
-      
+        AND da.created_at >= CURRENT_DATE - INTERVAL '7 days'
+
       ORDER BY created_at DESC
     `);
     res.json(result.rows);
