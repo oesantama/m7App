@@ -181,13 +181,8 @@ export const api = {
   }) => fetchJson(`${API_URL}/conciliation/save`, { method: 'POST', body: JSON.stringify(data) }),
   generateConciliationReport: (documentId: string, targetEmail: string | string[]) =>
     fetchJson(`${API_URL}/conciliation/report`, { method: 'POST', body: JSON.stringify({ documentId, targetEmail }) }),
-  getConciliationPlanillaUrl: (plate: string, from: string, to: string, documentId?: string) => {
-    const params = new URLSearchParams();
-    if (documentId) params.append('documentId', documentId);
-    if (plate) params.append('plate', plate);
-    if (from) params.append('from', from);
-    if (to) params.append('to', to);
-    return `${API_URL}/conciliation/planilla?${params.toString()}`;
+  getConciliationPlanillaUrl: (routeId: string | number) => {
+    return `${API_URL}/conciliation/planilla?routeId=${routeId}`;
   },
   searchConciliationRoutes: (clientId: string, date: string) =>
     fetchJson(`${API_URL}/conciliation/search-routes?clientId=${encodeURIComponent(clientId)}&date=${date}`),

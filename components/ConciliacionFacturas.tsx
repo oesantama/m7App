@@ -207,15 +207,9 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
     };
 
     const handleDownloadRoute = async (route: any) => {
-        if (!route.vehicle_plate) return;
-        setDownloading(route.id);
+        setDownloading(String(route.id));
         try {
-            // Usamos la misma lógica de descarga pero para la placa y fecha específica de la ruta
-            const from = planDate;
-            const to = planDate;
-            const url = api.getConciliationPlanillaUrl(route.vehicle_plate, from, to, route.id);
-            
-            // Obtener token para la descarga (Error 401 fix)
+            const url = api.getConciliationPlanillaUrl(route.id);
             const token = localStorage.getItem('token') || localStorage.getItem('m7_token');
             const headers: any = {};
             if (token) headers['Authorization'] = `Bearer ${token.trim()}`;
@@ -228,7 +222,7 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
             const blob = await resp.blob();
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `Planilla_${route.vehicle_plate}_${route.external_doc_id}.xlsx`;
+            link.download = `Planilla_${route.vehicle_plate || 'SV'}_${planDate}.xlsx`;
             link.click();
             URL.revokeObjectURL(link.href);
             toast.success('Planilla descargada');
@@ -678,13 +672,13 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
                                                     </div>
                                                     <div className="min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <h4 className="text-sm font-black text-slate-900 truncate uppercase tracking-tight">{route.external_doc_id}</h4>
+                                                            <h4 className="text-sm font-black text-slate-900 truncate uppercase tracking-tight">{route.vehicle_plate || `RUTA-${route.id}`}</h4>
                                                             <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${isAllConciliated ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                                {isAllConciliated ? 'Conciliado' : 'Pendiente'}
+                                                                {route.estado || (isAllConciliated ? 'Conciliado' : 'Pendiente')}
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-slate-500">
-                                                            <span className="flex items-center gap-1">🚛 {route.vehicle_plate}</span>
+                                                            <span className="flex items-center gap-1">🚛 {route.vehicle_plate || '—'}</span>
                                                             <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                                                             <span className="truncate">👤 {route.conductor_name || 'Sin conductor'}</span>
                                                             <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
@@ -709,10 +703,10 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
 
                                                     <button 
                                                         onClick={() => handleDownloadRoute(route)}
-                                                        disabled={downloading === route.id}
+                                                        disabled={downloading === String(route.id)}
                                                         className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-emerald-600 active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
                                                     >
-                                                        {downloading === route.id ? (
+                                                        {downloading === String(route.id) ? (
                                                             <Icons.Loader className="w-3.5 h-3.5 animate-spin" />
                                                         ) : (
                                                             <Icons.Download className="w-3.5 h-3.5" />
