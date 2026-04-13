@@ -327,7 +327,7 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
             LEFT JOIN LATERAL (
                 SELECT vehicle_plate, conductor_name
                 FROM invoice_conciliations
-                WHERE document_id = dl.id::text
+                WHERE document_id = dl.id
                 LIMIT 1
             ) ic_head ON true
             WHERE ${documentId
