@@ -981,6 +981,10 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
     try {
       await onConfirm(finalItems, inventoryObservation, email);
+      // M7 V18 FIX: Asegurar limpieza total de UI tras éxito
+      setIsProcessing(false);
+      setShowEmailInput(false);
+      setShowConfirmDialog(false);
     } catch (e: any) {
       toast.error('Error al finalizar: ' + (e.message || 'Error desconocido'));
       setIsProcessing(false); // Desbloquear botón para reintentar o corregir
@@ -1048,6 +1052,13 @@ const BlindCount: React.FC<BlindCountProps> = ({
     const start = (currentPage - 1) * rowsPerPage;
     return filteredItems.slice(start, start + rowsPerPage);
   }, [filteredItems, currentPage, rowsPerPage]);
+
+  // M7 V18 OPTIMIZATION: Evitar sort redundante dentro del render de la tabla
+  const maxScanTimestamp = useMemo(() => {
+    const values = Object.values(lastScannedAt);
+    if (values.length === 0) return 0;
+    return Math.max(...values);
+  }, [lastScannedAt]);
 
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -1228,7 +1239,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                   {paginatedItems.map(it => {
                     const currentCount = counts[it.articleId] || 0;
                     const isLatest = lastScan?.article?.id === it.articleId || lastScan?.article?.sku === it.articleId || 
-                                     (lastScannedAt[it.articleId] && Object.values(lastScannedAt).sort((a,b)=>b-a)[0] === lastScannedAt[it.articleId]);
+                                     (lastScannedAt[it.articleId] && lastScannedAt[it.articleId] === maxScanTimestamp);
 
                     return (
                       <tr key={it.articleId} className={`hover:bg-slate-50 transition-all duration-500 font-bold 

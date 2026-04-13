@@ -170,6 +170,8 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
       if (res.success) {
         toast.success("Inventario finalizado y sincronizado.");
         localStorage.removeItem(`m7_offline_count_${selectedDocForCount.id}`);
+        localStorage.removeItem(`m7_extras_${selectedDocForCount.id}`); // M7 V18: Limpiar también los extras
+        
         onUpdateDocuments(documents.map(d =>
           d.id === selectedDocForCount.id
             ? { ...d, items: finalItems, status: DocStatus.INVENTORED, inventoryDate: new Date().toISOString(), inventoryUser: user.name, inventoryNotes: generalObs, updatedBy: user.name, updatedAt: new Date().toISOString() }
@@ -180,8 +182,12 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         throw new Error(res.error || "Error al sincronizar");
       }
     } catch (err: any) {
-      toast.error("Error al finalizar inventario.");
-      if (import.meta.env.DEV) console.error('[M7-FINISH-SYNC]', err);
+      toast.error("Error al finalizar inventario. Intente nuevamente.");
+      console.error('[M7-FINISH-SYNC-ERROR]', {
+        docId: selectedDocForCount?.id,
+        error: err.message,
+        stack: err.stack
+      });
     } finally {
       setIsSyncingFinal(false);
     }
