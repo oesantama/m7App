@@ -183,6 +183,8 @@ export const api = {
     fetchJson(`${API_URL}/conciliation/report`, { method: 'POST', body: JSON.stringify({ documentId, targetEmail }) }),
   getConciliationPlanillaUrl: (plate: string, from: string, to: string) =>
     `${API_URL}/conciliation/planilla?plate=${encodeURIComponent(plate)}&from=${from}&to=${to}`,
+  searchConciliationRoutes: (clientId: string, date: string) =>
+    fetchJson(`${API_URL}/conciliation/search-routes?clientId=${encodeURIComponent(clientId)}&date=${date}`),
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO

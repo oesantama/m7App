@@ -811,10 +811,21 @@ export const getInvoices = async (req: Request, res: Response) => {
          searchTerm = searchTerm.replace(/\s/g, '');
          queryParams.push(searchTerm);
          const pIdx = `$${queryParams.length}`;
+         
+         if (lastUnderscore > 0) {
+            const docIdExtracted = compId.substring(0, lastUnderscore);
+            queryParams.push(docIdExtracted);
+            const pIdxDoc = `$${queryParams.length}`;
+            return `(
+               (TRIM(COALESCE(document_items.invoice, '')) = ${pIdx} OR TRIM(COALESCE(document_items.order_number, '')) = ${pIdx})
+               AND document_items.document_id = ${pIdxDoc}
+            )`;
+         }
+
          return `(
-            REGEXP_REPLACE(COALESCE(document_items.invoice, ''), '\\s', '', 'g') = ${pIdx} 
+            TRIM(COALESCE(document_items.invoice, '')) = ${pIdx} 
             OR 
-            REGEXP_REPLACE(COALESCE(document_items.order_number, ''), '\\s', '', 'g') = ${pIdx}
+            TRIM(COALESCE(document_items.order_number, '')) = ${pIdx}
          )`;
       });
       if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;

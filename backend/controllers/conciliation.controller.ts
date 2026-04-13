@@ -62,6 +62,52 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET /conciliation/search-routes ─────────────────────────────────────────
+// Busca todas las rutas (Documentos L) de un cliente en una fecha específica
+// para previsualizar antes de descargar la planilla.
+export const searchRoutesForPlanilla = async (req: Request, res: Response) => {
+    try {
+        const { clientId, date } = req.query;
+
+        if (!clientId || !date) {
+            return res.status(400).json({ success: false, error: 'clientId y date son requeridos' });
+        }
+
+        const result = await pool.query(`
+            SELECT
+                dl.id,
+                dl.external_doc_id,
+                dl.vehicle_plate,
+                dl.codplan,
+                dl.plan_type,
+                dl.status,
+                dl.created_at,
+                dl.delivery_date,
+                dl.client_id,
+                -- Conductor
+                (SELECT u.name FROM dispatch_assignments da
+                 LEFT JOIN users u ON u.id = da.driver_id
+                 WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name,
+                -- Resumen de facturas
+                COUNT(DISTINCT di.invoice) AS total_invoices,
+                COUNT(DISTINCT ic.invoice_number) AS conciliadas
+            FROM documents_l dl
+            LEFT JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
+            LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
+            WHERE dl.client_id = $1
+              AND (dl.delivery_date = $2 OR dl.created_at::date = $2)
+              AND dl.plan_type ILIKE '%plan r%'
+            GROUP BY dl.id
+            ORDER BY dl.created_at DESC
+        `, [clientId, date]);
+
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[CONCILIATION] searchRoutesForPlanilla error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
 // ─── GET /conciliation/:documentId ───────────────────────────────────────────
 // Detalle de un documento: facturas + estado de conciliación de cada una.
 export const getConciliationByDocument = async (req: Request, res: Response) => {
