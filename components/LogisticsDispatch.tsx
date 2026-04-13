@@ -1304,11 +1304,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <span>Devoluciones</span>
                     </button>
                     <button 
-                        onClick={fetchLocations}
+                        onClick={() => {
+                            fetchLocations();
+                            onRefresh();
+                            toast.info("Actualizando datos operativos...");
+                        }}
                         disabled={isValidating}
                         className={`w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-slate-950 hover:bg-emerald-400 transition-all ${isValidating ? 'animate-spin' : ''}`}
                     >
-                        <Icons.RefreshCw className="w-3.5 h-3.5" />
+                        <Icons.RefreshCw className={`w-3.5 h-3.5 ${isValidating ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             </header>

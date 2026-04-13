@@ -49,6 +49,13 @@ export const getRoutes = async (req: Request, res: Response) => {
 
       ORDER BY created_at DESC
     `);
+    
+    if (result.rows.length > 0) {
+      console.log(`[M7-SUCCESS] getRoutes: Enviando ${result.rows.length} rutas activas (últimos 7 días).`);
+    } else {
+      console.warn('[M7-WARN] getRoutes: No se encontraron rutas activas en los últimos 7 días.');
+    }
+
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-GET-ROUTES-ERR]', err);

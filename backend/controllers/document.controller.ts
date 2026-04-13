@@ -1296,8 +1296,17 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
         NULLIF(COALESCE(NULLIF(rt.truck_plate,''), NULLIF(dt.truck_plate,'')), '') AS "TRUCK_ID_DESTIN",
         NULLIF(COALESCE(NULLIF(rt.driver_doc,''),  NULLIF(dt.driver_doc,'')), '')  AS "DRIVER_ID_DESTIN"
       FROM base b
-      LEFT JOIN route_truck    rt ON rt.invoice_id = b.inv_key OR rt.invoice_id = b.compound_id
-      LEFT JOIN dispatch_truck dt ON dt.invoice_id = b.inv_key OR dt.invoice_id = b.compound_id
+      LEFT JOIN route_truck    rt ON (
+        TRIM(rt.invoice_id) = TRIM(b.inv_key) 
+        OR TRIM(rt.invoice_id) = TRIM(b.compound_id)
+        OR REGEXP_REPLACE(rt.invoice_id, '\s', '', 'g') = REGEXP_REPLACE(b.inv_key, '\s', '', 'g')
+        OR REGEXP_REPLACE(rt.invoice_id, '\s', '', 'g') = REGEXP_REPLACE(b.compound_id, '\s', '', 'g')
+      )
+      LEFT JOIN dispatch_truck dt ON (
+        TRIM(dt.invoice_id) = TRIM(b.inv_key) 
+        OR TRIM(dt.invoice_id) = TRIM(b.compound_id)
+        OR REGEXP_REPLACE(dt.invoice_id, '\s', '', 'g') = REGEXP_REPLACE(b.inv_key, '\s', '', 'g')
+      )
       ORDER BY b.load_id, b.inv_key
       LIMIT 5000
     `, [docParam, plateParam]);

@@ -72,8 +72,8 @@ const MastersuiteReport: React.FC = () => {
         </div>
         <div>
           <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Informe Mastersuite</h1>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-            Documentos por documento L o placa — Plan R / Plan Normal
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+            Gestión de última milla • <span className="text-slate-900">Origen:</span> Vehículo que trae a bodega • <span className="text-emerald-500">Destino:</span> Vehículo de reparto final
           </p>
         </div>
       </div>
@@ -213,19 +213,33 @@ const MastersuiteReport: React.FC = () => {
                     <td className="px-4 py-2.5 font-black text-slate-900 uppercase whitespace-nowrap">
                       {row.DOCUMENT_ID || '—'}
                     </td>
-                    <td className="px-4 py-2.5 font-bold text-slate-600 uppercase whitespace-nowrap">
-                      {row.TRUCK_ID_ORIGIN || '—'}
+                    <td className="px-4 py-2.5 whitespace-nowrap">
+                      {row.TRUCK_ID_ORIGIN
+                        ? <div className="flex flex-col">
+                            <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Bodega Origen</span>
+                            <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-200">{row.TRUCK_ID_ORIGIN}</span>
+                          </div>
+                        : <span className="text-slate-300 font-bold">—</span>}
                     </td>
-                    <td className="px-4 py-2.5 font-bold text-slate-600 uppercase whitespace-nowrap">
+                    <td className="px-4 py-2.5 font-bold text-slate-500 uppercase whitespace-nowrap">
                       {row.LOAD_ID || '—'}
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       {row.TRUCK_ID_DESTIN
-                        ? <span className="bg-slate-900 text-white text-[10px] font-black px-2 py-1 rounded-lg uppercase">{row.TRUCK_ID_DESTIN}</span>
-                        : <span className="text-slate-300 font-bold">—</span>}
+                        ? <div className="flex flex-col">
+                            <span className="text-[7px] font-black text-emerald-500 uppercase mb-0.5">Reparto Destino</span>
+                            <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-sm">{row.TRUCK_ID_DESTIN}</span>
+                          </div>
+                        : <div className="flex flex-col opacity-40">
+                            <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Sin Asignar</span>
+                            <span className="border border-dashed border-slate-300 text-slate-400 text-[9px] px-2 py-1 rounded-lg italic">Pendiente</span>
+                          </div>}
                     </td>
                     <td className="px-4 py-2.5 font-bold text-slate-600 whitespace-nowrap">
-                      {row.DRIVER_ID_DESTIN || '—'}
+                      <div className="flex flex-col">
+                        <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Identificación</span>
+                        {row.DRIVER_ID_DESTIN || '—'}
+                      </div>
                     </td>
                   </tr>
                 ))}
