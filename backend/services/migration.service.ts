@@ -748,6 +748,10 @@ export const restoreSystem = async () => {
       SET module_id = 'MOD-03', parent_id = 'MOD-03' 
       WHERE id IN ('PAG-13', 'PAG-15');
     `);
+
+    // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas
+    await recoverOrphanedRoutes(client);
+
     console.log(`[M7-SYNC] Módulos Logísticos Sincronizados con Éxito - ${new Date().toLocaleString()}`);
 
     const total = Date.now() - start;
@@ -759,3 +763,43 @@ export const restoreSystem = async () => {
     client.release();
   }
 };
+
+/**
+ * M7-RECOVERY-TOOL: Rescata rutas que fueron "borradas" por la curación nuclear
+ * pero que aún tienen facturas asociadas en route_invoices, o tienen fechas nulas.
+ */
+async function recoverOrphanedRoutes(client: any) {
+    try {
+        console.log('[M7-RECOVERY] Iniciando rescate de datos hoy...');
+        
+        // 1. Reparar fechas nulas (esto las hace visibles en Despacho Logístico)
+        const dateFix = await client.query(`
+            UPDATE routes SET created_at = NOW() WHERE created_at IS NULL;
+            UPDATE route_invoices SET created_at = NOW() WHERE created_at IS NULL;
+        `);
+        
+        // 2. Buscar rutas que existen en route_invoices pero NO en routes (huérfanas)
+        const orphans = await client.query(`
+            SELECT DISTINCT ri.route_id 
+            FROM route_invoices ri 
+            LEFT JOIN routes r ON r.id::text = ri.route_id::text 
+            WHERE r.id IS NULL
+        `);
+        
+        if (orphans.rows.length > 0) {
+            console.log(`[M7-RECOVERY] Detectadas ${orphans.rows.length} rutas huérfanas. Reconstruyendo encabezados...`);
+            for (const row of orphans.rows) {
+                const rid = row.route_id;
+                // Creamos un registro base para que la asociación no sea inválida y aparezca en el UI
+                await client.query(`
+                    INSERT INTO routes (id, name, description, status_id, created_by, created_at)
+                    VALUES ($1, 'RUTA RECUPERADA', 'Rescatada automáticamente', 'EST-10', 'SYSTEM_RECOVERY', NOW())
+                    ON CONFLICT (id) DO NOTHING
+                `, [rid]);
+            }
+        }
+        console.log('[M7-RECOVERY] Limpieza y rescate finalizado.');
+    } catch (err: any) {
+        console.error('[M7-RECOVERY-ERROR] Falló el rescate:', err.message);
+    }
+}
