@@ -55,12 +55,13 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
     isOpen, onClose, invoice, documentId,
     currentUserId, vehiclePlate, conductorId, conductorName, onSaved,
 }) => {
-    const [formaPago, setFormaPago] = useState<FormaPago | ''>('');
-    const [banco, setBanco]         = useState('');
-    const [valor, setValor]         = useState('');
+    const [formaPago, setFormaPago]     = useState<FormaPago | ''>('');
+    const [banco, setBanco]             = useState('');
+    const [valor, setValor]             = useState('');
     const [comprobante, setComprobante] = useState('');
-    const [fechaPago, setFechaPago] = useState('');
-    const [saving, setSaving]       = useState(false);
+    const [fechaPago, setFechaPago]     = useState('');
+    const [numeroCheque, setNumeroCheque] = useState('');
+    const [saving, setSaving]           = useState(false);
 
     // Precargar datos: si ya está conciliado usa esos valores,
     // si es nueva conciliación pre-carga desde los datos de pago de la factura
@@ -103,6 +104,7 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                 comprobante:    comprobante || undefined,
                 fechaPago:      fechaPago || undefined,
                 formaPago:      formaPago as FormaPago,
+                numeroCheque:   numeroCheque || undefined,
                 esDevolucion:   false,
                 conciliadoPor:  currentUserId,
                 vehiclePlate,
