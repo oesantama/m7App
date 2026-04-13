@@ -114,17 +114,22 @@ export const syncInventory = async (req: Request, res: Response) => {
     const inventoryDate = isPartial ? null : new Date();
 
     // 1. Actualizar Metadatos del Documento
-    // inventory_start: se llena la primera vez que alguien toca el inventario (parcial o final)
     await client.query(`
       UPDATE documents_l
       SET status = $1,
           inventory_date = COALESCE($2::timestamptz, inventory_date),
-          inventory_start = COALESCE(inventory_start, CURRENT_TIMESTAMP::text),
           inventory_user = $3,
           inventory_observation = $4,
           inventory_notes = $4
       WHERE id = $5
     `, [newStatus, inventoryDate || null, user, notes || '', docId]);
+
+    // inventory_start: se llena solo la primera vez — query separada para evitar conflictos de tipo
+    await client.query(`
+      UPDATE documents_l
+      SET inventory_start = NOW()::text
+      WHERE id = $1 AND (inventory_start IS NULL OR inventory_start = '')
+    `, [docId]);
 
     // 2. Obtener cliente y AGREGAR CONTEOS por SKU
     const clientId = docL.client_id;
