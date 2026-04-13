@@ -138,7 +138,12 @@ export const saveRoute = async (req: Request, res: Response) => {
     }
 
     await client.query('COMMIT');
-    res.json({ success: true, message: 'Ruta confirmada y guardada con éxito' });
+    console.log(`[M7-ROUTE-SUCCESS] Ruta #${finalRouteId} guardada con éxito. Invoices: ${uniqueInvoiceIds.length}`);
+    res.json({ 
+      success: true, 
+      message: 'Ruta confirmada y guardada con éxito',
+      routeId: finalRouteId 
+    });
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[M7-ROUTE-CTRL] Error:', err.message);
