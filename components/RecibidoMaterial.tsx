@@ -43,20 +43,9 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
     document.body.style.overscrollBehavior = 'none';
     document.body.style.touchAction = 'pan-x pan-y'; // permite scroll pero bloquea pull-to-refresh
 
-    // Prevenir el gesto de refresh en Chrome Android (touchstart en top 10px)
-    const blockPullToRefresh = (e: TouchEvent) => {
-      if (window.scrollY === 0 && e.touches[0].clientY > 0) {
-        // Si el usuario hace scroll hacia abajo desde el tope, lo bloqueamos
-        e.preventDefault();
-      }
-    };
-
-    document.addEventListener('touchstart', blockPullToRefresh, { passive: false });
-
     return () => {
       document.body.style.overscrollBehavior = originalOverscroll;
       document.body.style.touchAction = originalTouchAction;
-      document.removeEventListener('touchstart', blockPullToRefresh);
     };
   }, [selectedDocForCount]);
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
@@ -153,6 +142,8 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           d.id === selectedDocForCount.id ? { ...d, items: currentItems, updatedAt: new Date().toISOString() } : d
         ));
         toast.info("Progreso guardado en el servidor.");
+      } else {
+        throw new Error(res.error || "Fallo guardando progreso parcial");
       }
     } catch (err: any) {
       toast.error("Error al guardar progreso parcial.");
@@ -186,7 +177,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         ));
         setSelectedDocForCount(null);
       } else {
-        toast.error("Error al sincronizar: " + (res.error || "Desconocido"));
+        throw new Error(res.error || "Error al sincronizar");
       }
     } catch (err: any) {
       toast.error("Error al finalizar inventario.");

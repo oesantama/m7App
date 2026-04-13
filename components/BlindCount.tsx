@@ -49,15 +49,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
   useEffect(() => {
     document.body.style.overscrollBehavior = 'none';
 
-    const blockRefresh = (e: TouchEvent) => {
-      // Bloquear solo cuando se está en el tope del scroll (posición 0)
-      if (window.scrollY === 0) e.preventDefault();
-    };
-    document.addEventListener('touchstart', blockRefresh, { passive: false });
-
     return () => {
       document.body.style.overscrollBehavior = '';
-      document.removeEventListener('touchstart', blockRefresh);
     };
   }, []);
   // ESTADOS DE INVENTARIO M7
@@ -990,7 +983,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
       await onConfirm(finalItems, inventoryObservation, email);
     } catch (e: any) {
       toast.error('Error al finalizar: ' + (e.message || 'Error desconocido'));
-      setIsProcessing(false); // Desbloquear botón para reintentar
+      setIsProcessing(false); // Desbloquear botón para reintentar o corregir
     }
   };
 
