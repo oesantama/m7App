@@ -189,6 +189,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         error: errorMsg,
         fullError: err
       });
+      throw err; // Re-lanzar para que el modal sepa que falló
     } finally {
       setIsSyncingFinal(false);
     }

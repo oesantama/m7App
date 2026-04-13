@@ -161,10 +161,19 @@ export const syncInventory = async (req: Request, res: Response) => {
       }
     }
     // 3. Actualizar CONSOLIDADO (Donde se ven los conteos en Auditoría)
+    const deltas: Record<string, number> = {};
     for (const sku in skuAggregates) {
+      // M7-FIX: Obtener el valor previo ANTES de actualizar para calcular el delta correcto de inventario
+      const oldRes = await client.query(
+        'SELECT count_2 FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
+        [String(docId), String(sku)]
+      );
+      const oldCount2 = Number(oldRes.rows[0]?.count_2 || 0);
+      const newCount2 = Number(skuAggregates[sku].count2 || 0);
+      deltas[sku] = newCount2 - oldCount2;
+
       const expQtyRes = await client.query('SELECT SUM(expected_qty) as total FROM document_items WHERE document_id = $1::text AND article_id = $2::text', [docId, sku]);
       const expectedQty = Number(expQtyRes.rows[0]?.total || 0);
-      const newCount2 = Number(skuAggregates[sku].count2 || 0);
 
       await client.query(`
         INSERT INTO document_consolidated_items (document_id, article_id, count_1, count_2, inventory_user, inventory_observation, expected_qty)
@@ -185,13 +194,8 @@ export const syncInventory = async (req: Request, res: Response) => {
       console.log('[M7-SYNC] Iniciando actualización de inventario_clientes...');
       for (const sku in skuAggregates) {
         try {
-          const oldConsolidated = await client.query(
-            'SELECT count_2 FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
-            [String(docId), String(sku)]
-          );
-          const oldCount2 = Number(oldConsolidated.rows[0]?.count_2 || 0);
-          const newCount2 = Number(skuAggregates[sku].count2 || 0);
-          const delta = newCount2 - oldCount2;
+          const delta = deltas[sku] || 0;
+          if (delta === 0) continue; // No hubo cambio neto para este SKU en esta sync
 
           await client.query(`
             INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
@@ -201,10 +205,9 @@ export const syncInventory = async (req: Request, res: Response) => {
             last_user = EXCLUDED.last_user,
             last_updated = CURRENT_TIMESTAMP
           `, [clientId, sku, skuAggregates[sku].batch || 'S/L', delta, user]);
+          console.log(`[M7-SYNC-INV] SKU ${sku} actualizado. Delta: ${delta}`);
         } catch (invErr: any) {
           console.error(`[M7-SYNC-INV-ERR] Falló SKU ${sku}:`, invErr.message);
-          // Opcional: podrías decidir si esto aborta la transacción o solo loguea. 
-          // Dada la importancia del stock, permitimos que el error se capture en el catch global para hacer ROLLBACK.
           throw new Error(`Error actualizando stock para ${sku}: ${invErr.message}`);
         }
       }
@@ -397,7 +400,9 @@ export const syncInventory = async (req: Request, res: Response) => {
           // Crear un adjunto Excel con la totalidad de los items contabilizados
           let attachments: any[] = [];
           try {
-            const XLSX = await import('xlsx');
+            const XLSX_MODULE = await import('xlsx');
+            const XLSX = XLSX_MODULE.default || XLSX_MODULE;
+
             const excelData = items.map((it: any) => ({
                  'SKU': it.articleId?.trim() || it.article_id?.trim() || '',
                  'Tipo de Plan': docL.plan_type || docL.planType || 'PLAN NORMAL',
@@ -449,14 +454,24 @@ export const syncInventory = async (req: Request, res: Response) => {
     // Respuesta inmediata tras el COMMIT (las notificaciones son asíncronas en espíritu, no deben fallar la respuesta principal)
     return res.json({ success: true, status: newStatus });
   } catch (err: any) {
-    if (client) await client.query('ROLLBACK');
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rbErr) {
+        console.error('[M7-ROLLBACK-ERR]', rbErr);
+      }
+    }
     console.error('-------------------------------------------');
-    console.error('[M7-SYNC-FATAL-ERROR] Detalles del error:');
+    console.error('[M7-SYNC-FATAL-ERROR] Detalle:');
     console.error('Mensaje:', err.message);
     console.error('Stack:', err.stack);
-    console.error('Data recibida:', { docId, user, isPartial, itemsCount: items?.length });
     console.error('-------------------------------------------');
-    res.status(500).json({ error: "Error de sincronización. Contacte soporte técnico.", detail: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: "Error de sincronización crítico.", 
+      detail: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   } finally {
     if (client) client.release();
   }
