@@ -213,9 +213,14 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
             // Usamos la misma lógica de descarga pero para la placa y fecha específica de la ruta
             const from = planDate;
             const to = planDate;
-            const url = api.getConciliationPlanillaUrl(route.vehicle_plate, from, to);
+            const url = api.getConciliationPlanillaUrl(route.vehicle_plate, from, to, route.id);
             
-            const resp = await fetch(url, { credentials: 'include' });
+            // Obtener token para la descarga (Error 401 fix)
+            const token = localStorage.getItem('token') || localStorage.getItem('m7_token');
+            const headers: any = {};
+            if (token) headers['Authorization'] = `Bearer ${token.trim()}`;
+
+            const resp = await fetch(url, { headers, credentials: 'include' });
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
                 throw new Error(err.error || 'Error al generar planilla');
@@ -682,6 +687,8 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
                                                             <span className="flex items-center gap-1">🚛 {route.vehicle_plate}</span>
                                                             <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                                                             <span className="truncate">👤 {route.conductor_name || 'Sin conductor'}</span>
+                                                            <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                                                            <span className="text-emerald-600">📄 {route.total_invoices || 0} facturas</span>
                                                         </div>
                                                     </div>
                                                 </div>

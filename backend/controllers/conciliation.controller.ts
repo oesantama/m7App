@@ -84,10 +84,13 @@ export const searchRoutesForPlanilla = async (req: Request, res: Response) => {
                 dl.created_at,
                 dl.delivery_date,
                 dl.client_id,
-                -- Conductor
-                (SELECT u.name FROM dispatch_assignments da
-                 LEFT JOIN users u ON u.id = da.driver_id
-                 WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name,
+                -- Conductor: Preferir el de invoice_conciliations si existe, si no el de dispatch
+                COALESCE(
+                    (SELECT conductor_name FROM invoice_conciliations WHERE document_id = dl.id LIMIT 1),
+                    (SELECT u.name FROM dispatch_assignments da
+                     LEFT JOIN users u ON u.id = da.driver_id
+                     WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)
+                ) AS conductor_name,
                 -- Resumen de facturas
                 COUNT(DISTINCT di.invoice) AS total_invoices,
                 COUNT(DISTINCT ic.invoice_number) AS conciliadas
@@ -96,7 +99,6 @@ export const searchRoutesForPlanilla = async (req: Request, res: Response) => {
             LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
             WHERE dl.client_id = $1
               AND (dl.delivery_date = $2 OR dl.created_at::date = $2)
-              AND dl.plan_type ILIKE '%plan r%'
             GROUP BY dl.id
             ORDER BY dl.created_at DESC
         `, [clientId, date]);
@@ -287,9 +289,9 @@ export const getConciliationHistory = async (req: Request, res: Response) => {
 // de fechas: documentos, facturas, clientes, estado de conciliación y totales.
 export const downloadPlanilla = async (req: Request, res: Response) => {
     try {
-        const { plate, from, to } = req.query;
-        if (!plate || !from || !to) {
-            return res.status(400).json({ success: false, error: 'plate, from y to son requeridos' });
+        const { plate, from, to, documentId } = req.query;
+        if (!documentId && (!plate || !from || !to)) {
+            return res.status(400).json({ success: false, error: 'documentId o (plate, from y to) son requeridos' });
         }
 
         const result = await pool.query(`
@@ -314,16 +316,14 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
             FROM documents_l dl
             JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
             LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
-            WHERE dl.vehicle_plate ILIKE $1
-              AND dl.delivery_date >= $2
-              AND dl.delivery_date <= $3
+            WHERE ${documentId ? 'dl.id = $1' : 'dl.vehicle_plate ILIKE $1 AND dl.delivery_date >= $2 AND dl.delivery_date <= $3'}
               AND dl.plan_type ILIKE '%plan r%'
             GROUP BY dl.external_doc_id, dl.vehicle_plate, dl.delivery_date,
                      ic.conductor_name, di.invoice, di.customer_name, di.city, di.address,
                      ic.forma_pago, ic.banco, ic.valor, ic.comprobante, ic.fecha_pago,
                      ic.numero_cheque, ic.es_devolucion
             ORDER BY dl.delivery_date, dl.external_doc_id, di.invoice
-        `, [`%${plate}%`, from, to]);
+        `, documentId ? [documentId] : [`%${plate}%`, from, to]);
 
         const rows = result.rows;
         if (!rows.length) {
