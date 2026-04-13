@@ -1105,36 +1105,52 @@ const BlindCount: React.FC<BlindCountProps> = ({
         </p>
       </div>
 
-      <div className="bg-slate-900 px-4 py-1 text-white flex flex-col lg:flex-row justify-between items-center shrink-0 border-none gap-3">
-        <div className="flex items-center gap-3 w-full lg:w-auto">
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-950 shadow-lg shrink-0"><Icons.Scan className="w-5 h-5" /></div>
+      {/* HEADER — Fila 1 (móvil): Doc info + botón cerrar siempre visible */}
+      <div className="bg-slate-900 text-white shrink-0 border-none">
+
+        {/* Fila superior: identidad del doc + cerrar siempre accesible */}
+        <div className="flex items-center gap-3 px-4 pt-2 pb-1">
+          <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-950 shadow-lg shrink-0">
+            <Icons.Scan className="w-4 h-4" />
+          </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-base md:text-xl font-black uppercase tracking-tight leading-none truncate -mt-1">{docL.externalDocId}</h2>
-            <div className="mt-0.5 flex items-center gap-2">
+            <h2 className="text-sm md:text-lg font-black uppercase tracking-tight leading-none truncate">{docL.externalDocId}</h2>
+            <div className="mt-0.5 flex items-center gap-2 flex-wrap">
               <span className="text-[8px] text-slate-500 font-bold uppercase bg-slate-800 px-2 py-0.5 rounded border border-white/5">{docL.vehicleData}</span>
               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${validationAttempts === 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
                 {validationAttempts === 0 ? 'Fase 1: Conteo' : 'Fase 2: Novedades'}
               </span>
             </div>
           </div>
-          <button onClick={onCancel} className="lg:hidden text-slate-500 hover:text-red-500 transition-all text-2xl font-thin">&times;</button>
-        </div>
-
-        <div className="flex items-center gap-6 w-full lg:w-auto justify-end">
-          {/* CONTADORES (FOTO 3) */}
-          <div className="flex items-center gap-6 mr-2">
+          {/* Contadores compactos */}
+          <div className="flex items-center gap-4 shrink-0">
             <div className="text-center">
-              <p className="text-xl font-black text-emerald-400 leading-none">{Object.keys(counts).length}</p>
-              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Items</p>
+              <p className="text-lg font-black text-emerald-400 leading-none">{Object.keys(counts).length}</p>
+              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Items</p>
             </div>
             <div className="text-center">
-              <p className="text-xl font-black text-white leading-none">{groupedItems.length}</p>
-              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Plan</p>
+              <p className="text-lg font-black text-white leading-none">{groupedItems.length}</p>
+              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Plan</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-black text-white leading-none">{totalUnits}</p>
+              <p className="text-[7px] font-black text-emerald-400 uppercase tracking-widest">Uds</p>
             </div>
           </div>
+          {/* Botón cancelar SIEMPRE visible */}
+          <button
+            onClick={onCancel}
+            className="ml-1 shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all text-lg font-thin"
+            title="Cancelar inventario"
+          >
+            &times;
+          </button>
+        </div>
 
-          {/* SCANNER EN HEADER E INDICADOR DE ÚLTIMO ESCANEADO */}
-          <div className="flex flex-col gap-1 w-48 md:w-64">
+        {/* Fila inferior: scanner + botón finalizar */}
+        <div className="flex items-center gap-2 px-4 pb-2 pt-1">
+          {/* SCANNER */}
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
             <form onSubmit={handleScan} className="relative group w-full">
               <input
                 ref={inputRef}
@@ -1152,37 +1168,32 @@ const BlindCount: React.FC<BlindCountProps> = ({
               </div>
             </form>
             {lastScan && (
-              <div 
-                key={lastScan.id} 
-                className={`w-full px-4 flex items-center justify-between gap-3 mt-2 rounded-xl shadow-md shrink-0 animate-in slide-in-from-top-2 fade-in duration-300 ${
+              <div
+                key={lastScan.id}
+                className={`w-full px-3 flex items-center justify-between gap-2 rounded-xl shadow-md shrink-0 animate-in slide-in-from-top-2 fade-in duration-300 ${
                   lastScan.status === 'success' ? 'bg-[#e0f2fe] border-l-4 border-blue-400' : 'bg-rose-100 border-l-4 border-rose-500'
                 }`}
               >
-                <div className="flex flex-col min-w-0 flex-1 py-1">
-                   <span className={`text-[17px] md:text-[22px] font-black uppercase tracking-tighter truncate ${lastScan.status === 'success' ? 'text-blue-900' : 'text-rose-900'}`}>{lastScan.message}</span>
-                </div>
+                <span className={`text-[15px] md:text-[20px] font-black uppercase tracking-tighter truncate py-1 ${lastScan.status === 'success' ? 'text-blue-900' : 'text-rose-900'}`}>{lastScan.message}</span>
                 {lastScan.qty !== undefined && (
-                   <div className="flex flex-col items-center py-1 justify-center pl-3 border-l-2 border-white/40 shrink-0">
-                       <span className={`text-[8px] font-extrabold uppercase leading-none opacity-60 ${lastScan.status === 'success' ? 'text-blue-900' : 'text-rose-900'}`}>Total</span>
-                       <span className={`text-2xl font-black leading-none ${lastScan.status === 'success' ? 'text-blue-700' : 'text-rose-700'}`}>{lastScan.qty}</span>
-                   </div>
+                  <div className="flex flex-col items-center py-1 justify-center pl-3 border-l-2 border-white/40 shrink-0">
+                    <span className={`text-[8px] font-extrabold uppercase leading-none opacity-60 ${lastScan.status === 'success' ? 'text-blue-900' : 'text-rose-900'}`}>Total</span>
+                    <span className={`text-xl font-black leading-none ${lastScan.status === 'success' ? 'text-blue-700' : 'text-rose-700'}`}>{lastScan.qty}</span>
+                  </div>
                 )}
               </div>
             )}
           </div>
 
-          <div className="flex flex-col items-end mr-4">
-            <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Total Unidades</span>
-            <span className="text-2xl font-black leading-none">{totalUnits}</span>
-          </div>
-          <button onClick={onCancel} className="hidden md:block px-6 py-2 bg-slate-800 text-slate-400 hover:text-white rounded-xl font-black text-[9px] uppercase tracking-widest transition-all">Cancelar</button>
+          {/* Botón finalizar/cerrar SIEMPRE visible */}
           <button
             onClick={handleValidationTrigger}
             disabled={isProcessing || Object.keys(counts).length === 0}
-            className="px-6 py-2 bg-emerald-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-[0.1em] shadow-lg hover:bg-emerald-400 transition-all flex items-center gap-2 disabled:opacity-20 active:scale-95"
+            className="shrink-0 px-5 py-2.5 bg-emerald-500 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-[0.1em] shadow-lg hover:bg-emerald-400 transition-all flex items-center gap-1.5 disabled:opacity-20 active:scale-95"
           >
             {isProcessing ? <Icons.Alert className="w-3 h-3 animate-spin" /> : <Icons.Signature className="w-3.5 h-3.5" />}
-            {validationAttempts === 0 ? 'Finalizar' : 'Cerrar'}
+            <span className="hidden sm:inline">{validationAttempts === 0 ? 'Finalizar' : 'Cerrar'}</span>
+            <span className="sm:hidden">{validationAttempts === 0 ? 'OK' : 'X'}</span>
           </button>
         </div>
       </div>

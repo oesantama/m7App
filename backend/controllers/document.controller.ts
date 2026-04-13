@@ -204,9 +204,9 @@ export const syncInventory = async (req: Request, res: Response) => {
 
           await client.query(`
             INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-            VALUES ($1::text, $2::text, $3::text, $4::numeric, $5::text, CURRENT_TIMESTAMP)
+            VALUES ($1::text, $2::text, $3::text, $4::numeric::text, $5::text, CURRENT_TIMESTAMP)
             ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-            quantity = GREATEST(0, inventario_clientes.quantity + $4::numeric),
+            quantity = GREATEST(0, COALESCE(inventario_clientes.quantity::numeric, 0) + $4::numeric)::text,
             last_user = EXCLUDED.last_user,
             last_updated = CURRENT_TIMESTAMP
           `, [clientId, sku, skuAggregates[sku].batch || 'S/L', delta, user]);
