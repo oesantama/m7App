@@ -450,6 +450,7 @@ export const syncInventory = async (req: Request, res: Response) => {
         console.error('[M7-NOTIF-ERROR]', notifErr.message);
       }
     }
+  }
 
     // Respuesta inmediata tras el COMMIT (las notificaciones son asíncronas en espíritu, no deben fallar la respuesta principal)
     return res.json({ success: true, status: newStatus });
