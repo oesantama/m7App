@@ -11,7 +11,7 @@ interface BlindCountProps {
   masterNotificaciones: MasterRecord[];
   masterTipoNotificacion: MasterRecord[];
   masterArticulo: MasterRecord[];
-  onConfirm: (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => void;
+  onConfirm: (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => Promise<void> | void;
   onPartialSave: (currentItems: DocumentLItem[], generalObs: string) => Promise<void>;
   onCancel: () => void;
   onAddArticleToMaster: (article: Article) => void;
@@ -963,7 +963,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     setIncidents(prev => prev.filter(inc => inc.id !== incidentId));
   };
 
-  const finalizeProcess = (email: string) => {
+  const finalizeProcess = async (email: string) => {
     setIsProcessing(true);
 
     const emailInMaster = masterNotificaciones.some(n => n.notificationEmail === email && n.name?.toLowerCase().includes('ajover'));
@@ -986,8 +986,12 @@ const BlindCount: React.FC<BlindCountProps> = ({
       status: (counts[it.articleId] || 0) === it.expectedQty ? 'Matches' : 'Mismatch'
     }));
 
-    onConfirm(finalItems, inventoryObservation, email);
-    // NO cerramos el procesamiento aquí, dejamos que el padre lo maneje o que el componente se desmonte
+    try {
+      await onConfirm(finalItems, inventoryObservation, email);
+    } catch (e: any) {
+      toast.error('Error al finalizar: ' + (e.message || 'Error desconocido'));
+      setIsProcessing(false); // Desbloquear botón para reintentar
+    }
   };
 
   const filteredItems = useMemo(() => {

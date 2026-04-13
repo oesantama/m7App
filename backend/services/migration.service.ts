@@ -176,7 +176,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_invoices', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
@@ -437,6 +437,29 @@ const healSchema = async (client: any) => {
       DROP INDEX IF EXISTS unq_routing_patterns_city_veh;
       CREATE UNIQUE INDEX IF NOT EXISTS unq_routing_patterns_granular
       ON routing_patterns (city, vehicle_id, neighborhood);
+    `);
+
+    // ── FIX: routing_patterns.id debe ser SERIAL (no TEXT) para que el INSERT sin id funcione ──
+    // Si la columna id es TEXT (sin default), los INSERTs sin id fallan con NOT NULL violation.
+    await client.query(`
+      DO $$
+      BEGIN
+        -- Solo migrar si id es TEXT (no tiene default de secuencia)
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'routing_patterns'
+            AND column_name = 'id'
+            AND data_type = 'text'
+        ) THEN
+          -- Crear secuencia y asignar como default
+          CREATE SEQUENCE IF NOT EXISTS routing_patterns_id_seq;
+          ALTER TABLE routing_patterns ALTER COLUMN id TYPE BIGINT USING (
+            CASE WHEN id ~ '^[0-9]+$' THEN id::BIGINT ELSE nextval('routing_patterns_id_seq') END
+          );
+          ALTER TABLE routing_patterns ALTER COLUMN id SET DEFAULT nextval('routing_patterns_id_seq');
+          SELECT setval('routing_patterns_id_seq', COALESCE((SELECT MAX(id::BIGINT) FROM routing_patterns), 0) + 1);
+        END IF;
+      END$$;
     `);
 
     // ── NORMALIZACIÓN document_items.item_status ─────────────────────────────
