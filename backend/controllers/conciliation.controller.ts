@@ -94,13 +94,13 @@ export const searchRoutesForPlanilla = async (req: Request, res: Response) => {
                    ON ic2.document_id::text = di2.document_id::text
                   AND ic2.invoice_number    = di2.invoice
                   AND ic2.forma_pago IS NOT NULL
-                 WHERE ri2.route_id = r.id
+                 WHERE ri2.route_id::text = r.id::text
                 ) AS conciliadas
             FROM routes r
-            LEFT JOIN vehicles       v  ON v.id::text  = r.vehicle_id::text
-            LEFT JOIN drivers        d  ON d.id::text  = r.driver_id::text
-            LEFT JOIN estados        e  ON e.id        = r.status_id
-            LEFT JOIN route_invoices ri ON ri.route_id = r.id
+            LEFT JOIN vehicles       v  ON v.id::text       = r.vehicle_id::text
+            LEFT JOIN drivers        d  ON d.id::text       = r.driver_id::text
+            LEFT JOIN estados        e  ON e.id             = r.status_id
+            LEFT JOIN route_invoices ri ON ri.route_id::text = r.id::text
             WHERE r.client_id = $1
               AND r.created_at::date = $2::date
             GROUP BY r.id, v.plate, v.capacity_m3, d.name, e.name, r.status_id, r.vehicle_capacity_m3, r.created_at
@@ -319,7 +319,7 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
             LEFT JOIN drivers  d ON d.id::text = r.driver_id::text
             LEFT JOIN estados  e ON e.id       = r.status_id
             LEFT JOIN clients  c ON c.id       = r.client_id
-            WHERE r.id = $1
+            WHERE r.id::text = $1::text
         `, [routeId]);
 
         if (!routeRes.rows.length) {
@@ -360,7 +360,7 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
              AND ic.invoice_number     = COALESCE(NULLIF(di.invoice,''), di.order_number)
             LEFT JOIN estados est_item
               ON est_item.id = di.item_status
-            WHERE ri.route_id = $1
+            WHERE ri.route_id::text = $1::text
             GROUP BY dl.external_doc_id,
                      COALESCE(NULLIF(di.invoice,''), di.order_number),
                      di.customer_name, di.city, di.address,
