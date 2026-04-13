@@ -74,8 +74,8 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
     }
   };
 
-  const handlePartialSave = async (currentItems: DocumentLItem[], generalObs: string) => {
-    if (!selectedDocForCount) return;
+  const handlePartialSave = async (currentItems: DocumentLItem[], generalObs: string): Promise<void> => {
+    if (!selectedDocForCount) return; // nada que guardar, sin error
     const res = await api.syncInventory({
       docId: selectedDocForCount.id,
       items: currentItems,
@@ -88,34 +88,32 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
         d.id === selectedDocForCount.id ? { ...d, items: currentItems, updatedAt: new Date().toISOString() } : d
       ));
     } else {
+      // Lanzar para que BlindCount muestre syncStatus = 'error' (punto rojo)
       throw new Error(res.error || 'Error al guardar parcial');
     }
   };
 
-  const handleFinishCount = async (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => {
+  const handleFinishCount = async (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string): Promise<void> => {
     if (!selectedDocForCount) return;
-    try {
-      const res = await api.syncInventory({
-        docId: selectedDocForCount.id,
-        items: finalItems,
-        user: user.name,
-        notes: generalObs,
-        isPartial: false,
-        driverEmail: updateEmail
-      });
-      if (res.success) {
-        toast.success("Recibo manual finalizado.");
-        onUpdateDocuments(documents.map(d =>
-          d.id === selectedDocForCount.id
-            ? { ...d, items: finalItems, status: DocStatus.INVENTORED, inventoryDate: new Date().toISOString(), inventoryUser: user.name, inventoryNotes: generalObs, updatedBy: user.name, updatedAt: new Date().toISOString() }
-            : d
-        ));
-        setSelectedDocForCount(null);
-      } else {
-        toast.error("Error al sincronizar: " + (res.error || "Desconocido") + (res.detail ? ` — ${res.detail}` : ''));
-      }
-    } catch (e: any) {
-      toast.error("Error de conexión: " + e.message);
+    const res = await api.syncInventory({
+      docId: selectedDocForCount.id,
+      items: finalItems,
+      user: user.name,
+      notes: generalObs,
+      isPartial: false,
+      driverEmail: updateEmail
+    });
+    if (res.success) {
+      toast.success("Recibo manual finalizado.");
+      onUpdateDocuments(documents.map(d =>
+        d.id === selectedDocForCount.id
+          ? { ...d, items: finalItems, status: DocStatus.INVENTORED, inventoryDate: new Date().toISOString(), inventoryUser: user.name, inventoryNotes: generalObs, updatedBy: user.name, updatedAt: new Date().toISOString() }
+          : d
+      ));
+      setSelectedDocForCount(null);
+    } else {
+      // Lanzar para que BlindCount resetee isProcessing y muestre el error
+      throw new Error((res.error || 'Error desconocido') + (res.detail ? ` — ${res.detail}` : ''));
     }
   };
 
