@@ -450,7 +450,6 @@ export const syncInventory = async (req: Request, res: Response) => {
         console.error('[M7-NOTIF-ERROR]', notifErr.message);
       }
     }
-  }
 
     // Respuesta inmediata tras el COMMIT (las notificaciones son asíncronas en espíritu, no deben fallar la respuesta principal)
     return res.json({ success: true, status: newStatus });
@@ -675,8 +674,9 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             `, [doc.id, articleId, item.expectedQty || 0, '']);
         }
       }
+    }
     await client.query('COMMIT');
-    console.log(`[M7-SYNC-SUCCESS] Transacción completada con éxito para ${docId}`);
+    console.log(`[M7-SYNC-SUCCESS] Carga masiva completada.`);
     res.json({ success: true, count: documents.length });
   } catch (err: any) {
     await client.query('ROLLBACK');
