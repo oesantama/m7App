@@ -96,8 +96,8 @@ export const saveRoute = async (req: Request, res: Response) => {
 
     // 1. Insertar Cabecera de Ruta con datos de eficiencia
     const routeRes = await client.query(`
-      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status_id, total_volume_m3, vehicle_capacity_m3, utilization_pct)
-      VALUES ($1, $2, $3, $4, 'EST-10', $5, $6, $7)
+      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status_id, total_volume_m3, vehicle_capacity_m3, utilization_pct, created_at)
+      VALUES ($1, $2, $3, $4, 'EST-10', $5, $6, $7, CURRENT_TIMESTAMP)
       RETURNING id
     `, [vehicleId, finalDriverId, clientId, createdBy,
         Number(totalVolume) || 0,
@@ -110,7 +110,7 @@ export const saveRoute = async (req: Request, res: Response) => {
     const uniqueInvoiceIds = [...new Set(invoiceIds as string[])];
 
     for (const invId of uniqueInvoiceIds) {
-      await client.query('INSERT INTO route_invoices (route_id, invoice_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [finalRouteId, invId]);
+      await client.query('INSERT INTO route_invoices (route_id, invoice_id, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING', [finalRouteId, invId]);
     }
 
     // 4. Actualización Masiva de Estado en Document Items (con Fallback)
