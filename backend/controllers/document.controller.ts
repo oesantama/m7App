@@ -110,7 +110,7 @@ export const syncInventory = async (req: Request, res: Response) => {
     }
 
     const docL = checkStatus.rows[0];
-    const newStatus = isPartial ? 'EST-03' : 'EST-08'; // EST-03=PENDIENTE, EST-08=INVENTARIADO
+    const newStatus = isPartial ? 'EST-04' : 'EST-08'; // EST-04=EN CONTEO (parcial), EST-08=INVENTARIADO (final)
     const inventoryDate = isPartial ? null : new Date();
 
     // 1. Actualizar Metadatos del Documento
@@ -443,7 +443,7 @@ export const syncInventory = async (req: Request, res: Response) => {
     console.error('Stack:', err.stack);
     console.error('Data recibida:', { docId, user, isPartial, itemsCount: items?.length });
     console.error('-------------------------------------------');
-    res.status(500).json({ error: "Error de sincronización. Contacte soporte técnico." });
+    res.status(500).json({ error: "Error de sincronización. Contacte soporte técnico.", detail: err.message });
   } finally {
     if (client) client.release();
   }

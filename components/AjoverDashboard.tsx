@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../constants';
 
+interface VehicleEfficiency {
+  plate: string;
+  capacityM3: number;
+  totalRoutes: number;
+  avgUtilization: number;
+  avgVolume: number;
+  maxUtilization: number;
+  totalVolumeDispatched: number;
+}
+
 interface AjoverStats {
   vehicles: { total: number; available: number; onRoute: number; totalCapacityM3: number; totalCapacityKg: number };
   drivers: { total: number; active: number };
@@ -8,6 +18,7 @@ interface AjoverStats {
   invoices: { total: number; delivered: number; inRoute: number; pending: number; returned: number; deliveredWeight: number; effectivenessRate: number; returnRate: number };
   topCities: { city: string; total: number; delivered: number; returned: number; effectiveness: number }[];
   activeRoutes: { name: string; status: string; plate: string; driver: string }[];
+  vehicleEfficiency: VehicleEfficiency[];
 }
 
 interface Props {
@@ -108,6 +119,7 @@ const AjoverDashboard: React.FC<Props> = ({ vehicles = [], drivers = [], routes 
           plate: r.plate || r.vehicleId || '-',
           driver: r.driverName || r.driverId || '-',
         })),
+        vehicleEfficiency: [],
       });
       setError('');
     } finally {
@@ -128,7 +140,7 @@ const AjoverDashboard: React.FC<Props> = ({ vehicles = [], drivers = [], routes 
 
   if (!stats) return null;
 
-  const { vehicles: veh, drivers: drv, routes: rts, invoices: inv, topCities, activeRoutes } = stats;
+  const { vehicles: veh, drivers: drv, routes: rts, invoices: inv, topCities, activeRoutes, vehicleEfficiency = [] } = stats;
   const fleetUtilization = veh.total > 0 ? Math.round((veh.onRoute / veh.total) * 100) : 0;
 
   return (
@@ -317,6 +329,51 @@ const AjoverDashboard: React.FC<Props> = ({ vehicles = [], drivers = [], routes 
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Eficiencia de Vehículos (últimos 30 días) */}
+      {vehicleEfficiency.length > 0 && (
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-lg p-6">
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-4">Eficiencia de Vehículos — últimos 30 días</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {['Vehículo', 'Cap. M³', 'Rutas', 'Util. Prom.', 'Util. Máx.', 'Vol. Total Desp.'].map(h => (
+                    <th key={h} className="py-3 px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {vehicleEfficiency.map((v, i) => {
+                  const utilColor = v.avgUtilization >= 80 ? 'text-emerald-600' : v.avgUtilization >= 50 ? 'text-amber-500' : 'text-red-500';
+                  const barColor = v.avgUtilization >= 80 ? 'bg-emerald-500' : v.avgUtilization >= 50 ? 'bg-amber-400' : 'bg-red-500';
+                  return (
+                    <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3 px-4 font-black text-slate-900 text-xs uppercase">{v.plate}</td>
+                      <td className="py-3 px-4 font-bold text-slate-500 text-xs">{v.capacityM3.toFixed(1)} m³</td>
+                      <td className="py-3 px-4 font-bold text-slate-700 text-xs">{v.totalRoutes}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2 min-w-[100px]">
+                          <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${Math.min(v.avgUtilization, 100)}%` }} />
+                          </div>
+                          <span className={`text-[10px] font-black ${utilColor}`}>{v.avgUtilization.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`text-[10px] font-black ${v.maxUtilization >= 90 ? 'text-red-500' : 'text-slate-600'}`}>
+                          {v.maxUtilization}%
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-600 text-xs">{v.totalVolumeDispatched.toFixed(2)} m³</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -68,14 +68,12 @@ export const saveRoute = async (req: Request, res: Response) => {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    // Asegurar columnas de eficiencia FUERA de la transacción (DDL no puede estar en BEGIN/COMMIT)
+    await client.query('ALTER TABLE routes ADD COLUMN IF NOT EXISTS total_volume_m3 NUMERIC(10,4) DEFAULT 0');
+    await client.query('ALTER TABLE routes ADD COLUMN IF NOT EXISTS vehicle_capacity_m3 NUMERIC(10,2) DEFAULT 0');
+    await client.query('ALTER TABLE routes ADD COLUMN IF NOT EXISTS utilization_pct INTEGER DEFAULT 0');
 
-    // Asegurar columnas de eficiencia (idempotente — no falla si ya existen)
-    await client.query(`
-      ALTER TABLE routes ADD COLUMN IF NOT EXISTS total_volume_m3 NUMERIC(10,4) DEFAULT 0;
-      ALTER TABLE routes ADD COLUMN IF NOT EXISTS vehicle_capacity_m3 NUMERIC(10,2) DEFAULT 0;
-      ALTER TABLE routes ADD COLUMN IF NOT EXISTS utilization_pct INTEGER DEFAULT 0;
-    `);
+    await client.query('BEGIN');
 
     // AUTO-ASSIGN DRIVER IF MISSING (Requerimiento Crítico)
     let finalDriverId = driverId;

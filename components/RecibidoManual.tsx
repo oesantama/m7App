@@ -114,10 +114,10 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
         ));
         setSelectedDocForCount(null);
       } else {
-        toast.error("Error al sincronizar: " + (res.error || "Desconocido"));
+        toast.error("Error al sincronizar: " + (res.error || "Desconocido") + (res.detail ? ` — ${res.detail}` : ''));
       }
     } catch (e: any) {
-      toast.error("Error de conexion: " + e.message);
+      toast.error("Error de conexión: " + e.message);
     }
   };
 
