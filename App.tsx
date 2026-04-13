@@ -688,8 +688,17 @@ const App: React.FC = () => {
               setAllMasterData({ ...allMasterData, masterArticulo: [...(allMasterData.masterArticulo || []), article as MasterRecord] });
             }}
             onAddNotificationToMaster={async (notif) => {
-              const newNotif = { ...notif, id: `not-${Date.now()}` };
-              await api.saveMaster('masterNotificaciones', newNotif);
+              const newNotif = {
+                id: notif.id || `not-${Date.now()}`,
+                name: notif.name || 'inventario ajover',
+                description: notif.description || '',
+                notificationEmail: (notif as any).notificationEmail || '',
+                tipoNotificacionId: (notif as any).tipoNotificacionId || null,
+                statusId: notif.statusId || 'EST-01',
+                createdBy: user?.name || 'System',
+                updatedBy: user?.name || 'System',
+              };
+              await api.saveNotificacionConfig(newNotif);
               setAllMasterData({ ...allMasterData, masterNotificaciones: [...(allMasterData.masterNotificaciones || []), newNotif as MasterRecord] });
             }}
           />
