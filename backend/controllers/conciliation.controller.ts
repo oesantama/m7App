@@ -102,7 +102,22 @@ export const searchRoutesForPlanilla = async (req: Request, res: Response) => {
             LEFT JOIN estados        e  ON e.id             = r.status_id
             LEFT JOIN route_invoices ri ON ri.route_id::text = r.id::text
             WHERE r.client_id = $1
-              AND r.created_at::date = $2::date
+              AND (
+                -- Ruta planificada en esa fecha
+                r.created_at::date = $2::date
+                OR
+                -- O tiene documentos con esa fecha de entrega
+                EXISTS (
+                    SELECT 1
+                    FROM route_invoices ri_f
+                    JOIN document_items di_f
+                      ON TRIM(COALESCE(NULLIF(di_f.invoice,''), di_f.order_number)) = ri_f.invoice_id
+                      OR CONCAT(di_f.document_id::text, '_', COALESCE(NULLIF(di_f.invoice,''), di_f.order_number)) = ri_f.invoice_id
+                    JOIN documents_l dl_f ON dl_f.id::text = di_f.document_id::text
+                    WHERE ri_f.route_id::text = r.id::text
+                      AND dl_f.delivery_date::date = $2::date
+                )
+              )
             GROUP BY r.id, v.plate, v.capacity_m3, d.name, e.name, r.status_id, r.vehicle_capacity_m3, r.created_at
             ORDER BY r.created_at DESC
         `, [clientId, date]);
