@@ -294,81 +294,151 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'documentId o (plate, from y to) son requeridos' });
         }
 
-        const result = await pool.query(`
+        // ── 1. Datos del documento (placa, conductor, estado desde routes) ──────
+        const docRes = await pool.query(`
             SELECT
-                dl.external_doc_id                          AS "Documento",
-                COALESCE(ic.vehicle_plate, 
-                    (SELECT v.plate FROM route_invoices ri 
-                     JOIN routes r ON r.id = ri.route_id 
-                     JOIN vehicles v ON v.id::text = r.vehicle_id::text 
-                     WHERE ri.invoice_id = dl.id::text OR ri.invoice_id = dl.external_doc_id 
-                     LIMIT 1),
-                    dl.vehicle_plate
-                )                                           AS "Placa",
-                dl.delivery_date                            AS "Fecha Entrega",
-                COALESCE(ic.conductor_name, 
-                    (SELECT dri.name FROM route_invoices ri 
-                     JOIN routes r ON r.id = ri.route_id 
-                     JOIN drivers dri ON dri.id::text = r.driver_id::text 
-                     WHERE ri.invoice_id = dl.id::text OR ri.invoice_id = dl.external_doc_id 
-                     LIMIT 1),
-                    (SELECT u.name FROM dispatch_assignments da 
-                     LEFT JOIN users u ON u.id = da.driver_id 
-                     WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)
-                )                                           AS "Conductor",
-                di.invoice                                  AS "Factura",
-                di.customer_name                            AS "Cliente",
-                di.city                                     AS "Ciudad",
-                di.address                                  AS "Dirección",
-                SUM(COALESCE(di.expected_qty, 0))           AS "Cant. Artículos",
-                MAX(p.vmetodo)                              AS "Valor Documento",
-                ic.forma_pago                               AS "Forma de Pago",
-                ic.banco                                    AS "Banco",
-                ic.valor                                    AS "Valor Recaudado",
-                ic.comprobante                              AS "No. Comprobante",
-                ic.fecha_pago                               AS "Fecha Pago",
-                ic.numero_cheque                            AS "No. Cheque",
-                CASE WHEN ic.es_devolucion THEN 'SÍ' ELSE 'NO' END AS "Es Devolución",
-                CASE WHEN ic.forma_pago IS NOT NULL THEN 'CONCILIADA' ELSE 'PENDIENTE' END AS "Estado"
+                dl.id,
+                dl.external_doc_id,
+                dl.vehicle_plate     AS doc_plate,
+                dl.delivery_date,
+                dl.plan_type,
+                dl.client_id,
+                c.name               AS client_name,
+                COALESCE(v.plate,    ic_head.vehicle_plate, dl.vehicle_plate)   AS placa,
+                COALESCE(v.capacity_m3::text, '—')                              AS capacidad_m3,
+                COALESCE(d.name,     ic_head.conductor_name, '—')               AS conductor,
+                COALESCE(e.name,     '—')                                        AS estado_ruta
             FROM documents_l dl
-            JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
-            LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
-            LEFT JOIN document_l_payments p ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
-            WHERE ${documentId ? 'dl.external_doc_id = $1' : 'dl.vehicle_plate ILIKE $1 AND dl.delivery_date >= $2 AND dl.delivery_date <= $3'}
-              AND (dl.plan_type ILIKE '%plan r%' OR $1 IS NOT NULL) -- Ser más flexible si se pide por ID
-            GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.delivery_date,
-                     ic.vehicle_plate, ic.conductor_name, di.invoice, di.customer_name, di.city, di.address,
-                     ic.forma_pago, ic.banco, ic.valor, ic.comprobante, ic.fecha_pago,
-                     ic.numero_cheque, ic.es_devolucion
-            ORDER BY dl.delivery_date, dl.external_doc_id, di.invoice
+            LEFT JOIN clients c ON c.id = dl.client_id
+            -- Ruta asignada al documento (1 sola via LATERAL)
+            LEFT JOIN LATERAL (
+                SELECT r.vehicle_id, r.driver_id, r.status_id
+                FROM route_invoices ri
+                JOIN routes r ON r.id = ri.route_id
+                WHERE ri.invoice_id = dl.external_doc_id
+                   OR ri.invoice_id = dl.id::text
+                ORDER BY r.created_at DESC
+                LIMIT 1
+            ) ruta ON true
+            LEFT JOIN vehicles v  ON v.id::text  = ruta.vehicle_id::text
+            LEFT JOIN drivers  d  ON d.id::text  = ruta.driver_id::text
+            LEFT JOIN estados  e  ON e.id        = ruta.status_id
+            -- Fallback: datos de la primera conciliación del documento
+            LEFT JOIN LATERAL (
+                SELECT vehicle_plate, conductor_name
+                FROM invoice_conciliations
+                WHERE document_id = dl.id::text
+                LIMIT 1
+            ) ic_head ON true
+            WHERE ${documentId
+                ? 'dl.external_doc_id = $1'
+                : 'dl.vehicle_plate ILIKE $1 AND dl.delivery_date >= $2 AND dl.delivery_date <= $3'}
+            ORDER BY dl.delivery_date, dl.external_doc_id
         `, documentId ? [documentId] : [`%${plate}%`, from, to]);
 
-        const rows = result.rows;
-        if (!rows.length) {
-            return res.status(404).json({ success: false, error: 'No se encontraron datos para los filtros indicados' });
+        if (!docRes.rows.length) {
+            return res.status(404).json({ success: false, error: 'No se encontraron documentos para los filtros indicados' });
         }
 
-        // Resumen por forma de pago
-        const resumen: Record<string, { facturas: number; total: number }> = {};
-        for (const r of rows) {
+        // ── 2. Facturas de todos los documentos encontrados ────────────────────
+        const docIds = docRes.rows.map(r => r.id);
+
+        const invRes = await pool.query(`
+            SELECT
+                dl.external_doc_id                                              AS "Documento",
+                di.invoice                                                      AS "Factura",
+                di.customer_name                                                AS "Cliente",
+                di.city                                                         AS "Ciudad",
+                di.address                                                      AS "Dirección",
+                SUM(COALESCE(di.expected_qty, 0))                              AS "Cant. Artículos",
+                MAX(p.vmetodo)                                                  AS "Valor Documento",
+                ic.forma_pago                                                   AS "Forma de Pago",
+                ic.banco                                                        AS "Banco",
+                ic.valor                                                        AS "Valor Recaudado",
+                ic.comprobante                                                  AS "No. Comprobante",
+                ic.fecha_pago                                                   AS "Fecha Pago",
+                ic.numero_cheque                                                AS "No. Cheque",
+                CASE WHEN ic.es_devolucion THEN 'SÍ' ELSE 'NO' END            AS "Es Devolución",
+                CASE WHEN ic.forma_pago IS NOT NULL THEN 'CONCILIADA' ELSE 'PENDIENTE' END AS "Estado"
+            FROM document_items di
+            JOIN documents_l dl ON dl.id = di.document_id::integer
+            LEFT JOIN invoice_conciliations ic
+                   ON ic.document_id  = di.document_id
+                  AND ic.invoice_number = di.invoice
+            LEFT JOIN document_l_payments p
+                   ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
+            WHERE di.document_id::integer = ANY($1::integer[])
+              AND di.invoice IS NOT NULL AND di.invoice <> ''
+            GROUP BY dl.external_doc_id, di.invoice, di.customer_name, di.city, di.address,
+                     ic.forma_pago, ic.banco, ic.valor, ic.comprobante, ic.fecha_pago,
+                     ic.numero_cheque, ic.es_devolucion
+            ORDER BY dl.external_doc_id, di.invoice
+        `, [docIds]);
+
+        const invoiceRows = invRes.rows;
+
+        // ── 3. Construir hoja Portada (una fila por documento) ─────────────────
+        const portadaRows = docRes.rows.map(doc => {
+            const facturas = invoiceRows.filter(r => r['Documento'] === doc.external_doc_id);
+            const conciliadas = facturas.filter(r => r['Forma de Pago']).length;
+            const totalRecaudado = facturas.reduce((s, r) => s + (Number(r['Valor Recaudado']) || 0), 0);
+            return {
+                'Documento':         doc.external_doc_id,
+                'Placa':             doc.placa        || '—',
+                'Capacidad (m³)':   doc.capacidad_m3 || '—',
+                'Conductor':         doc.conductor    || '—',
+                'Estado Ruta':       doc.estado_ruta  || '—',
+                'Cliente':           doc.client_name  || '—',
+                'Fecha Entrega':     doc.delivery_date
+                                       ? new Date(doc.delivery_date).toLocaleDateString('es-CO')
+                                       : '—',
+                'Plan':              doc.plan_type    || '—',
+                'Total Facturas':    facturas.length,
+                'Conciliadas':       conciliadas,
+                'Pendientes':        facturas.length - conciliadas,
+                'Devoluciones':      facturas.filter(r => r['Es Devolución'] === 'SÍ').length,
+                'Total Recaudado':   totalRecaudado,
+                'Estado General':    conciliadas === facturas.length && facturas.length > 0 ? 'COMPLETO' : 'INCOMPLETO',
+            };
+        });
+
+        // ── 4. Resumen global por forma de pago ───────────────────────────────
+        const resumenMap: Record<string, { facturas: number; total: number }> = {};
+        for (const r of invoiceRows) {
             const fp = r['Forma de Pago'] || 'PENDIENTE';
-            if (!resumen[fp]) resumen[fp] = { facturas: 0, total: 0 };
-            resumen[fp].facturas++;
-            resumen[fp].total += Number(r['Valor Recaudado']) || 0;
+            if (!resumenMap[fp]) resumenMap[fp] = { facturas: 0, total: 0 };
+            resumenMap[fp].facturas++;
+            resumenMap[fp].total += Number(r['Valor Recaudado']) || 0;
         }
-        const resumenRows = Object.entries(resumen).map(([fp, v]) => ({
-            'Forma de Pago': fp, 'Facturas': v.facturas,
-            'Total Recaudado': v.total
+        const resumenRows = Object.entries(resumenMap).map(([fp, v]) => ({
+            'Forma de Pago':    fp,
+            'Facturas':         v.facturas,
+            'Total Recaudado':  v.total,
         }));
 
+        // ── 5. Construir Excel multi-hoja ──────────────────────────────────────
         const XLSX = await import('xlsx');
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Planilla Ruta');
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows), 'Resumen Pago');
+
+        const wsPortada  = XLSX.utils.json_to_sheet(portadaRows);
+        const wsFacturas = XLSX.utils.json_to_sheet(invoiceRows);
+        const wsResumen  = XLSX.utils.json_to_sheet(resumenRows);
+
+        // Anchos de columna
+        wsPortada['!cols']  = [18,14,14,24,20,24,14,10,12,12,12,12,16,14].map(w => ({ wch: w }));
+        wsFacturas['!cols'] = [18,14,28,16,30,14,16,14,12,16,18,14,14,14].map(w => ({ wch: w }));
+        wsResumen['!cols']  = [20,12,16].map(w => ({ wch: w }));
+
+        XLSX.utils.book_append_sheet(wb, wsPortada,  'Resumen General');
+        XLSX.utils.book_append_sheet(wb, wsFacturas, 'Detalle Facturas');
+        XLSX.utils.book_append_sheet(wb, wsResumen,  'Resumen por Pago');
+
         const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-        const plateClean = String(plate).toUpperCase().replace(/[^A-Z0-9]/g, '');
-        const filename = `Planilla_${plateClean}_${from}_${to}.xlsx`;
+        const plateClean = (String(plate || docRes.rows[0]?.doc_plate || 'SV'))
+            .toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const dateLabel = String(from || docRes.rows[0]?.delivery_date?.toISOString?.()?.slice(0,10) || 'fecha');
+        const filename = `Planilla_${plateClean}_${dateLabel}.xlsx`;
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
