@@ -843,15 +843,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             }
         } catch (e) {
             console.warn('[M7-OSRM] Fallback a líneas rectas:', e);
+            toast.warning('Ruteo por calles no disponible — mostrando trayectoria aproximada', { duration: 4000 });
         }
 
         // Fallback: líneas rectas si OSRM falló
         if (!usedRoadRoute && mapRef.current) {
             routePolylineRef.current = L.polyline(allLatLngs, {
-                color: '#0ea5e9',
-                weight: 4,
+                color: '#f59e0b',
+                weight: 3,
                 opacity: 0.7,
-                dashArray: '8, 12'
+                dashArray: '8, 10'
             }).addTo(mapRef.current);
             setMapRouteInfo({
                 plate:           visualizedRoute?.plate || '',

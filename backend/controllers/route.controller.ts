@@ -294,6 +294,7 @@ export const geocodeAddress = async (req: Request, res: Response) => {
 const OSRM_SERVERS = [
   'https://router.project-osrm.org',
   'https://routing.openstreetmap.de/routed-car',
+  'https://osrm.openstreetmap.de/routed-car',
 ];
 
 export const getRoadRoute = async (req: Request, res: Response) => {
@@ -310,7 +311,7 @@ export const getRoadRoute = async (req: Request, res: Response) => {
     try {
       const response = await fetch(url, {
         headers: { 'User-Agent': 'OrbitM7-Logistics/1.0 (logistics@orbitm7.io)' },
-        signal: AbortSignal.timeout(20000)
+        signal: AbortSignal.timeout(30000)
       });
       if (!response.ok) throw new Error(`OSRM status ${response.status}`);
       const data = await response.json() as any;
