@@ -1075,8 +1075,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         try {
             const signatures = [];
             signatures.push({ userId: user.id, role: 'DISPATCHER', signNow: signNowMap[user.id] !== false, password: signatureKeys[user.id] });
-            // Conductor firma en diferido (FIRMAR), no se bloquea aquí
-            if (actualDriver) signatures.push({ userId: actualDriver.id, role: 'DRIVER', signNow: false, password: '' });
+            if (actualDriver) {
+                const driverSignNow = signNowMap[actualDriver.id] !== false;
+                // Si el conductor firma ahora, validar que haya ingresado su clave
+                if (driverSignNow && !signatureKeys[actualDriver.id]) {
+                    toast.error('Falta la clave del conductor — seleccione "DESPUÉS" si firmará luego');
+                    setIsValidating(false);
+                    return;
+                }
+                signatures.push({ userId: actualDriver.id, role: 'DRIVER', signNow: driverSignNow, password: signatureKeys[actualDriver.id] || '' });
+            }
 
             if (isAccompanied) {
                 selectedHelpers.slice(0, helperCount).forEach(hid => {

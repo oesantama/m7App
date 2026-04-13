@@ -195,23 +195,19 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                     PROTOCOLOS DE SEGURIDAD M7
                                 </h4>
                                 <div className="space-y-3">
-                                    {/* Firma del Despachador (USUARIO ACTUAL) */}
+                                    {/* Firma del Despachador (BODEGA) */}
                                     <div className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg shadow-black/20">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <div>
-                                                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">RESPONSABLE TIENDA</p>
-                                                <p className="text-[11px] font-black text-white uppercase">{user.name}</p>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                                                    <Icons.Shield className="w-3.5 h-3.5 text-emerald-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black text-emerald-400 uppercase tracking-wider leading-none">FIRMA BODEGA</p>
+                                                    <p className="text-[11px] font-black text-white uppercase leading-none mt-0.5">{user.name}</p>
+                                                </div>
                                             </div>
-                                            <div className="flex bg-white/10 p-1 rounded-lg">
-                                                <button 
-                                                    onClick={() => setSignNowMap({...signNowMap, [user.id]: true})}
-                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] !== false ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20' : 'text-slate-400'}`}
-                                                >AHORA</button>
-                                                <button 
-                                                    onClick={() => setSignNowMap({...signNowMap, [user.id]: false})}
-                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] === false ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'text-slate-400'}`}
-                                                >DESPUÉS</button>
-                                            </div>
+                                            <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-[7px] font-black rounded-lg uppercase tracking-widest">REQUERIDA</span>
                                         </div>
                                         {signNowMap[user.id] !== false && (
                                             <div className="relative">
@@ -233,35 +229,40 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                         )}
                                     </div>
 
-                                    {/* Firma del Conductor Real */}
-                                    {actualDriver && (
+                                    {/* Firma del Conductor */}
+                                    {actualDriver ? (
                                         <div className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg shadow-black/20">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <div>
-                                                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">RESPONSABLE LOGÍSTICO</p>
-                                                    <p className="text-[11px] font-black text-white uppercase">{actualDriver.name} (CONDUCTOR)</p>
+                                            <div className="flex justify-between items-center mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-7 h-7 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                                        <Icons.Truck className="w-3.5 h-3.5 text-blue-400" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-wider leading-none">FIRMA CONDUCTOR</p>
+                                                        <p className="text-[11px] font-black text-white uppercase leading-none mt-0.5">{actualDriver.name}</p>
+                                                    </div>
                                                 </div>
                                                 <div className="flex bg-white/10 p-1 rounded-lg">
-                                                    <button 
+                                                    <button
                                                         onClick={() => setSignNowMap({...signNowMap, [actualDriver.id]: true})}
-                                                        className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] !== false ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20' : 'text-slate-400'}`}
+                                                        className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] !== false ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400'}`}
                                                     >AHORA</button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => setSignNowMap({...signNowMap, [actualDriver.id]: false})}
-                                                        className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] === false ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'text-slate-400'}`}
+                                                        className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] === false ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400'}`}
                                                     >DESPUÉS</button>
                                                 </div>
                                             </div>
-                                            {signNowMap[actualDriver.id] !== false && (
+                                            {signNowMap[actualDriver.id] !== false ? (
                                                 <div className="relative">
-                                                    <input 
+                                                    <input
                                                         type={showPasswordMap[actualDriver.id] ? "text" : "password"}
-                                                        placeholder="CLAVE CONDUCTOR..."
+                                                        placeholder="CLAVE DEL CONDUCTOR..."
                                                         autoComplete="new-password"
-                                                        className="w-full bg-slate-950 border border-white/5 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500/50 pr-10 shadow-inner"
+                                                        className="w-full bg-slate-950 border border-white/5 p-3 rounded-xl text-xs font-black text-blue-400 outline-none focus:border-blue-500/50 pr-10 shadow-inner"
                                                         onChange={(e) => setSignatureKeys({...signatureKeys, [actualDriver.id]: e.target.value})}
                                                     />
-                                                    <button 
+                                                    <button
                                                         type="button"
                                                         onClick={() => setShowPasswordMap({...showPasswordMap, [actualDriver.id]: !showPasswordMap[actualDriver.id]})}
                                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
@@ -269,7 +270,13 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                                         {showPasswordMap[actualDriver.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
                                                     </button>
                                                 </div>
+                                            ) : (
+                                                <p className="text-[9px] font-bold text-amber-400/70 uppercase tracking-widest">El conductor firmará por separado con el botón "Firma Pend."</p>
                                             )}
+                                        </div>
+                                    ) : (
+                                        <div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20">
+                                            <p className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Sin conductor asignado a esta ruta — la firma del conductor no aplica</p>
                                         </div>
                                     )}
 

@@ -76,21 +76,19 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
 
   const handlePartialSave = async (currentItems: DocumentLItem[], generalObs: string) => {
     if (!selectedDocForCount) return;
-    try {
-      const res = await api.syncInventory({
-        docId: selectedDocForCount.id,
-        items: currentItems,
-        user: user.name,
-        notes: generalObs,
-        isPartial: true
-      });
-      if (res.success) {
-        onUpdateDocuments(documents.map(d =>
-          d.id === selectedDocForCount.id ? { ...d, items: currentItems, updatedAt: new Date().toISOString() } : d
-        ));
-      }
-    } catch (e: any) {
-      if (import.meta.env.DEV) console.error('[M7-PARTIAL-SAVE]', e.message);
+    const res = await api.syncInventory({
+      docId: selectedDocForCount.id,
+      items: currentItems,
+      user: user.name,
+      notes: generalObs,
+      isPartial: true
+    });
+    if (res.success) {
+      onUpdateDocuments(documents.map(d =>
+        d.id === selectedDocForCount.id ? { ...d, items: currentItems, updatedAt: new Date().toISOString() } : d
+      ));
+    } else {
+      throw new Error(res.error || 'Error al guardar parcial');
     }
   };
 

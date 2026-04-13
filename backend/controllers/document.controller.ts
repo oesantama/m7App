@@ -118,7 +118,7 @@ export const syncInventory = async (req: Request, res: Response) => {
     await client.query(`
       UPDATE documents_l
       SET status = $1,
-          inventory_date = COALESCE($2, inventory_date),
+          inventory_date = COALESCE($2::timestamptz, inventory_date),
           inventory_start = COALESCE(inventory_start, CURRENT_TIMESTAMP),
           inventory_user = $3,
           inventory_observation = $4,

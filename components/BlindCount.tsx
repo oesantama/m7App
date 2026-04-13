@@ -12,7 +12,7 @@ interface BlindCountProps {
   masterTipoNotificacion: MasterRecord[];
   masterArticulo: MasterRecord[];
   onConfirm: (finalItems: DocumentLItem[], generalObs: string, updateEmail?: string) => void;
-  onPartialSave: (currentItems: DocumentLItem[], generalObs: string) => void;
+  onPartialSave: (currentItems: DocumentLItem[], generalObs: string) => Promise<void>;
   onCancel: () => void;
   onAddArticleToMaster: (article: Article) => void;
   onAddNotificationToMaster: (notif: Partial<MasterRecord>) => void;
@@ -225,7 +225,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
     setSyncStatus('syncing');
-    autoSaveTimer.current = setTimeout(() => {
+    autoSaveTimer.current = setTimeout(async () => {
       const finalItems: DocumentLItem[] = groupedItems.map(it => ({
         ...it,
         countedQty: counts[it.articleId] || 0,
@@ -234,9 +234,13 @@ const BlindCount: React.FC<BlindCountProps> = ({
         inventoryNote: itemObservations[it.articleId] || '',
       }));
 
-    onPartialSave(finalItems, inventoryObservation);
-      setSyncStatus('synced');
-      setLastSyncTime(new Date());
+      try {
+        await onPartialSave(finalItems, inventoryObservation);
+        setSyncStatus('synced');
+        setLastSyncTime(new Date());
+      } catch {
+        setSyncStatus('error');
+      }
     }, 5000); // M7 V17: Aumentado a 5 segundos para priorizar ráfaga de escaneo sin bloqueos
 
     return () => {
