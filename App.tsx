@@ -286,7 +286,7 @@ const App: React.FC = () => {
             api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => {})
           );
         }
-        if (hasPerm('RUTAS') || hasPerm('ASIGNACIONES')) {
+        if (hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || activeTab === 'despacho') {
           fetches.push(
             api.getRoutes().then(r => useAppStore.setState({ routes: r || [] })).catch(() => {}),
             api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => {})

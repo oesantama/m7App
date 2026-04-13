@@ -1001,6 +1001,20 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         return activeRoutes;
     }, [activeRoutes, user, assignments, drivers]);
 
+    // DIAGNÓSTICO DE DATOS (M7-DEBUG)
+    useEffect(() => {
+        if (import.meta.env.DEV) {
+            console.log('%c [M7-DISPATCH-DIAGNOSTIC] 🛰️ RUTAS RECIBIDAS', 'background: #0ea5e9; color: white; padding: 4px; border-radius: 4px;');
+            console.table(activeRoutes.map(r => ({
+                id: r.id,
+                plate: r.plate || (r as any).vehicle_id,
+                status: r.status || (r as any).status_id,
+                invoices: (r as any).invoice_ids?.length || 0
+            })));
+            console.log(`[M7-DISPATCH] Visibles despues de filtro: ${filteredRoutes.length}`);
+        }
+    }, [activeRoutes, filteredRoutes]);
+
     // FILTRA UBICACIONES GPS BASADAS EN LAS RUTAS VISIBLES
     const filteredLocations = React.useMemo(() => {
         const visibleVehicleIds = new Set(filteredRoutes.map(r => r.vehicle_id));
@@ -1362,12 +1376,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             )}
                         </div>
 
-                        {activeRoutes.length === 0 ? (
+                        {filteredRoutes.length === 0 ? (
                             <div className="text-center p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Esperando despacho...</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">{activeRoutes.length === 0 ? 'Esperando despacho...' : 'Sin rutas para este criterio'}</p>
                             </div>
                         ) : (
-                            activeRoutes
+                            filteredRoutes
                             .filter(route => {
                                 if (!routeSearch) return true;
                                 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
