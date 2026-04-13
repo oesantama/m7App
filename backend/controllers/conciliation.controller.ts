@@ -297,14 +297,19 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
         const result = await pool.query(`
             SELECT
                 dl.external_doc_id                          AS "Documento",
-                dl.vehicle_plate                            AS "Placa",
+                COALESCE(ic.vehicle_plate, v.plate, dl.vehicle_plate) AS "Placa",
                 dl.delivery_date                            AS "Fecha Entrega",
-                ic.conductor_name                           AS "Conductor",
+                COALESCE(ic.conductor_name, d.name,
+                    (SELECT u.name FROM dispatch_assignments da 
+                     LEFT JOIN users u ON u.id = da.driver_id 
+                     WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)
+                )                                           AS "Conductor",
                 di.invoice                                  AS "Factura",
                 di.customer_name                            AS "Cliente",
                 di.city                                     AS "Ciudad",
                 di.address                                  AS "Dirección",
                 SUM(COALESCE(di.expected_qty, 0))           AS "Cant. Artículos",
+                MAX(p.vmetodo)                              AS "Valor Documento",
                 ic.forma_pago                               AS "Forma de Pago",
                 ic.banco                                    AS "Banco",
                 ic.valor                                    AS "Valor Recaudado",
@@ -316,10 +321,16 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
             FROM documents_l dl
             JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
             LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
+            LEFT JOIN document_l_payments p ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
+            -- Intentar obtener info de la ruta asignada en el planificador
+            LEFT JOIN route_invoices ri ON ri.invoice_id = dl.id
+            LEFT JOIN routes r ON r.id = ri.route_id
+            LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+            LEFT JOIN drivers d ON d.id::text = r.driver_id::text
             WHERE ${documentId ? 'dl.id = $1' : 'dl.vehicle_plate ILIKE $1 AND dl.delivery_date >= $2 AND dl.delivery_date <= $3'}
               AND dl.plan_type ILIKE '%plan r%'
-            GROUP BY dl.external_doc_id, dl.vehicle_plate, dl.delivery_date,
-                     ic.conductor_name, di.invoice, di.customer_name, di.city, di.address,
+            GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.delivery_date,
+                     ic.vehicle_plate, v.plate, ic.conductor_name, d.name, di.invoice, di.customer_name, di.city, di.address,
                      ic.forma_pago, ic.banco, ic.valor, ic.comprobante, ic.fecha_pago,
                      ic.numero_cheque, ic.es_devolucion
             ORDER BY dl.delivery_date, dl.external_doc_id, di.invoice
