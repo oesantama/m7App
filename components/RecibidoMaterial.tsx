@@ -105,7 +105,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const getDocMetrics = (doc: DocumentL) => {
     const items = doc.items || [];
     const totalItems = items.length;
-    const countedItems = items.filter(i => i.countedQty > 0 || i.status === 'Matches' || i.status === 'OK').length;
+    const countedItems = items.filter(i => (i.countedQty > 0 || (i.count2 ?? 0) > 0 || (i.count1 ?? 0) > 0) || i.status === 'Matches' || i.status === 'OK').length;
     const novedades = items.filter(i => i.status === 'Mismatch' || i.status === 'Novedad' || i.novedad).length;
     const totalVol = items.reduce((acc, i) => acc + (parseFloat(String(i.volume || '0')) || 0), 0);
     const progress = totalItems > 0 ? Math.round((countedItems / totalItems) * 100) : 0;
