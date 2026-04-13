@@ -166,13 +166,6 @@ export const syncInventory = async (req: Request, res: Response) => {
       const expectedQty = Number(expQtyRes.rows[0]?.total || 0);
       const newCount2 = Number(skuAggregates[sku].count2 || 0);
 
-      // Leer old count_2 ANTES de actualizar el consolidado, para calcular el delta correcto en inventario
-      const oldConsolidated = await client.query(
-        'SELECT count_2 FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
-        [String(docId), String(sku)]
-      );
-      const oldCount2 = Number(oldConsolidated.rows[0]?.count_2 || 0);
-
       await client.query(`
         INSERT INTO document_consolidated_items (document_id, article_id, count_1, count_2, inventory_user, inventory_observation, expected_qty)
         VALUES ($1::text, $2::text, $3::numeric, $4::numeric, $5::text, $6::text, $7::numeric)
@@ -183,18 +176,37 @@ export const syncInventory = async (req: Request, res: Response) => {
         inventory_user = EXCLUDED.inventory_user,
         inventory_observation = EXCLUDED.inventory_observation
       `, [String(docId), String(sku), Number(skuAggregates[sku].count1 || 0), newCount2, user, skuAggregates[sku].observation || notes || '', expectedQty]);
+    }
 
-      if (!isPartial) {
-        // delta = diferencia neta de este documento → inventario_clientes acumula correctamente entre documentos y no duplica en re-sync
-        const delta = newCount2 - oldCount2;
-        await client.query(`
-          INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-          VALUES ($1::text, $2::text, $3::text, $4::numeric, $5::text, CURRENT_TIMESTAMP)
-          ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-          quantity = GREATEST(0, inventario_clientes.quantity + $4::numeric),
-          last_user = EXCLUDED.last_user,
-          last_updated = CURRENT_TIMESTAMP
-        `, [clientId, sku, skuAggregates[sku].batch, delta, user]);
+    console.log(`[M7-SYNC] Consolidado actualizado para ${Object.keys(skuAggregates).length} SKUs.`);
+
+    // 3. Actualizar INVENTARIO CLIENTES (Solo en Finalización)
+    if (!isPartial) {
+      console.log('[M7-SYNC] Iniciando actualización de inventario_clientes...');
+      for (const sku in skuAggregates) {
+        try {
+          const oldConsolidated = await client.query(
+            'SELECT count_2 FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
+            [String(docId), String(sku)]
+          );
+          const oldCount2 = Number(oldConsolidated.rows[0]?.count_2 || 0);
+          const newCount2 = Number(skuAggregates[sku].count2 || 0);
+          const delta = newCount2 - oldCount2;
+
+          await client.query(`
+            INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
+            VALUES ($1::text, $2::text, $3::text, $4::numeric, $5::text, CURRENT_TIMESTAMP)
+            ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
+            quantity = GREATEST(0, inventario_clientes.quantity + $4::numeric),
+            last_user = EXCLUDED.last_user,
+            last_updated = CURRENT_TIMESTAMP
+          `, [clientId, sku, skuAggregates[sku].batch || 'S/L', delta, user]);
+        } catch (invErr: any) {
+          console.error(`[M7-SYNC-INV-ERR] Falló SKU ${sku}:`, invErr.message);
+          // Opcional: podrías decidir si esto aborta la transacción o solo loguea. 
+          // Dada la importancia del stock, permitimos que el error se capture en el catch global para hacer ROLLBACK.
+          throw new Error(`Error actualizando stock para ${sku}: ${invErr.message}`);
+        }
       }
     }
 
@@ -434,7 +446,8 @@ export const syncInventory = async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ success: true, status: newStatus });
+    // Respuesta inmediata tras el COMMIT (las notificaciones son asíncronas en espíritu, no deben fallar la respuesta principal)
+    return res.json({ success: true, status: newStatus });
   } catch (err: any) {
     if (client) await client.query('ROLLBACK');
     console.error('-------------------------------------------');
@@ -646,8 +659,8 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             `, [doc.id, articleId, item.expectedQty || 0, '']);
         }
       }
-    }
     await client.query('COMMIT');
+    console.log(`[M7-SYNC-SUCCESS] Transacción completada con éxito para ${docId}`);
     res.json({ success: true, count: documents.length });
   } catch (err: any) {
     await client.query('ROLLBACK');

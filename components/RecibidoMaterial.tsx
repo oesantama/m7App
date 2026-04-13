@@ -182,11 +182,12 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         throw new Error(res.error || "Error al sincronizar");
       }
     } catch (err: any) {
-      toast.error("Error al finalizar inventario. Intente nuevamente.");
+      const errorMsg = err.detail || err.message || "Error desconocido";
+      toast.error(`Error al finalizar inventario: ${errorMsg}`);
       console.error('[M7-FINISH-SYNC-ERROR]', {
         docId: selectedDocForCount?.id,
-        error: err.message,
-        stack: err.stack
+        error: errorMsg,
+        fullError: err
       });
     } finally {
       setIsSyncingFinal(false);
