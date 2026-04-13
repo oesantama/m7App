@@ -177,7 +177,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [auditModal, setAuditModal] = useState<{ isOpen: boolean; action: any; data: any } | null>(null);
   const [auditComment, setAuditComment] = useState('');
-  const [addInvoiceModal, setAddInvoiceModal] = useState<{ isOpen: boolean; routeIndex: number | null }>({ isOpen: false, routeIndex: null });
+  const [addInvoiceModal, setAddInvoiceModal] = useState<{ isOpen: boolean; routeIndex: number | null; tab: 'plan' | 'repique' }>({ isOpen: false, routeIndex: null, tab: 'plan' });
   const [isSaving, setIsSaving] = useState(false);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<Invoice | null>(null);
   const [manualRouteModal, setManualRouteModal] = useState(false);
@@ -974,7 +974,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const newSuggestions = [...suggestedRoutes];
     const route = newSuggestions[addInvoiceModal.routeIndex];
 
-    route.assignedInvoices.push(invoice);
+    // Marcar como repique si viene del tab repique
+    const invoiceToAdd = addInvoiceModal.tab === 'repique'
+      ? { ...invoice, isRepique: true, status: 'EST-15' } as any
+      : invoice;
+    route.assignedInvoices.push(invoiceToAdd);
     const realCapacity = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) > 0 ? Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) : 30; // Fallback
     const newVol = route.assignedInvoices.reduce((acc, curr) => acc + Number(curr.volumeM3 || (curr as any).volume_m3 || 0), 0);
     route.totalVolume = Number(Number(newVol).toFixed(4));
@@ -1451,11 +1455,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       body: route.assignedInvoices.map((inv, idx) => {
         const fi = (inv.items?.[0] || {}) as any;
         const method = String((inv as any).paymentMethod || fi.paymentMethod || '-').toUpperCase();
+        const isRepique = !!(inv as any).isRepique;
         return [
           String(idx + 1),
           String(inv.unCode || fi.unCode || fi.un_code || '-'),
           String(inv.docLId || '-'),
-          inv.invoiceNumber,
+          isRepique ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
           String(inv.orderNumber || '-'),
           String(inv.totalItems || '-'),
           String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
@@ -1480,8 +1485,17 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       },
       theme: 'grid',
       didParseCell: (data: any) => {
-        if (data.section === 'body' && data.row.index % 2 !== 0)
-          data.cell.styles.fillColor = [248, 250, 252];
+        if (data.section === 'body') {
+          const inv = route.assignedInvoices[data.row.index] as any;
+          if (inv?.isRepique) {
+            // Fila de repique: fondo ámbar claro
+            data.cell.styles.fillColor = [254, 243, 199]; // amber-100
+            data.cell.styles.textColor = [146, 64, 14];   // amber-800
+            data.cell.styles.fontStyle = 'bold';
+          } else if (data.row.index % 2 !== 0) {
+            data.cell.styles.fillColor = [248, 250, 252];
+          }
+        }
       },
     });
     y = (pdf as any).lastAutoTable.finalY + 5;
@@ -2001,7 +2015,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                             <p className="text-[6px] font-black uppercase text-slate-600 tracking-widest">Ocupacion</p>
                           </div>
                           <button
-                            onClick={() => setAddInvoiceModal({ isOpen: true, routeIndex: rIdx })}
+                            onClick={() => setAddInvoiceModal({ isOpen: true, routeIndex: rIdx, tab: 'plan' })}
                             className="w-8 h-8 bg-white/10 hover:bg-emerald-500 rounded-lg flex items-center justify-center transition-all"
                             title="Agregar Factura Manual"
                           >
@@ -2205,7 +2219,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Agregar Factura</h3>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase">Seleccione una factura pendiente</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">{addInvoiceModal.tab === 'plan' ? 'Seleccione una factura pendiente' : 'Factura de repique (no está en el plan)'}</p>
                   </div>
                 </div>
                 <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null }); setModalSearchTerm(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
@@ -2237,13 +2251,29 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 </div>
               )}
 
+              {/* Tabs: Plan / Repique */}
+              <div className="flex gap-2 bg-slate-100 p-1 rounded-2xl">
+                <button
+                  onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'plan' }))}
+                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'plan' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  📋 Del Plan
+                </button>
+                <button
+                  onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'repique' }))}
+                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'repique' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  ⚡ Repique
+                </button>
+              </div>
+
               <div className="relative">
                 <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
                 <input
                   ref={addInvoiceInputRef}
                   autoFocus
                   type="text"
-                  placeholder="Buscar por factura, cliente o pedido..."
+                  placeholder={addInvoiceModal.tab === 'plan' ? 'Buscar por factura, cliente o pedido...' : 'Buscar factura de repique por número...'}
                   value={modalSearchTerm}
                   onChange={(e) => {
                     const raw = e.target.value;
@@ -2324,7 +2354,19 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-3">
               {(() => {
-                const filtered = unassignedInvoices.filter(inv => {
+                // Para repique: solo facturas en estado EST-15
+                const pool = addInvoiceModal.tab === 'repique'
+                  ? invoices.filter(inv => {
+                      if ((inv as any).status !== 'EST-15' && (inv as any).item_status !== 'EST-15') return false;
+                      const term = modalSearchTerm.toLowerCase().trim();
+                      if (!term || term.length < 2) return true; // muestra todos EST-15 si no hay búsqueda
+                      return (inv.invoiceNumber || '').toLowerCase().includes(term) ||
+                        (inv.customerName || '').toLowerCase().includes(term) ||
+                        (inv.orderNumber || '').toLowerCase().includes(term);
+                    })
+                  : unassignedInvoices;
+
+                const filtered = addInvoiceModal.tab === 'repique' ? pool : pool.filter(inv => {
                   const term = modalSearchTerm.toLowerCase();
                   return (inv.invoiceNumber || '').toLowerCase().includes(term) ||
                     (inv.customerName || '').toLowerCase().includes(term) ||
@@ -2337,7 +2379,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 scale-150 opacity-20">
                         <Icons.Plus className="w-8 h-8" />
                       </div>
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sin resultados para tu búsqueda</p>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                        {addInvoiceModal.tab === 'repique'
+                          ? 'No hay facturas en estado Repique (EST-15)'
+                          : 'Sin resultados para tu búsqueda'}
+                      </p>
                     </div>
                   );
                 }
@@ -2363,6 +2409,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                           {inv.externalDocId && (
                             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase border border-slate-200">
                               DOC: {inv.externalDocId}
+                            </span>
+                          )}
+                          {addInvoiceModal.tab === 'repique' && (
+                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-black uppercase border border-amber-300 animate-pulse">
+                              ⚡ REPIQUE
                             </span>
                           )}
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Orbit (R)' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
