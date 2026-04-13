@@ -101,11 +101,11 @@ export const searchRoutesForPlanilla = async (req: Request, res: Response) => {
             LEFT JOIN drivers        d  ON d.id::text       = r.driver_id::text
             LEFT JOIN estados        e  ON e.id             = r.status_id
             LEFT JOIN route_invoices ri ON ri.route_id::text = r.id::text
-            WHERE r.created_at::date = $2::date
+            WHERE r.created_at::date = $1::date
             GROUP BY r.id, v.plate, v.capacity_m3, d.name, e.name, r.status_id, r.vehicle_capacity_m3, r.created_at
             HAVING COUNT(ri.invoice_id) > 0
             ORDER BY r.created_at DESC
-        `, [clientId, date]);
+        `, [date]);
 
         // Agregar campo external_doc_id como alias del id de ruta para compatibilidad con el frontend
         const rows = result.rows.map(r => ({
