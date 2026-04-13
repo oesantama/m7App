@@ -101,9 +101,10 @@ export const searchRoutesForPlanilla = async (req: Request, res: Response) => {
             LEFT JOIN drivers        d  ON d.id::text       = r.driver_id::text
             LEFT JOIN estados        e  ON e.id             = r.status_id
             LEFT JOIN route_invoices ri ON ri.route_id::text = r.id::text
-            WHERE (r.client_id = $1 OR r.client_id IS NULL)
-              AND r.created_at::date BETWEEN ($2::date - INTERVAL '1 day') AND $2::date
+            WHERE r.client_id = $1
+              AND r.created_at >= NOW() - INTERVAL '90 days'
             GROUP BY r.id, v.plate, v.capacity_m3, d.name, e.name, r.status_id, r.vehicle_capacity_m3, r.created_at
+            HAVING COUNT(ri.invoice_id) > 0
             ORDER BY r.created_at DESC
         `, [clientId, date]);
 
