@@ -342,7 +342,7 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
                 ic.banco                                                           AS "Banco",
                 ic.valor                                                           AS "Valor Recaudado",
                 ic.comprobante                                                     AS "Comprobante",
-                TO_CHAR(ic.fecha_pago, 'DD/MM/YYYY')                              AS "Fecha Pago",
+                ic.fecha_pago                                                      AS "Fecha Pago",
                 ic.numero_cheque                                                   AS "No. Cheque",
                 CASE WHEN ic.es_devolucion THEN 'SÍ' ELSE 'NO' END               AS "Devolución",
                 CASE WHEN ic.forma_pago IS NOT NULL THEN 'CONCILIADA'
