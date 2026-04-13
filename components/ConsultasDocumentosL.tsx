@@ -416,8 +416,12 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
             <input type="text" placeholder="DOCUMENTO L..." value={filters.docL} onChange={e => setFilters({ ...filters, docL: e.target.value })} className={inputClass} />
           </div>
           <div className="space-y-1">
-            <label className={labelClass}>UN Orig</label>
-            <input type="text" placeholder="UN ORIG..." value={filters.codplan} onChange={e => setFilters({ ...filters, codplan: e.target.value })} className={inputClass} />
+            <label className={labelClass}>Tipo Plan</label>
+            <select value={filters.planType} onChange={e => setFilters({ ...filters, planType: e.target.value })} className={inputClass}>
+              <option value="">TODOS</option>
+              <option value="Plan Normal">PLAN NORMAL</option>
+              <option value="Plan R">PLAN R</option>
+            </select>
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Estado</label>
@@ -441,8 +445,9 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
             <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px]">
               <tr>
                 <th className="px-6 py-5">Documento / Placa</th>
-                <th className="px-6 py-5">UN Orig</th>
-                <th className="px-6 py-5">F. Envío</th>
+                <th className="px-6 py-5">F. Cargue</th>
+                <th className="px-6 py-5">Tipo Plan</th>
+                <th className="px-6 py-5">Cliente</th>
                 <th className="px-6 py-5 text-center">Estado</th>
                 <th className="px-6 py-5 text-right">Acción</th>
               </tr>
@@ -454,8 +459,17 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                     <p className="font-black text-slate-900 text-xs uppercase">{doc.externalDocId}</p>
                     <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">PLACA: {doc.vehicleData}</p>
                   </td>
-                  <td className="px-6 py-5 font-bold text-slate-600 text-[10px] uppercase">{doc.codplan || doc.planType || 'MANUAL'}</td>
-                  <td className="px-6 py-5 font-bold text-slate-400 text-[9px] uppercase">{doc.deliveryDate}</td>
+                  <td className="px-6 py-5 font-bold text-slate-400 text-[9px] uppercase">
+                    {(doc.createdAt || (doc as any).created_at)
+                      ? new Date(doc.createdAt || (doc as any).created_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : 'S/F'}
+                  </td>
+                  <td className="px-6 py-5">
+                    <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${doc.planType === 'Plan R' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {doc.planType || 'NORMAL'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-5 font-bold text-slate-600 text-[10px] uppercase">{doc.clientId || 'S/C'}</td>
                   <td className="px-6 py-5 text-center">
                     <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border shadow-inner ${
                       (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO') ? 'bg-emerald-500 text-white border-emerald-400' :
@@ -488,14 +502,15 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                         </button>
                       )}
 
-                      <button 
-                        onClick={() => { 
+                      {doc.planType === 'Plan R' && (
+                      <button
+                        onClick={() => {
                           if ((doc as any).paymentsCount > 0) {
                             setSelectedDoc(doc);
                             setActiveDetailTab('payments');
                           } else {
-                            setPaymentTarget(doc); 
-                            setShowPaymentModal(true); 
+                            setPaymentTarget(doc);
+                            setShowPaymentModal(true);
                           }
                         }} 
                         className={`p-3 rounded-xl transition-all ${(doc as any).paymentsCount > 0 ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
@@ -503,6 +518,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                       >
                         {(doc as any).paymentsCount > 0 ? <Icons.Check className="w-4 h-4" /> : <Icons.Excel className="w-4 h-4" />}
                       </button>
+                      )}
                       {isAuthorizedToDelete && (
                         <button 
                           onClick={() => handleDeleteDocument(doc.id)} 

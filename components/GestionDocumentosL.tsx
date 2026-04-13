@@ -760,7 +760,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                            </div>
                            <h5 className="text-base font-black text-slate-900 uppercase mb-1 tracking-tighter truncate">{doc.externalDocId}</h5>
                            <div className="space-y-2 mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-                              <p><span className="text-slate-900">UN ORIG:</span> {doc.codplan || 'S/I'}</p>
+                              <p><span className="text-slate-900">CLIENTE:</span> {doc.clientId || 'S/C'}</p>
                               <p><span className="text-slate-900">PLACA:</span> {doc.vehicleData}</p>
                               <p>
                                 <span className="text-slate-900">CARGUE:</span> 
@@ -778,27 +778,29 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                   )}
                               </div>
                            </div>
+                            {doc.planType === 'Plan R' && (
                             <div className="mt-6 pt-6 border-t border-slate-50 flex gap-2">
-                                <button 
-                                  onClick={() => { 
+                                <button
+                                  onClick={() => {
                                     if ((doc as any).paymentsCount > 0) {
                                       setSelectedPendingDoc(doc);
                                       setActiveModalTab('payments');
                                     } else {
-                                      setPaymentTarget(doc); 
-                                      setShowPaymentModal(true); 
+                                      setPaymentTarget(doc);
+                                      setShowPaymentModal(true);
                                     }
                                   }}
                                   className={`flex-1 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                                    (doc as any).paymentsCount > 0 
-                                      ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30 shadow-lg' 
+                                    (doc as any).paymentsCount > 0
+                                      ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30 shadow-lg'
                                       : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'
                                   }`}
                                 >
-                                  <Icons.Excel className="w-4 h-4" /> 
+                                  <Icons.Excel className="w-4 h-4" />
                                   {(doc as any).paymentsCount > 0 ? `Pagos: ${(doc as any).paymentsCount} Cargados` : 'Cargar Pagos L'}
                                 </button>
                             </div>
+                            )}
                          </div>
                        ))}
                     </div>
