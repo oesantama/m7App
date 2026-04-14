@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getRoutes, saveRoute, logRouteMovement, getRoutingPatterns, updateLocation, getLatestLocations, learnFromCompletedRoute, geocodeAddress, getRoadRoute } from '../controllers/route.controller.js';
+import { getRoutes, saveRoute, logRouteMovement, getRoutingPatterns, updateLocation, getLatestLocations, learnFromCompletedRoute, geocodeAddress, getRoadRoute, reassignRouteVehicle } from '../controllers/route.controller.js';
 
 const router = Router();
 
@@ -13,5 +13,6 @@ router.get('/locations', getLatestLocations);
 router.post('/learn', learnFromCompletedRoute);
 router.post('/geocode', geocodeAddress);
 router.post('/road-route', getRoadRoute);
+router.post('/reassign-vehicle', reassignRouteVehicle);
 
 export default router;

@@ -332,3 +332,79 @@ export const getRoadRoute = async (req: Request, res: Response) => {
   console.error('[M7-OSRM] Todos los servidores fallaron');
   return res.status(500).json({ error: 'Error al calcular ruta por calles' });
 };
+
+export const reassignRouteVehicle = async (req: Request, res: Response) => {
+  const { routeId, newVehicleId, observations, userId } = req.body;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Obtener datos de la ruta actual
+    const currentRoute = await client.query('SELECT * FROM routes WHERE id = $1', [routeId]);
+    if (currentRoute.rowCount === 0) {
+      throw new Error('Ruta no encontrada');
+    }
+    const oldRoute = currentRoute.rows[0];
+
+    // 2. Obtener conductor del nuevo vehículo
+    const assignment = await client.query(
+      'SELECT driver_id FROM assignments WHERE vehicle_id = $1 AND is_active = true LIMIT 1', 
+      [newVehicleId]
+    );
+    const newDriverId = assignment.rows[0]?.driver_id || oldRoute.driver_id;
+
+    // 3. Cancelar ruta vieja (Estado EST-16)
+    await client.query('UPDATE routes SET status_id = \'EST-16\' WHERE id = $1', [routeId]);
+
+    // 4. Crear nueva ruta
+    const newRouteRes = await client.query(`
+      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status_id, created_at)
+      VALUES ($1, $2, $3, $4, 'EST-10', CURRENT_TIMESTAMP)
+      RETURNING id
+    `, [newVehicleId, newDriverId, oldRoute.client_id, userId]);
+    
+    const newRouteId = newRouteRes.rows[0].id;
+
+    // 5. Clonar facturas asociadas
+    const invoices = await client.query('SELECT invoice_id FROM route_invoices WHERE route_id = $1', [routeId]);
+    const invoiceIds = invoices.rows.map(r => r.invoice_id);
+
+    if (invoiceIds.length > 0) {
+      for (const invId of invoiceIds) {
+        await client.query(
+          'INSERT INTO route_invoices (route_id, invoice_id, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP)',
+          [newRouteId, invId]
+        );
+      }
+
+      // 6. Actualizar item_status en document_items a 'EST-03' (Para Despacho)
+      await client.query(`
+        UPDATE document_items 
+        SET item_status = 'EST-03'
+        WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = ANY($1)
+      `, [invoiceIds]);
+    }
+
+    // 7. Loguear movimiento
+    await client.query(`
+      INSERT INTO route_modifications_log (route_id, action, user_id, details)
+      VALUES ($1, 'REASSIGN_PLATE', $2, $3)
+    `, [routeId, userId, JSON.stringify({
+      old_route_id: routeId,
+      new_route_id: newRouteId,
+      old_plate: oldRoute.vehicle_id,
+      new_plate: newVehicleId,
+      observations
+    })]);
+
+    await client.query('COMMIT');
+    res.json({ success: true, newRouteId });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-REASSIGN-ERR]', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+};
