@@ -355,7 +355,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
             const despachador = user.name || 'SISTEMA ORBIT';
             const driverName = String(routeData.driver_name || 'Conductor');
-            const currentClient = (allMasterData?.['masterClientes'] || []).find((c: any) => String(c.id) === String(routeData.client_id));
+            // Obtener nombre del cliente desde las facturas cargadas en el componente
+            const currentClient = invoices.find((c: any) => String(c.clientId || c.client_id) === String(routeData.client_id));
+            const clientName = currentClient?.customerName || currentClient?.client_name || 'CLIENTE GENERAL';
             const dateStr = new Date().toLocaleDateString('es-CO');
             const fileName = `PLANILLA-${routeData.plate || 'RUTA'}-${dateStr.replace(/\//g, '')}.pdf`;
 

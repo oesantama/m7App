@@ -365,12 +365,18 @@ export const reassignRouteVehicle = async (req: Request, res: Response) => {
     }
     const oldRoute = currentRoute.rows[0];
 
-    // 2. Obtener conductor del nuevo vehículo
-    const assignment = await client.query(
-      'SELECT driver_id FROM assignments WHERE vehicle_id = $1 AND is_active = true LIMIT 1', 
-      [newVehicleId]
-    );
-    const newDriverId = assignment.rows[0]?.driver_id || oldRoute.driver_id;
+    // 2. Obtener conductor del nuevo vehículo (Prioridad: Activo, Fallback: Último conocido)
+    const assignment = await client.query(`
+      SELECT driver_id FROM assignments 
+      WHERE vehicle_id = $1 
+      ORDER BY is_active DESC, created_at DESC LIMIT 1
+    `, [newVehicleId]);
+    
+    // Si no se encuentra conductor para el NUEVO vehículo, no podemos heredar el viejo (porque es de otro camión)
+    const newDriverId = assignment.rows[0]?.driver_id;
+    if (!newDriverId) {
+      throw new Error(`No se pudo encontrar un conductor vinculado a la placa ${newVehicleId}. Verifique el vínculo en Operativa.`);
+    }
 
     // 3. Cancelar ruta vieja (Estado EST-16)
     await client.query('UPDATE routes SET status_id = \'EST-16\' WHERE id = $1', [routeId]);

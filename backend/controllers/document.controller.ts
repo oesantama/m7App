@@ -1363,20 +1363,30 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
         END AS "TRUCK_ID_DESTIN",
         
         CASE 
-          WHEN NULLIF(rt.truck_plate, '') IS NOT NULL THEN COALESCE(rt.driver_doc, '')
-          WHEN NULLIF(dt.truck_plate, '') IS NOT NULL THEN COALESCE(dt.driver_doc, '')
+          WHEN NULLIF(rt.truck_plate, '') IS NOT NULL THEN 
+            COALESCE(NULLIF(rt.driver_doc, ''), NULLIF(curr.driver_doc, ''), '')
+          WHEN NULLIF(dt.truck_plate, '') IS NOT NULL THEN 
+            COALESCE(NULLIF(dt.driver_doc,''), '')
           ELSE ''
         END AS "DRIVER_ID_DESTIN"
 
       FROM base b
       LEFT JOIN route_truck rt ON (
-        TRIM(rt.invoice_id) = TRIM(b.compound_id) -- Prioridad: Match exacto con ID Compuesto
+        TRIM(rt.invoice_id) = TRIM(b.compound_id)
         OR TRIM(rt.invoice_id) = TRIM(b.inv_key)
       )
       LEFT JOIN dispatch_truck dt ON (
         TRIM(dt.invoice_id) = TRIM(b.compound_id)
         OR TRIM(dt.invoice_id) = TRIM(b.inv_key)
       )
+      LEFT JOIN (
+        SELECT DISTINCT ON (v.plate) v.plate, d.document_number AS driver_doc
+        FROM assignments a
+        JOIN vehicles v ON a.vehicle_id::text = v.id::text
+        JOIN drivers d ON a.driver_id::text = d.id::text
+        WHERE a.is_active = true
+        ORDER BY v.plate, a.created_at DESC
+      ) curr ON curr.plate = rt.truck_plate OR curr.plate = dt.truck_plate
       ORDER BY b.load_id, b.inv_key
       LIMIT 10000
     `, [docParam, plateParam]);
