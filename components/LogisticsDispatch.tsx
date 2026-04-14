@@ -1457,52 +1457,60 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 });
                                 const totalRouteInvoices = routeInvList.length;
                                 const deliveredRouteCount = routeInvList.filter(i => ['EST-12','EST-13','EST-14','ENTREGADO'].includes(i.status as string)).length;
+                                const percent = totalRouteInvoices > 0 ? (deliveredRouteCount / totalRouteInvoices) * 100 : 0;
 
-                                return (
-                                    <div key={route.id} className="bg-slate-50 rounded-2xl border border-slate-100 shadow-sm p-4 group hover:shadow-xl hover:scale-[1.02] transition-all border-l-4 border-l-slate-900 hover:border-l-emerald-500">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{route.plate}</span>
-                                                <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{route.driver_name || 'PENDIENTE'}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="flex items-center gap-2 justify-end">
-                                                    <div className="flex flex-col items-end">
-                                                        <span className="text-[10px] font-black text-slate-900">{deliveredRouteCount}/{totalRouteInvoices} <span className="text-[7px] text-slate-400 uppercase ml-0.5">Docs</span></span>
-                                                        <span className="text-[9px] font-black text-emerald-500">{(Number(utilizationPercent) || 0).toFixed(0)}%</span>
+                                 return (
+                                    <div key={route.id} className="relative group">
+                                        <div 
+                                            className={`p-6 rounded-[2.5rem] border ${selectedActiveRoute?.id === route.id ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 bg-white'} hover:border-emerald-200 hover:shadow-xl transition-all cursor-pointer overflow-hidden`}
+                                            onClick={() => setSelectedActiveRoute(route)}
+                                        >
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div>
+                                                    <h3 className="text-xl font-black text-slate-900 tracking-tighter leading-none">{route.plate}</h3>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{route.driver_name || 'PENDIENTE'}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                                                        {deliveredRouteCount}/{totalRouteInvoices} <span className="text-[8px] text-indigo-400">fact</span>
                                                     </div>
+                                                    <p className="text-[11px] font-black text-emerald-500 mt-1">{Math.round(percent)}%</p>
                                                 </div>
-                                                <div className="w-20 h-1 bg-slate-200 rounded-full mt-1 overflow-hidden">
-                                                <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
-                                                    {deliveredRouteCount}/{totalRouteInvoices} <span className="text-[8px] text-indigo-400">fact</span>
-                                                </div>
-                                                <p className="text-[11px] font-black text-emerald-500 mt-1">{Math.round(utilizationPercent)}%</p>
+                                            </div>
+
+                                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-5">
+                                                <div 
+                                                    className="h-full bg-emerald-400 rounded-full transition-all duration-1000"
+                                                    style={{ width: `${percent}%` }}
+                                                />
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    className="flex-1 py-3 bg-slate-50 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white hover:shadow-md transition-all flex items-center justify-center gap-2"
+                                                    onClick={(e) => { e.stopPropagation(); setVisualizedRoute(route); }}
+                                                >
+                                                    <Icons.MapPin className="w-3.5 h-3.5" />
+                                                    {visualizedRoute?.id === route.id ? 'TRACKER ON' : 'VER MAPA'}
+                                                </button>
+                                                <button 
+                                                    className="flex-1 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg"
+                                                    onClick={(e) => { e.stopPropagation(); generateRoutePDF(route); }}
+                                                >
+                                                    <Icons.FileText className="w-3.5 h-3.5" />
+                                                    PLANILLABN
+                                                </button>
                                             </div>
                                         </div>
 
-                                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-5">
-                                            <div 
-                                                className="h-full bg-emerald-400 rounded-full transition-all duration-1000"
-                                                style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
-                                            />
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                            <button 
-                                                onClick={() => setVisualizedRoute(route)}
-                                                className={`flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${visualizedRoute?.id === route.id ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-600 hover:bg-white hover:shadow-md'}`}
-                                            >
-                                                <Icons.MapPin className="w-3.5 h-3.5" />
-                                                {visualizedRoute?.id === route.id ? 'TRACKER ON' : 'VER MAPA'}
-                                            </button>
-                                            <button 
-                                                onClick={() => setSelectedActiveRoute(route)}
-                                                className="flex items-center justify-center gap-2 bg-slate-900 text-white rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-slate-900/20"
-                                            >
-                                                <Icons.FileText className="w-3 h-3" />
-                                                Docs
-                                            </button>
-                                        </div>
+                                        {/* BOTÓN EDITAR PLACA - FLOTANTE */}
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setShowReassignModal({ isOpen: true, route }); }}
+                                            className="absolute -top-2 -right-2 w-8 h-8 bg-white border border-slate-200 text-slate-400 rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-600 hover:text-white hover:scale-110 transition-all z-10"
+                                            title="Editar Placa / Reasignar"
+                                        >
+                                            <Icons.Settings className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 );
                             })
