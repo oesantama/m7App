@@ -523,7 +523,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               peso: pesoVal,
               unCode: val(iUnCodeDetail),
               clientRef: val(iClientRefDetail),
-              customerName: val(iCustomerName) // nombre destinatario para deteccion de cadenas
+              customerName: val(iCustomerName), // nombre destinatario para deteccion de cadenas
+              itemStatus: 'EST-03'
             });
 
             // 2. Mapeo para AUDITORÃA (Consolidado Inventario)

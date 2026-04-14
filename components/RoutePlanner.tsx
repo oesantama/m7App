@@ -1406,8 +1406,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       startY: y, margin: { left: ML }, tableWidth: bankW,
       head: [['BANCO', 'VALOR', 'COMPROBANTE', 'FECHA']],
       body: [['','','',''],['','','',''],['','','','']],
-      styles: { fontSize: 6, cellPadding: 2, minCellHeight: 6.5 },
-      headStyles: { fillColor: [241,245,249], textColor: [15,23,42], fontStyle: 'bold', fontSize: 6 },
+      styles: { fontSize: 6, cellPadding: 1.5, minCellHeight: 5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+      headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
       theme: 'grid',
     });
     const bankEndY = (pdf as any).lastAutoTable.finalY;
@@ -1430,21 +1430,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     let totY = y;
     totRows.forEach(([label, val], i) => {
       const isLast = i === totRows.length - 1;
-      pdf.setFillColor(...(isLast ? [15,23,42] : [241,245,249]) as [number,number,number]);
-      pdf.rect(totX, totY, totW, 6.5, 'F');
-      pdf.setDrawColor(203, 213, 225); pdf.rect(totX, totY, totW, 6.5);
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(totX, totY, totW, 5.5, 'F');
+      pdf.setDrawColor(0, 0, 0); pdf.rect(totX, totY, totW, 5.5);
       pdf.setFontSize(5.5); pdf.setFont('helvetica', isLast ? 'bold' : 'normal');
-      pdf.setTextColor(...(isLast ? [255,255,255] : [15,23,42]) as [number,number,number]);
-      pdf.text(label, totX + 1.5, totY + 4.5);
-      pdf.text(val, totX + totW - 1.5, totY + 4.5, { align: 'right' });
-      totY += 6.5;
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(label, totX + 1.5, totY + 4);
+      pdf.text(val, totX + totW - 1.5, totY + 4, { align: 'right' });
+      totY += 5.5;
     });
     y = Math.max(bankEndY, totY) + 3;
 
-    pdf.setFillColor(15, 23, 42); pdf.rect(ML, y, CW, 6, 'F');
-    pdf.setFontSize(6); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(16, 185, 129);
-    pdf.text('CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)', PW / 2, y + 4, { align: 'center' });
-    y += 8;
+    pdf.setFillColor(255, 255, 255); pdf.rect(ML, y, CW, 5, 'F');
+    pdf.setDrawColor(0, 0, 0); pdf.rect(ML, y, CW, 5);
+    pdf.setFontSize(6); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+    pdf.text('CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)', PW / 2, y + 3.5, { align: 'center' });
+    y += 7;
 
     // ── INVOICES TABLE ────────────────────────────────────────────────────────
     // Columnas: # | U.NEG | DOC L | FACTURA | PEDIDO | CANT | REF | VALOR | PAG | CLIENTE / DIRECCION
@@ -1469,8 +1470,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
         ];
       }),
-      styles: { fontSize: 6.5, cellPadding: 2 },
-      headStyles: { fillColor: [15,23,42], textColor: [255,255,255], fontStyle: 'bold', fontSize: 6.5 },
+      styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+      headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
       columnStyles: {
         0: { cellWidth: 8,  halign: 'center' },
         1: { cellWidth: 12, halign: 'center' },
@@ -1488,12 +1489,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         if (data.section === 'body') {
           const inv = route.assignedInvoices[data.row.index] as any;
           if (inv?.isRepique) {
-            // Fila de repique: fondo ámbar claro
-            data.cell.styles.fillColor = [254, 243, 199]; // amber-100
-            data.cell.styles.textColor = [146, 64, 14];   // amber-800
             data.cell.styles.fontStyle = 'bold';
-          } else if (data.row.index % 2 !== 0) {
-            data.cell.styles.fillColor = [248, 250, 252];
+            data.cell.styles.textColor = [0, 0, 0];
           }
         }
       },
@@ -1531,8 +1528,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         startY: y, margin: { left: ML, right: MR },
         head: [['ID','DESCRIPCION','CANT','NOTAS','ID','DESCRIPCION','CANT','NOTAS','ID','DESCRIPCION','CANT','NOTAS']],
         body: cargoRows,
-        styles: { fontSize: 6, cellPadding: 2 },
-        headStyles: { fillColor: [15,23,42], textColor: [255,255,255], fontStyle: 'bold', fontSize: 6 },
+        styles: { fontSize: 6, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+        headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
         columnStyles: {
           0:  { cellWidth: 18, halign: 'center' },
           1:  { cellWidth: 47 },
@@ -1567,8 +1564,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     pdf.setFontSize(6); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139);
     pdf.text(despachador.toUpperCase(), ML + 5 + sigW + 20 + sigW / 2, y + 27, { align: 'center' });
 
-    pdf.setFontSize(5); pdf.setTextColor(148, 163, 184);
-    pdf.text(`ORBITM7 Intelligence - ${dateStr} - ${route.vehicle.plate} - ${route.assignedInvoices.length} facturas`, PW / 2, PH - 5, { align: 'center' });
+    const totalPages = (pdf as any).internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(5); pdf.setTextColor(100, 116, 139);
+        pdf.text(`Página ${i} de ${totalPages} | ORBITM7 Intelligence - ${dateStr} - ${route.vehicle.plate} - ${route.assignedInvoices.length} facturas`, PW / 2, PH - 5, { align: 'center' });
+    }
 
     pdf.save(fileName);
   };

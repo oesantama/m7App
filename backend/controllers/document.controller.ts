@@ -74,9 +74,9 @@ export const getDocuments = async (req: Request, res: Response) => {
     }
 
     if (!isSuper) {
-       const allowedIds = user?.client_ids || [];
-       queryParams.push(allowedIds);
-       query += ` AND d.client_id = ANY($${queryParams.length}::text[])`;
+      const allowedIds = user?.client_ids || [];
+      queryParams.push(allowedIds);
+      query += ` AND d.client_id = ANY($${queryParams.length}::text[])`;
     }
 
     query += ` ORDER BY d.created_at DESC`;
@@ -401,7 +401,7 @@ export const syncInventory = async (req: Request, res: Response) => {
 
         if (targetEmails.length > 0) {
           const { sendEmail } = await import('../services/notification.service.js');
-          
+
           // Crear un adjunto Excel con la totalidad de los items contabilizados
           let attachments: any[] = [];
           try {
@@ -409,31 +409,31 @@ export const syncInventory = async (req: Request, res: Response) => {
             const XLSX = XLSX_MODULE.default || XLSX_MODULE;
 
             const excelData = items.map((it: any) => ({
-                 'SKU': it.articleId?.trim() || it.article_id?.trim() || '',
-                 'Tipo de Plan': docL.plan_type || docL.planType || 'PLAN NORMAL',
-                 'Cant (Orig)': Number(it.expectedQty || it.expected_qty || 0),
-                 'Conteo 1': Number(it.count1 || it.count_1 || 0),
-                 'Conteo 2 (Final)': Number(it.count2 || it.countedQty || it.count_2 || 0),
-                 'Diferencia': Number(it.count2 || it.countedQty || it.count_2 || 0) - Number(it.expectedQty || it.expected_qty || 0),
-                 'Nota': it.inventoryNote || it.inventory_observation || it.notes || ''
+              'SKU': it.articleId?.trim() || it.article_id?.trim() || '',
+              'Tipo de Plan': docL.plan_type || docL.planType || 'PLAN NORMAL',
+              'Cant (Orig)': Number(it.expectedQty || it.expected_qty || 0),
+              'Conteo 1': Number(it.count1 || it.count_1 || 0),
+              'Conteo 2 (Final)': Number(it.count2 || it.countedQty || it.count_2 || 0),
+              'Diferencia': Number(it.count2 || it.countedQty || it.count_2 || 0) - Number(it.expectedQty || it.expected_qty || 0),
+              'Nota': it.inventoryNote || it.inventory_observation || it.notes || ''
             }));
-            
+
             const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
-            
+
             const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-            
+
             attachments.push({
-                filename: `Inventario_${docL.external_doc_id || docL.externalDocId || 'Reporte'}.xlsx`,
-                content: excelBuffer
+              filename: `Inventario_${docL.external_doc_id || docL.externalDocId || 'Reporte'}.xlsx`,
+              content: excelBuffer
             });
           } catch (xlsErr) {
             console.error('[M7-NOTIF] Falló la creación del Excel Adjunto:', xlsErr);
           }
 
           console.log(`[M7-NOTIF] Iniciando envío de correos a: ${targetEmails.join(', ')}`);
-          
+
           for (const targetEmail of targetEmails) {
             try {
               await sendEmail(targetEmail, subject, html, attachments);
@@ -471,9 +471,9 @@ export const syncInventory = async (req: Request, res: Response) => {
     console.error('Mensaje:', err.message);
     console.error('Stack:', err.stack);
     console.error('-------------------------------------------');
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Error de sincronización crítico.", 
+      error: "Error de sincronización crítico.",
       detail: err.message,
       stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
@@ -499,9 +499,9 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
       // [M7-VALIDATION] Evitar duplicados por Placa + Documento + Cliente
       const plate = doc.vehicleData || doc.vehicle_plate || doc.plate || 'S/A';
       const extId = doc.externalDocId || doc.external_doc_id;
-      
+
       if (plate !== 'S/A') {
-          const duplicateCheck = await client.query(`
+        const duplicateCheck = await client.query(`
             SELECT id, plan_type FROM documents_l 
             WHERE client_id = $1 
             AND external_doc_id = $2 
@@ -510,17 +510,17 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             LIMIT 1
           `, [doc.clientId, extId, plate]);
 
-          if (duplicateCheck.rowCount && duplicateCheck.rowCount > 0) {
-            const existingPlanType = String(duplicateCheck.rows[0].plan_type || '').toUpperCase();
-            // [M7-PATCH] Si es manual, permitimos actualizar (hacer UPSERT) en lugar de dar error 409
-            if (!existingPlanType.includes('MANUAL')) {
-              await client.query('ROLLBACK');
-              return res.status(409).json({ 
-                  error: "Documento duplicado", 
-                  details: `Ya existe un inventario activo (${existingPlanType}) para la placa ${plate} con el documento ${extId}.` 
-              });
-            }
+        if (duplicateCheck.rowCount && duplicateCheck.rowCount > 0) {
+          const existingPlanType = String(duplicateCheck.rows[0].plan_type || '').toUpperCase();
+          // [M7-PATCH] Si es manual, permitimos actualizar (hacer UPSERT) en lugar de dar error 409
+          if (!existingPlanType.includes('MANUAL')) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({
+              error: "Documento duplicado",
+              details: `Ya existe un inventario activo (${existingPlanType}) para la placa ${plate} con el documento ${extId}.`
+            });
           }
+        }
       }
 
       const deliveryDate = sanitizeDate(doc.deliveryDate);
@@ -594,7 +594,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
                 unit = $2, volume = $3, unit_volume = $4,
                 city = $5, address = $6, observation = $7,
                 batch = $8, peso = $9, un_code = $10, client_ref = $11,
-                customer_name = $12
+                customer_name = $12, item_status = COALESCE(item_status, 'EST-03')
               WHERE document_id = $13 AND article_id = $14 AND invoice = $15
             `, [
               item.expectedQty || 0,
@@ -613,8 +613,8 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             ]);
           } else {
             await client.query(`
-              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name, item_status)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'EST-03')
             `, [
               doc.id,
               artId,
@@ -721,9 +721,9 @@ export const getInvoices = async (req: Request, res: Response) => {
       }
     }
     const queryParams: any[] = [];
-    
+
     const sqlIdGen = `CONCAT(TRIM(document_items.document_id), '_', TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number, 'NA')))`;
-    
+
     let query = `
       SELECT 
         ${sqlIdGen} as id,
@@ -810,24 +810,24 @@ export const getInvoices = async (req: Request, res: Response) => {
     if (ids) {
       const idList = String(ids).split(',').map(item => item.trim());
       const orClauses = idList.map((compId) => {
-         const lastUnderscore = compId.lastIndexOf('_');
-         let searchTerm = compId;
-         if (lastUnderscore > 0) searchTerm = compId.substring(lastUnderscore + 1);
-         searchTerm = searchTerm.replace(/\s/g, '');
-         queryParams.push(searchTerm);
-         const pIdx = `$${queryParams.length}`;
-         
-         if (lastUnderscore > 0) {
-            const docIdExtracted = compId.substring(0, lastUnderscore);
-            queryParams.push(docIdExtracted);
-            const pIdxDoc = `$${queryParams.length}`;
-            return `(
+        const lastUnderscore = compId.lastIndexOf('_');
+        let searchTerm = compId;
+        if (lastUnderscore > 0) searchTerm = compId.substring(lastUnderscore + 1);
+        searchTerm = searchTerm.replace(/\s/g, '');
+        queryParams.push(searchTerm);
+        const pIdx = `$${queryParams.length}`;
+
+        if (lastUnderscore > 0) {
+          const docIdExtracted = compId.substring(0, lastUnderscore);
+          queryParams.push(docIdExtracted);
+          const pIdxDoc = `$${queryParams.length}`;
+          return `(
                (TRIM(COALESCE(document_items.invoice, '')) = ${pIdx} OR TRIM(COALESCE(document_items.order_number, '')) = ${pIdx})
                AND document_items.document_id = ${pIdxDoc}
             )`;
-         }
+        }
 
-         return `(
+        return `(
             TRIM(COALESCE(document_items.invoice, '')) = ${pIdx} 
             OR 
             TRIM(COALESCE(document_items.order_number, '')) = ${pIdx}
@@ -838,8 +838,8 @@ export const getInvoices = async (req: Request, res: Response) => {
       // Planificador: solo facturas pendientes o en repique a bodega
       // EST-01 = pendiente inicial | EST-15 = repique (devuelto para re-entrega)
       // NULL = registros legacy antes del backfill (compatibilidad con producción)
-      query += ` AND (document_items.item_status IN ('EST-01', 'EST-08', 'EST-15') OR document_items.item_status IS NULL)
-        AND documents_l.status NOT IN ('EST-16','EST-12','EST-07','EST-17','ELIMINADO','ENTREGADO','COMPLETADO','RECHAZADO')`;
+      query += ` AND (document_items.item_status IN ('EST-01', 'EST-03', 'EST-08', 'EST-15') OR document_items.item_status IS NULL)
+        AND documents_l.status NOT IN ('EST-16','EST-12','EST-07','EST-17')`;
     }
 
     query += ` GROUP BY 
@@ -1122,28 +1122,28 @@ export const resendInventoryNotification = async (req: Request, res: Response) =
     // 4. Generar Adjunto Excel y Enviar Correo
     const { sendEmail } = await import('../services/notification.service.js');
     let attachments: any[] = [];
-    
+
     try {
       const XLSX = await import('xlsx');
       const excelData = items.map((it: any) => ({
-           'SKU': it.article_id?.trim() || '',
-           'Nombre': it.article_name || '',
-           'Cant (Orig)': Number(it.expected_qty || 0),
-           'Conteo 1': Number(it.count_1 || 0),
-           'Conteo 2 (Final)': Number(it.count_2 || it.count_1 || 0),
-           'Diferencia': Number(it.count_2 || it.count_1 || 0) - Number(it.expected_qty || 0),
-           'Nota': it.inventory_note || it.inventory_observation || ''
+        'SKU': it.article_id?.trim() || '',
+        'Nombre': it.article_name || '',
+        'Cant (Orig)': Number(it.expected_qty || 0),
+        'Conteo 1': Number(it.count_1 || 0),
+        'Conteo 2 (Final)': Number(it.count_2 || it.count_1 || 0),
+        'Diferencia': Number(it.count_2 || it.count_1 || 0) - Number(it.expected_qty || 0),
+        'Nota': it.inventory_note || it.inventory_observation || ''
       }));
-      
+
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
-      
+
       const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-      
+
       attachments.push({
-          filename: `Inventario_Reenvio_${docL.external_doc_id || 'Reporte'}.xlsx`,
-          content: excelBuffer
+        filename: `Inventario_Reenvio_${docL.external_doc_id || 'Reporte'}.xlsx`,
+        content: excelBuffer
       });
     } catch (xlsErr) {
       console.error('[M7-RESEND] Falló la creación del Excel Adjunto:', xlsErr);
@@ -1184,12 +1184,12 @@ export const createManualDocument = async (req: Request, res: Response) => {
     );
 
     if (existing.rows.length > 0) {
-       // Si existe y no está eliminado, lo devolvemos
-       if (existing.rows[0].status !== 'EST-16' && existing.rows[0].status !== 'ELIMINADO') {
-          const docId = existing.rows[0].id;
-          const fullDoc = await client.query('SELECT *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData", plan_type as "planType" FROM documents_l WHERE id = $1', [docId]);
-          return res.json({ success: true, document: fullDoc.rows[0], message: "Documento ya existía, continuando..." });
-       }
+      // Si existe y no está eliminado, lo devolvemos
+      if (existing.rows[0].status !== 'EST-16' && existing.rows[0].status !== 'ELIMINADO') {
+        const docId = existing.rows[0].id;
+        const fullDoc = await client.query('SELECT *, external_doc_id as "externalDocId", vehicle_plate as "vehicleData", plan_type as "planType" FROM documents_l WHERE id = $1', [docId]);
+        return res.json({ success: true, document: fullDoc.rows[0], message: "Documento ya existía, continuando..." });
+      }
     }
 
     // 2. Crear el documento base
@@ -1279,7 +1279,7 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Debe ingresar al menos un filtro (documento o placa)' });
     }
 
-    const docParam  = String(document).trim();
+    const docParam = String(document).trim();
     const plateParam = String(plate).trim();
 
     const result = await pool.query(`

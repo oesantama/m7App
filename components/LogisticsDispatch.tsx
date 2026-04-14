@@ -346,34 +346,34 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
               <title>PLANILLA - ${route.plate}</title>
               <style>
                 @page { size: letter landscape; margin: 0.3cm; }
-                body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #0f172a; margin: 0; padding: 10px; font-size: 7.5px; }
-                .compact-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 8px; }
+                body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #000; margin: 0; padding: 10px; font-size: 7.5px; }
+                .compact-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #000; padding-bottom: 5px; margin-bottom: 8px; }
                 .logo-img { max-height: 45px; max-width: 150px; object-fit: contain; }
                 .header-info-grid { display: flex; gap: 12px; }
                 .info-col { display: flex; flex-direction: column; line-height: 1.1; }
-                .info-label { font-size: 6px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+                .info-label { font-size: 6px; font-weight: 800; color: #000; text-transform: uppercase; }
                 .info-val { font-size: 9px; font-weight: 900; }
 
-                .consolidado-section { margin-top: 8px; border-top: 2px solid #0f172a; padding-top: 6px; }
+                .consolidado-section { margin-top: 8px; border-top: 1.5px solid #000; padding-top: 6px; }
                 .consolidado-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
-                .consolidado-col { padding: 0 8px; border-right: 1.5px solid #cbd5e1; }
+                .consolidado-col { padding: 0 8px; border-right: 1px solid #000; }
                 .consolidado-col:first-child { padding-left: 0; }
                 .consolidado-col:last-child { border-right: none; padding-right: 0; }
 
                 table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
-                th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 3px; font-size: 6px; font-weight: 900; text-transform: uppercase; }
-                td { border: 1px solid #cbd5e1; padding: 2px 3px; font-weight: 700; height: 13px; font-size: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                th { background: #fff; border: 1px solid #000; padding: 2px 3px; font-size: 6px; font-weight: 900; text-transform: uppercase; color: #000; }
+                td { border: 1px solid #000; padding: 1.5px 3px; font-weight: 700; height: 11px; font-size: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #000; }
                 .text-center { text-align: center; }
                 .text-right { text-align: right; }
 
                 .top-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 15px; margin-bottom: 5px; }
-                .totals-box { border: 2px solid #000; border-radius: 4px; overflow: hidden; }
-                .total-row { display: flex; justify-content: space-between; padding: 3px 8px; border-bottom: 1px solid #e2e8f0; }
-                .total-row:last-child { border-bottom: none; background: #f8fafc; font-weight: 900; font-size: 9px; }
-                .bank-strip { background: #0f172a; color: #fff; text-align: center; padding: 2px; font-weight: 900; margin-bottom: 5px; font-size: 7px; }
+                .totals-box { border: 1.5px solid #000; border-radius: 4px; overflow: hidden; }
+                .total-row { display: flex; justify-content: space-between; padding: 2px 8px; border-bottom: 1px solid #000; color: #000; }
+                .total-row:last-child { border-bottom: none; background: #fff; font-weight: 900; font-size: 9px; }
+                .bank-strip { background: #fff; color: #000; text-align: center; padding: 2px; font-weight: 900; margin-bottom: 5px; font-size: 7px; border: 1px solid #000; }
                 
                 .signature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 30px; padding: 0 40px; }
-                .sig-box { border-top: 2px solid #0f172a; text-align: center; padding-top: 8px; font-weight: 900; text-transform: uppercase; font-size: 9px; }
+                .sig-box { border-top: 1.5px solid #000; text-align: center; padding-top: 8px; font-weight: 900; text-transform: uppercase; font-size: 9px; color: #000; }
               </style>
             </head>
             <body>
@@ -433,8 +433,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <td class="text-center">${inv.orderNumber || inv.docLId || '-'}</td>
                         <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
                         <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
-                        <td class="text-center" style="background:#f8fafc; font-weight:900;">${method}</td>
-                        <td><div style="font-weight:900; font-size:8px;">${inv.customerName}</div><div style="font-size:8px; color:#1e293b; font-weight:900;">${inv.address || ''}</div></td>
+                        <td class="text-center" style="font-weight:900;">${method}</td>
+                        <td><div style="font-weight:900; font-size:8px;">${inv.customerName}</div><div style="font-size:8px; color:#000; font-weight:900;">${inv.address || ''}</div></td>
                       </tr>
                     `;
                   }).join('')}
@@ -462,8 +462,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             ${group.map(it => `
                               <tr>
                                 <td style="font-size:6px;">${it.id}</td>
-                                <td class="text-center" style="font-weight:900; background:#fefce8;">${it.total}</td>
-                                <td style="font-size:6px; color:#64748b;">${it.unit || it.name?.substring(0,15) || '-'}</td>
+                                <td class="text-center" style="font-weight:900;">${it.total}</td>
+                                <td style="font-size:6px; color:#000;">${it.unit || it.name?.substring(0,15) || '-'}</td>
                               </tr>
                             `).join('')}
                           </tbody>
@@ -513,6 +513,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
           let y = 0;
           let pageNum = 0;
+          const totalPages = Math.ceil(canvas.height / pageHeightPx);
           while (y < canvas.height) {
             const sliceH = Math.min(pageHeightPx, canvas.height - y);
             const sliceCanvas = document.createElement('canvas');
@@ -525,6 +526,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const sliceImg = sliceCanvas.toDataURL('image/jpeg', 0.93);
             if (pageNum > 0) pdf.addPage();
             pdf.addImage(sliceImg, 'JPEG', 0, 0, pdfW, pdfH * (sliceH / pageHeightPx));
+            
+            // Paginación personalizada
+            pdf.setFontSize(7);
+            pdf.setTextColor(100, 100, 100);
+            pdf.text(`Página ${pageNum + 1} de ${totalPages} | Planilla de Despacho OrbitM7 | ${route.plate}`, pdfW / 2, pdfH - 5, { align: 'center' });
+            
             y += sliceH;
             pageNum++;
           }
@@ -1403,17 +1410,33 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 }, 0);
                                 const utilizationPercent = vehicleData ? (totalVolume / vehicleData.capacityM3) * 100 : 0;
 
+                                const routeInvList = invoices.filter(inv => {
+                                    const ci = String(inv.id).trim().replace(/[\r\n\t\f\v ]/g, '');
+                                    const cn = String(inv.invoiceNumber).trim().replace(/[\r\n\t\f\v ]/g, '');
+                                    return (route.invoice_ids || []).some((rid: any) => {
+                                        const c = String(rid).trim().replace(/[\r\n\t\f\v ]/g, '');
+                                        return c === ci || c === cn;
+                                    });
+                                });
+                                const totalRouteInvoices = routeInvList.length;
+                                const deliveredRouteCount = routeInvList.filter(i => ['EST-12','EST-13','EST-14','ENTREGADO'].includes(i.status as string)).length;
+
                                 return (
                                     <div key={route.id} className="bg-slate-50 rounded-2xl border border-slate-100 shadow-sm p-4 group hover:shadow-xl hover:scale-[1.02] transition-all border-l-4 border-l-slate-900 hover:border-l-emerald-500">
-                                        <div className="flex justify-between items-center mb-3">
+                                        <div className="flex justify-between items-start mb-3">
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{route.plate}</span>
                                                 <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{route.driver_name || 'PENDIENTE'}</span>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-[10px] font-black text-slate-900">{(Number(utilizationPercent) || 0).toFixed(0)}%</div>
-                                                <div className="w-16 h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                                                    <div className="h-full bg-emerald-500" style={{ width: `${Math.min(utilizationPercent, 100)}%` }}></div>
+                                                <div className="flex items-center gap-2 justify-end">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[10px] font-black text-slate-900">{deliveredRouteCount}/{totalRouteInvoices} <span className="text-[7px] text-slate-400 uppercase ml-0.5">Docs</span></span>
+                                                        <span className="text-[9px] font-black text-emerald-500">{(Number(utilizationPercent) || 0).toFixed(0)}%</span>
+                                                    </div>
+                                                </div>
+                                                <div className="w-20 h-1 bg-slate-200 rounded-full mt-1 overflow-hidden">
+                                                    <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(utilizationPercent, 100)}%` }}></div>
                                                 </div>
                                             </div>
                                         </div>
