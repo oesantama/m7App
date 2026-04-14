@@ -365,7 +365,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
             const PW = pdf.internal.pageSize.getWidth();
             const PH = pdf.internal.pageSize.getHeight();
-            const ML = 6, MR = 6, CW = PW - ML - MR;
+            const ML = 7, MR = 7, CW = PW - ML - MR;
             let y = ML;
 
             // ── HEADER BAR ──────────────────────────────────────────────────────────
@@ -409,7 +409,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 styles: { fontSize: 6, cellPadding: 1.5, minCellHeight: 5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
                 headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
                 theme: 'grid',
-                margin: { bottom: 35 }
+                margin: { bottom: 28 }
             });
             const bankEndY = (pdf as any).lastAutoTable.finalY;
 
@@ -484,7 +484,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     9: { halign: 'left' },
                 },
                 theme: 'grid',
-                margin: { bottom: 35 }
+                margin: { bottom: 28 }
             });
             y = (pdf as any).lastAutoTable.finalY + 5;
 
@@ -534,14 +534,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         11: { cellWidth: 19 },
                     },
                     theme: 'grid',
-                    margin: { bottom: 35 }
+                    margin: { bottom: 28 }
                 });
                 y = (pdf as any).lastAutoTable.finalY + 8;
             }
 
             const totalPages = (pdf as any).internal.getNumberOfPages();
             const sigW = (CW - 20) / 2;
-            const footerY = PH - 32;
+            const footerY = PH - 26;
 
             for (let i = 1; i <= totalPages; i++) {
                 pdf.setPage(i);
