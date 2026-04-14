@@ -16,7 +16,6 @@ function getCacheKey(query: Record<string, any>): string {
 
 export const getDocuments = async (req: Request, res: Response) => {
   try {
-    const { clientId } = req.query;
     let query = `
       SELECT d.*, 
       plan_type as "planType",
