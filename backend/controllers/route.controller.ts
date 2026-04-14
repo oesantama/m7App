@@ -20,7 +20,23 @@ export const getRoutes = async (req: Request, res: Response) => {
             WHERE route_id::text = r.id::text
           ),
           '[]'::json
-        ) as invoice_ids
+        ) as invoice_ids,
+        -- Contadores robustos via subquery
+        (
+          SELECT COUNT(DISTINCT ri.invoice_id)
+          FROM route_invoices ri
+          WHERE ri.route_id::text = r.id::text
+        ) as total_invoices,
+        (
+          SELECT COUNT(DISTINCT ri.invoice_id)
+          FROM route_invoices ri
+          JOIN document_items di ON (
+            CONCAT(di.document_id, '_', COALESCE(NULLIF(di.invoice, ''), di.order_number)) = ri.invoice_id 
+            OR TRIM(COALESCE(NULLIF(di.invoice, ''), di.order_number)) = ri.invoice_id
+          )
+          WHERE ri.route_id::text = r.id::text
+            AND di.item_status IN ('EST-12', 'EST-13', 'EST-14', 'COMPLETED', 'ENTREGADO', 'FINALIZADO')
+        ) as delivered_invoices
       FROM routes r
       LEFT JOIN vehicles v ON r.vehicle_id::text = v.id::text
       LEFT JOIN drivers d ON r.driver_id::text = d.id::text
@@ -39,7 +55,9 @@ export const getRoutes = async (req: Request, res: Response) => {
         da.created_at,
         v.plate,
         d.name as driver_name,
-        json_build_array(da.invoice_id) as invoice_ids
+        json_build_array(da.invoice_id) as invoice_ids,
+        1 as total_invoices,
+        CASE WHEN da.status IN ('COMPLETED', 'EST-12', 'ENTREGADO') THEN 1 ELSE 0 END as delivered_invoices
       FROM dispatch_assignments da
       LEFT JOIN assignments a ON da.driver_id::text = a.driver_id::text AND a.is_active::boolean = true
       LEFT JOIN vehicles v ON a.vehicle_id::text = v.id::text
