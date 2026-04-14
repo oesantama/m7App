@@ -407,6 +407,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 styles: { fontSize: 6, cellPadding: 1.5, minCellHeight: 5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
                 headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
                 theme: 'grid',
+                margin: { bottom: 35 }
             });
             const bankEndY = (pdf as any).lastAutoTable.finalY;
 
@@ -481,6 +482,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     9: { halign: 'left' },
                 },
                 theme: 'grid',
+                margin: { bottom: 35 }
             });
             y = (pdf as any).lastAutoTable.finalY + 5;
 
@@ -530,28 +532,34 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         11: { cellWidth: 19 },
                     },
                     theme: 'grid',
+                    margin: { bottom: 35 }
                 });
                 y = (pdf as any).lastAutoTable.finalY + 8;
             }
 
-            // ── SIGNATURES ────────────────────────────────────────────────────────
-            if (y > PH - 40) { pdf.addPage(); y = ML + 20; }
-            const sigW = (CW - 20) / 2;
-            pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.4);
-            pdf.line(ML + 5, y + 18, ML + 5 + sigW, y + 18);
-            pdf.line(ML + 5 + sigW + 20, y + 18, ML + 5 + sigW * 2 + 20, y + 18);
-            pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
-            pdf.text('FIRMA CONDUCTOR', ML + 5 + sigW / 2, y + 22, { align: 'center' });
-            pdf.setFontSize(6); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
-            pdf.text(driverName.toUpperCase(), ML + 5 + sigW / 2, y + 27, { align: 'center' });
-            pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
-            pdf.text('DESPACHO / AUDITORIA', ML + 5 + sigW + 20 + sigW / 2, y + 22, { align: 'center' });
-            pdf.setFontSize(6); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
-            pdf.text(despachador.toUpperCase(), ML + 5 + sigW + 20 + sigW / 2, y + 27, { align: 'center' });
-
             const totalPages = (pdf as any).internal.getNumberOfPages();
+            const sigW = (CW - 20) / 2;
+            const footerY = PH - 32;
+
             for (let i = 1; i <= totalPages; i++) {
                 pdf.setPage(i);
+                
+                // ── FOOTER SIGNATURES (ON EVERY PAGE) ─────────────────────────────
+                pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.3);
+                pdf.line(ML + 5, footerY + 12, ML + 5 + sigW, footerY + 12);
+                pdf.line(ML + 5 + sigW + 20, footerY + 12, ML + 5 + sigW * 2 + 20, footerY + 12);
+                
+                pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+                pdf.text('FIRMA CONDUCTOR', ML + 5 + sigW / 2, footerY + 16, { align: 'center' });
+                pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(80, 80, 80);
+                pdf.text(driverName.toUpperCase(), ML + 5 + sigW / 2, footerY + 20, { align: 'center' });
+                
+                pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+                pdf.text('DESPACHO / AUDITORIA', ML + 5 + sigW + 20 + sigW / 2, footerY + 16, { align: 'center' });
+                pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(80, 80, 80);
+                pdf.text(despachador.toUpperCase(), ML + 5 + sigW + 20 + sigW / 2, footerY + 20, { align: 'center' });
+
+                // Page numbers
                 pdf.setFontSize(5); pdf.setTextColor(100, 116, 139);
                 pdf.text(`Página ${i} de ${totalPages} | ORBITM7 Intelligence - ${dateStr} - ${routeData.plate} - ${routeInvList.length} facturas`, PW / 2, PH - 5, { align: 'center' });
             }
