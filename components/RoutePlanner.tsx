@@ -1455,23 +1455,25 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     autoTable(pdf, {
       startY: y, margin: { left: ML, right: MR },
       head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
-      body: route.assignedInvoices.map((inv, idx) => {
-        const fi = (inv.items?.[0] || {}) as any;
-        const method = String((inv as any).paymentMethod || fi.paymentMethod || '-').toUpperCase();
-        const isRepique = !!(inv as any).isRepique;
-        return [
-          String(idx + 1),
-          String(inv.unCode || fi.unCode || fi.un_code || '-'),
-          String(inv.docLId || '-'),
-          isRepique ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
-          String(inv.orderNumber || '-'),
-          String(inv.totalItems || '-'),
-          String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
-          fmtCOP(inv.invoiceValue || 0),
-          method,
-          `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
-        ];
-      }),
+      body: [...route.assignedInvoices]
+        .sort((a, b) => String(a.invoiceNumber || '').localeCompare(String(b.invoiceNumber || ''), undefined, { numeric: true, sensitivity: 'base' }))
+        .map((inv, idx) => {
+          const fi = (inv.items?.[0] || {}) as any;
+          const method = String((inv as any).paymentMethod || fi.paymentMethod || fi.payment_method || '-').toUpperCase();
+          const isRepique = !!(inv as any).isRepique;
+          return [
+            String(idx + 1),
+            String(inv.unCode || fi.unCode || fi.un_code || '-'),
+            String(inv.docLId || '-'),
+            isRepique ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
+            String(inv.orderNumber || '-'),
+            String(inv.totalItems || '-'),
+            String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
+            fmtCOP(inv.invoiceValue || 0),
+            method,
+            `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
+          ];
+        }),
       styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
       headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
       columnStyles: {

@@ -717,7 +717,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 
 export const getOrders = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { search, status, client, fechaCorteDesde, fechaCorteHasta } = req.query;
+        const { search, status, client, fechaCorteDesde, fechaCorteHasta, invoice, plate, planilla } = req.query;
         const values: any[] = [];
         let paramIdx = 1;
 
@@ -738,6 +738,24 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             values.push(`%${search}%`);
             paramIdx++;
         }
+
+        // Nuevos filtros específicos con soporte ILIKE (coincidencia parcial)
+        if (invoice) {
+            whereClauses.push(`p.no_factura_m7 ILIKE $${paramIdx}`);
+            values.push(`%${invoice}%`);
+            paramIdx++;
+        }
+        if (plate) {
+            whereClauses.push(`p.placa ILIKE $${paramIdx}`);
+            values.push(`%${plate}%`);
+            paramIdx++;
+        }
+        if (planilla) {
+            whereClauses.push(`p.numero_planilla ILIKE $${paramIdx}`);
+            values.push(`%${planilla}%`);
+            paramIdx++;
+        }
+
         if (status) {
             whereClauses.push(`p.estado = $${paramIdx}`);
             values.push(status);
@@ -750,7 +768,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         }
 
         // M7-EXT: Filtro de fecha (Solo si no hay búsqueda global activa)
-        if (!search) {
+        if (!search && !invoice && !plate && !planilla) {
             if (fechaCorteDesde) {
                 whereClauses.push(`p.f_ultimo_corte >= $${paramIdx}`);
                 values.push(fechaCorteDesde);
@@ -767,8 +785,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
 
         const whereStr = whereClauses.join(' AND ');
 
-        // Reemplaza subconsultas correlacionadas (N×2 queries) por CTEs + JOIN lateral
-        // Ahora es una sola pasada por Postgres: mucho más eficiente con grandes rangos de fecha
+        // [M7-OPTIMIZE] Eliminamos ::TEXT en los JOINs y WHERE del IN para usar índices INT nativos
         const query = `
             WITH pedidos_filtrados AS (
                 SELECT p.*
@@ -778,25 +795,25 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
                 LIMIT 500
             ),
             items_agg AS (
-                SELECT i.pedido_id::TEXT AS pid,
+                SELECT i.pedido_id AS pid,
                        string_agg(DISTINCT i.producto, ', ') AS producto
                 FROM grupo_inter_pedidos_items i
-                WHERE i.pedido_id::TEXT IN (SELECT id::TEXT FROM pedidos_filtrados)
+                WHERE i.pedido_id IN (SELECT id FROM pedidos_filtrados)
                 GROUP BY i.pedido_id
             ),
             historico_agg AS (
-                SELECT h.pedido_id::TEXT AS pid,
+                SELECT h.pedido_id AS pid,
                        json_agg(h ORDER BY h.fecha DESC) AS historico
                 FROM grupo_inter_pedidos_historico h
-                WHERE h.pedido_id::TEXT IN (SELECT id::TEXT FROM pedidos_filtrados)
+                WHERE h.pedido_id IN (SELECT id FROM pedidos_filtrados)
                 GROUP BY h.pedido_id
             )
             SELECT pf.*,
                    ia.producto,
                    ha.historico
             FROM pedidos_filtrados pf
-            LEFT JOIN items_agg      ia ON ia.pid = pf.id::TEXT
-            LEFT JOIN historico_agg  ha ON ha.pid = pf.id::TEXT
+            LEFT JOIN items_agg      ia ON ia.pid = pf.id
+            LEFT JOIN historico_agg  ha ON ha.pid = pf.id
             ORDER BY pf.f_ultimo_corte DESC, pf.create_at DESC
         `;
 
@@ -1102,10 +1119,18 @@ export const getNovedades = async (req: Request, res: Response): Promise<void> =
 
 export const addNovedad = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { pedido_id, novedad, usuario } = req.body;
+        const { pedido_id, novedad, observacion, usuario } = req.body;
+        // Soportamos 'novedad' por compatibilidad, pero preferimos 'observacion' que es el nombre en DB
+        const obsFinal = observacion || novedad;
+
+        if (!obsFinal) {
+            res.status(400).json({ message: 'La observación es requerida' });
+            return;
+        }
+
         await pool.query(
             "INSERT INTO grupo_inter_novedades (pedido_id, tipo, observacion, usuario) VALUES ($1, 'NOVEDAD', $2, $3)",
-            [pedido_id, novedad, usuario || 'System']
+            [pedido_id, obsFinal, usuario || 'System']
         );
         res.json({ message: 'Novedad registrada con éxito' });
     } catch (error) {

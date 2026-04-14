@@ -453,22 +453,24 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             autoTable(pdf, {
                 startY: y, margin: { left: ML, right: MR },
                 head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
-                body: routeInvList.map((inv, idx) => {
-                    const firstItem = inv.items?.[0] || {} as any;
-                    const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
-                    return [
-                        String(idx + 1),
-                        String(inv.unCode || firstItem.unCode || firstItem.un_code || '-'),
-                        String(inv.docLId || '-'),
-                        String(inv.invoiceNumber),
-                        String(inv.orderNumber || '-'),
-                        String(inv.totalItems || '-'),
-                        String(inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'),
-                        fmtCOP(inv.invoiceValue || 0),
-                        method,
-                        `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
-                    ];
-                }),
+                body: [...routeInvList]
+                    .sort((a, b) => String(a.invoiceNumber || '').localeCompare(String(b.invoiceNumber || ''), undefined, { numeric: true, sensitivity: 'base' }))
+                    .map((inv, idx) => {
+                        const firstItem = inv.items?.[0] || {} as any;
+                        const method = String(inv.paymentMethod || firstItem.paymentMethod || firstItem.payment_method || '-').toUpperCase();
+                        return [
+                            String(idx + 1),
+                            String(inv.unCode || firstItem.unCode || firstItem.un_code || '-'),
+                            String(inv.docLId || '-'),
+                            String(inv.invoiceNumber),
+                            String(inv.orderNumber || '-'),
+                            String(inv.totalItems || '-'),
+                            String(inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'),
+                            fmtCOP(inv.invoiceValue || 0),
+                            method,
+                            `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
+                        ];
+                    }),
                 styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
                 headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
                 columnStyles: {

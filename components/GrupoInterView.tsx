@@ -37,11 +37,13 @@ interface Order {
   items?: any[];
   historico?: any[];
   fecha_entregado: string | null;
+  fecha_viaje: string | null;
   fecha_carge: string;
   create_at: string;
   create_by?: string;
   update_at?: string;
   valor_flete?: number;
+  no_factura_m7?: string;
 }
 
 const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string; light?: boolean }> = ({ icon, label, value, light }) => (
@@ -139,6 +141,9 @@ const GrupoInterView: React.FC = () => {
       if (filters.client) params.client = filters.client;
       if (filters.fechaCorteDesde) params.fechaCorteDesde = filters.fechaCorteDesde;
       if (filters.fechaCorteHasta) params.fechaCorteHasta = filters.fechaCorteHasta;
+      if (filters.factura) params.invoice = filters.factura;
+      if (filters.placa) params.plate = filters.placa;
+      if (filters.planilla) params.planilla = filters.planilla;
       
       const data = await api.getGrupoInterOrders(params);
       if (data && data.length === 0) {
@@ -808,7 +813,14 @@ const GrupoInterView: React.FC = () => {
                   <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100"><Eye size={24} /></div>
                   <div>
                     <h2 className="text-2xl font-black text-slate-900 tracking-tight">Pedido {selectedOrder.numero_documento}</h2>
-                    <p className="text-slate-400 text-sm font-medium">Información centralizada del despacho</p>
+                    <div className="flex gap-2 items-center">
+                      <p className="text-slate-400 text-sm font-medium">Información centralizada del despacho</p>
+                      {selectedOrder.no_factura_m7 && (
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded-md text-[9px] font-black uppercase tracking-widest border border-blue-200">
+                          FACTURA: {selectedOrder.no_factura_m7}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                   <div className="flex items-center gap-2">
@@ -861,6 +873,7 @@ const GrupoInterView: React.FC = () => {
                    <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-4">
                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Logística Operativa</h4>
                       <DetailItem icon={<Truck size={14}/>} label="Placa" value={selectedOrder.placa || '-'} />
+                      <DetailItem icon={<Clock size={14}/>} label="Fecha Viaje" value={selectedOrder.fecha_viaje ? new Date(selectedOrder.fecha_viaje).toLocaleDateString() : '-'} />
                       <DetailItem icon={<Clock size={14}/>} label="Último Corte" value={selectedOrder.f_ultimo_corte ? new Date(selectedOrder.f_ultimo_corte).toLocaleDateString() : '-'} />
                       <DetailItem icon={<Filter size={14}/>} label="Clasificación" value={selectedOrder.clasificacion || '-'} />
                    </div>
