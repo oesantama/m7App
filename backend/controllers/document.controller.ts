@@ -1298,12 +1298,20 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
         JOIN documents_l dl ON di.document_id = dl.id
         WHERE
           ($1::text = ''
-            OR dl.external_doc_id ILIKE '%' || $1 || '%'
-            OR di.invoice         ILIKE '%' || $1 || '%'
-            OR di.order_number    ILIKE '%' || $1 || '%')
+            OR EXISTS (
+              SELECT 1 FROM unnest(string_to_array($1, ',')) AS s
+              WHERE (dl.external_doc_id ILIKE '%' || TRIM(s) || '%'
+                 OR di.invoice         ILIKE '%' || TRIM(s) || '%'
+                 OR di.order_number    ILIKE '%' || TRIM(s) || '%')
+                 AND TRIM(s) <> ''
+            ))
           AND
           ($2::text = ''
-            OR dl.vehicle_plate ILIKE '%' || $2 || '%')
+            OR EXISTS (
+              SELECT 1 FROM unnest(string_to_array($2, ',')) AS s
+              WHERE dl.vehicle_plate ILIKE '%' || TRIM(s) || '%'
+                 AND TRIM(s) <> ''
+            ))
       ),
       -- Búsqueda de placa destino: route_invoices → routes → vehicles
       -- invoice_id puede ser el ID compuesto (doc_id + '_' + factura) o la factura corta

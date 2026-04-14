@@ -90,7 +90,7 @@ const MastersuiteReport: React.FC = () => {
               <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
               <input
                 type="text"
-                placeholder="Ej: L010909614"
+                placeholder="Ej: L0109, L0110..."
                 value={filterDoc}
                 onChange={e => { setFilterDoc(e.target.value.toUpperCase()); setError(''); }}
                 onKeyDown={handleKeyDown}
@@ -107,7 +107,7 @@ const MastersuiteReport: React.FC = () => {
               <Icons.Truck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
               <input
                 type="text"
-                placeholder="Ej: PUN493"
+                placeholder="Ej: PUN493, ABC123..."
                 value={filterPlate}
                 onChange={e => { setFilterPlate(e.target.value.toUpperCase()); setError(''); }}
                 onKeyDown={handleKeyDown}
