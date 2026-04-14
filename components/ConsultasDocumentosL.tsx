@@ -285,7 +285,9 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc => {
       const matchPlaca = !filters.plate || (doc.vehicleData || '').toLowerCase().includes(filters.plate.toLowerCase());
-      const matchDocL = !filters.docL || doc.externalDocId.toLowerCase().includes(filters.docL.toLowerCase());
+      const matchDocL = !filters.docL || filters.docL.split(',').some(term => 
+        doc.externalDocId.toLowerCase().includes(term.trim().toLowerCase())
+      );
       const matchCodPlan = !filters.codplan || (doc.codplan || '').toLowerCase().includes(filters.codplan.toLowerCase());
       const matchStatus = !filters.status || doc.status === filters.status;
       const matchPlanType = !filters.planType || doc.planType === filters.planType;

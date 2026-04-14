@@ -160,11 +160,15 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     );
     
     if (!searchTerm) return list;
-    return list.filter(d => 
-      (d.externalDocId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (d.vehicleData || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (d.city || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const searchTerms = searchTerm.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    return list.filter(d => {
+      const docId = (d.externalDocId || '').toLowerCase();
+      const plate = (d.vehicleData || '').toLowerCase();
+      const city = (d.city || '').toLowerCase();
+      return searchTerms.some(term => 
+        docId.includes(term) || plate.includes(term) || city.includes(term)
+      );
+    });
   }, [documents, searchTerm]);
 
   React.useEffect(() => {

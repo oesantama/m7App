@@ -65,12 +65,21 @@ export const getDocuments = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
+    const { clientId, docL } = req.query;
     const user = (req as any).user;
     const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
 
     if (clientId) {
-      query += ` AND d.client_id = $1`;
       queryParams.push(clientId);
+      query += ` AND d.client_id = $${queryParams.length}`;
+    }
+
+    if (docL) {
+        const docIds = String(docL).split(',').map(id => id.trim()).filter(Boolean);
+        if (docIds.length > 0) {
+            queryParams.push(docIds);
+            query += ` AND d.external_doc_id = ANY($${queryParams.length})`;
+        }
     }
 
     if (!isSuper) {
