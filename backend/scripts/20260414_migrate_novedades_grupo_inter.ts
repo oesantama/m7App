@@ -1,4 +1,4 @@
-import pool from './backend/config/database.js';
+import pool from '../config/database.js';
 
 async function migrate() {
     try {
