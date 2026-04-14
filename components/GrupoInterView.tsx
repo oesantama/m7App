@@ -518,24 +518,28 @@ const GrupoInterView: React.FC = () => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Grupo Inter</h1>
-            <p className="text-slate-500 mt-1">Gestión de Logística y Trazabilidad</p>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100">
+              <Package size={12} /> Gestión de Logística
+            </div>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Grupo Inter</h1>
+            <p className="text-slate-500 font-medium">Panel de trazabilidad y control de operaciones terrestres</p>
           </div>
-          <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
             <button 
               onClick={() => setActiveTab('gestion')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${activeTab === 'gestion' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`flex items-center gap-2 px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'gestion' ? 'bg-white text-blue-600 shadow-lg shadow-blue-100/50' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              Gestión Operativa
+              <Clock size={16} /> Gestión Operativa
             </button>
             <button 
               onClick={() => setActiveTab('carga')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${activeTab === 'carga' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`flex items-center gap-2 px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'carga' ? 'bg-white text-blue-600 shadow-lg shadow-blue-100/50' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              Carga Masiva
+              <Upload size={16} /> Carga Masiva
             </button>
           </div>
         </div>
@@ -599,42 +603,31 @@ const GrupoInterView: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-            <div className="p-8 border-b border-slate-100 bg-slate-50/30 flex flex-col gap-6">
-              <div className="flex flex-col md:flex-row gap-4 w-full items-end justify-between">
-                <div className="flex-1 flex flex-col md:flex-row gap-4 w-full items-end">
-                  <div className="flex-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Rango de Consulta</label>
-                    <div className="flex gap-2 bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
-                      <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none" value={filters.fechaCorteDesde} onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})} />
-                      <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none" value={filters.fechaCorteHasta} onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})} />
-                    </div>
+          <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+            <div className="p-8 lg:p-10 space-y-8">
+              {/* Primary Filter Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Clock size={12} className="text-blue-500" /> Rango de Consulta
+                  </label>
+                  <div className="flex items-center bg-slate-50 p-1.5 rounded-2xl border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                    <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none text-slate-700" value={filters.fechaCorteDesde} onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})} />
+                    <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                    <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none text-slate-700" value={filters.fechaCorteHasta} onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})} />
                   </div>
+                </div>
 
-                  <button 
-                    onClick={() => {
-                      const today = new Date();
-                      const eightDaysAgo = new Date();
-                      eightDaysAgo.setDate(today.getDate() - 8);
-                      const newFilters = {
-                        ...filters,
-                        fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0],
-                        fechaCorteHasta: today.toISOString().split('T')[0]
-                      };
-                      setFilters(newFilters);
-                      setTimeout(() => fetchOrders(searchTerm), 0);
-                    }}
-                    className="px-6 py-3.5 bg-amber-50 text-amber-600 rounded-2xl text-[10px] font-black flex items-center gap-2 hover:bg-amber-100 transition-all border border-amber-100/50 uppercase tracking-widest"
-                  >
-                    <Clock size={16} /> ÚLTIMOS 8 DÍAS
-                  </button>
-
-                  <div className="w-full md:w-64 relative group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Search size={12} className="text-blue-500" /> Búsqueda Global
+                  </label>
+                  <div className="relative group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
                     <input 
                       type="text" 
-                      placeholder="Búsqueda global..." 
-                      className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" 
+                      placeholder="Factura, placa, planilla..." 
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500/20 focus:bg-white outline-none transition-all" 
                       value={searchTerm} 
                       onChange={(e) => {
                         setSearchTerm(e.target.value);
@@ -645,42 +638,68 @@ const GrupoInterView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <button onClick={() => fetchOrders(searchTerm)} className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-lg shadow-slate-200 active:scale-95">Consultar</button>
+                <div className="flex gap-2">
                   <button 
-                      onClick={() => handleExportExcel()}
-                      className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl font-black hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                      title="Exportar a Excel"
-                    >
-                      <FileSpreadsheet size={20} />
+                    onClick={() => {
+                      const today = new Date();
+                      const eightDaysAgo = new Date();
+                      eightDaysAgo.setDate(today.getDate() - 8);
+                      setFilters({...filters, fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0], fechaCorteHasta: today.toISOString().split('T')[0]});
+                      setTimeout(() => fetchOrders(searchTerm), 0);
+                    }}
+                    className="flex-1 py-3.5 bg-white text-slate-600 border border-slate-200 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-slate-50 transition-all uppercase tracking-widest"
+                  >
+                    8 Días
+                  </button>
+                  <button onClick={() => fetchOrders(searchTerm)} className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95">
+                    Consultar
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between px-6 py-3.5 bg-blue-50/50 border border-blue-100 rounded-2xl">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Resultados</span>
+                    <span className="text-lg font-black text-blue-600 leading-tight">{visibleOrders.length}</span>
+                  </div>
+                  <button 
+                    onClick={() => handleExportExcel()}
+                    className="p-2.5 bg-white text-emerald-600 rounded-xl font-black hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+                    title="Exportar a Excel"
+                  >
+                    <FileSpreadsheet size={18} />
                   </button>
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row gap-4 w-full items-end mt-2">
-                <div className="flex-1 relative">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 text-blue-600">Filtro Factura</label>
-                  <input type="text" placeholder="Ej. TI1000..." className="w-full px-4 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" value={filters.factura || ''} onChange={e => {setFilters({...filters, factura: e.target.value}); setCurrentPage(1);}} />
+              {/* Secondary Specific Filters */}
+              <div className="pt-6 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Filtro Factura</label>
+                  <div className="relative">
+                    <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                    <input type="text" placeholder="Ej. TI1000..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all" value={filters.factura || ''} onChange={e => {setFilters({...filters, factura: e.target.value}); setCurrentPage(1);}} />
+                  </div>
                 </div>
-                <div className="flex-1 relative">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 text-blue-600">Filtro Planilla</label>
-                  <input type="text" placeholder="Ej. 100043" className="w-full px-4 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" value={filters.planilla || ''} onChange={e => {setFilters({...filters, planilla: e.target.value}); setCurrentPage(1);}} />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Filtro Planilla</label>
+                  <div className="relative">
+                    <FileSpreadsheet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                    <input type="text" placeholder="Ej. 100043" className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all" value={filters.planilla || ''} onChange={e => {setFilters({...filters, planilla: e.target.value}); setCurrentPage(1);}} />
+                  </div>
                 </div>
-                <div className="flex-1 relative">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 text-blue-600">Filtro Placa</label>
-                  <input type="text" placeholder="Ej. LZN785" className="w-full px-4 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm uppercase" value={filters.placa || ''} onChange={e => {setFilters({...filters, placa: e.target.value}); setCurrentPage(1);}} />
-                </div>
-                <div className="flex items-center justify-center px-6 py-3 bg-blue-50 border border-blue-100 rounded-2xl shadow-sm">
-                  <span className="text-blue-600 font-extrabold text-[12px] uppercase tracking-widest flex items-center gap-2">
-                    <span className="bg-white text-slate-800 px-3 py-1 rounded-lg border border-blue-100">{visibleOrders.length}</span> Registros
-                  </span>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Filtro Placa</label>
+                  <div className="relative">
+                    <Truck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                    <input type="text" placeholder="Ej. LZN785" className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all uppercase" value={filters.placa || ''} onChange={e => {setFilters({...filters, placa: e.target.value}); setCurrentPage(1);}} />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 tracking-wider border-b">
+            <div className="overflow-x-auto relative scrollbar-hide">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-50/80 text-[10px] font-black uppercase text-slate-400 tracking-wider border-b border-slate-100">
                   <tr>
                     {[
                       { key: 'numero_documento', label: 'Documento' },
@@ -688,78 +707,94 @@ const GrupoInterView: React.FC = () => {
                       { key: 'placa', label: 'Placa' },
                       { key: 'f_ultimo_corte', label: 'Fct. Último C.' },
                       { key: 'clienteDestino', label: 'Cliente / Destino' },
-                      { key: 'cantidad_total', label: 'Cant. Total' },
-                      { key: 'precio_total', label: 'Precio Total' },
-                      { key: 'peso_total_prod', label: 'Peso Total' },
+                      { key: 'cantidad_total', label: 'Total Und' },
+                      { key: 'peso_total_prod', label: 'Total Kg' },
                       { key: 'valor_flete', label: 'Flete ($)' },
-                      { key: 'ultimaNovedad', label: 'Última Novedad' }
+                      { key: 'ultimaNovedad', label: 'Seguimiento' }
                     ].map(col => (
-                      <th key={col.key} className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors group select-none" onClick={() => requestSort(col.key)}>
+                      <th key={col.key} className="px-8 py-5 cursor-pointer hover:bg-slate-100/50 transition-colors group select-none" onClick={() => requestSort(col.key)}>
                         <div className="flex items-center gap-1">
                           {col.label} 
                           <span className={`text-[10px] transition-opacity ${sortConfig?.key === col.key ? 'opacity-100 text-blue-500' : 'opacity-0 group-hover:opacity-100 text-slate-300'}`}>
-                            {sortConfig?.key === col.key ? (sortConfig.direction === 'asc' ? '↓' : '↑') : '↕'}
+                            {sortConfig?.key === col.key ? (sortConfig.direction === 'asc' ? ' ↓' : ' ↑') : ' ↕'}
                           </span>
                         </div>
                       </th>
                     ))}
-                    <th className="px-6 py-4 text-right">Acciones</th>
+                    <th className="px-8 py-5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-xs text-slate-600">
                   {loading ? (
-                    <tr><td colSpan={11} className="py-20 text-center text-slate-400 font-medium">Sincronizando con Orbit...</td></tr>
+                    <tr><td colSpan={11} className="py-24 text-center">
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                          <span className="font-black text-[10px] uppercase text-slate-400 tracking-widest">Sincronizando con el núcleo M7...</span>
+                        </div>
+                    </td></tr>
                   ) : visibleOrders.length === 0 ? (
-                    <tr><td colSpan={11} className="py-20 text-center text-slate-300 font-medium">Sin registros encontrados</td></tr>
+                    <tr><td colSpan={11} className="py-24 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">Sin registros encontrados</td></tr>
                   ) : (
                     visibleOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => (
-                      <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-slate-900">{order.numero_documento}</td>
-                        <td className="px-6 py-4">
-                           <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-black uppercase tracking-tight border border-slate-200">
+                      <tr key={order.id} className="hover:bg-blue-50/20 transition-all group">
+                        <td className="px-8 py-5 font-black text-slate-900">{order.numero_documento}</td>
+                        <td className="px-8 py-5">
+                           <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-tight border border-slate-200 group-hover:bg-white transition-colors">
                              {order.numero_planilla || '-'}
                            </span>
                         </td>
-                        <td className="px-6 py-4 font-black text-slate-700 uppercase">{order.placa || '-'}</td>
-                        <td className="px-6 py-4 font-medium">{order.f_ultimo_corte ? new Date(order.f_ultimo_corte).toLocaleDateString() : '-'}</td>
-                        <td className="px-6 py-4">
-                           <div className="flex flex-col">
-                             <span className="font-bold text-slate-800">{order.cliente}</span>
-                             <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest">{order.municipio_destino}</span>
-                             <span className="text-[9px] text-slate-400 font-bold">{order.nit}</span>
+                        <td className="px-8 py-5 font-black text-slate-700 uppercase">{order.placa || '-'}</td>
+                        <td className="px-8 py-5 font-bold text-slate-400">{order.f_ultimo_corte ? new Date(order.f_ultimo_corte).toLocaleDateString() : '-'}</td>
+                        <td className="px-8 py-5">
+                           <div className="flex flex-col max-w-[200px]">
+                             <span className="font-extrabold text-slate-800 truncate">{order.cliente}</span>
+                             <div className="flex items-center gap-1.5 mt-0.5">
+                               <MapPin size={10} className="text-blue-500" />
+                               <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest truncate">{order.municipio_destino}</span>
+                             </div>
                            </div>
                         </td>
-                        <td className="px-6 py-4 font-bold text-slate-400">{order.cantidad_total || 0}</td>
-                        <td className="px-6 py-4 font-bold text-slate-400">${(order.precio_total || 0).toLocaleString()}</td>
-                        <td className="px-6 py-4 font-bold text-slate-400">{order.peso_total_prod || 0} Kg</td>
-                        <td className="px-6 py-4">
-                           <span className="font-black text-emerald-600">
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-2">
+                            <Package size={14} className="text-slate-300" />
+                            <span className="font-black text-slate-500">{order.cantidad_total || 0}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-5 font-black text-slate-400">{order.peso_total_prod || 0} Kg</td>
+                        <td className="px-8 py-5">
+                           <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full font-black text-[11px] border border-emerald-100">
                              ${Math.round(order.valor_flete || 0).toLocaleString()}
                            </span>
                         </td>
-                        <td className="px-6 py-4">
-                           <div className="flex flex-col min-w-[150px]">
-                             <span className="text-[10px] font-black text-blue-600 uppercase mb-1">
-                               {order.historico && order.historico.length > 0 ? order.historico[0].estado : order.estado || 'PENDIENTE'}
-                             </span>
-                             <span className="text-[10px] text-slate-400 font-bold leading-tight line-clamp-2">
+                        <td className="px-8 py-5">
+                           <div className="flex flex-col min-w-[180px] bg-slate-50 p-3 rounded-2xl border border-slate-100 group-hover:bg-white transition-colors">
+                             <div className="flex items-center gap-2 mb-1.5">
+                                <div className={`w-2 h-2 rounded-full ${['Entregado', 'Completado'].includes(order.estado || '') ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`}></div>
+                                <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">
+                                  {order.historico && order.historico.length > 0 ? order.historico[0].estado : order.estado || 'PENDIENTE'}
+                                </span>
+                             </div>
+                             <p className="text-[10px] text-slate-400 font-bold leading-[1.4] line-clamp-2">
                                {order.historico && order.historico.length > 0 ? order.historico[0].observacion : '-'}
-                             </span>
-                             <span className="text-[9px] text-slate-300 font-black mt-1">
-                               {order.historico && order.historico.length > 0 ? new Date(order.historico[0].fecha).toLocaleString() : ''}
-                             </span>
+                             </p>
+                             <div className="flex items-center gap-1 mt-2">
+                               <Clock size={10} className="text-slate-300" />
+                               <span className="text-[9px] text-slate-300 font-black">
+                                 {order.historico && order.historico.length > 0 ? new Date(order.historico[0].fecha).toLocaleString() : ''}
+                               </span>
+                             </div>
                            </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex gap-2 justify-end">
-                            <button onClick={() => openDetail(order)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition shadow-sm" title="Ver Detalle"><Eye size={18} /></button>
+                        <td className="px-8 py-5 text-right">
+                          <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => openDetail(order)} className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-black transition-all shadow-lg shadow-blue-200" title="Ver Detalle"><Eye size={18} /></button>
                             <button 
                                 onClick={() => {
                                   setSelectedOrder(order);
                                   setNewStatus({ estado: order.estado || '', observacion: '' });
                                   setShowStatusModal(true);
                                 }}
-                                className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all shadow-sm"
+                                className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg"
                                 title="Cambiar Estado"
                               >
                                 <Clock size={18} />

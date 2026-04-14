@@ -1317,18 +1317,26 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
           AND
           -- Filtro 2: Placa (Global: Origen o Destino)
           ($2::text = ''
-            OR dl.vehicle_plate ILIKE '%' || $2 || '%'
             OR EXISTS (
-              SELECT 1 FROM route_invoices ri 
-              JOIN routes r ON r.id = ri.route_id
-              LEFT JOIN vehicles v ON v.id = r.vehicle_id
-              WHERE (TRIM(ri.invoice_id) = TRIM(di.invoice) OR TRIM(ri.invoice_id) = CONCAT(di.document_id, '_', TRIM(di.invoice)))
-                AND (v.plate ILIKE '%' || $2 || '%' OR r.vehicle_id ILIKE '%' || $2 || '%')
-            )
-            OR EXISTS (
-              SELECT 1 FROM dispatch_assignments da
-              WHERE da.invoice_id = di.invoice OR da.invoice_id = CONCAT(di.document_id, '_', TRIM(di.invoice))
-                AND (da.truck_plate ILIKE '%' || $2 || '%')
+              SELECT 1 FROM unnest(string_to_array($2, ',')) AS p
+              WHERE (
+                dl.vehicle_plate ILIKE '%' || TRIM(p) || '%'
+                OR EXISTS (
+                  SELECT 1 FROM route_invoices ri 
+                  JOIN routes r ON r.id::text = ri.route_id::text
+                  LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+                  WHERE (TRIM(ri.invoice_id) = TRIM(di.invoice) OR TRIM(ri.invoice_id) = CONCAT(di.document_id, '_', TRIM(di.invoice)))
+                    AND (v.plate ILIKE '%' || TRIM(p) || '%' OR r.vehicle_id ILIKE '%' || TRIM(p) || '%')
+                )
+                OR EXISTS (
+                  SELECT 1 FROM dispatch_assignments da
+                  JOIN assignments asgn ON asgn.driver_id::text = da.driver_id::text
+                  JOIN vehicles v2 ON v2.id::text = asgn.vehicle_id::text
+                  WHERE (da.invoice_id = di.invoice OR da.invoice_id = CONCAT(di.document_id, '_', TRIM(di.invoice)))
+                    AND (v2.plate ILIKE '%' || TRIM(p) || '%')
+                )
+              )
+              AND TRIM(p) <> ''
             )
           )
       ),

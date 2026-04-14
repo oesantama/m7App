@@ -726,16 +726,16 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
 
         if (search) {
             whereClauses.push(`(
-                p.numero_documento::TEXT ILIKE $${paramIdx} OR
-                p.cliente::TEXT ILIKE $${paramIdx} OR
-                p.nit::TEXT ILIKE $${paramIdx} OR
-                p.numero_planilla::TEXT ILIKE $${paramIdx} OR
-                p.placa::TEXT ILIKE $${paramIdx} OR
-                p.municipio_destino::TEXT ILIKE $${paramIdx} OR
-                p.estado::TEXT ILIKE $${paramIdx} OR
-                p.no_factura_m7::TEXT ILIKE $${paramIdx}
+                p.numero_documento ILIKE $${paramIdx} OR
+                p.cliente ILIKE $${paramIdx} OR
+                p.nit ILIKE $${paramIdx} OR
+                p.numero_planilla ILIKE $${paramIdx} OR
+                p.placa ILIKE $${paramIdx} OR
+                p.municipio_destino ILIKE $${paramIdx} OR
+                p.estado ILIKE $${paramIdx} OR
+                p.no_factura_m7 ILIKE $${paramIdx}
             )`);
-            values.push(`%${search}%`);
+            values.push(`%${String(search).trim()}%`);
             paramIdx++;
         }
 
@@ -769,17 +769,20 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
 
         // M7-EXT: Filtro de fecha (Solo si no hay búsqueda global activa)
         if (!search && !invoice && !plate && !planilla) {
-            if (fechaCorteDesde) {
+            if (fechaCorteDesde && fechaCorteHasta) {
+                whereClauses.push(`p.f_ultimo_corte::DATE BETWEEN $${paramIdx} AND $${paramIdx + 1}`);
+                values.push(fechaCorteDesde, fechaCorteHasta);
+                paramIdx += 2;
+            } else if (fechaCorteDesde) {
                 whereClauses.push(`p.f_ultimo_corte >= $${paramIdx}`);
                 values.push(fechaCorteDesde);
                 paramIdx++;
-            } else {
-                whereClauses.push(`(p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`);
-            }
-            if (fechaCorteHasta) {
+            } else if (fechaCorteHasta) {
                 whereClauses.push(`p.f_ultimo_corte <= $${paramIdx}`);
                 values.push(fechaCorteHasta);
                 paramIdx++;
+            } else {
+                whereClauses.push(`(p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`);
             }
         }
 
