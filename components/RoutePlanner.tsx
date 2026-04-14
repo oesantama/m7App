@@ -1518,36 +1518,32 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(15, 23, 42);
       pdf.text('CONSOLIDADO DE MERCANCIA (RESUMEN DE CARGA)', ML, y);
       y += 4;
-      // 3 grupos por fila: ID | DESCRIPCIÓN | CANT | NOTAS  ×3
-      // Anchos por grupo (CW≈285mm / 3 = 95mm): id=18, desc=47, cant=11, notas=19 = 95mm
+      // 3 bloques por fila: ID | CANT | NOTAS (Acondicionado para más espacio en notas)
       const cargoRows: string[][] = [];
       for (let i = 0; i < cargoItems.length; i += 3) {
         const a = cargoItems[i], b = cargoItems[i + 1], c = cargoItems[i + 2];
         cargoRows.push([
-          a.id, a.name.substring(0, 28), String(a.total), '',
-          b ? b.id : '', b ? b.name.substring(0, 28) : '', b ? String(b.total) : '', '',
-          c ? c.id : '', c ? c.name.substring(0, 28) : '', c ? String(c.total) : '', '',
+          a.id, String(a.total), '',
+          b ? b.id : '', b ? String(b.total) : '', '',
+          c ? c.id : '', c ? String(c.total) : '', '',
         ]);
       }
       autoTable(pdf, {
         startY: y, margin: { left: ML, right: MR },
-        head: [['ID','DESCRIPCION','CANT','NOTAS','ID','DESCRIPCION','CANT','NOTAS','ID','DESCRIPCION','CANT','NOTAS']],
+        head: [['ID','CANT','NOTAS','ID','CANT','NOTAS','ID','CANT','NOTAS']],
         body: cargoRows,
         styles: { fontSize: 6, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
         headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
         columnStyles: {
-          0:  { cellWidth: 18, halign: 'center' },
-          1:  { cellWidth: 47 },
-          2:  { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
-          3:  { cellWidth: 19 },
-          4:  { cellWidth: 18, halign: 'center' },
-          5:  { cellWidth: 47 },
-          6:  { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
-          7:  { cellWidth: 19 },
-          8:  { cellWidth: 18, halign: 'center' },
-          9:  { cellWidth: 47 },
-          10: { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
-          11: { cellWidth: 19 },
+          0: { cellWidth: 25, halign: 'center' },
+          1: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
+          2: { cellWidth: 55 },
+          3: { cellWidth: 25, halign: 'center' },
+          4: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
+          5: { cellWidth: 55 },
+          6: { cellWidth: 25, halign: 'center' },
+          7: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
+          8: { cellWidth: 55 },
         },
         theme: 'grid',
         margin: { bottom: 28 }

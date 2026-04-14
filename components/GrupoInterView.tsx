@@ -137,10 +137,27 @@ const GrupoInterView: React.FC = () => {
     try {
       setLoading(true);
       const params: any = { search: query };
+      
+      // [M7-OPTIMIZE] Validación de rango de fechas para notificar al usuario
+      if (filters.fechaCorteDesde && filters.fechaCorteHasta) {
+        const start = new Date(filters.fechaCorteDesde);
+        const end = new Date(filters.fechaCorteHasta);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 90) {
+          toast.warning(`Has seleccionado un rango de ${diffDays} días. La consulta podría tardar un poco más de lo habitual, por favor espera.`);
+        }
+        params.fechaCorteDesde = filters.fechaCorteDesde;
+        params.fechaCorteHasta = filters.fechaCorteHasta;
+      } else if (filters.fechaCorteDesde) {
+        params.fechaCorteDesde = filters.fechaCorteDesde;
+      } else if (filters.fechaCorteHasta) {
+        params.fechaCorteHasta = filters.fechaCorteHasta;
+      }
+
       if (filters.status) params.status = filters.status;
       if (filters.client) params.client = filters.client;
-      if (filters.fechaCorteDesde) params.fechaCorteDesde = filters.fechaCorteDesde;
-      if (filters.fechaCorteHasta) params.fechaCorteHasta = filters.fechaCorteHasta;
       if (filters.factura) params.invoice = filters.factura;
       if (filters.placa) params.plate = filters.placa;
       if (filters.planilla) params.planilla = filters.planilla;
