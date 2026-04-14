@@ -1355,22 +1355,31 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
         b.inv_key      AS "DOCUMENT_ID",
         b.truck_origin AS "TRUCK_ID_ORIGIN",
         b.load_id      AS "LOAD_ID",
-        NULLIF(COALESCE(NULLIF(rt.truck_plate,''), NULLIF(dt.truck_plate,'')), '') AS "TRUCK_ID_DESTIN",
-        NULLIF(COALESCE(NULLIF(rt.driver_doc,''),  NULLIF(dt.driver_doc,'')), '')  AS "DRIVER_ID_DESTIN"
+        -- Prioridad de fuente Atómica: Si hay Ruta (rt), se toma todo de rt.
+        -- Si no hay, se intenta con Despacho (dt). Nunca mezclar columnas de fuentes distintas.
+        CASE 
+          WHEN NULLIF(rt.truck_plate, '') IS NOT NULL THEN rt.truck_plate
+          WHEN NULLIF(dt.truck_plate, '') IS NOT NULL THEN dt.truck_plate
+          ELSE ''
+        END AS "TRUCK_ID_DESTIN",
+        
+        CASE 
+          WHEN NULLIF(rt.truck_plate, '') IS NOT NULL THEN COALESCE(rt.driver_doc, '')
+          WHEN NULLIF(dt.truck_plate, '') IS NOT NULL THEN COALESCE(dt.driver_doc, '')
+          ELSE ''
+        END AS "DRIVER_ID_DESTIN"
+
       FROM base b
-      LEFT JOIN route_truck    rt ON (
-        TRIM(rt.invoice_id) = TRIM(b.inv_key) 
-        OR TRIM(rt.invoice_id) = TRIM(b.compound_id)
-        OR REGEXP_REPLACE(rt.invoice_id, '\s', '', 'g') = REGEXP_REPLACE(b.inv_key, '\s', '', 'g')
-        OR REGEXP_REPLACE(rt.invoice_id, '\s', '', 'g') = REGEXP_REPLACE(b.compound_id, '\s', '', 'g')
+      LEFT JOIN route_truck rt ON (
+        TRIM(rt.invoice_id) = TRIM(b.compound_id) -- Prioridad: Match exacto con ID Compuesto
+        OR TRIM(rt.invoice_id) = TRIM(b.inv_key)
       )
       LEFT JOIN dispatch_truck dt ON (
-        TRIM(dt.invoice_id) = TRIM(b.inv_key) 
-        OR TRIM(dt.invoice_id) = TRIM(b.compound_id)
-        OR REGEXP_REPLACE(dt.invoice_id, '\s', '', 'g') = REGEXP_REPLACE(b.inv_key, '\s', '', 'g')
+        TRIM(dt.invoice_id) = TRIM(b.compound_id)
+        OR TRIM(dt.invoice_id) = TRIM(b.inv_key)
       )
       ORDER BY b.load_id, b.inv_key
-      LIMIT 5000
+      LIMIT 10000
     `, [docParam, plateParam]);
 
     res.json(result.rows);

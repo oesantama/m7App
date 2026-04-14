@@ -117,7 +117,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const exportToExcel = (data: any[], fileName: string) => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "M7_Datos");
+    XLSX.utils.book_append_sheet(wb, ws, "Hoja 1");
     XLSX.writeFile(wb, `${fileName}_${new Date().getTime()}.xlsx`);
   };
 
