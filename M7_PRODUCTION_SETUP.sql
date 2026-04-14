@@ -55,24 +55,46 @@ CREATE TABLE IF NOT EXISTS grupo_inter_pedidos (
     id SERIAL PRIMARY KEY,
     nro_documento VARCHAR(100),
     cliente VARCHAR(255),
+    nit VARCHAR(50),
     ciudad_origen VARCHAR(255),
     ciudad_destino VARCHAR(255),
+    municipio_destino VARCHAR(255),
+    direccion TEXT,
     estado VARCHAR(50) DEFAULT 'Pendiente',
     nro_guia VARCHAR(100),
+    numero_planilla VARCHAR(100),
+    no_factura_m7 VARCHAR(100),
+    clasificacion VARCHAR(100),
     fecha_entregado TIMESTAMP,
+    fecha_viaje TIMESTAMP,
+    f_ultimo_corte TIMESTAMP,
     placa VARCHAR(50),
     acta_entrega_b64 TEXT,
     producto TEXT,
-    cantidad NUMERIC,
-    peso NUMERIC,
-    valor_flete NUMERIC,
-    valor_declarado NUMERIC,
+    cantidad NUMERIC DEFAULT 0,
+    peso NUMERIC DEFAULT 0,
+    peso_total_prod NUMERIC DEFAULT 0,
+    cantidad_total NUMERIC DEFAULT 0,
+    precio_total NUMERIC DEFAULT 0,
+    valor_flete NUMERIC DEFAULT 0,
+    valor_declarado NUMERIC DEFAULT 0,
+    notas_encabezado TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(50),
+    create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    create_by VARCHAR(50),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(50),
     UNIQUE (nro_documento, producto)
 );
+
+-- Índices Críticos para Grupo Inter (Solución Error 502)
+CREATE INDEX IF NOT EXISTS idx_gi_f_ultimo_corte_desc ON grupo_inter_pedidos (f_ultimo_corte DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_gi_no_factura_m7 ON grupo_inter_pedidos (no_factura_m7);
+CREATE INDEX IF NOT EXISTS idx_gi_placa ON grupo_inter_pedidos (placa);
+CREATE INDEX IF NOT EXISTS idx_gi_nro_doc_producto ON grupo_inter_pedidos (nro_documento, producto);
+CREATE INDEX IF NOT EXISTS idx_gi_planilla ON grupo_inter_pedidos (numero_planilla);
+CREATE INDEX IF NOT EXISTS idx_gi_composite_perf ON grupo_inter_pedidos (f_ultimo_corte DESC, create_at DESC);
 
 -- 6. Tabla de Auditoría y Trazabilidad (M7 Core)
 CREATE TABLE IF NOT EXISTS inventory_audit_log (

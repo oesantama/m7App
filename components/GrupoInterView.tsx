@@ -146,13 +146,24 @@ const GrupoInterView: React.FC = () => {
       if (filters.planilla) params.planilla = filters.planilla;
       
       const data = await api.getGrupoInterOrders(params);
-      if (data && data.length === 0) {
-        toast.info('No se encontraron registros para los filtros aplicados');
+      
+      // [M7-OPTIMIZE] Solo actualizamos el estado si la respuesta es válida
+      // Esto evita el "falso positivo" de ver 0 resultados si la tabla se limpia antes de tiempo
+      if (data) {
+        if (data.length === 0) {
+          toast.info('No se encontraron registros para los filtros aplicados');
+        }
+        setOrders(data);
+        setCurrentPage(1);
       }
-      setOrders(data || []);
-      setCurrentPage(1);
     } catch (error: any) {
-      toast.error(error.message || 'Error al cargar pedidos');
+      console.error('Error fetching orders:', error);
+      // Manejo específico para 502/Timeout
+      if (error.status === 502 || error.message?.includes('502') || error.message?.includes('timeout')) {
+        toast.error('El servidor tardó demasiado en responder (Timeout 502). Por favor, reduce el rango de fechas o contacta al administrador para aplicar índices de optimización.', { duration: 6000 });
+      } else {
+        toast.error(error.message || 'Error al cargar pedidos');
+      }
     } finally {
       setLoading(false);
     }

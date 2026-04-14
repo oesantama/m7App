@@ -770,7 +770,9 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         // M7-EXT: Filtro de fecha (Solo si no hay búsqueda global activa)
         if (!search && !invoice && !plate && !planilla) {
             if (fechaCorteDesde && fechaCorteHasta) {
-                whereClauses.push(`p.f_ultimo_corte::DATE BETWEEN $${paramIdx} AND $${paramIdx + 1}`);
+                // [M7-OPTIMIZE] Usamos >= y < (raw timestamp) en lugar de ::DATE para permitir uso de índices
+                whereClauses.push(`p.f_ultimo_corte >= $${paramIdx}`);
+                whereClauses.push(`p.f_ultimo_corte < ($${paramIdx + 1}::date + 1)`);
                 values.push(fechaCorteDesde, fechaCorteHasta);
                 paramIdx += 2;
             } else if (fechaCorteDesde) {
@@ -778,7 +780,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
                 values.push(fechaCorteDesde);
                 paramIdx++;
             } else if (fechaCorteHasta) {
-                whereClauses.push(`p.f_ultimo_corte <= $${paramIdx}`);
+                whereClauses.push(`p.f_ultimo_corte < ($${paramIdx}::date + 1)`);
                 values.push(fechaCorteHasta);
                 paramIdx++;
             } else {
