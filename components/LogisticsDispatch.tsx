@@ -291,37 +291,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
     };
 
-    // 3. Generación de Planilla Profesional (Unificada & Refinada)
-    const generateRoutePDF = async (route: any) => {
-        const despachador = user.name || 'SISTEMA ORBIT';
-        const driverName = route.driver_name !== 'S/A' ? route.driver_name : 'Óscar Santamaría';
-
-        // 0. Logo del Cliente Dinámico (Soporte multi-campo & Base64 robusto)
-        const currentClient = (clients || []).find(c => String(c.id) === String(selectedClient));
-        let clientLogo = currentClient?.logo_url || currentClient?.logoUrl || currentClient?.logo || currentClient?.avatar || '';
-        
-        // Si es base64 y le falta el prefijo, lo agregamos
-        if (clientLogo && !clientLogo.startsWith('http') && !clientLogo.startsWith('data:')) {
-            clientLogo = `data:image/png;base64,${clientLogo}`;
-        }
-        if (!clientLogo) clientLogo = 'https://placehold.co/150x50?text=CLIENTE+LOGO';
-
-        // 1. Obtener facturas asociadas para consolidación y cálculos
-        const routeInvoices = invoices.filter(inv => {
-           const rid = route.invoice_ids || route.invoiceIds || [];
-           return rid.includes(String(inv.id)) || rid.includes(String(inv.invoiceNumber)) || rid.includes(inv.docLId);
-        });
-
-        // Cálculos de Cabecera y Resumen basados en las facturas filtradas
-        const totalItemsCount = routeInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.totalItems) || 0), 0);
-        const totalValue = routeInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.invoiceValue) || 0), 0);
-        const totalVolume = routeInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.volumeM3) || 0), 0);
-
-        const cargoMap = new Map<string, { id: string, name: string, total: number, unit?: string }>();
-        routeInvoices.forEach(inv => {
-          inv.items?.forEach((it: any) => {
-            const id = it.sku || it.articleId || it.id || 'N/A';
-            const name = it.articleName || it.name || id;
     const generateRoutePDF = async (routeData: any) => {
         setIsGeneratingPDF(true);
         try {
