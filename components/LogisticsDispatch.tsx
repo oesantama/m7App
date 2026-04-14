@@ -382,7 +382,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                   <img src="${clientLogo}" class="logo-img" onerror="this.src='https://placehold.co/100x45?text=LOGO'"/>
                   <div>
                     <div style="font-size: 11px; font-weight: 900;">${(currentClient?.name || 'OPERACIÓN LOGÍSTICA').toUpperCase()}</div>
-                    <div style="font-size: 6px; font-weight: 700; color:#64748b">ORBITM7 LOGISTICS INTELLIGENCE</div>
+                    <div style="font-size: 6px; font-weight: 700; color:#000">ORBITM7 LOGISTICS INTELLIGENCE</div>
                   </div>
                 </div>
                 <div class="header-info-grid">
@@ -403,7 +403,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 <div class="totals-box">
                   <div class="total-row"><span>EFECTIVO (EF):</span> <span>$ ${cashTotal.toLocaleString()}</span></div>
                   <div class="total-row"><span>CRÉDITO (30D/60D):</span> <span>$ ${creditTotal.toLocaleString()}</span></div>
-                  <div class="total-row"><span>DIFERENCIA:</span> <span style="color:red">$ 0</span></div>
+                  <div class="total-row"><span>DIFERENCIA:</span> <span style="color:#000">$ 0</span></div>
                   <div class="total-row"><span>TOTAL RECAUDO:</span> <span style="font-weight:900;">$ ${cashTotal.toLocaleString()}</span></div>
                 </div>
               </div>

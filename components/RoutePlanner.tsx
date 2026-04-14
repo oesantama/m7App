@@ -1370,11 +1370,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     let y = ML;
 
     // ── HEADER BAR ──────────────────────────────────────────────────────────
-    pdf.setFillColor(15, 23, 42);
-    pdf.roundedRect(ML, y, CW, 22, 2, 2, 'F');
-    pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(0, 0, 0);
+    pdf.roundedRect(ML, y, CW, 22, 1, 1, 'FD');
+    pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
     pdf.text((currentClient?.name || 'OPERACION LOGISTICA').toUpperCase().substring(0, 32), ML + 4, y + 9);
-    pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(16, 185, 129);
+    pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
     pdf.text('ORBITM7 LOGISTICS INTELLIGENCE', ML + 4, y + 15);
 
     const infoItems: [string, string][] = [
@@ -1390,9 +1391,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     infoItems.forEach(([label, val], i) => {
       const col = i % 3, row = Math.floor(i / 3);
       const ix = gridX + col * itemW, iy = y + 4 + row * 9;
-      pdf.setFontSize(5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139);
+      pdf.setFontSize(5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
       pdf.text(label, ix, iy);
-      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
       pdf.text(val, ix, iy + 5);
     });
     y += 26;
