@@ -207,9 +207,18 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                                     <p className="text-[11px] font-black text-white uppercase leading-none mt-0.5">{user.name}</p>
                                                 </div>
                                             </div>
-                                            <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-[7px] font-black rounded-lg uppercase tracking-widest">REQUERIDA</span>
+                                            <div className="flex bg-white/10 p-1 rounded-lg">
+                                                <button
+                                                    onClick={() => setSignNowMap({...signNowMap, [user.id]: true})}
+                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] !== false ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20' : 'text-slate-400'}`}
+                                                >AHORA</button>
+                                                <button
+                                                    onClick={() => setSignNowMap({...signNowMap, [user.id]: false})}
+                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] === false ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400'}`}
+                                                >DESPUÉS</button>
+                                            </div>
                                         </div>
-                                        {signNowMap[user.id] !== false && (
+                                        {signNowMap[user.id] !== false ? (
                                             <div className="relative">
                                                 <input 
                                                     type={showPasswordMap[user.id] ? "text" : "password"}
@@ -226,6 +235,8 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                                     {showPasswordMap[user.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
                                                 </button>
                                             </div>
+                                        ) : (
+                                            <p className="text-[9px] font-bold text-amber-400/70 uppercase tracking-widest">El personal de bodega firmará luego desde el monitor de despacho</p>
                                         )}
                                     </div>
 
