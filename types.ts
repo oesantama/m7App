@@ -266,6 +266,8 @@ export interface Route extends AuditBase {
   driver_document?: string;
   driver_name?: string;
   plate?: string;
+  delivered_invoices?: number;
+  total_invoices?: number;
 }
 
 export type MasterCategory = 

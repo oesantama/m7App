@@ -70,6 +70,33 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [isReassigningPlate, setIsReassigningPlate] = useState(false);
+
+    // MEJORA: Filtrar flota disponible (misma lógica que RoutePlanner para consistencia)
+    const availableVehicles = useMemo(() => {
+        const activeLinks = assignments.filter(a => {
+            const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+            const cId = a.clientId || (a as any).client_id;
+            const currentClientId = user.clientId || (user as any).client_id || 'CLI-01';
+            return active && String(cId) === String(currentClientId);
+        });
+
+        return activeLinks.map(link => {
+            const linkVId = link.vehicleId || (link as any).vehicle_id;
+            const linkDId = link.driverId || (link as any).driver_id;
+            const v = vehicles.find(veh => String(veh.id) === String(linkVId));
+            const d = drivers.find(drv => String(drv.id) === String(linkDId));
+
+            if (!v || !d) return null;
+
+            return {
+                ...v,
+                driverName: d.name,
+                driverId: d.id,
+                assignmentId: link.id
+            };
+        }).filter(item => item !== null) as (any)[];
+    }, [assignments, vehicles, drivers, user.clientId]);
+
     const [showReassignModal, setShowReassignModal] = useState<{ isOpen: boolean; route: any }>({ isOpen: false, route: null });
     const [reassignData, setReassignData] = useState({ newVehicleId: '', observations: '' });
     const mapRef = useRef<L.Map | null>(null);
@@ -301,14 +328,28 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 return cleanId(val);
             });
 
-            const routeInvList = (invoices || []).filter(inv => {
+            // [M7-FIX] Si las facturas no están en la lista local, las descargamos de la API
+            let routeInvList = (invoices || []).filter(inv => {
                 const invId = cleanId(inv.id);
                 const invNum = cleanId(inv.invoiceNumber);
                 return targetIds.includes(invId) || targetIds.includes(invNum);
             });
 
+            if (routeInvList.length === 0 && targetIds.length > 0) {
+                console.log(`[M7-PDF] Facturas no encontradas localmente. Descargando ${targetIds.length} facturas...`);
+                try {
+                    const freshInvoices = await api.getInvoices(routeData.client_id, targetIds.join(','));
+                    if (Array.isArray(freshInvoices) && freshInvoices.length > 0) {
+                        routeInvList = freshInvoices;
+                    }
+                } catch (err) {
+                    console.error('[M7-PDF] Error descargando facturas faltantes:', err);
+                }
+            }
+
             if (routeInvList.length === 0) {
-                toast.error("No se encontraron facturas para esta ruta");
+                toast.error("No se encontraron facturas para esta ruta en el servidor");
+                setIsGeneratingPDF(false);
                 return;
             }
 
@@ -1429,8 +1470,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     });
                                     return targetIds.includes(invId) || targetIds.includes(invNum);
                                 });
-                                const totalRouteInvoices = routeInvList.length;
-                                const deliveredRouteCount = routeInvList.filter(i => ['EST-12','EST-13','EST-14','ENTREGADO'].includes(i.status as string)).length;
+                                const totalRouteInvoices = route.total_invoices ?? routeInvList.length;
+                                const deliveredRouteCount = route.delivered_invoices ?? routeInvList.filter(i => ['EST-12','EST-13','EST-14','ENTREGADO'].includes(i.status as string)).length;
                                 const percent = totalRouteInvoices > 0 ? (deliveredRouteCount / totalRouteInvoices) * 100 : 0;
 
                                  return (
@@ -1879,8 +1920,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     onChange={(e) => setReassignData({ ...reassignData, newVehicleId: e.target.value })}
                                 >
                                     <option value="">Seleccionar Placa...</option>
-                                    {vehicles.map((v: any) => (
-                                        <option key={v.id} value={v.id}>{v.plate} - {v.driverName || 'Sin Conductor'}</option>
+                                    {availableVehicles.map((v: any) => (
+                                        <option key={v.id} value={v.id}>{v.plate} - {v.driverName}</option>
                                     ))}
                                 </select>
                             </div>
