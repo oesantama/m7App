@@ -69,6 +69,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [isReassigningPlate, setIsReassigningPlate] = useState(false);
+    const [showReassignModal, setShowReassignModal] = useState<{ isOpen: boolean; route: any }>({ isOpen: false, route: null });
+    const [reassignData, setReassignData] = useState({ newVehicleId: '', observations: '' });
     const mapRef = useRef<L.Map | null>(null);
     const markersRef = useRef<{ [key: string]: L.Marker }>({});
     const routeLinesRef = useRef<{ [key: string]: L.Polyline }>({});
@@ -319,231 +322,265 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
           inv.items?.forEach((it: any) => {
             const id = it.sku || it.articleId || it.id || 'N/A';
             const name = it.articleName || it.name || id;
-            if (!cargoMap.has(id)) cargoMap.set(id, { id, name, total: 0, unit: it.unit });
-            cargoMap.get(id)!.total += Number(it.qty || it.expectedQty || it.quantity || 0);
-          });
-        });
-
-        // 2. Lógica de Totales Verídicos
-        const cashTotal = routeInvoices.reduce((acc, inv) => {
-          const method = String((inv as any).paymentMethod || inv.items?.[0]?.paymentMethod || 'EF').toUpperCase();
-          const isCash = method === 'EF' || method === 'CONTADO' || method === 'EFECTIVO';
-          return isCash ? acc + (Number(inv.invoiceValue) || 0) : acc;
-        }, 0);
-
-        const creditTotal = routeInvoices.reduce((acc, inv) => {
-          const method = String((inv as any).paymentMethod || inv.items?.[0]?.paymentMethod || '').toUpperCase();
-          const isCredit = method.includes('30D') || method.includes('60D') || method.includes('CREDIT') || method === 'CR';
-          return isCredit ? acc + (Number(inv.invoiceValue) || 0) : acc;
-        }, 0);
-        
+    const generateRoutePDF = async (routeData: any) => {
         setIsGeneratingPDF(true);
+        try {
+            // 1. Preparar datos (buscar facturas reales)
+            const routeInvList = (invoices || []).filter(inv => {
+                const ci = String(inv.id).trim();
+                const cn = String(inv.invoiceNumber).trim();
+                return (routeData.invoice_ids || []).some((rid: any) => {
+                    const c = String(rid).trim();
+                    return c === ci || c === cn;
+                });
+            });
 
-        // Construcción del HTML mediante template literal PURO (sin sintaxis React)
-        const html = `
-          <html>
-            <head>
-              <title>PLANILLA - ${route.plate}</title>
-              <style>
-                @page { size: letter landscape; margin: 0.3cm; }
-                body { font-family: 'Inter', 'Segoe UI', sans-serif; color: #000; margin: 0; padding: 10px; font-size: 7.5px; }
-                .compact-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #000; padding-bottom: 5px; margin-bottom: 8px; }
-                .logo-img { max-height: 45px; max-width: 150px; object-fit: contain; }
-                .header-info-grid { display: flex; gap: 12px; }
-                .info-col { display: flex; flex-direction: column; line-height: 1.1; }
-                .info-label { font-size: 6px; font-weight: 800; color: #000; text-transform: uppercase; }
-                .info-val { font-size: 9px; font-weight: 900; }
+            if (routeInvList.length === 0) {
+                toast.error("No se encontraron facturas para esta ruta");
+                return;
+            }
 
-                .consolidado-section { margin-top: 8px; border-top: 1.5px solid #000; padding-top: 6px; }
-                .consolidado-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
-                .consolidado-col { padding: 0 8px; border-right: 1px solid #000; }
-                .consolidado-col:first-child { padding-left: 0; }
-                .consolidado-col:last-child { border-right: none; padding-right: 0; }
+            const despachador = user.name || 'SISTEMA ORBIT';
+            const driverName = String(routeData.driver_name || 'Conductor');
+            const currentClient = (allMasterData?.['masterClientes'] || []).find((c: any) => String(c.id) === String(routeData.client_id));
+            const dateStr = new Date().toLocaleDateString('es-CO');
+            const fileName = `PLANILLA-${routeData.plate || 'RUTA'}-${dateStr.replace(/\//g, '')}.pdf`;
 
-                table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
-                th { background: #fff; border: 1px solid #000; padding: 2px 3px; font-size: 6px; font-weight: 900; text-transform: uppercase; color: #000; }
-                td { border: 1px solid #000; padding: 1.5px 3px; font-weight: 700; height: 11px; font-size: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #000; }
-                .text-center { text-align: center; }
-                .text-right { text-align: right; }
+            // 2. Inicializar jsPDF
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const PW = pdf.internal.pageSize.getWidth();
+            const PH = pdf.internal.pageSize.getHeight();
+            const ML = 6, MR = 6, CW = PW - ML - MR;
+            let y = ML;
 
-                .top-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 15px; margin-bottom: 5px; }
-                .totals-box { border: 1.5px solid #000; border-radius: 4px; overflow: hidden; }
-                .total-row { display: flex; justify-content: space-between; padding: 2px 8px; border-bottom: 1px solid #000; color: #000; }
-                .total-row:last-child { border-bottom: none; background: #fff; font-weight: 900; font-size: 9px; }
-                .bank-strip { background: #fff; color: #000; text-align: center; padding: 2px; font-weight: 900; margin-bottom: 5px; font-size: 7px; border: 1px solid #000; }
-                
-                .signature-section { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 30px; padding: 0 40px; }
-                .sig-box { border-top: 1.5px solid #000; text-align: center; padding-top: 8px; font-weight: 900; text-transform: uppercase; font-size: 9px; color: #000; }
-              </style>
-            </head>
-            <body>
-              <div class="compact-header">
-                <div style="display:flex; align-items:center; gap:12px;">
-                  <img src="${clientLogo}" class="logo-img" onerror="this.src='https://placehold.co/100x45?text=LOGO'"/>
-                  <div>
-                    <div style="font-size: 11px; font-weight: 900;">${(currentClient?.name || 'OPERACIÓN LOGÍSTICA').toUpperCase()}</div>
-                    <div style="font-size: 6px; font-weight: 700; color:#000">ORBITM7 LOGISTICS INTELLIGENCE</div>
-                  </div>
-                </div>
-                <div class="header-info-grid">
-                   <div class="info-col"> <span class="info-label">Operación (DOC L)</span> <span class="info-val">${routeInvoices[0]?.docLId || 'S/N'}</span> </div>
-                   <div class="info-col"> <span class="info-label">Fecha</span> <span class="info-val">${new Date().toLocaleDateString('es-CO')}</span> </div>
-                   <div class="info-col"> <span class="info-label">Vehículo</span> <span class="info-val">${route.plate || 'N/A'}</span> </div>
-                   <div class="info-col"> <span class="info-label">FACTURAS</span> <span class="info-val">${routeInvoices.length}</span> </div>
-                   <div class="info-col"> <span class="info-label">Conductor</span> <span class="info-val">${driverName}</span> </div>
-                   <div class="info-col"> <span class="info-label">Despachador</span> <span class="info-val">${despachador}</span> </div>
-                </div>
-              </div>
+            // ── HEADER BAR ──────────────────────────────────────────────────────────
+            pdf.setFillColor(255, 255, 255);
+            pdf.setDrawColor(0, 0, 0);
+            pdf.roundedRect(ML, y, CW, 22, 1, 1, 'FD');
+            pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+            pdf.text((currentClient?.name || 'OPERACION LOGISTICA').toUpperCase().substring(0, 32), ML + 4, y + 9);
+            pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
+            pdf.text('ORBITM7 LOGISTICS INTELLIGENCE', ML + 4, y + 15);
 
-              <div class="top-grid">
-                <table>
-                  <thead> <tr><th>BANCO</th><th>VALOR</th><th>COMPROBANTE</th><th>FECHA</th></tr> </thead>
-                  <tbody> ${Array(4).fill(0).map(() => `<tr><td></td><td></td><td></td><td></td></tr>`).join('')} </tbody>
-                </table>
-                <div class="totals-box">
-                  <div class="total-row"><span>EFECTIVO (EF):</span> <span>$ ${cashTotal.toLocaleString()}</span></div>
-                  <div class="total-row"><span>CRÉDITO (30D/60D):</span> <span>$ ${creditTotal.toLocaleString()}</span></div>
-                  <div class="total-row"><span>DIFERENCIA:</span> <span style="color:#000">$ 0</span></div>
-                  <div class="total-row"><span>TOTAL RECAUDO:</span> <span style="font-weight:900;">$ ${cashTotal.toLocaleString()}</span></div>
-                </div>
-              </div>
+            const infoItems: [string, string][] = [
+                ['DOC L', String(routeInvList[0]?.docLId || 'S/N')],
+                ['FECHA', dateStr],
+                ['VEHICULO', String(routeData.plate || 'N/A')],
+                ['CONDUCTOR', driverName.substring(0, 18)],
+                ['FACTURAS', String(routeInvList.length)],
+                ['DESPACHADOR', despachador.substring(0, 16)],
+            ];
+            const gridX = ML + CW * 0.42;
+            const itemW = (CW - CW * 0.42 - 2) / 3;
+            infoItems.forEach(([label, val], i) => {
+                const col = i % 3, row = Math.floor(i / 3);
+                const ix = gridX + col * itemW, iy = y + 4 + row * 9;
+                pdf.setFontSize(5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
+                pdf.text(label, ix, iy);
+                pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+                pdf.text(val, ix, iy + 5);
+            });
+            y += 26;
 
-              <div class="bank-strip">🏦 CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)</div>
+            // ── PAYMENT SECTION (RECUADRO DE RECAUDO) ────────────────────────────────
+            const bankW = Math.floor(CW * 0.62);
+            const totW = CW - bankW - 3;
+            const totX = ML + bankW + 3;
 
-              <table>
-                <thead>
-                  <tr>
-                    <th width="35">U.NEG</th>
-                    <th width="75">FACTURA</th>
-                    <th width="75"># INTERNO</th>
-                    <th width="85">REF CLIENTE</th>
-                    <th width="75">VALOR</th>
-                    <th width="35">C.PAG</th>
-                    <th>CLIENTE / DIRECCIÓN</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${routeInvoices.map(inv => {
+            autoTable(pdf, {
+                startY: y, margin: { left: ML }, tableWidth: bankW,
+                head: [['BANCO', 'VALOR', 'COMPROBANTE', 'FECHA']],
+                body: [['','','',''],['','','',''],['','','','']],
+                styles: { fontSize: 6, cellPadding: 1.5, minCellHeight: 5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+                headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
+                theme: 'grid',
+            });
+            const bankEndY = (pdf as any).lastAutoTable.finalY;
+
+            const fmtCOP = (v: number) => `$ ${v.toLocaleString('es-CO')}`;
+            const cashTotal = routeInvList.reduce((acc, inv) => {
+                const m = String(inv.paymentMethod || inv.items?.[0]?.paymentMethod || 'EF').toUpperCase();
+                return (m === 'EF' || m === 'CONTADO' || m === 'EFECTIVO') ? acc + (Number(inv.invoiceValue) || 0) : acc;
+            }, 0);
+            const creditTotal = routeInvList.reduce((acc, inv) => {
+                const m = String(inv.paymentMethod || inv.items?.[0]?.paymentMethod || '').toUpperCase();
+                return (m.includes('30D') || m.includes('60D') || m.includes('CREDIT') || m === 'CR') ? acc + (Number(inv.invoiceValue) || 0) : acc;
+            }, 0);
+
+            const totRows: [string, string][] = [
+                ['EFECTIVO (EF)', fmtCOP(cashTotal)],
+                ['CREDITO (30/60D)', fmtCOP(creditTotal)],
+                ['DIFERENCIA', '$ 0'],
+                ['TOTAL RECAUDO', fmtCOP(cashTotal + creditTotal)],
+            ];
+            let totY = y;
+            totRows.forEach(([label, val], i) => {
+                const isLast = i === totRows.length - 1;
+                pdf.setFillColor(255, 255, 255);
+                pdf.rect(totX, totY, totW, 5.5, 'F');
+                pdf.setDrawColor(0, 0, 0); pdf.rect(totX, totY, totW, 5.5);
+                pdf.setFontSize(5.5); pdf.setFont('helvetica', isLast ? 'bold' : 'normal');
+                pdf.setTextColor(0, 0, 0);
+                pdf.text(label, totX + 1.5, totY + 4);
+                pdf.text(val, totX + totW - 1.5, totY + 4, { align: 'right' });
+                totY += 5.5;
+            });
+            y = Math.max(bankEndY, totY) + 3;
+
+            pdf.setFillColor(255, 255, 255); pdf.rect(ML, y, CW, 5, 'F');
+            pdf.setDrawColor(0, 0, 0); pdf.rect(ML, y, CW, 5);
+            pdf.setFontSize(6); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+            pdf.text('CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)', PW / 2, y + 3.5, { align: 'center' });
+            y += 7;
+
+            // ── INVOICES TABLE ──────────────────────────────────────────────────────
+            autoTable(pdf, {
+                startY: y, margin: { left: ML, right: MR },
+                head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
+                body: routeInvList.map((inv, idx) => {
                     const firstItem = inv.items?.[0] || {} as any;
                     const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
-                    return `
-                      <tr>
-                        <td class="text-center">${inv.unCode || firstItem.unCode || firstItem.un_code || '-'}</td>
-                        <td class="text-center" style="font-weight:900;">${inv.invoiceNumber}</td>
-                        <td class="text-center">${inv.orderNumber || inv.docLId || '-'}</td>
-                        <td class="text-center">${inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'}</td>
-                        <td class="text-right" style="font-family: monospace;">$ ${(inv.invoiceValue || 0).toLocaleString()}</td>
-                        <td class="text-center" style="font-weight:900;">${method}</td>
-                        <td><div style="font-weight:900; font-size:8px;">${inv.customerName}</div><div style="font-size:8px; color:#000; font-weight:900;">${inv.address || ''}</div></td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
+                    return [
+                        String(idx + 1),
+                        String(inv.unCode || firstItem.unCode || firstItem.un_code || '-'),
+                        String(inv.docLId || '-'),
+                        String(inv.invoiceNumber),
+                        String(inv.orderNumber || '-'),
+                        String(inv.totalItems || '-'),
+                        String(inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'),
+                        fmtCOP(inv.invoiceValue || 0),
+                        method,
+                        `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
+                    ];
+                }),
+                styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+                headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+                columnStyles: {
+                    0: { cellWidth: 8,  halign: 'center' },
+                    1: { cellWidth: 12, halign: 'center' },
+                    2: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+                    3: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+                    4: { cellWidth: 24, halign: 'center' },
+                    5: { cellWidth: 10, halign: 'center' },
+                    6: { cellWidth: 18, halign: 'center' },
+                    7: { cellWidth: 26, halign: 'right' },
+                    8: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
+                    9: { halign: 'left' },
+                },
+                theme: 'grid',
+            });
+            y = (pdf as any).lastAutoTable.finalY + 5;
 
-              <div class="consolidado-section">
-                <div style="font-weight:900; font-size:7px; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.1em;">📦 CONSOLIDADO DE CARGA</div>
-                <div class="consolidado-grid">
-                  ${(() => {
-                    const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
-                    const chunkSize = Math.ceil(items.length / 3) || 1;
-                    const groups = [items.slice(0, chunkSize), items.slice(chunkSize, chunkSize * 2), items.slice(chunkSize * 2)];
-                    return groups.map(group => `
-                      <div class="consolidado-col">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th width="45%">ID</th>
-                              <th width="20%">CANT</th>
-                              <th width="35%">NOTAS</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            ${group.map(it => `
-                              <tr>
-                                <td style="font-size:6px;">${it.id}</td>
-                                <td class="text-center" style="font-weight:900;">${it.total}</td>
-                                <td style="font-size:6px; color:#000;">${it.unit || it.name?.substring(0,15) || '-'}</td>
-                              </tr>
-                            `).join('')}
-                          </tbody>
-                        </table>
-                      </div>
-                    `).join('');
-                  })()}
-                </div>
-              </div>
+            // ── CARGO CONSOLIDATION ──────────────────────────────────────────────────
+            const cargoMap = new Map<string, { id: string; name: string; total: number }>();
+            routeInvList.forEach(inv => {
+                inv.items?.forEach((it: any) => {
+                    const id = String(it.sku || it.articleId || it.id || 'N/A');
+                    const name = String(it.articleName || it.name || id);
+                    if (!cargoMap.has(id)) cargoMap.set(id, { id, name, total: 0 });
+                    cargoMap.get(id)!.total += Number(it.qty || it.expectedQty || it.quantity || 0);
+                });
+            });
+            const cargoItems = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+            if (cargoItems.length > 0) {
+                if (y > PH - 65) { pdf.addPage(); y = ML; }
+                pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+                pdf.text('CONSOLIDADO DE MERCANCIA (RESUMEN DE CARGA)', ML, y);
+                y += 4;
+                const cargoRows: string[][] = [];
+                for (let i = 0; i < cargoItems.length; i += 3) {
+                    const a = cargoItems[i], b = cargoItems[i + 1], c = cargoItems[i + 2];
+                    cargoRows.push([
+                        a.id, a.name.substring(0, 28), String(a.total), '',
+                        b ? b.id : '', b ? b.name.substring(0, 28) : '', b ? String(b.total) : '', '',
+                        c ? c.id : '', c ? c.name.substring(0, 28) : '', c ? String(c.total) : '', '',
+                    ]);
+                }
+                autoTable(pdf, {
+                    startY: y, margin: { left: ML, right: MR },
+                    head: [['ID','DESCRIPCION','CANT','NOTAS','ID','DESCRIPCION','CANT','NOTAS','ID','DESCRIPCION','CANT','NOTAS']],
+                    body: cargoRows,
+                    styles: { fontSize: 6, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+                    headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
+                    columnStyles: {
+                        0:  { cellWidth: 18, halign: 'center' },
+                        1:  { cellWidth: 47 },
+                        2:  { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
+                        3:  { cellWidth: 19 },
+                        4:  { cellWidth: 18, halign: 'center' },
+                        5:  { cellWidth: 47 },
+                        6:  { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
+                        7:  { cellWidth: 19 },
+                        8:  { cellWidth: 18, halign: 'center' },
+                        9:  { cellWidth: 47 },
+                        10: { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
+                        11: { cellWidth: 19 },
+                    },
+                    theme: 'grid',
+                });
+                y = (pdf as any).lastAutoTable.finalY + 8;
+            }
 
-              <div class="signature-section">
-                <div class="sig-box">FIRMA CONDUCTOR: ${driverName.toUpperCase()}</div>
-                <div class="sig-box">DESPACHO / AUDITORÍA: ${despachador.toUpperCase()}</div>
-              </div>
+            // ── SIGNATURES ────────────────────────────────────────────────────────
+            if (y > PH - 40) { pdf.addPage(); y = ML + 20; }
+            const sigW = (CW - 20) / 2;
+            pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.4);
+            pdf.line(ML + 5, y + 18, ML + 5 + sigW, y + 18);
+            pdf.line(ML + 5 + sigW + 20, y + 18, ML + 5 + sigW * 2 + 20, y + 18);
+            pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+            pdf.text('FIRMA CONDUCTOR', ML + 5 + sigW / 2, y + 22, { align: 'center' });
+            pdf.setFontSize(6); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
+            pdf.text(driverName.toUpperCase(), ML + 5 + sigW / 2, y + 27, { align: 'center' });
+            pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+            pdf.text('DESPACHO / AUDITORIA', ML + 5 + sigW + 20 + sigW / 2, y + 22, { align: 'center' });
+            pdf.setFontSize(6); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
+            pdf.text(despachador.toUpperCase(), ML + 5 + sigW + 20 + sigW / 2, y + 27, { align: 'center' });
 
-            </body>
-          </html>
-        `;
+            const totalPages = (pdf as any).internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                pdf.setPage(i);
+                pdf.setFontSize(5); pdf.setTextColor(100, 116, 139);
+                pdf.text(`Página ${i} de ${totalPages} | ORBITM7 Intelligence - ${dateStr} - ${routeData.plate} - ${routeInvList.length} facturas`, PW / 2, PH - 5, { align: 'center' });
+            }
 
-        // Renderizar en iframe oculto → html2canvas → jsPDF → descarga directa
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1122px;height:794px;border:none;visibility:hidden;';
-        document.body.appendChild(iframe);
-
-        await new Promise<void>(resolve => {
-          iframe.onload = () => resolve();
-          iframe.srcdoc = html;
-        });
-
-        // Dar tiempo para que carguen imágenes dentro del iframe
-        await new Promise(r => setTimeout(r, 800));
-
-        try {
-          const canvas = await html2canvas(iframe.contentDocument!.body, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            width: 1122,
-            windowWidth: 1122,
-          });
-
-          const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
-          const pdfW = pdf.internal.pageSize.getWidth();
-          const pdfH = pdf.internal.pageSize.getHeight();
-          const pageHeightPx = canvas.width * (pdfH / pdfW);
-
-          let y = 0;
-          let pageNum = 0;
-          const totalPages = Math.ceil(canvas.height / pageHeightPx);
-          while (y < canvas.height) {
-            const sliceH = Math.min(pageHeightPx, canvas.height - y);
-            const sliceCanvas = document.createElement('canvas');
-            sliceCanvas.width = canvas.width;
-            sliceCanvas.height = sliceH;
-            const ctx = sliceCanvas.getContext('2d')!;
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-            ctx.drawImage(canvas, 0, -y);
-            const sliceImg = sliceCanvas.toDataURL('image/jpeg', 0.93);
-            if (pageNum > 0) pdf.addPage();
-            pdf.addImage(sliceImg, 'JPEG', 0, 0, pdfW, pdfH * (sliceH / pageHeightPx));
-            
-            // Paginación personalizada
-            pdf.setFontSize(7);
-            pdf.setTextColor(100, 100, 100);
-            pdf.text(`Página ${pageNum + 1} de ${totalPages} | Planilla de Despacho OrbitM7 | ${route.plate}`, pdfW / 2, pdfH - 5, { align: 'center' });
-            
-            y += sliceH;
-            pageNum++;
-          }
-
-          const fecha = new Date().toISOString().split('T')[0];
-          pdf.save(`planilla_${route.plate || 'ruta'}_${fecha}.pdf`);
+            pdf.save(fileName);
+        } catch (err: any) {
+            console.error('[PDF-GEN-ERR]', err);
+            toast.error("Error al generar PDF: " + err.message);
         } finally {
-          document.body.removeChild(iframe);
-          setIsGeneratingPDF(false);
+            setIsGeneratingPDF(false);
         }
     };
 
+    const handleReassignPlate = async () => {
+        if (!showReassignModal.route || !reassignData.newVehicleId) {
+            toast.error("Debe seleccionar un vehículo");
+            return;
+        }
+
+        setIsReassigningPlate(true);
+        try {
+            const res = await api.reassignRouteVehicle({
+                routeId: showReassignModal.route.id,
+                newVehicleId: reassignData.newVehicleId,
+                observations: reassignData.observations,
+                userId: user.id
+            });
+
+            if (res.success) {
+                toast.success("Vehículo reasignado exitosamente. Se ha creado una nueva ruta.");
+                setShowReassignModal({ isOpen: false, route: null });
+                setReassignData({ newVehicleId: '', observations: '' });
+                loadData(); // Recargar monitor
+            } else {
+                toast.error(res.error || "Error al reasignar vehículo");
+            }
+        } catch (err: any) {
+            toast.error("Error el servidor: " + err.message);
+        } finally {
+            setIsReassigningPlate(false);
+        }
+    };
 
     // Helper for robust ID matching
     const cleanId = (id: any) => String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
@@ -1436,20 +1473,27 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     </div>
                                                 </div>
                                                 <div className="w-20 h-1 bg-slate-200 rounded-full mt-1 overflow-hidden">
-                                                    <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(utilizationPercent, 100)}%` }}></div>
+                                                <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                                                    {deliveredRouteCount}/{totalRouteInvoices} <span className="text-[8px] text-indigo-400">fact</span>
                                                 </div>
+                                                <p className="text-[11px] font-black text-emerald-500 mt-1">{Math.round(utilizationPercent)}%</p>
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-5">
+                                            <div 
+                                                className="h-full bg-emerald-400 rounded-full transition-all duration-1000"
+                                                style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
+                                            />
+                                        </div>
+
+                                        <div className="flex gap-2">
                                             <button 
-                                                onClick={() => {
-                                                    setVisualizedRoute(route);
-                                                }}
-                                                className={`flex items-center justify-center gap-2 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${visualizedRoute?.id === route.id ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                                onClick={() => setVisualizedRoute(route)}
+                                                className={`flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${visualizedRoute?.id === route.id ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-600 hover:bg-white hover:shadow-md'}`}
                                             >
-                                                <Icons.Truck className="w-3 h-3" />
-                                                {visualizedRoute?.id === route.id ? 'Tracker On' : 'Ver Mapa'}
+                                                <Icons.MapPin className="w-3.5 h-3.5" />
+                                                {visualizedRoute?.id === route.id ? 'TRACKER ON' : 'VER MAPA'}
                                             </button>
                                             <button 
                                                 onClick={() => setSelectedActiveRoute(route)}
@@ -1834,6 +1878,60 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 isValidating={isValidating}
                 handleConfirmDispatch={handleConfirmDispatch}
             />
+
+            {/* MODAL: REASIGNAR PLACA / CAMBIO DE VEHICULO */}
+            {showReassignModal.isOpen && (
+                <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+                        <div className="p-8 border-b border-slate-50 bg-slate-50/50">
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Reasignar Vehículo</h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase">Ruta actual: {showReassignModal.route?.plate}</p>
+                        </div>
+                        
+                        <div className="p-8 space-y-6">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nuevo Vehículo / Placa</label>
+                                <select 
+                                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                    value={reassignData.newVehicleId}
+                                    onChange={(e) => setReassignData({ ...reassignData, newVehicleId: e.target.value })}
+                                >
+                                    <option value="">Seleccionar Placa...</option>
+                                    {vehicles.map((v: any) => (
+                                        <option key={v.id} value={v.id}>{v.plate} - {v.driverName || 'Sin Conductor'}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Observaciones del Cambio</label>
+                                <textarea 
+                                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 h-32"
+                                    placeholder="Motivo del cambio (ej: falla mecánica, cambio de zona...)"
+                                    value={reassignData.observations}
+                                    onChange={(e) => setReassignData({ ...reassignData, observations: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-8 bg-slate-50 flex gap-4">
+                            <button 
+                                className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                onClick={() => setShowReassignModal({ isOpen: false, route: null })}
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 disabled:opacity-50"
+                                onClick={handleReassignPlate}
+                                disabled={isReassigningPlate}
+                            >
+                                {isReassigningPlate ? 'PROCESANDO...' : 'CONFIRMAR CAMBIO'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL: SOPORTE DE PAGO */}
             {voucherModal?.isOpen && (
