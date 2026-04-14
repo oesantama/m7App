@@ -295,13 +295,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         setIsGeneratingPDF(true);
         try {
             // 1. Preparar datos (buscar facturas reales)
+            const targetIds = (routeData.invoice_ids || []).map((id: any) => {
+                const val = typeof id === 'object' && id !== null ? (id.id || id.invoice_id) : id;
+                return cleanId(val);
+            });
+
             const routeInvList = (invoices || []).filter(inv => {
-                const ci = String(inv.id).trim();
-                const cn = String(inv.invoiceNumber).trim();
-                return (routeData.invoice_ids || []).some((rid: any) => {
-                    const c = String(rid).trim();
-                    return c === ci || c === cn;
-                });
+                const invId = cleanId(inv.id);
+                const invNum = cleanId(inv.invoiceNumber);
+                return targetIds.includes(invId) || targetIds.includes(invNum);
             });
 
             if (routeInvList.length === 0) {
@@ -1417,12 +1419,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 const utilizationPercent = vehicleData ? (totalVolume / vehicleData.capacityM3) * 100 : 0;
 
                                 const routeInvList = invoices.filter(inv => {
-                                    const ci = String(inv.id).trim().replace(/[\r\n\t\f\v ]/g, '');
-                                    const cn = String(inv.invoiceNumber).trim().replace(/[\r\n\t\f\v ]/g, '');
-                                    return (route.invoice_ids || []).some((rid: any) => {
-                                        const c = String(rid).trim().replace(/[\r\n\t\f\v ]/g, '');
-                                        return c === ci || c === cn;
+                                    const invId = cleanId(inv.id);
+                                    const invNum = cleanId(inv.invoiceNumber);
+                                    const targetIds = (route.invoice_ids || []).map((id: any) => {
+                                        const val = typeof id === 'object' && id !== null ? (id.id || id.invoice_id) : id;
+                                        return cleanId(val);
                                     });
+                                    return targetIds.includes(invId) || targetIds.includes(invNum);
                                 });
                                 const totalRouteInvoices = routeInvList.length;
                                 const deliveredRouteCount = routeInvList.filter(i => ['EST-12','EST-13','EST-14','ENTREGADO'].includes(i.status as string)).length;
