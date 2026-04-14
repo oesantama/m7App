@@ -295,7 +295,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         setIsGeneratingPDF(true);
         try {
             // 1. Preparar datos (buscar facturas reales)
-            const targetIds = (routeData.invoice_ids || []).map((id: any) => {
+            const rawIds = routeData.invoice_ids || routeData.invoiceIds || [];
+            const targetIds = rawIds.map((id: any) => {
                 const val = typeof id === 'object' && id !== null ? (id.id || id.invoice_id) : id;
                 return cleanId(val);
             });
@@ -1421,7 +1422,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 const routeInvList = invoices.filter(inv => {
                                     const invId = cleanId(inv.id);
                                     const invNum = cleanId(inv.invoiceNumber);
-                                    const targetIds = (route.invoice_ids || []).map((id: any) => {
+                                    const rawIds = route.invoice_ids || route.invoiceIds || [];
+                                    const targetIds = rawIds.map((id: any) => {
                                         const val = typeof id === 'object' && id !== null ? (id.id || id.invoice_id) : id;
                                         return cleanId(val);
                                     });

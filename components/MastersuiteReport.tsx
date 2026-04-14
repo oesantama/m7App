@@ -57,7 +57,7 @@ const MastersuiteReport: React.FC = () => {
     ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Mastersuite');
+    XLSX.utils.book_append_sheet(wb, ws, 'Hoja 1');
     const date = new Date().toISOString().split('T')[0];
     XLSX.writeFile(wb, `informe_mastersuite_${date}.xlsx`);
   };
