@@ -292,6 +292,13 @@ const GrupoInterView: React.FC = () => {
 
   const handlePdfUpload = async () => {
     if (!pdfFile) return;
+
+    // Validación preventiva de tamaño (80MB) para evitar errores HTTP 413
+    if (pdfFile.size > 80 * 1024 * 1024) {
+      toast.error('El PDF es demasiado grande (>80MB). Por favor, divida el documento o use una resolución de escaneo menor para asegurar el procesamiento.');
+      return;
+    }
+
     try {
       setLoading(true);
       setIsProcessing(true);

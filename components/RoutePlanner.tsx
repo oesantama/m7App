@@ -1522,32 +1522,34 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const cargoRows: string[][] = [];
       for (let i = 0; i < cargoItems.length; i += 4) {
         const a = cargoItems[i], b = cargoItems[i + 1], c = cargoItems[i + 2], d = cargoItems[i + 3];
-        cargoRows.push([
+        const row = [
           a.id, String(a.total), '',
           b ? b.id : '', b ? String(b.total) : '', '',
           c ? c.id : '', c ? String(c.total) : '', '',
           d ? d.id : '', d ? String(d.total) : '', '',
-        ]);
+        ];
+        cargoRows.push(row);
       }
       autoTable(pdf, {
         startY: y, margin: { left: ML, right: MR },
+        tableWidth: CW, // Forzar el ancho al margen de la tabla superior
         head: [['ID','CANT','NOTAS','ID','CANT','NOTAS','ID','CANT','NOTAS','ID','CANT','NOTAS']],
         body: cargoRows,
-        styles: { fontSize: 6, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
-        headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
+        styles: { fontSize: 5.5, cellPadding: 1, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+        headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 5.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
         columnStyles: {
           0:  { halign: 'center' },
-          1:  { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
-          2:  { cellWidth: 15 },
+          1:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
+          2:  { cellWidth: 12 },
           3:  { halign: 'center' },
-          4:  { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
-          5:  { cellWidth: 15 },
+          4:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
+          5:  { cellWidth: 12 },
           6:  { halign: 'center' },
-          7:  { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
-          8:  { cellWidth: 15 },
+          7:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
+          8:  { cellWidth: 12 },
           9:  { halign: 'center' },
-          10: { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
-          11: { cellWidth: 15 },
+          10: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
+          11: { cellWidth: 12 },
         },
         theme: 'grid',
         margin: { bottom: 28 }

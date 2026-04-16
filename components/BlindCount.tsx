@@ -69,7 +69,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
     
     const initial: { [id: string]: number } = {};
     docL.items.forEach(it => {
-      if ((it.countedQty || 0) > 0) initial[it.articleId] = Number(it.countedQty);
+      const val = Number(it.count2 || it.countedQty || 0);
+      if (val > 0) initial[it.articleId] = val;
     });
     return initial;
   });
@@ -77,7 +78,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [count1Data, setCount1Data] = useState<{ [articleId: string]: number }>(() => {
     const initial: { [id: string]: number } = {};
     docL.items.forEach(it => {
-      if (it.count1 > 0) initial[it.articleId] = Number(it.count1);
+      const val = Number(it.count1 || 0);
+      if (val > 0) initial[it.articleId] = val;
     });
     return initial;
   });
@@ -85,10 +87,10 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [itemObservations, setItemObservations] = useState<{ [articleId: string]: string }>(() => {
     const initial: { [id: string]: string } = {};
     docL.items.forEach(it => {
-      // M7-FIX: Solo cargar si es una nota REAL de inventario, no instrucciones de entrega
-      // Las instrucciones de entrega vienen en 'notes', no en 'inventoryNote'
-      if (it.inventoryNote && it.inventoryNote !== it.notes) {
-        initial[it.articleId] = it.inventoryNote;
+      // M7-FIX: Cargar desde inventoryNote o inventory_observation
+      const note = it.inventoryNote || (it as any).inventory_observation;
+      if (note && note !== it.notes) {
+        initial[it.articleId] = note;
       }
     });
     return initial;

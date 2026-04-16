@@ -3,7 +3,20 @@ import multer from 'multer';
 import * as grupoInterController from '../controllers/grupoInter.controller.js';
 
 const router = express.Router();
-const upload = multer(); // Usamos memoria para el buffer del Excel
+
+// Configuración de almacenamiento en disco para proteger la RAM del servidor
+const storage = multer.diskStorage({
+  destination: '/tmp', // Usamos el directorio temporal del sistema
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + '-' + file.originalname);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 } // Límite de 100MB por archivo
+});
 
 // Rutas de Gestión Grupo Inter
 router.post('/upload-excel', upload.single('file'), grupoInterController.uploadExcel);

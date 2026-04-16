@@ -221,7 +221,7 @@ async function generateContentWithRetry(model: any, promptData: any, sendProgres
 export const uploadExcel = async (req: any, res: Response): Promise<void> => {
     try {
         await ensureSchema();
-        if (!req.file) {
+        if (!req.file || !req.file.path) {
             res.status(400).json({ message: 'No se subió ningún archivo' });
             return;
         }
@@ -229,7 +229,9 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const { placa, fleteTotal, planilla } = req.body;
         const fleteTotalNum = parseFloat(fleteTotal) || 0;
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        // Leer archivo desde disco
+        const fileContent = fs.readFileSync(req.file.path);
+        const workbook = XLSX.read(fileContent, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
@@ -433,17 +435,25 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
     } catch (error) {
         console.error('[GRUPO-INTER] Error al subir Excel:', error);
         res.status(500).json({ message: 'Error interno al procesar el Excel' });
+    } finally {
+        // Limpieza de archivo temporal
+        if (req.file && req.file.path) {
+            fs.unlink(req.file.path, (err) => {
+                if (err) console.error('[GRUPO-INTER] Error borrando temporal Excel:', err);
+            });
+        }
     }
 };
 
 export const uploadManifestExcel = async (req: Request, res: Response): Promise<void> => {
     try {
-        if (!req.file) {
+        if (!req.file || !req.file.path) {
             res.status(400).json({ message: 'No se ha subido ningún archivo' });
             return;
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const fileContent = fs.readFileSync(req.file.path);
+        const workbook = XLSX.read(fileContent, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
@@ -565,9 +575,16 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
                 updatedCount++;
             }
         }
+        res.json({ message: `Complemento procesado: ${updatedCount} facturas actualizadas.` });
     } catch (error) {
         console.error('[GRUPO-INTER] Error en carga complementaria:', error);
         res.status(500).json({ message: 'Error interno al procesar el segundo archivo' });
+    } finally {
+        if (req.file && req.file.path) {
+            fs.unlink(req.file.path, (err) => {
+                if (err) console.error('[GRUPO-INTER] Error borrando temporal Manifest:', err);
+            });
+        }
     }
 };
 
@@ -576,12 +593,13 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
 
 export const processPDF = async (req: any, res: Response): Promise<void> => {
     try {
-        if (!req.file) {
+        if (!req.file || !req.file.path) {
             res.status(400).json({ message: 'No se subió ningún PDF' });
             return;
         }
 
-        const mainPdfDoc = await PDFDocument.load(req.file.buffer);
+        const fileContent = fs.readFileSync(req.file.path);
+        const mainPdfDoc = await PDFDocument.load(fileContent);
         const totalPages = mainPdfDoc.getPageCount();
 
         res.setHeader('Content-Type', 'application/x-ndjson');
@@ -626,7 +644,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         
         sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico para ${totalPages} páginas...` });
         
-        const fullPdfBase64 = req.file.buffer.toString('base64');
+        const fullPdfBase64 = fileContent.toString('base64');
 
         const prompt = `Actúa como un motor OCR estadístico de logística. 
         Analiza este documento PDF completo de ${totalPages} páginas.
@@ -698,10 +716,6 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches });
             res.end();
             return;
-        } catch (error: any) {
-            console.error('[ATOMIC-OCR] Error:', error);
-            sendProgress({ type: 'log', message: `❌ Error en el motor atómico: ${error.message}` });
-            sendProgress({ type: 'end', message: 'Motor Atómico Interrumpido.', matches: 0 });
         }
         res.end();
     } catch (error) {
@@ -711,6 +725,12 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         } else {
             res.write(JSON.stringify({ type: 'end', message: 'Fallo interno crítico', matches: 0 }) + '\n');
             res.end();
+        }
+    } finally {
+        if (req.file && req.file.path) {
+            fs.unlink(req.file.path, (err) => {
+                if (err) console.error('[GRUPO-INTER] Error borrando temporal PDF:', err);
+            });
         }
     }
 };

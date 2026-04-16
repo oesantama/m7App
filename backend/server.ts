@@ -38,9 +38,9 @@ app.use(cors({
   credentials: true,
 }));
 
-// Limit request body a 10MB (antes 100MB — superficie de ataque innecesaria)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Limit request body a 50MB (para permitir carga de PDFs escaneados)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Request-ID middleware: cada request lleva un ID único para trazabilidad en logs
 app.use((req: any, _res, next) => {
