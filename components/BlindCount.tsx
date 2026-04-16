@@ -670,20 +670,24 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const proceedToFinalize = () => {
     setShowConfirmDialog(false);
     
-    // 1. Identificar el ID del tipo de notificación "INVENTARIO AJOVER"
-    const typeId = masterTipoNotificacion.find(t => 
-      t.name?.trim().toUpperCase() === 'INVENTARIO AJOVER'
-    )?.id;
+    // 1. Identificar todos los IDs posibles del tipo de notificación "INVENTARIO AJOVER"
+    // Usamos filter en lugar de find para capturar múltiples coincidencias y añadimos TGN-01 por requisito
+    const matchedTypes = masterTipoNotificacion.filter(t => 
+      t.name?.trim().toUpperCase() === 'INVENTARIO AJOVER' ||
+      t.id === 'TGN-01'
+    );
+    const typeIds = matchedTypes.map(t => t.id);
 
-    // 2. Buscar si hay alertas activas de ese tipo con correos válidos (Validación Mayúsculas/Minúsculas)
+    // 2. Buscar si hay alertas activas vinculadas a cualquiera de esos IDs
     const activeNotifs = masterNotificaciones.filter(n => {
-      const isCorrectType = n.tipo_notificacion_id === typeId || n.tipoNotificacionId === typeId;
+      const typeId = n.tipo_notificacion_id || n.tipoNotificacionId;
+      const isCorrectType = typeIds.includes(typeId);
       const isActive = n.statusId === 'EST-01' || n.status?.toUpperCase() === 'ACTIVO' || n.statusId === 'ACTIVO';
       return isCorrectType && isActive && n.notificationEmail;
     });
 
     if (activeNotifs.length === 0) {
-      // Fallback: búsqueda por nombre si no se encontró por ID de tipo (por seguridad)
+      // Fallback: búsqueda por nombre si no se encontró por ID técnico
       const fallbackNotif = masterNotificaciones.find(n =>
         n.name?.trim().toUpperCase().includes('INVENTARIO') &&
         n.notificationEmail &&
@@ -696,8 +700,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
       }
       finalizeProcess(fallbackNotif.notificationEmail);
     } else {
-      // Si hay al menos una activa del tipo correcto, el servidor enviará a todos
-      // Le mandamos el primero como referencia pero el backend iterará por todos los del tipo
+      // Si hay activas, enviamos la primera (el backend se encargará de notificar al grupo configurado)
       finalizeProcess(activeNotifs[0].notificationEmail!);
     }
   };
