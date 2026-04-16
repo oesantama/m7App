@@ -659,65 +659,62 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         4. Si no hay coincidencias, responde: {"matches": []}
         5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
 
-        try {
-            const result = await generateContentWithRetry(visionModel, [
-                { text: prompt },
-                { inlineData: { data: fullPdfBase64, mimeType: "application/pdf" } }
-            ], sendProgress, 3);
+        const result = await generateContentWithRetry(visionModel, [
+            { text: prompt },
+            { inlineData: { data: fullPdfBase64, mimeType: "application/pdf" } }
+        ], sendProgress, 3);
 
-            const response = await result.response;
-            const textResponse = response.text().trim();
-            
-            const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) throw new Error("Gemini no devolvió un formato JSON válido.");
-            
-            const data = JSON.parse(jsonMatch[0]);
-            const foundMatches = data.matches || [];
-            
-            sendProgress({ type: 'log', message: `🔍 Inteligencia detectó ${foundMatches.length} números en el documento.` });
+        const response = await result.response;
+        const textResponse = response.text().trim();
+        
+        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("Gemini no devolvió un formato JSON válido.");
+        
+        const data = JSON.parse(jsonMatch[0]);
+        const foundMatches = data.matches || [];
+        
+        sendProgress({ type: 'log', message: `🔍 Inteligencia detectó ${foundMatches.length} números en el documento.` });
 
-            let finalMatches = 0;
-            for (const item of foundMatches) {
-                // Limpiamos lo que traiga gemini por seguridad
-                const matchedNum = String(item.doc).replace(/\D/g, '');
-                const originalDocId = numericDocsMap.get(matchedNum);
-                const pageIndex = item.page - 1;
+        let finalMatches = 0;
+        for (const item of foundMatches) {
+            // Limpiamos lo que traiga gemini por seguridad
+            const matchedNum = String(item.doc).replace(/\D/g, '');
+            const originalDocId = numericDocsMap.get(matchedNum);
+            const pageIndex = item.page - 1;
 
-                if (pageIndex >= 0 && pageIndex < totalPages && originalDocId) {
-                    sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${item.page}...` });
-                    
-                    // Extraer solo la página específica para guardarla como acta
-                    const subPdf = await PDFDocument.create();
-                    const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [pageIndex]);
-                    subPdf.addPage(copiedPage);
-                    const rawBase64 = await subPdf.saveAsBase64();
-                    const base64Page = `data:application/pdf;base64,${rawBase64}`;
+            if (pageIndex >= 0 && pageIndex < totalPages && originalDocId) {
+                sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${item.page}...` });
+                
+                // Extraer solo la página específica para guardarla como acta
+                const subPdf = await PDFDocument.create();
+                const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [pageIndex]);
+                subPdf.addPage(copiedPage);
+                const rawBase64 = await subPdf.saveAsBase64();
+                const base64Page = `data:application/pdf;base64,${rawBase64}`;
 
-                    const username = req.body.username || 'System OCR';
+                const username = req.body.username || 'System OCR';
 
+                await pool.query(
+                    "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
+                    [base64Page, username, originalDocId]
+                );
+
+                // Registrar en histórico
+                const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
+                if (pedRes.rows.length > 0) {
                     await pool.query(
-                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
-                        [base64Page, username, originalDocId]
+                        "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', 'PDF Procesado Automáticamente', 'System OCR')",
+                        [pedRes.rows[0].id]
                     );
-
-                    // Registrar en histórico
-                    const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
-                    if (pedRes.rows.length > 0) {
-                        await pool.query(
-                            "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', 'PDF Procesado Automáticamente', 'System OCR')",
-                            [pedRes.rows[0].id]
-                        );
-                    }
-                    finalMatches++;
-                    sendProgress({ type: 'progress', page: item.page, percent: Math.round((finalMatches/foundMatches.length)*100) });
                 }
+                finalMatches++;
+                sendProgress({ type: 'progress', page: item.page, percent: Math.round((finalMatches/foundMatches.length)*100) });
             }
-
-            sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches });
-            res.end();
-            return;
         }
+
+        sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches });
         res.end();
+        return;
     } catch (error) {
         console.error('[GRUPO-INTER] Error Crítico de Procesamiento:', error);
         if (!res.headersSent) {
