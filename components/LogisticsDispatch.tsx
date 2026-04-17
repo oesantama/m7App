@@ -526,16 +526,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     styles: { fontSize: 5.5, cellPadding: 1, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
                     headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 5.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
                     columnStyles: {
-                        0:  { halign: 'center' },
+                        0:  { cellWidth: 50.75, halign: 'center' },
                         1:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
                         2:  { cellWidth: 12 },
-                        3:  { halign: 'center' },
+                        3:  { cellWidth: 50.75, halign: 'center' },
                         4:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
                         5:  { cellWidth: 12 },
-                        6:  { halign: 'center' },
+                        6:  { cellWidth: 50.75, halign: 'center' },
                         7:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
                         8:  { cellWidth: 12 },
-                        9:  { halign: 'center' },
+                        9:  { cellWidth: 50.75, halign: 'center' },
                         10: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
                         11: { cellWidth: 12 },
                     },
@@ -1534,14 +1534,26 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* BOTÓN EDITAR PLACA - FLOTANTE */}
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); setShowReassignModal({ isOpen: true, route }); }}
-                                            className="absolute -top-2 -right-2 w-8 h-8 bg-white border border-slate-200 text-slate-400 rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-600 hover:text-white hover:scale-110 transition-all z-10"
-                                            title="Editar Placa / Reasignar"
-                                        >
-                                            <Icons.Settings className="w-4 h-4" />
-                                        </button>
+                                        {/* BOTÓN EDITAR PLACA - FLOTANTE (Solo disponible para rutas de hoy) */}
+                                        {(() => {
+                                            const rDate = new Date(route.createdAt || route.created_at || Date.now());
+                                            const today = new Date();
+                                            const isToday = rDate.getDate() === today.getDate() && 
+                                                           rDate.getMonth() === today.getMonth() && 
+                                                           rDate.getFullYear() === today.getFullYear();
+                                            
+                                            if (!isToday) return null;
+
+                                            return (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setShowReassignModal({ isOpen: true, route }); }}
+                                                    className="absolute -top-2 -right-2 w-8 h-8 bg-white border border-slate-200 text-slate-400 rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-600 hover:text-white hover:scale-110 transition-all z-10"
+                                                    title="Editar Placa / Reasignar"
+                                                >
+                                                    <Icons.Settings className="w-4 h-4" />
+                                                </button>
+                                            );
+                                        })()}
                                     </div>
                                 );
                             })
