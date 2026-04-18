@@ -162,12 +162,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         routes.find(r => r.route_id === selectedRouteId) ?? null,
     [routes, selectedRouteId]);
 
-    // Facturas de la ruta seleccionada (filtra por placa; si no hay filtro muestra todas)
+    // Facturas visibles en la lista inferior:
+    // - sin filtro → solo sin asignar (sin placa)
+    // - con ruta seleccionada → solo las de esa placa
     const visibleInvoices = useMemo(() => {
-        if (!selectedRoute) return invoices;
-        return invoices.filter(inv =>
-            inv.vehicle_plate === selectedRoute.plate || !inv.vehicle_plate
-        );
+        if (!selectedRoute) return invoices.filter(inv => !inv.vehicle_plate);
+        return invoices.filter(inv => inv.vehicle_plate === selectedRoute.plate);
     }, [invoices, selectedRoute]);
 
     // ── Métricas globales del documento ───────────────────────────────────────
@@ -512,7 +512,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                                                 {selectedRoute
                                                     ? `Facturas · ${selectedRoute.plate} (${visibleInvoices.length})`
-                                                    : `Todas las facturas (${invoices.length})`}
+                                                    : unassigned > 0
+                                                        ? `⚠️ Sin asignar (${visibleInvoices.length})`
+                                                        : 'Sin facturas sin asignar'}
                                             </p>
                                             {visibleInvoices.some(i => i.forma_pago) && (
                                                 <span className="text-[8px] font-bold text-emerald-600">
@@ -523,9 +525,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
                                         {visibleInvoices.length === 0 ? (
                                             <div className="text-center py-8 bg-white rounded-2xl border border-slate-100">
-                                                <p className="text-2xl mb-2">📄</p>
+                                                <p className="text-2xl mb-2">{selectedRouteId ? '📄' : '✅'}</p>
                                                 <p className="text-xs text-slate-400 font-bold">
-                                                    {selectedRouteId ? 'Sin facturas para esta ruta' : 'Sin facturas en este documento'}
+                                                    {selectedRouteId
+                                                        ? 'Sin facturas para esta ruta'
+                                                        : 'Todas las facturas tienen ruta asignada'}
                                                 </p>
                                             </div>
                                         ) : (
@@ -647,7 +651,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     onClose={() => setModalRoute(null)}
                     route={modalRoute}
                     invoices={invoices.filter(inv =>
-                        inv.vehicle_plate === modalRoute.plate || !inv.vehicle_plate
+                        inv.vehicle_plate === modalRoute.plate
                     )}
                     documentId={selectedDoc.id}
                     currentUserId={user?.id || ''}
