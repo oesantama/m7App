@@ -59,6 +59,7 @@ const TrainingAdmin = lazyWithRetry(() => import('./components/TrainingAdmin'));
 const AjoverDashboard = lazyWithRetry(() => import('./components/AjoverDashboard'));
 const PublicAttendanceForm = lazyWithRetry(() => import('./components/PublicAttendanceForm'));
 const ConciliacionFacturas = lazyWithRetry(() => import('./components/ConciliacionFacturas'));
+const ConsultaFacturas = lazyWithRetry(() => import('./components/ConsultaFacturas'));
 
 
 // Import Admin Module
@@ -923,6 +924,8 @@ const App: React.FC = () => {
         );
       case 'conciliacion':
         return <ConciliacionFacturas user={user!} />;
+      case 'consulta-facturas':
+        return <ConsultaFacturas />;
       case 'capacitaciones':
         return <CentroCapacitaciones user={user!} />;
       case 'chatbot':

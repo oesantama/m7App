@@ -875,6 +875,168 @@ export const getInvoices = async (req: Request, res: Response) => {
   }
 };
 
+// ─── GET /documents/invoice-traceability ─────────────────────────────────────
+// Trazabilidad completa de una factura: ingreso, ruta, entrega, conciliación.
+export const getInvoiceTraceability = async (req: Request, res: Response) => {
+  try {
+    const { invoiceNumber } = req.query;
+    if (!invoiceNumber) return res.status(400).json({ success: false, error: 'invoiceNumber es requerido' });
+
+    const inv = String(invoiceNumber).trim();
+
+    // 1. Datos base de la factura
+    const invoiceRes = await pool.query(`
+      SELECT
+        TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) AS invoice_number,
+        di.order_number,
+        di.customer_name,
+        di.address,
+        di.city,
+        di.document_id,
+        di.item_status,
+        est_item.name  AS item_status_name,
+        dl.external_doc_id,
+        dl.plan_type,
+        dl.client_id,
+        dl.created_at  AS received_at,
+        u_recv.name    AS received_by_name,
+        dl.inventory_date,
+        dl.inventory_user,
+        dl.status      AS doc_status,
+        est_doc.name   AS doc_status_name,
+        dl.vehicle_plate,
+        dl.codplan,
+        dl.delivery_date,
+        SUM(di.expected_qty) AS total_qty,
+        SUM(di.received_qty) AS received_qty
+      FROM document_items di
+      LEFT JOIN documents_l   dl       ON dl.id = di.document_id
+      LEFT JOIN estados        est_item ON est_item.id = di.item_status
+      LEFT JOIN estados        est_doc  ON est_doc.id  = dl.status
+      LEFT JOIN users          u_recv   ON u_recv.id   = dl.created_by
+      WHERE TRIM(UPPER(di.invoice))      = TRIM(UPPER($1))
+         OR TRIM(UPPER(di.order_number)) = TRIM(UPPER($1))
+      GROUP BY
+        di.invoice, di.order_number, di.customer_name, di.address, di.city,
+        di.document_id, di.item_status, est_item.name,
+        dl.external_doc_id, dl.plan_type, dl.client_id, dl.created_at,
+        u_recv.name, dl.inventory_date, dl.inventory_user,
+        dl.status, est_doc.name, dl.vehicle_plate, dl.codplan, dl.delivery_date
+      ORDER BY dl.created_at DESC
+      LIMIT 1
+    `, [inv]);
+
+    if (!invoiceRes.rows.length) {
+      return res.status(404).json({ success: false, error: 'Factura no encontrada' });
+    }
+
+    const invoiceData = invoiceRes.rows[0];
+
+    // 2. Ítems de la factura
+    const itemsRes = await pool.query(`
+      SELECT
+        di.article_id,
+        COALESCE(art.name, di.article_id) AS article_name,
+        di.expected_qty,
+        di.received_qty,
+        di.item_status,
+        est.name  AS item_status_name,
+        di.novedad,
+        di.observation,
+        di.unit
+      FROM document_items di
+      LEFT JOIN articles art ON art.id = di.article_id
+      LEFT JOIN estados  est ON est.id = di.item_status
+      WHERE di.document_id = $1
+        AND (TRIM(UPPER(di.invoice)) = TRIM(UPPER($2)) OR TRIM(UPPER(di.order_number)) = TRIM(UPPER($2)))
+      ORDER BY di.article_id
+    `, [invoiceData.document_id, inv]);
+
+    // 3. Asignación a ruta
+    const routeRes = await pool.query(`
+      SELECT
+        r.id::text                            AS route_id,
+        r.created_at                          AS assigned_at,
+        v.plate,
+        d.name                                AS driver_name,
+        d.document_number                     AS driver_document,
+        est.name                              AS route_status_name,
+        r.status_id
+      FROM route_invoices ri
+      JOIN  routes   r   ON r.id::text = ri.route_id::text
+      LEFT JOIN vehicles v   ON v.id::text = r.vehicle_id::text
+      LEFT JOIN drivers  d   ON d.id::text = r.driver_id::text
+      LEFT JOIN estados  est ON est.id = r.status_id
+      WHERE TRIM(UPPER(ri.invoice_id)) = TRIM(UPPER($1))
+         OR ri.invoice_id = CONCAT($2, '_', $1)
+      ORDER BY r.created_at DESC
+      LIMIT 1
+    `, [inv, invoiceData.document_id]);
+
+    // 4. Despacho (dispatch_assignments)
+    const dispatchRes = await pool.query(`
+      SELECT
+        da.id::text                           AS dispatch_id,
+        da.created_at                         AS dispatched_at,
+        da.status                             AS dispatch_status,
+        v.plate,
+        d.name                                AS driver_name
+      FROM dispatch_assignments da
+      LEFT JOIN assignments a ON da.driver_id::text = a.driver_id::text AND a.is_active = true
+      LEFT JOIN vehicles    v ON v.id::text = a.vehicle_id::text
+      LEFT JOIN drivers     d ON d.id::text = da.driver_id::text
+      WHERE TRIM(UPPER(da.invoice_id)) = TRIM(UPPER($1))
+         OR da.invoice_id = CONCAT($2, '_', $1)
+      ORDER BY da.created_at DESC
+      LIMIT 1
+    `, [inv, invoiceData.document_id]);
+
+    // 5. Conciliación
+    const concRes = await pool.query(`
+      SELECT
+        ic.forma_pago,
+        ic.valor,
+        ic.banco,
+        ic.comprobante,
+        ic.fecha_pago,
+        ic.numero_cheque,
+        ic.es_devolucion,
+        ic.created_at     AS conciliado_at,
+        u.name            AS conciliado_por_nombre,
+        ic.conductor_name,
+        ic.vehicle_plate
+      FROM invoice_conciliations ic
+      LEFT JOIN users u ON u.id = ic.conciliado_por
+      WHERE TRIM(UPPER(ic.invoice_number)) = TRIM(UPPER($1))
+      ORDER BY ic.created_at DESC
+      LIMIT 1
+    `, [inv]);
+
+    // 6. Pago registrado (document_l_payments)
+    const paymentRes = await pool.query(`
+      SELECT metodo_pago, vmetodo, banco, referencia
+      FROM document_l_payments
+      WHERE TRIM(UPPER(invoice)) = TRIM(UPPER($1))
+      LIMIT 1
+    `, [inv]);
+
+    res.json({
+      success: true,
+      data: {
+        invoice:      invoiceData,
+        items:        itemsRes.rows,
+        route:        routeRes.rows[0]    || null,
+        dispatch:     dispatchRes.rows[0] || null,
+        conciliation: concRes.rows[0]     || null,
+        payment:      paymentRes.rows[0]  || null,
+      }
+    });
+  } catch (err: any) {
+    console.error('[TRACEABILITY] getInvoiceTraceability error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 export const processDocumentLPayment = async (req: Request, res: Response) => {
   const { documentId, payments, userId } = req.body;
   const client = await pool.connect();

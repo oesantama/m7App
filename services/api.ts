@@ -449,6 +449,9 @@ export const api = {
     return fetchJson(url);
   },
 
+  getInvoiceTraceability: (invoiceNumber: string) =>
+    fetchJson(`${API_URL}/documents/invoice-traceability?invoiceNumber=${encodeURIComponent(invoiceNumber)}`),
+
   resendInventoryNotification: (docId: string, targetEmail: string) => fetchJson(`${API_URL}/documents/resend-notification`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

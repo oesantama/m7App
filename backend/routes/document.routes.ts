@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2 } from '../controllers/document.controller.js';
+import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2, getInvoiceTraceability } from '../controllers/document.controller.js';
 import multer from 'multer';
 
 import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
@@ -73,5 +73,16 @@ router.get('/mastersuite-report', (req, res, next) => {
 
 router.post('/parse-pdf', authenticateToken, upload.single('file'), parsePdfRemisiones);
 router.patch('/consolidated-count2', requireAuditEdit, updateConsolidatedCount2);
+
+// Trazabilidad completa de una factura por número
+router.get('/invoice-traceability', (req, res, next) => {
+  const user = (req as any).user;
+  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const hasPerm = user?.permissions?.some((p: any) =>
+    ['PAG-16', 'PAG-15', 'PAG-17', 'PAG-30', 'PAG-01'].includes(p.module) && p.actions.includes('view')
+  );
+  if (isSuper || hasPerm) return next();
+  res.status(403).json({ success: false, error: 'Permiso insuficiente' });
+}, getInvoiceTraceability);
 
 export default router;
