@@ -31,6 +31,7 @@ interface InvoiceRow {
     invoice_value?: number;
     invoice_metodo_pago?: string;
     item_status?: string;
+    route_vehicle_plate?: string;
 }
 
 interface RouteGroup {

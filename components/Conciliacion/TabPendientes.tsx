@@ -60,6 +60,7 @@ interface InvoiceRow {
     invoice_value?: number;
     invoice_metodo_pago?: string;
     item_status?: string;
+    route_vehicle_plate?: string;  // placa asignada desde route_invoices (antes de conciliar)
 }
 
 interface Props {
@@ -111,8 +112,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [showReportInput, setShowReportInput] = useState(false);
     const [reportEmail, setReportEmail]     = useState('');
     const [sendingReport, setSendingReport] = useState(false);
-    const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-    const [modalRoute, setModalRoute]           = useState<RouteGroup | null>(null);
+    const [modalRoute, setModalRoute]       = useState<RouteGroup | null>(null);
+    const [searchInvoice, setSearchInvoice] = useState('');
 
     // ── Carga detalle del documento ───────────────────────────────────────────
     const loadDocDetail = useCallback(async (doc: DocSummary) => {
@@ -120,7 +121,6 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         setInvoices([]);
         setRoutes([]);
         setUnassigned(0);
-        setSelectedRouteId(null);
         setShowReportInput(false);
         setLoadingInv(true);
         try {
@@ -158,17 +158,16 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             d.conductor_name?.toLowerCase().includes(searchPend.toLowerCase())
         ), [docs, searchPend]);
 
-    const selectedRoute = useMemo(() =>
-        routes.find(r => r.route_id === selectedRouteId) ?? null,
-    [routes, selectedRouteId]);
-
-    // Facturas visibles en la lista inferior:
-    // - sin filtro → solo sin asignar (sin placa)
-    // - con ruta seleccionada → solo las de esa placa
+    // Lista inferior: solo facturas sin asignar, filtradas por búsqueda
     const visibleInvoices = useMemo(() => {
-        if (!selectedRoute) return invoices.filter(inv => !inv.vehicle_plate);
-        return invoices.filter(inv => inv.vehicle_plate === selectedRoute.plate);
-    }, [invoices, selectedRoute]);
+        const unassigned = invoices.filter(inv => !inv.route_vehicle_plate);
+        if (!searchInvoice.trim()) return unassigned;
+        const q = searchInvoice.toLowerCase();
+        return unassigned.filter(inv =>
+            inv.invoice_number?.toLowerCase().includes(q) ||
+            inv.customer_name?.toLowerCase().includes(q)
+        );
+    }, [invoices, searchInvoice]);
 
     // ── Métricas globales del documento ───────────────────────────────────────
     const stats = useMemo(() => {
@@ -388,26 +387,16 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                                                     Placas asignadas ({routes.length})
                                                 </p>
-                                                {selectedRouteId && (
-                                                    <button onClick={() => setSelectedRouteId(null)}
-                                                        className="text-[8px] font-black text-slate-400 hover:text-rose-500 uppercase tracking-widest transition-colors">
-                                                        ✕ Quitar filtro
-                                                    </button>
-                                                )}
                                             </div>
                                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                                                 {routes.map(route => {
-                                                    const isSelected = selectedRouteId === route.route_id;
                                                     const pct = route.invoice_count > 0
                                                         ? Math.round((route.legalizadas / route.invoice_count) * 100) : 0;
                                                     return (
                                                         <div key={route.route_id}
-                                                            className={`rounded-2xl border-2 transition-all overflow-hidden
-                                                                ${isSelected
-                                                                    ? 'border-emerald-400 shadow-md shadow-emerald-100'
-                                                                    : 'border-slate-100 bg-white'}`}>
+                                                            className="rounded-2xl border-2 border-slate-100 bg-white transition-all overflow-hidden hover:border-slate-200">
                                                             {/* Cabecera de la tarjeta */}
-                                                            <div className={`px-4 py-3 ${isSelected ? 'bg-emerald-50' : 'bg-white'}`}>
+                                                            <div className="px-4 py-3 bg-white">
                                                                 <div className="flex items-start justify-between gap-2">
                                                                     <div className="min-w-0">
                                                                         <p className="text-base font-black text-slate-900 uppercase tracking-tight leading-none">
@@ -472,19 +461,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                 )}
                                                             </div>
 
-                                                            {/* Botones — filtrar + conciliar */}
-                                                            <div className="px-4 pb-3 pt-2 flex gap-2">
-                                                                <button
-                                                                    onClick={() => setSelectedRouteId(isSelected ? null : route.route_id)}
-                                                                    className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
-                                                                        ${isSelected
-                                                                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                                                                    {isSelected ? '✓ Filtrando' : 'Ver Facturas'}
-                                                                </button>
+                                                            {/* Botón conciliar */}
+                                                            <div className="px-4 pb-3 pt-2">
                                                                 <button
                                                                     onClick={() => setModalRoute(route)}
-                                                                    className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-emerald-600 transition-all">
+                                                                    className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-emerald-600 transition-all">
                                                                     Conciliar →
                                                                 </button>
                                                             </div>
@@ -506,15 +487,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         </div>
                                     )}
 
-                                    {/* ── Lista de facturas ─────────────────── */}
+                                    {/* ── Facturas sin asignar ─────────────── */}
+                                    {unassigned > 0 && (
                                     <div>
                                         <div className="flex items-center justify-between mb-2">
                                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                                {selectedRoute
-                                                    ? `Facturas · ${selectedRoute.plate} (${visibleInvoices.length})`
-                                                    : unassigned > 0
-                                                        ? `⚠️ Sin asignar (${visibleInvoices.length})`
-                                                        : 'Sin facturas sin asignar'}
+                                                ⚠️ Sin asignar ({visibleInvoices.length}{searchInvoice ? ` de ${invoices.filter(i => !i.route_vehicle_plate).length}` : ''})
                                             </p>
                                             {visibleInvoices.some(i => i.forma_pago) && (
                                                 <span className="text-[8px] font-bold text-emerald-600">
@@ -523,14 +501,21 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             )}
                                         </div>
 
+                                        {/* Búsqueda */}
+                                        <div className="relative mb-2">
+                                            <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                                            <input
+                                                value={searchInvoice}
+                                                onChange={e => setSearchInvoice(e.target.value)}
+                                                placeholder="Buscar por factura o cliente…"
+                                                className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] outline-none focus:border-emerald-500"
+                                            />
+                                        </div>
+
                                         {visibleInvoices.length === 0 ? (
                                             <div className="text-center py-8 bg-white rounded-2xl border border-slate-100">
-                                                <p className="text-2xl mb-2">{selectedRouteId ? '📄' : '✅'}</p>
-                                                <p className="text-xs text-slate-400 font-bold">
-                                                    {selectedRouteId
-                                                        ? 'Sin facturas para esta ruta'
-                                                        : 'Todas las facturas tienen ruta asignada'}
-                                                </p>
+                                                <p className="text-2xl mb-2">🔍</p>
+                                                <p className="text-xs text-slate-400 font-bold">Sin resultados para la búsqueda</p>
                                             </div>
                                         ) : (
                                             <div className="space-y-2">
@@ -622,6 +607,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             </div>
                                         )}
                                     </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -651,7 +637,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     onClose={() => setModalRoute(null)}
                     route={modalRoute}
                     invoices={invoices.filter(inv =>
-                        inv.vehicle_plate === modalRoute.plate
+                        inv.route_vehicle_plate === modalRoute.plate
                     )}
                     documentId={selectedDoc.id}
                     currentUserId={user?.id || ''}

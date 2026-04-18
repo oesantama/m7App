@@ -154,6 +154,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
         const doc = docRes.rows[0];
 
         // Facturas únicas del documento con sus ítems y datos de pago precargados
+        // route_vehicle_plate: placa asignada vía route_invoices (independiente de si está conciliada)
         const invoicesRes = await pool.query(`
             SELECT
                 di.invoice                                  AS invoice_number,
@@ -177,13 +178,21 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 u.name                                      AS conciliado_por_nombre,
                 MAX(p.vmetodo)                              AS invoice_value,
                 MAX(p.metodo_pago)                          AS invoice_metodo_pago,
-                MAX(di.item_status)                         AS item_status
+                MAX(di.item_status)                         AS item_status,
+                -- Placa asignada desde route_invoices (disponible antes de conciliar)
+                MAX(COALESCE(v2.plate, r2.vehicle_id::text)) AS route_vehicle_plate
             FROM document_items di
             LEFT JOIN invoice_conciliations ic
                 ON ic.document_id = $1 AND ic.invoice_number = di.invoice
             LEFT JOIN users u ON u.id = ic.conciliado_por
             LEFT JOIN document_l_payments p
                 ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
+            -- Asignación de ruta para obtener la placa antes de conciliar
+            LEFT JOIN route_invoices ri2
+                ON (TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = TRIM(ri2.invoice_id)
+                    OR CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = ri2.invoice_id)
+            LEFT JOIN routes r2 ON r2.id::text = ri2.route_id::text
+            LEFT JOIN vehicles v2 ON v2.id::text = r2.vehicle_id::text
             WHERE di.document_id = $1
               AND di.invoice IS NOT NULL
               AND di.invoice <> ''
