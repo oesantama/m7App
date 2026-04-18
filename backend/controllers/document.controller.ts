@@ -1005,8 +1005,9 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
     `, [inv]);
 
     // 6. Pago registrado (document_l_payments)
+    // SELECT * para evitar errores por schema drift (banco/referencia no existen en prod)
     const paymentRes = await pool.query(`
-      SELECT metodo_pago, vmetodo, banco, referencia
+      SELECT *
       FROM document_l_payments
       WHERE TRIM(UPPER(invoice)) = TRIM(UPPER($1))
       LIMIT 1
