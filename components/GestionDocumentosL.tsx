@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { DocumentL, User, DocStatus, MasterRecord, Invoice, UserRole, getStatusLabel } from '../types';
 import { api } from '../services/api';
 import ConsultasDocumentosL from './ConsultasDocumentosL';
+import ConsultaFacturas from './ConsultaFacturas';
 import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
@@ -35,7 +36,7 @@ interface GestionDocumentosLProps {
 
 
 const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invoices, user, masterEstados, onDocumentsChange, onRefresh }) => {
-  const [activeTab, setActiveTab] = useState<'cargue' | 'consultas'>('cargue');
+  const [activeTab, setActiveTab] = useState<'cargue' | 'consultas' | 'consulta-facturas'>('cargue');
   const [activeModalTab, setActiveModalTab] = useState<'reception' | 'audit' | 'payments'>('reception');
   const [preview, setPreview] = useState<{ fileName: string; mapped: PreviewDocument[]; type: string } | null>(null);
   const [selectedPendingDoc, setSelectedPendingDoc] = useState<DocumentL | null>(null);
@@ -709,6 +710,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
          <div className="flex bg-slate-50 p-1 rounded-xl shadow-inner border border-slate-100">
             <button onClick={()=>setActiveTab('cargue')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'cargue' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Cargue Masivo</button>
             <button onClick={()=>setActiveTab('consultas')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consultas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta Histórica</button>
+            <button onClick={()=>setActiveTab('consulta-facturas')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consulta-facturas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta de Facturas</button>
          </div>
       </div>
 
@@ -899,14 +901,16 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                 </div>
                )}
             </div>
-          ) : (
-            <ConsultasDocumentosL 
-              documents={documents} 
-              invoices={invoices} 
-              user={user} 
-              masterEstados={masterEstados} 
+          ) : activeTab === 'consultas' ? (
+            <ConsultasDocumentosL
+              documents={documents}
+              invoices={invoices}
+              user={user}
+              masterEstados={masterEstados}
               onRefresh={onRefresh}
             />
+          ) : (
+            <ConsultaFacturas />
           )}
         </div>
       </div>
