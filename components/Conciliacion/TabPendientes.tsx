@@ -114,6 +114,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [sendingReport, setSendingReport] = useState(false);
     const [modalRoute, setModalRoute]       = useState<RouteGroup | null>(null);
     const [searchInvoice, setSearchInvoice] = useState('');
+    const [searchRoute, setSearchRoute]     = useState('');
 
     // ── Carga detalle del documento ───────────────────────────────────────────
     const loadDocDetail = useCallback(async (doc: DocSummary) => {
@@ -157,6 +158,16 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             d.vehicle_plate?.toLowerCase().includes(searchPend.toLowerCase()) ||
             d.conductor_name?.toLowerCase().includes(searchPend.toLowerCase())
         ), [docs, searchPend]);
+
+    // Rutas filtradas por búsqueda de placa/conductor
+    const filteredRoutes = useMemo(() => {
+        if (!searchRoute.trim()) return routes;
+        const q = searchRoute.toLowerCase();
+        return routes.filter(r =>
+            r.plate?.toLowerCase().includes(q) ||
+            r.driver_name?.toLowerCase().includes(q)
+        );
+    }, [routes, searchRoute]);
 
     // Lista inferior: solo facturas sin asignar, filtradas por búsqueda
     const visibleInvoices = useMemo(() => {
@@ -385,11 +396,21 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                                    Placas asignadas ({routes.length})
+                                                    Placas asignadas ({filteredRoutes.length}{searchRoute ? ` de ${routes.length}` : ''})
                                                 </p>
                                             </div>
+                                            {/* Búsqueda por placa */}
+                                            <div className="relative mb-3">
+                                                <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                                                <input
+                                                    value={searchRoute}
+                                                    onChange={e => setSearchRoute(e.target.value)}
+                                                    placeholder="Buscar por placa o conductor…"
+                                                    className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] outline-none focus:border-emerald-500"
+                                                />
+                                            </div>
                                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                                                {routes.map(route => {
+                                                {filteredRoutes.map(route => {
                                                     const pct = route.invoice_count > 0
                                                         ? Math.round((route.legalizadas / route.invoice_count) * 100) : 0;
                                                     return (
