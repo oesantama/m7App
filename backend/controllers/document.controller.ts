@@ -940,9 +940,8 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
         di.expected_qty,
         di.received_qty,
         di.item_status,
-        est.name  AS item_status_name,
-        di.novedad,
-        di.observation,
+        est.name      AS item_status_name,
+        di.observation AS novedad,
         di.unit
       FROM document_items di
       LEFT JOIN articles art ON art.id = di.article_id

@@ -39,6 +39,18 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                 COUNT(DISTINCT ic.invoice_number)                            AS conciliadas,
                 COUNT(DISTINCT di.invoice) - COUNT(DISTINCT ic.invoice_number) AS pendientes,
 
+                -- Efectivo y crédito desde document_l_payments
+                COALESCE(SUM(
+                    CASE WHEN UPPER(TRIM(p.metodo_pago)) LIKE '%EFECTIVO%' OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
+                    THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
+                ), 0)                                                        AS total_efectivo,
+                COALESCE(SUM(
+                    CASE WHEN p.metodo_pago IS NOT NULL
+                         AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFECTIVO%'
+                         AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFE%'
+                    THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
+                ), 0)                                                        AS total_credito,
+
                 -- Conductor y placa desde dispatch (última asignación del doc)
                 (SELECT da.driver_id FROM dispatch_assignments da
                  WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_id,
@@ -49,6 +61,7 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
             FROM documents_l dl
             LEFT JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
             LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
+            LEFT JOIN document_l_payments p ON p.invoice IS NOT NULL AND TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
 
             ${where}
             GROUP BY dl.id
@@ -162,9 +175,9 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 ic.vehicle_plate,
                 ic.created_at                               AS conciliado_at,
                 u.name                                      AS conciliado_por_nombre,
-                -- Valor e información de pago pre-cargada desde document_l_payments
                 MAX(p.vmetodo)                              AS invoice_value,
-                MAX(p.metodo_pago)                          AS invoice_banco
+                MAX(p.metodo_pago)                          AS invoice_metodo_pago,
+                MAX(di.item_status)                         AS item_status
             FROM document_items di
             LEFT JOIN invoice_conciliations ic
                 ON ic.document_id = $1 AND ic.invoice_number = di.invoice
@@ -181,7 +194,68 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
             ORDER BY di.invoice
         `, [documentId]);
 
-        res.json({ success: true, doc, invoices: invoicesRes.rows });
+        // ── Rutas/placas que cargaron facturas de este documento ─────────────
+        const routesRes = await pool.query(`
+            SELECT
+                r.id::text                                          AS route_id,
+                COALESCE(v.plate, r.vehicle_plate)                  AS plate,
+                d.name                                              AS driver_name,
+                COUNT(DISTINCT ri.invoice_id)                       AS invoice_count,
+                -- Efectivo desde payments
+                COALESCE(SUM(
+                    CASE WHEN UPPER(TRIM(p.metodo_pago)) LIKE '%EFECTIVO%' OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
+                    THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
+                ), 0)                                               AS efectivo,
+                -- Crédito = todo lo que no es efectivo
+                COALESCE(SUM(
+                    CASE WHEN p.metodo_pago IS NOT NULL
+                         AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFECTIVO%'
+                         AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFE%'
+                    THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
+                ), 0)                                               AS credito,
+                -- Conteo por estado de entrega
+                COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-12','ENTREGADO','COMPLETED','FINALIZADO') THEN di.invoice END) AS completadas,
+                COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-13','DEVUELTO') THEN di.invoice END)                           AS devueltas,
+                COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN di.invoice END)                    AS parciales
+            FROM route_invoices ri
+            JOIN  routes   r   ON r.id::text = ri.route_id::text
+            LEFT JOIN vehicles v   ON v.id::text  = r.vehicle_id::text
+            LEFT JOIN drivers  d   ON d.id::text  = r.driver_id::text
+            LEFT JOIN document_items di ON (
+                di.document_id = $1
+                AND (
+                    TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = TRIM(ri.invoice_id)
+                    OR CONCAT(di.document_id,'_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = ri.invoice_id
+                )
+            )
+            LEFT JOIN document_l_payments p
+                ON p.invoice IS NOT NULL
+                AND TRIM(UPPER(p.invoice)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+            WHERE di.document_id = $1
+            GROUP BY r.id, v.plate, r.vehicle_plate, d.name
+            ORDER BY COUNT(DISTINCT ri.invoice_id) DESC
+        `, [documentId]);
+
+        // ── Facturas sin asignar a ruta ───────────────────────────────────────
+        const unassignedRes = await pool.query(`
+            SELECT COUNT(DISTINCT di.invoice) AS unassigned
+            FROM document_items di
+            WHERE di.document_id = $1
+              AND di.invoice IS NOT NULL AND di.invoice <> ''
+              AND NOT EXISTS (
+                SELECT 1 FROM route_invoices ri
+                WHERE ri.invoice_id = TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))
+                   OR ri.invoice_id = CONCAT(di.document_id,'_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+              )
+        `, [documentId]);
+
+        res.json({
+            success: true,
+            doc,
+            invoices: invoicesRes.rows,
+            routes:   routesRes.rows,
+            unassigned_invoices: Number(unassignedRes.rows[0]?.unassigned || 0),
+        });
     } catch (err: any) {
         console.error('[CONCILIATION] getConciliationByDocument error:', err.message);
         res.status(500).json({ success: false, error: err.message });
