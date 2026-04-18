@@ -213,10 +213,12 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                          AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFE%'
                     THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
                 ), 0)                                               AS credito,
-                -- Conteo por estado de entrega
+                -- Conteo por estado de entrega (delivery)
                 COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-12','ENTREGADO','COMPLETED','FINALIZADO') THEN di.invoice END) AS completadas,
                 COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-13','DEVUELTO') THEN di.invoice END)                           AS devueltas,
-                COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN di.invoice END)                    AS parciales
+                COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN di.invoice END)                    AS parciales,
+                -- Legalizadas = conciliadas (tienen forma_pago registrada)
+                COUNT(DISTINCT CASE WHEN ic2.forma_pago IS NOT NULL THEN di.invoice END)                                        AS legalizadas
             FROM route_invoices ri
             JOIN  routes   r   ON r.id::text = ri.route_id::text
             LEFT JOIN vehicles v   ON v.id::text  = r.vehicle_id::text
@@ -231,6 +233,9 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
             LEFT JOIN document_l_payments p
                 ON p.invoice IS NOT NULL
                 AND TRIM(UPPER(p.invoice)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+            LEFT JOIN invoice_conciliations ic2
+                ON ic2.document_id = $1
+                AND TRIM(UPPER(ic2.invoice_number)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
             WHERE di.document_id = $1
             GROUP BY r.id, v.plate, r.vehicle_id, d.name
             ORDER BY COUNT(DISTINCT ri.invoice_id) DESC

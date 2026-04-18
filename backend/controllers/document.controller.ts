@@ -991,19 +991,12 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
     `, [inv, invoiceData.document_id]);
 
     // 5. Conciliación
+    // Usamos ic.* para evitar errores si la tabla en producción no tiene
+    // todas las columnas (schema drift). El frontend usa optional chaining.
     const concRes = await pool.query(`
       SELECT
-        ic.forma_pago,
-        ic.valor,
-        ic.banco,
-        ic.comprobante,
-        ic.fecha_pago,
-        ic.numero_cheque,
-        ic.es_devolucion,
-        ic.created_at     AS conciliado_at,
-        u.name            AS conciliado_por_nombre,
-        ic.conductor_name,
-        ic.vehicle_plate
+        ic.*,
+        u.name AS conciliado_por_nombre
       FROM invoice_conciliations ic
       LEFT JOIN users u ON u.id = ic.conciliado_por
       WHERE TRIM(UPPER(ic.invoice_number)) = TRIM(UPPER($1))
