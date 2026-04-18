@@ -3,6 +3,7 @@ import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import ConciliacionModal from '../Logistics/ConciliacionModal';
+import ConciliacionRouteModal from '../Logistics/ConciliacionRouteModal';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [reportEmail, setReportEmail]     = useState('');
     const [sendingReport, setSendingReport] = useState(false);
     const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+    const [modalRoute, setModalRoute]           = useState<RouteGroup | null>(null);
 
     // ── Carga detalle del documento ───────────────────────────────────────────
     const loadDocDetail = useCallback(async (doc: DocSummary) => {
@@ -470,15 +472,20 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                 )}
                                                             </div>
 
-                                                            {/* Botón conciliar */}
-                                                            <div className="px-4 pb-3 pt-2">
+                                                            {/* Botones — filtrar + conciliar */}
+                                                            <div className="px-4 pb-3 pt-2 flex gap-2">
                                                                 <button
                                                                     onClick={() => setSelectedRouteId(isSelected ? null : route.route_id)}
-                                                                    className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
+                                                                    className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
                                                                         ${isSelected
-                                                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                                                            : 'bg-slate-900 text-white hover:bg-emerald-600'}`}>
-                                                                    {isSelected ? '✓ Viendo facturas' : 'Conciliar →'}
+                                                                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                                                                    {isSelected ? '✓ Filtrando' : 'Ver Facturas'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setModalRoute(route)}
+                                                                    className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-emerald-600 transition-all">
+                                                                    Conciliar →
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -618,7 +625,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 )}
             </div>
 
-            {/* Modal de conciliación */}
+            {/* Modal de conciliación individual */}
             {modalInvoice && selectedDoc && (
                 <ConciliacionModal
                     isOpen={!!modalInvoice}
@@ -630,6 +637,24 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     conductorId={selectedDoc.conductor_id}
                     conductorName={selectedDoc.conductor_name}
                     onSaved={handleInvoiceSaved}
+                />
+            )}
+
+            {/* Modal de conciliación por placa/ruta */}
+            {modalRoute && selectedDoc && (
+                <ConciliacionRouteModal
+                    isOpen={!!modalRoute}
+                    onClose={() => setModalRoute(null)}
+                    route={modalRoute}
+                    invoices={invoices.filter(inv =>
+                        inv.vehicle_plate === modalRoute.plate || !inv.vehicle_plate
+                    )}
+                    documentId={selectedDoc.id}
+                    currentUserId={user?.id || ''}
+                    onSaved={() => {
+                        if (selectedDoc) loadDocDetail(selectedDoc);
+                        onRefresh();
+                    }}
                 />
             )}
         </div>
