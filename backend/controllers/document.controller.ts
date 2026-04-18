@@ -967,7 +967,7 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
       LEFT JOIN drivers  d   ON d.id::text = r.driver_id::text
       LEFT JOIN estados  est ON est.id = r.status_id
       WHERE TRIM(UPPER(ri.invoice_id)) = TRIM(UPPER($1))
-         OR ri.invoice_id = CONCAT($2, '_', $1)
+         OR ri.invoice_id = CONCAT($2::text, '_', $1::text)
       ORDER BY r.created_at DESC
       LIMIT 1
     `, [inv, invoiceData.document_id]);
@@ -985,7 +985,7 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
       LEFT JOIN vehicles    v ON v.id::text = a.vehicle_id::text
       LEFT JOIN drivers     d ON d.id::text = da.driver_id::text
       WHERE TRIM(UPPER(da.invoice_id)) = TRIM(UPPER($1))
-         OR da.invoice_id = CONCAT($2, '_', $1)
+         OR da.invoice_id = CONCAT($2::text, '_', $1::text)
       ORDER BY da.created_at DESC
       LIMIT 1
     `, [inv, invoiceData.document_id]);

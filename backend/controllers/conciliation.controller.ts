@@ -198,7 +198,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
         const routesRes = await pool.query(`
             SELECT
                 r.id::text                                          AS route_id,
-                COALESCE(v.plate, r.vehicle_plate)                  AS plate,
+                COALESCE(v.plate, r.vehicle_id::text)               AS plate,
                 d.name                                              AS driver_name,
                 COUNT(DISTINCT ri.invoice_id)                       AS invoice_count,
                 -- Efectivo desde payments
@@ -232,7 +232,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 ON p.invoice IS NOT NULL
                 AND TRIM(UPPER(p.invoice)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
             WHERE di.document_id = $1
-            GROUP BY r.id, v.plate, r.vehicle_plate, d.name
+            GROUP BY r.id, v.plate, r.vehicle_id, d.name
             ORDER BY COUNT(DISTINCT ri.invoice_id) DESC
         `, [documentId]);
 
