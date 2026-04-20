@@ -153,9 +153,8 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
 
         const doc = docRes.rows[0];
 
-        // Facturas únicas del documento con sus ítems y datos de pago precargados
-        // route_vehicle_plate: placa asignada vía route_invoices (independiente de si está conciliada)
-        const invoicesRes = await pool.query(`
+        // Base del SELECT para facturas — compartido entre query con/sin MasterSuite
+        const baseInvoiceSelect = `
             SELECT
                 di.invoice                                  AS invoice_number,
                 di.customer_name,
@@ -179,21 +178,15 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 MAX(p.vmetodo)                              AS invoice_value,
                 MAX(p.metodo_pago)                          AS invoice_metodo_pago,
                 MAX(di.item_status)                         AS item_status,
-                -- Placa asignada desde route_invoices (disponible antes de conciliar)
-                MAX(COALESCE(v2.plate, r2.vehicle_id::text)) AS route_vehicle_plate,
-                -- Estados MasterSuite
-                MAX(di.mastersuite_estado)                  AS mastersuite_estado,
-                MAX(di.mastersuite_id_carga)                AS mastersuite_id_carga,
-                MAX(di.mastersuite_fecha_despacho::text)     AS mastersuite_fecha_despacho,
-                MAX(di.mastersuite_fecha_entrega::text)      AS mastersuite_fecha_entrega,
-                MAX(di.mastersuite_motivo_dev)               AS mastersuite_motivo_dev
+                MAX(COALESCE(v2.plate, r2.vehicle_id::text)) AS route_vehicle_plate`;
+
+        const baseInvoiceFrom = `
             FROM document_items di
             LEFT JOIN invoice_conciliations ic
                 ON ic.document_id = $1 AND ic.invoice_number = di.invoice
             LEFT JOIN users u ON u.id = ic.conciliado_por
             LEFT JOIN document_l_payments p
                 ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
-            -- Asignación de ruta para obtener la placa antes de conciliar
             LEFT JOIN route_invoices ri2
                 ON (TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = TRIM(ri2.invoice_id)
                     OR CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = ri2.invoice_id)
@@ -206,8 +199,38 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                      ic.id, ic.banco, ic.valor, ic.comprobante, ic.fecha_pago,
                      ic.forma_pago, ic.numero_cheque, ic.es_devolucion, ic.conciliado_por,
                      ic.conductor_id, ic.conductor_name, ic.vehicle_plate, ic.created_at, u.name
-            ORDER BY di.invoice
-        `, [documentId]);
+            ORDER BY di.invoice`;
+
+        // Intentar con columnas MasterSuite; si no existen, reintentar sin ellas
+        let invoicesRes: any;
+        try {
+            invoicesRes = await pool.query(
+                baseInvoiceSelect + `,
+                MAX(di.mastersuite_estado)              AS mastersuite_estado,
+                MAX(di.mastersuite_id_carga)            AS mastersuite_id_carga,
+                MAX(di.mastersuite_fecha_despacho::text) AS mastersuite_fecha_despacho,
+                MAX(di.mastersuite_fecha_entrega::text)  AS mastersuite_fecha_entrega,
+                MAX(di.mastersuite_motivo_dev)           AS mastersuite_motivo_dev`
+                + baseInvoiceFrom,
+                [documentId]
+            );
+        } catch (e: any) {
+            if (e.message?.includes('does not exist')) {
+                // Migración pendiente en este entorno — consultar sin campos MasterSuite
+                invoicesRes = await pool.query(
+                    baseInvoiceSelect + `,
+                    NULL::text AS mastersuite_estado,
+                    NULL::text AS mastersuite_id_carga,
+                    NULL::text AS mastersuite_fecha_despacho,
+                    NULL::text AS mastersuite_fecha_entrega,
+                    NULL::text AS mastersuite_motivo_dev`
+                    + baseInvoiceFrom,
+                    [documentId]
+                );
+            } else {
+                throw e;
+            }
+        }
 
         // ── Rutas/placas que cargaron facturas de este documento ─────────────
         const routesRes = await pool.query(`
