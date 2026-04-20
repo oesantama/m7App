@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database.js';
 // @ts-ignore – xlsx está instalado en el servidor; no hay node_modules local
 import * as XLSX from 'xlsx';
+import { readFileSync, unlink } from 'fs';
 
 // ─── GET /conciliation/pending ───────────────────────────────────────────────
 // Documentos Plan R con estado EST-12 (entregado) o EST-13 (parcial) que aún
@@ -435,7 +436,8 @@ export const importMasterSuite = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'No se recibió archivo' });
         }
 
-        const wb = XLSX.readFile(req.file.path);
+        const fileBuffer = readFileSync(req.file.path);
+        const wb = XLSX.read(fileBuffer, { type: 'buffer' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         // Fila 7 (índice 6) es el encabezado, datos desde fila 8 (índice 7)
         const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, range: 6, defval: '' });
@@ -498,8 +500,7 @@ export const importMasterSuite = async (req: Request, res: Response) => {
         }
 
         // Cleanup temp file
-        const fs = await import('fs/promises');
-        await fs.unlink(req.file.path).catch(() => {});
+        unlink(req.file.path, () => {});
 
         res.json({ success: true, updated, notFound, total: dataRows.length, errors: errors.slice(0, 10) });
     } catch (err: any) {
