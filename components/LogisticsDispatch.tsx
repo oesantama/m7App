@@ -101,6 +101,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [reassignData, setReassignData] = useState({ newVehicleId: '', observations: '' });
     const [vehicleSearch, setVehicleSearch] = useState('');
     const [vehicleDropOpen, setVehicleDropOpen] = useState(false);
+    const [reassignTab, setReassignTab] = useState<'placa' | 'factura'>('placa');
+    const [modalRouteInvoices, setModalRouteInvoices] = useState<any[]>([]);
+    const [loadingModalInvoices, setLoadingModalInvoices] = useState(false);
+    const [selectedInvoicesToRemove, setSelectedInvoicesToRemove] = useState<Set<string>>(new Set());
+    const [unassignObs, setUnassignObs] = useState('');
+    const [isUnassigning, setIsUnassigning] = useState(false);
     const mapRef = useRef<L.Map | null>(null);
     const markersRef = useRef<{ [key: string]: L.Marker }>({});
     const routeLinesRef = useRef<{ [key: string]: L.Polyline }>({});
@@ -581,6 +587,44 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         } finally {
             setIsGeneratingPDF(false);
         }
+    };
+
+    const loadModalInvoices = async (routeId: string) => {
+        setLoadingModalInvoices(true);
+        setModalRouteInvoices([]);
+        setSelectedInvoicesToRemove(new Set());
+        try {
+            const res = await api.getRouteInvoices(routeId);
+            setModalRouteInvoices(res.data || []);
+        } catch { toast.error('Error cargando facturas de la ruta'); }
+        finally { setLoadingModalInvoices(false); }
+    };
+
+    const handleUnassignInvoices = async () => {
+        if (!showReassignModal.route || selectedInvoicesToRemove.size === 0) return;
+        if (!unassignObs.trim()) { toast.error('Debe ingresar una observación'); return; }
+        setIsUnassigning(true);
+        let ok = 0; let fail = 0;
+        for (const invoiceId of selectedInvoicesToRemove) {
+            try {
+                await api.unassignRouteInvoice({
+                    routeId: showReassignModal.route.id,
+                    invoiceId,
+                    observations: unassignObs,
+                    userId: user.id,
+                });
+                ok++;
+            } catch { fail++; }
+        }
+        setIsUnassigning(false);
+        if (ok > 0) {
+            toast.success(`${ok} factura${ok > 1 ? 's' : ''} liberada${ok > 1 ? 's' : ''} correctamente`);
+            setUnassignObs('');
+            setSelectedInvoicesToRemove(new Set());
+            loadModalInvoices(showReassignModal.route.id);
+            onRefresh();
+        }
+        if (fail > 0) toast.error(`${fail} no se pudieron liberar`);
     };
 
     const handleReassignPlate = async () => {
@@ -1934,99 +1978,181 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 handleConfirmDispatch={handleConfirmDispatch}
             />
 
-            {/* MODAL: REASIGNAR PLACA / CAMBIO DE VEHICULO */}
+            {/* MODAL: REASIGNAR PLACA / LIBERAR FACTURA */}
             {showReassignModal.isOpen && (
-                <div className="fixed inset-0 z-[800] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
-                        <div className="p-8 border-b border-slate-50 bg-slate-50/50">
-                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Reasignar Vehículo</h3>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase">Ruta actual: {showReassignModal.route?.plate}</p>
+                <div className="fixed inset-0 z-[800] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+
+                        {/* Header */}
+                        <div className="px-7 pt-6 pb-4 border-b border-slate-100">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Gestión de Ruta</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">🚛 {showReassignModal.route?.plate}</p>
+                                </div>
+                                <button onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setVehicleSearch(''); setVehicleDropOpen(false); setReassignTab('placa'); }}
+                                    className="w-9 h-9 bg-slate-100 hover:bg-rose-50 hover:text-rose-500 rounded-full flex items-center justify-center text-slate-400 transition-all text-lg font-black">×</button>
+                            </div>
+                            {/* Tabs */}
+                            <div className="flex gap-2">
+                                <button onClick={() => setReassignTab('placa')}
+                                    className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all
+                                        ${reassignTab === 'placa' ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}`}>
+                                    🔄 Cambio de Placa
+                                </button>
+                                <button onClick={() => { setReassignTab('factura'); loadModalInvoices(showReassignModal.route.id); }}
+                                    className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all
+                                        ${reassignTab === 'factura' ? 'bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200' : 'bg-white border-slate-200 text-slate-500 hover:border-rose-300'}`}>
+                                    📦 Liberar Factura
+                                </button>
+                            </div>
                         </div>
-                        
-                        <div className="p-8 space-y-6">
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nuevo Vehículo / Placa</label>
-                                <div className="relative">
-                                    {/* Campo de búsqueda + placa seleccionada */}
-                                    <div
-                                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-900 focus-within:ring-2 focus-within:ring-indigo-500/20 cursor-text flex items-center gap-2"
-                                        onClick={() => setVehicleDropOpen(true)}
-                                    >
-                                        <input
-                                            className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-900 placeholder:text-slate-400"
-                                            placeholder={reassignData.newVehicleId
-                                                ? (availableVehicles.find((v: any) => v.id === reassignData.newVehicleId)?.plate + ' - ' + availableVehicles.find((v: any) => v.id === reassignData.newVehicleId)?.driverName)
-                                                : 'Buscar placa o conductor...'}
-                                            value={vehicleSearch}
-                                            onChange={e => { setVehicleSearch(e.target.value); setVehicleDropOpen(true); }}
-                                            onFocus={() => setVehicleDropOpen(true)}
-                                        />
-                                        {reassignData.newVehicleId && (
-                                            <button onClick={e => { e.stopPropagation(); setReassignData({ ...reassignData, newVehicleId: '' }); setVehicleSearch(''); }}
-                                                className="text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none">×</button>
-                                        )}
-                                    </div>
-                                    {/* Dropdown */}
-                                    {vehicleDropOpen && (
-                                        <>
-                                            <div className="fixed inset-0 z-10" onClick={() => setVehicleDropOpen(false)} />
-                                            <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto">
-                                                {availableVehicles
-                                                    .filter((v: any) => {
-                                                        const q = vehicleSearch.toLowerCase();
-                                                        return !q || v.plate?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q);
-                                                    })
-                                                    .map((v: any) => (
-                                                        <button key={v.id}
-                                                            className={`w-full text-left px-4 py-3 text-sm font-bold hover:bg-indigo-50 hover:text-indigo-700 transition-colors
-                                                                ${reassignData.newVehicleId === v.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'}`}
-                                                            onClick={() => {
-                                                                setReassignData({ ...reassignData, newVehicleId: v.id });
-                                                                setVehicleSearch('');
-                                                                setVehicleDropOpen(false);
-                                                            }}>
-                                                            <span className="font-black">{v.plate}</span>
-                                                            {v.driverName && <span className="text-slate-500 font-normal"> — {v.driverName}</span>}
-                                                        </button>
-                                                    ))}
-                                                {availableVehicles.filter((v: any) => {
-                                                    const q = vehicleSearch.toLowerCase();
-                                                    return !q || v.plate?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q);
-                                                }).length === 0 && (
-                                                    <p className="px-4 py-3 text-xs text-slate-400 font-bold">Sin resultados</p>
+
+                        {/* ── TAB: CAMBIO DE PLACA ── */}
+                        {reassignTab === 'placa' && (
+                            <>
+                                <div className="p-7 space-y-5 overflow-y-auto flex-1">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nuevo Vehículo / Placa</label>
+                                        <div className="relative">
+                                            <div className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus-within:ring-2 focus-within:ring-indigo-400/30 cursor-text flex items-center gap-2"
+                                                onClick={() => setVehicleDropOpen(true)}>
+                                                <input
+                                                    className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-900 placeholder:text-slate-400"
+                                                    placeholder={reassignData.newVehicleId
+                                                        ? (availableVehicles.find((v: any) => v.id === reassignData.newVehicleId)?.plate + ' — ' + availableVehicles.find((v: any) => v.id === reassignData.newVehicleId)?.driverName)
+                                                        : 'Buscar placa o conductor...'}
+                                                    value={vehicleSearch}
+                                                    onChange={e => { setVehicleSearch(e.target.value); setVehicleDropOpen(true); }}
+                                                    onFocus={() => setVehicleDropOpen(true)}
+                                                />
+                                                {reassignData.newVehicleId && (
+                                                    <button onClick={e => { e.stopPropagation(); setReassignData({ ...reassignData, newVehicleId: '' }); setVehicleSearch(''); }}
+                                                        className="text-slate-400 hover:text-rose-500 text-lg leading-none">×</button>
                                                 )}
                                             </div>
-                                        </>
-                                    )}
+                                            {vehicleDropOpen && (
+                                                <>
+                                                    <div className="fixed inset-0 z-10" onClick={() => setVehicleDropOpen(false)} />
+                                                    <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto">
+                                                        {availableVehicles
+                                                            .filter((v: any) => { const q = vehicleSearch.toLowerCase(); return !q || v.plate?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q); })
+                                                            .map((v: any) => (
+                                                                <button key={v.id}
+                                                                    className={`w-full text-left px-4 py-3 text-sm font-bold hover:bg-indigo-50 hover:text-indigo-700 transition-colors ${reassignData.newVehicleId === v.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'}`}
+                                                                    onClick={() => { setReassignData({ ...reassignData, newVehicleId: v.id }); setVehicleSearch(''); setVehicleDropOpen(false); }}>
+                                                                    <span className="font-black">{v.plate}</span>
+                                                                    {v.driverName && <span className="text-slate-400 font-normal"> — {v.driverName}</span>}
+                                                                </button>
+                                                            ))}
+                                                        {availableVehicles.filter((v: any) => { const q = vehicleSearch.toLowerCase(); return !q || v.plate?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q); }).length === 0 && (
+                                                            <p className="px-4 py-3 text-xs text-slate-400 font-bold">Sin resultados</p>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Observación</label>
+                                        <textarea className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 h-28 resize-none"
+                                            placeholder="Motivo del cambio (ej: falla mecánica, calamidad...)"
+                                            value={reassignData.observations}
+                                            onChange={e => setReassignData({ ...reassignData, observations: e.target.value })} />
+                                    </div>
                                 </div>
-                            </div>
+                                <div className="px-7 py-5 bg-slate-50 border-t border-slate-100 flex gap-3">
+                                    <button className="px-5 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setVehicleSearch(''); setVehicleDropOpen(false); setReassignTab('placa'); }}>
+                                        Cancelar
+                                    </button>
+                                    <button className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50"
+                                        onClick={handleReassignPlate} disabled={isReassigningPlate || !reassignData.newVehicleId}>
+                                        {isReassigningPlate ? 'Procesando...' : 'Confirmar Cambio'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
 
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Observaciones del Cambio</label>
-                                <textarea 
-                                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 h-32"
-                                    placeholder="Motivo del cambio (ej: falla mecánica, cambio de zona...)"
-                                    value={reassignData.observations}
-                                    onChange={(e) => setReassignData({ ...reassignData, observations: e.target.value })}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="p-8 bg-slate-50 flex gap-4">
-                            <button 
-                                className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
-                                onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setVehicleSearch(''); setVehicleDropOpen(false); }}
-                            >
-                                Cancelar
-                            </button>
-                            <button 
-                                className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 disabled:opacity-50"
-                                onClick={handleReassignPlate}
-                                disabled={isReassigningPlate}
-                            >
-                                {isReassigningPlate ? 'PROCESANDO...' : 'CONFIRMAR CAMBIO'}
-                            </button>
-                        </div>
+                        {/* ── TAB: LIBERAR FACTURA ── */}
+                        {reassignTab === 'factura' && (
+                            <>
+                                <div className="flex-1 overflow-y-auto">
+                                    {loadingModalInvoices ? (
+                                        <div className="flex items-center justify-center py-16">
+                                            <div className="w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                                        </div>
+                                    ) : modalRouteInvoices.length === 0 ? (
+                                        <div className="text-center py-16 text-slate-400">
+                                            <p className="text-3xl mb-2">📦</p>
+                                            <p className="text-sm font-bold">No hay facturas en esta ruta</p>
+                                        </div>
+                                    ) : (
+                                        <div className="px-7 pt-5 space-y-2">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                    {selectedInvoicesToRemove.size} de {modalRouteInvoices.length} seleccionadas
+                                                </p>
+                                                <div className="flex gap-3">
+                                                    <button onClick={() => setSelectedInvoicesToRemove(new Set(modalRouteInvoices.map(i => i.invoice_id)))}
+                                                        className="text-[8px] font-black text-rose-500 hover:text-rose-700 uppercase tracking-widest">Todas</button>
+                                                    <span className="text-slate-300 text-[8px]">|</span>
+                                                    <button onClick={() => setSelectedInvoicesToRemove(new Set())}
+                                                        className="text-[8px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest">Ninguna</button>
+                                                </div>
+                                            </div>
+                                            {modalRouteInvoices.map((inv: any) => {
+                                                const checked = selectedInvoicesToRemove.has(inv.invoice_id);
+                                                return (
+                                                    <label key={inv.invoice_id}
+                                                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border cursor-pointer transition-all
+                                                            ${checked ? 'bg-rose-50 border-rose-300' : 'bg-slate-50 border-slate-100 hover:border-slate-300'}`}>
+                                                        <input type="checkbox" checked={checked} className="w-4 h-4 accent-rose-500 shrink-0"
+                                                            onChange={() => {
+                                                                setSelectedInvoicesToRemove(prev => {
+                                                                    const next = new Set(prev);
+                                                                    next.has(inv.invoice_id) ? next.delete(inv.invoice_id) : next.add(inv.invoice_id);
+                                                                    return next;
+                                                                });
+                                                            }} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[11px] font-black text-slate-900">{inv.invoice_number || inv.invoice_id}</p>
+                                                            {inv.customer_name && <p className="text-[9px] text-slate-500 truncate">{inv.customer_name}</p>}
+                                                        </div>
+                                                        {inv.invoice_value && (
+                                                            <span className="text-[9px] font-black text-slate-600 shrink-0">
+                                                                ${Number(inv.invoice_value).toLocaleString('es-CO')}
+                                                            </span>
+                                                        )}
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {/* Observación */}
+                                    <div className="px-7 pt-4 pb-5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                                            Observación <span className="text-rose-500">*</span>
+                                        </label>
+                                        <textarea className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-400/30 h-24 resize-none"
+                                            placeholder="Motivo de liberación (ej: cliente no encontrado, dirección incorrecta...)"
+                                            value={unassignObs}
+                                            onChange={e => setUnassignObs(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="px-7 py-5 bg-slate-50 border-t border-slate-100 flex gap-3">
+                                    <button className="px-5 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setReassignTab('placa'); setUnassignObs(''); setSelectedInvoicesToRemove(new Set()); }}>
+                                        Cancelar
+                                    </button>
+                                    <button className="flex-1 py-3 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-200 disabled:opacity-50"
+                                        onClick={handleUnassignInvoices}
+                                        disabled={isUnassigning || selectedInvoicesToRemove.size === 0 || !unassignObs.trim()}>
+                                        {isUnassigning ? 'Liberando...' : `Liberar (${selectedInvoicesToRemove.size}) Factura${selectedInvoicesToRemove.size !== 1 ? 's' : ''}`}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

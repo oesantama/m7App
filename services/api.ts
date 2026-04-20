@@ -418,6 +418,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+  getRouteInvoices: (routeId: string) =>
+    fetchJson(`${API_URL}/routes/${encodeURIComponent(routeId)}/invoices`),
+  unassignRouteInvoice: (data: { routeId: string; invoiceId: string; observations?: string; userId?: string }) =>
+    fetchJson(`${API_URL}/routes/unassign-invoice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
 
   getMastersuiteReport: (params?: { document?: string; plate?: string }) => {
     const qs = new URLSearchParams();

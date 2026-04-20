@@ -351,6 +351,86 @@ export const getRoadRoute = async (req: Request, res: Response) => {
   return res.status(500).json({ error: 'Error al calcular ruta por calles' });
 };
 
+// ─── GET /routes/:routeId/invoices ───────────────────────────────────────────
+export const getRouteInvoices = async (req: Request, res: Response) => {
+    const { routeId } = req.params;
+    try {
+        const result = await pool.query(`
+            SELECT
+                ri.invoice_id,
+                COALESCE(NULLIF(di.invoice,''), di.order_number) AS invoice_number,
+                di.customer_name,
+                di.city,
+                MAX(p.vmetodo)           AS invoice_value,
+                MAX(di.item_status)      AS item_status
+            FROM route_invoices ri
+            LEFT JOIN document_items di ON (
+                TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = TRIM(ri.invoice_id)
+                OR CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = ri.invoice_id
+            )
+            LEFT JOIN document_l_payments p ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+            WHERE ri.route_id::text = $1::text
+            GROUP BY ri.invoice_id, di.invoice, di.order_number, di.customer_name, di.city
+            ORDER BY invoice_number
+        `, [routeId]);
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── POST /routes/unassign-invoice ───────────────────────────────────────────
+export const unassignRouteInvoice = async (req: Request, res: Response) => {
+    const { routeId, invoiceId, observations, userId } = req.body;
+    if (!routeId || !invoiceId) {
+        return res.status(400).json({ success: false, error: 'routeId e invoiceId son requeridos' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Verificar que la factura pertenece a esta ruta
+        const check = await client.query(
+            `SELECT 1 FROM route_invoices WHERE route_id::text = $1::text AND invoice_id = $2`,
+            [routeId, invoiceId]
+        );
+        if (!check.rowCount) {
+            throw new Error('La factura no pertenece a esta ruta');
+        }
+
+        // 2. Eliminar de route_invoices
+        await client.query(
+            `DELETE FROM route_invoices WHERE route_id::text = $1::text AND invoice_id = $2`,
+            [routeId, invoiceId]
+        );
+
+        // 3. Resetear item_status a EST-03 (Para Despacho) → disponible para reasignar
+        await client.query(
+            `UPDATE document_items SET item_status = 'EST-03'
+             WHERE CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $1
+                OR TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $1`,
+            [invoiceId]
+        );
+
+        // 4. Registrar en log
+        await client.query(
+            `INSERT INTO route_modifications_log (route_id, action, user_id, details)
+             VALUES ($1, 'UNASSIGN_INVOICE', $2, $3)`,
+            [routeId, userId || null, JSON.stringify({ invoice_id: invoiceId, observations, timestamp: new Date().toISOString() })]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[M7-UNASSIGN-INVOICE]', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
+
 export const reassignRouteVehicle = async (req: Request, res: Response) => {
   const { routeId, newVehicleId, observations, userId } = req.body;
   const client = await pool.connect();
