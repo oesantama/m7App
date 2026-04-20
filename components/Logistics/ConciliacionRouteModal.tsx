@@ -92,7 +92,26 @@ const ENTREGADO_STATUS = ['EST-12', 'ENTREGADO', 'COMPLETED', 'FINALIZADO'];
 const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO'];
 const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL'];
 
+// Determina qué opciones están disponibles según MasterSuite
+function getMsConstraint(inv: InvoiceRow): { allowed: Set<EstadoEntrega>; hint: string | null } {
+    const ms = (inv.mastersuite_estado || '').toLowerCase().trim();
+    if (!ms) return { allowed: new Set<EstadoEntrega>(['entregado', 'parcial', 'devolucion']), hint: null };
+    if (ms.includes('complet') || ms === 'entregado')
+        return { allowed: new Set<EstadoEntrega>(['entregado']), hint: `MasterSuite: ${inv.mastersuite_estado}` };
+    if (ms.includes('no entregad') || ms.includes('devol'))
+        return { allowed: new Set<EstadoEntrega>(['parcial', 'devolucion']), hint: `MasterSuite: ${inv.mastersuite_estado}` };
+    if (ms.includes('parcial'))
+        return { allowed: new Set<EstadoEntrega>(['parcial', 'devolucion']), hint: `MasterSuite: ${inv.mastersuite_estado}` };
+    return { allowed: new Set<EstadoEntrega>(['entregado', 'parcial', 'devolucion']), hint: null };
+}
+
 function inferEstado(inv: InvoiceRow): EstadoEntrega {
+    // MasterSuite tiene prioridad sobre item_status
+    const ms = (inv.mastersuite_estado || '').toLowerCase().trim();
+    if (ms.includes('complet') || ms === 'entregado') return 'entregado';
+    if (ms.includes('devol'))  return 'devolucion';
+    if (ms.includes('parcial')) return 'parcial';
+    // Fallback a item_status / es_devolucion
     if (inv.es_devolucion) return 'devolucion';
     const s = (inv.item_status || '').toUpperCase();
     if (DEVUELTO_STATUS.includes(s)) return 'devolucion';
@@ -136,8 +155,17 @@ const EstadoPill: React.FC<{
     label: string;
     icon: string;
     onClick: () => void;
-}> = ({ value, active, label, icon, onClick }) => {
+    disabled?: boolean;
+}> = ({ value, active, label, icon, onClick, disabled }) => {
     const isActive = value === active;
+    if (disabled)
+        return (
+            <button disabled
+                className="flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-300 text-[9px] font-black uppercase tracking-wide cursor-not-allowed opacity-40">
+                <span className="text-lg grayscale">{icon}</span>
+                {label}
+            </button>
+        );
     const colors: Record<EstadoEntrega, string> = {
         entregado:  isActive ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-600',
         devolucion: isActive ? 'bg-rose-500    border-rose-500    text-white' : 'border-slate-200 text-slate-500 hover:border-rose-400    hover:text-rose-600',
@@ -408,6 +436,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             const isExpanded  = form.expanded;
                             const invoiceVal  = Number(inv.invoice_value) || 0;
                             const sobrecostoNum = Number(form.sobrecosto) || 0;
+                            const { allowed: msAllowed, hint: msHint } = getMsConstraint(inv);
 
                             const itemBadge = ENTREGADO_STATUS.includes(inv.item_status || '')
                                 ? { bg: 'bg-teal-100', text: 'text-teal-700', label: '✅ Entregada' }
@@ -487,13 +516,20 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
                                             {/* Estado de entrega */}
                                             <div>
-                                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                                                    Estado de Entrega <span className="text-rose-500">*</span>
-                                                </p>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                        Estado de Entrega <span className="text-rose-500">*</span>
+                                                    </p>
+                                                    {msHint && (
+                                                        <span className="text-[7px] font-black px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">
+                                                            🏢 {msHint}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="flex gap-2">
-                                                    <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'entregado',  valor: String(invoiceVal + sobrecostoNum || '') })} />
-                                                    <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'parcial'    })} />
-                                                    <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'devolucion', valor: '0' })} />
+                                                    <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!msAllowed.has('entregado')}  onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'entregado',  valor: String(invoiceVal + sobrecostoNum || '') })} />
+                                                    <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!msAllowed.has('parcial')}    onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'parcial'    })} />
+                                                    <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!msAllowed.has('devolucion')} onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'devolucion', valor: '0' })} />
                                                 </div>
                                             </div>
 
