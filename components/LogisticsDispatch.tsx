@@ -602,7 +602,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 toast.success("Vehículo reasignado exitosamente. Se ha creado una nueva ruta.");
                 setShowReassignModal({ isOpen: false, route: null });
                 setReassignData({ newVehicleId: '', observations: '' });
-                loadData(); // Recargar monitor
+                setVehicleSearch('');
+                setVehicleDropOpen(false);
+                onRefresh();
             } else {
                 toast.error(res.error || "Error al reasignar vehículo");
             }
