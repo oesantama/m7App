@@ -60,7 +60,12 @@ interface InvoiceRow {
     invoice_value?: number;
     invoice_metodo_pago?: string;
     item_status?: string;
-    route_vehicle_plate?: string;  // placa asignada desde route_invoices (antes de conciliar)
+    route_vehicle_plate?: string;
+    mastersuite_estado?: string;
+    mastersuite_id_carga?: string;
+    mastersuite_fecha_despacho?: string;
+    mastersuite_fecha_entrega?: string;
+    mastersuite_motivo_dev?: string;
 }
 
 interface Props {
@@ -112,9 +117,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [showReportInput, setShowReportInput] = useState(false);
     const [reportEmail, setReportEmail]     = useState('');
     const [sendingReport, setSendingReport] = useState(false);
-    const [modalRoute, setModalRoute]       = useState<RouteGroup | null>(null);
-    const [searchInvoice, setSearchInvoice] = useState('');
-    const [searchRoute, setSearchRoute]     = useState('');
+    const [modalRoute, setModalRoute]           = useState<RouteGroup | null>(null);
+    const [searchInvoice, setSearchInvoice]     = useState('');
+    const [searchRoute, setSearchRoute]         = useState('');
+    const [importingMS, setImportingMS]         = useState(false);
+    const msFileRef                             = React.useRef<HTMLInputElement>(null);
 
     // ── Carga detalle del documento ───────────────────────────────────────────
     const loadDocDetail = useCallback(async (doc: DocSummary) => {
@@ -136,6 +143,22 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const handleInvoiceSaved = () => {
         if (selectedDoc) loadDocDetail(selectedDoc);
         onRefresh();
+    };
+
+    const handleImportMasterSuite = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImportingMS(true);
+        try {
+            const res = await api.importMasterSuite(file);
+            toast.success(`MasterSuite: ${res.updated} facturas actualizadas, ${res.notFound} no encontradas`);
+            if (selectedDoc) loadDocDetail(selectedDoc);
+        } catch (err: any) {
+            toast.error(err.message || 'Error importando MasterSuite');
+        } finally {
+            setImportingMS(false);
+            if (msFileRef.current) msFileRef.current.value = '';
+        }
     };
 
     const handleSendReport = async () => {
@@ -334,6 +357,24 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {/* Importar MasterSuite */}
+                                    <input
+                                        ref={msFileRef}
+                                        type="file"
+                                        accept=".xlsx,.xls"
+                                        className="hidden"
+                                        onChange={handleImportMasterSuite}
+                                    />
+                                    <button
+                                        onClick={() => msFileRef.current?.click()}
+                                        disabled={importingMS}
+                                        title="Importar reporte MasterSuite (.xlsx)"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all">
+                                        {importingMS
+                                            ? <Icons.Loader className="w-3 h-3 animate-spin" />
+                                            : <Icons.Upload className="w-3 h-3" />}
+                                        MasterSuite
+                                    </button>
                                     {isAllLegalized && (
                                         <button onClick={() => setShowReportInput(v => !v)}
                                             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-700 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all">

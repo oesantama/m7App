@@ -180,7 +180,13 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 MAX(p.metodo_pago)                          AS invoice_metodo_pago,
                 MAX(di.item_status)                         AS item_status,
                 -- Placa asignada desde route_invoices (disponible antes de conciliar)
-                MAX(COALESCE(v2.plate, r2.vehicle_id::text)) AS route_vehicle_plate
+                MAX(COALESCE(v2.plate, r2.vehicle_id::text)) AS route_vehicle_plate,
+                -- Estados MasterSuite
+                MAX(di.mastersuite_estado)                  AS mastersuite_estado,
+                MAX(di.mastersuite_id_carga)                AS mastersuite_id_carga,
+                MAX(di.mastersuite_fecha_despacho::text)     AS mastersuite_fecha_despacho,
+                MAX(di.mastersuite_fecha_entrega::text)      AS mastersuite_fecha_entrega,
+                MAX(di.mastersuite_motivo_dev)               AS mastersuite_motivo_dev
             FROM document_items di
             LEFT JOIN invoice_conciliations ic
                 ON ic.document_id = $1 AND ic.invoice_number = di.invoice
@@ -278,21 +284,39 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
 
 // ─── POST /conciliation/save ──────────────────────────────────────────────────
 // Guarda o actualiza la conciliación de UNA factura dentro de un documento.
+// También actualiza item_status en document_items y guarda historial.
 export const saveConciliation = async (req: Request, res: Response) => {
     const {
         documentId, invoiceNumber,
         banco, valor, comprobante, fechaPago, formaPago, numeroCheque,
         esDevolucion, conciliadoPor,
         vehiclePlate, conductorId, conductorName,
+        estadoEntrega,   // 'entregado' | 'parcial' | 'devolucion'
+        valorFactura,    // valor original de la factura (para calcular devuelto en parcial)
+        usuarioNombre,
     } = req.body;
 
     if (!documentId || !invoiceNumber) {
         return res.status(400).json({ success: false, error: 'documentId e invoiceNumber son requeridos' });
     }
 
+    const client = await pool.connect();
     try {
-        // UPSERT: si ya existe para ese doc + factura, actualiza; si no, inserta
-        const result = await pool.query(`
+        await client.query('BEGIN');
+
+        // 1. Estado anterior de la factura
+        const prevRes = await client.query(
+            `SELECT ic.forma_pago, di.item_status
+             FROM document_items di
+             LEFT JOIN invoice_conciliations ic ON ic.document_id = $1 AND ic.invoice_number = $2
+             WHERE di.document_id = $1 AND di.invoice = $2 LIMIT 1`,
+            [documentId, invoiceNumber]
+        );
+        const prevFormaPago  = prevRes.rows[0]?.forma_pago  || null;
+        const prevItemStatus = prevRes.rows[0]?.item_status || null;
+
+        // 2. UPSERT en invoice_conciliations
+        const result = await client.query(`
             INSERT INTO invoice_conciliations
                 (document_id, invoice_number, banco, valor, comprobante, fecha_pago,
                  forma_pago, numero_cheque, es_devolucion, conciliado_por,
@@ -319,9 +343,159 @@ export const saveConciliation = async (req: Request, res: Response) => {
             vehiclePlate || null, conductorId || null, conductorName || null,
         ]);
 
+        // 3. Determinar nuevo item_status según estado de entrega
+        let nuevoItemStatus: string | null = null;
+        let eventoHistorial = 'LEGALIZADO';
+
+        if (esDevolucion || estadoEntrega === 'devolucion' || formaPago === 'DEVOLUCION') {
+            nuevoItemStatus = 'EST-13';
+            eventoHistorial = 'DEVOLUCION';
+        } else if (estadoEntrega === 'parcial') {
+            nuevoItemStatus = 'EST-14';
+            eventoHistorial = 'PARCIAL';
+        } else if (estadoEntrega === 'entregado' || formaPago) {
+            nuevoItemStatus = 'EST-12';
+            eventoHistorial = 'LEGALIZADO';
+        }
+
+        // 4. Actualizar item_status en document_items (si hay cambio)
+        if (nuevoItemStatus) {
+            await client.query(
+                `UPDATE document_items SET item_status = $1
+                 WHERE document_id = $2 AND invoice = $3`,
+                [nuevoItemStatus, documentId, invoiceNumber]
+            );
+        }
+
+        // 5. Calcular valores para historial
+        const valorNum   = Number(valor) || 0;
+        const facturaNum = Number(valorFactura) || 0;
+        const valorEntregado = esDevolucion || estadoEntrega === 'devolucion' ? 0 : valorNum;
+        const valorDevuelto  = estadoEntrega === 'parcial' && facturaNum > valorNum
+            ? facturaNum - valorNum : 0;
+
+        // 6. Insertar en historial
+        await client.query(`
+            INSERT INTO invoice_status_history
+                (document_id, invoice_number, evento, estado_anterior, estado_nuevo,
+                 valor_factura, valor_entregado, valor_devuelto,
+                 usuario_id, usuario_nombre, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+        `, [
+            documentId, invoiceNumber, eventoHistorial,
+            prevItemStatus, nuevoItemStatus,
+            facturaNum > 0 ? facturaNum : null,
+            valorEntregado > 0 ? valorEntregado : null,
+            valorDevuelto  > 0 ? valorDevuelto  : null,
+            conciliadoPor  || null,
+            usuarioNombre  || null,
+        ]);
+
+        await client.query('COMMIT');
         res.json({ success: true, data: result.rows[0] });
     } catch (err: any) {
+        await client.query('ROLLBACK');
         console.error('[CONCILIATION] saveConciliation error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
+
+// ─── POST /conciliation/import-mastersuite ────────────────────────────────────
+// Recibe un Excel (MasterSuite), extrae placa/ID carga/factura/estado/fecha y
+// actualiza document_items.mastersuite_* para cada fila.
+export const importMasterSuite = async (req: Request, res: Response) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No se recibió archivo' });
+        }
+
+        const wb = XLSX.readFile(req.file.path);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        // Fila 7 (índice 6) es el encabezado, datos desde fila 8 (índice 7)
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, range: 6, defval: '' });
+
+        // Columnas: 0=Placa, 1=Conductor, 2=RazonSocial, 3=IDCarga, 4=Documento(Factura),
+        //           5=Estado, 6=Distancia, 7=FechaDespacho, 8=FechaHoraEntrega, 11=MotivoDevolucion
+        const dataRows = rows.slice(1); // saltar encabezado
+
+        let updated = 0;
+        let notFound = 0;
+        const errors: string[] = [];
+
+        for (const row of dataRows) {
+            const placa         = String(row[0] || '').trim();
+            const idCarga       = String(row[3] || '').trim();
+            const factura       = String(row[4] || '').trim();
+            const estado        = String(row[5] || '').trim();
+            const fechaDespacho = String(row[7] || '').trim();
+            const fechaEntrega  = String(row[8] || '').trim();
+            const motivoDev     = String(row[11] || '').trim();
+
+            if (!factura) continue;
+
+            // Parsear fechas al formato ISO
+            const parseFecha = (s: string): string | null => {
+                if (!s) return null;
+                // "08/04/2026" → ISO date; "09/04/2026 14:34:36" → ISO timestamp
+                const parts = s.split(' ');
+                const dateParts = parts[0].split('/');
+                if (dateParts.length !== 3) return null;
+                return `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}${parts[1] ? ' ' + parts[1] : ''}`;
+            };
+
+            try {
+                const upd = await pool.query(
+                    `UPDATE document_items
+                     SET mastersuite_estado         = $1,
+                         mastersuite_id_carga       = $2,
+                         mastersuite_fecha_despacho = $3,
+                         mastersuite_fecha_entrega  = $4,
+                         mastersuite_motivo_dev     = $5
+                     WHERE TRIM(UPPER(invoice)) = TRIM(UPPER($6))`,
+                    [
+                        estado   || null,
+                        idCarga  || null,
+                        parseFecha(fechaDespacho),
+                        parseFecha(fechaEntrega),
+                        motivoDev || null,
+                        factura,
+                    ]
+                );
+                if ((upd.rowCount ?? 0) > 0) {
+                    updated++;
+                } else {
+                    notFound++;
+                }
+            } catch (e: any) {
+                errors.push(`${factura}: ${e.message}`);
+            }
+        }
+
+        // Cleanup temp file
+        const fs = await import('fs/promises');
+        await fs.unlink(req.file.path).catch(() => {});
+
+        res.json({ success: true, updated, notFound, total: dataRows.length, errors: errors.slice(0, 10) });
+    } catch (err: any) {
+        console.error('[CONCILIATION] importMasterSuite error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── GET /conciliation/:documentId/history ────────────────────────────────────
+// Historial de estados de todas las facturas de un documento
+export const getInvoiceStatusHistory = async (req: Request, res: Response) => {
+    const { documentId } = req.params;
+    try {
+        const result = await pool.query(`
+            SELECT * FROM invoice_status_history
+            WHERE document_id = $1
+            ORDER BY created_at DESC
+        `, [documentId]);
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
     }
 };

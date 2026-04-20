@@ -178,9 +178,17 @@ export const api = {
     banco?: string; valor?: number; comprobante?: string; fechaPago?: string;
     formaPago?: string; numeroCheque?: string; esDevolucion?: boolean;
     conciliadoPor?: string; vehiclePlate?: string; conductorId?: string; conductorName?: string;
+    estadoEntrega?: string; valorFactura?: number; usuarioNombre?: string;
   }) => fetchJson(`${API_URL}/conciliation/save`, { method: 'POST', body: JSON.stringify(data) }),
   generateConciliationReport: (documentId: string, targetEmail: string | string[]) =>
     fetchJson(`${API_URL}/conciliation/report`, { method: 'POST', body: JSON.stringify({ documentId, targetEmail }) }),
+  importMasterSuite: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return fetchJson(`${API_URL}/conciliation/import-mastersuite`, { method: 'POST', body: form });
+  },
+  getInvoiceStatusHistory: (documentId: string) =>
+    fetchJson(`${API_URL}/conciliation/${encodeURIComponent(documentId)}/history`),
   getConciliationPlanillaUrl: (routeId: string | number) => {
     return `${API_URL}/conciliation/planilla?routeId=${routeId}`;
   },
@@ -403,6 +411,12 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ waypoints })
+    }),
+  reassignRouteVehicle: (data: { routeId: string; newVehicleId: string; observations?: string }) =>
+    fetchJson(`${API_URL}/routes/reassign-vehicle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     }),
 
   getMastersuiteReport: (params?: { document?: string; plate?: string }) => {

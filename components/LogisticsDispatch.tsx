@@ -99,6 +99,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
     const [showReassignModal, setShowReassignModal] = useState<{ isOpen: boolean; route: any }>({ isOpen: false, route: null });
     const [reassignData, setReassignData] = useState({ newVehicleId: '', observations: '' });
+    const [vehicleSearch, setVehicleSearch] = useState('');
+    const [vehicleDropOpen, setVehicleDropOpen] = useState(false);
     const mapRef = useRef<L.Map | null>(null);
     const markersRef = useRef<{ [key: string]: L.Marker }>({});
     const routeLinesRef = useRef<{ [key: string]: L.Polyline }>({});
@@ -1942,16 +1944,59 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <div className="p-8 space-y-6">
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nuevo Vehículo / Placa</label>
-                                <select 
-                                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                                    value={reassignData.newVehicleId}
-                                    onChange={(e) => setReassignData({ ...reassignData, newVehicleId: e.target.value })}
-                                >
-                                    <option value="">Seleccionar Placa...</option>
-                                    {availableVehicles.map((v: any) => (
-                                        <option key={v.id} value={v.id}>{v.plate} - {v.driverName}</option>
-                                    ))}
-                                </select>
+                                <div className="relative">
+                                    {/* Campo de búsqueda + placa seleccionada */}
+                                    <div
+                                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-900 focus-within:ring-2 focus-within:ring-indigo-500/20 cursor-text flex items-center gap-2"
+                                        onClick={() => setVehicleDropOpen(true)}
+                                    >
+                                        <input
+                                            className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-900 placeholder:text-slate-400"
+                                            placeholder={reassignData.newVehicleId
+                                                ? (availableVehicles.find((v: any) => v.id === reassignData.newVehicleId)?.plate + ' - ' + availableVehicles.find((v: any) => v.id === reassignData.newVehicleId)?.driverName)
+                                                : 'Buscar placa o conductor...'}
+                                            value={vehicleSearch}
+                                            onChange={e => { setVehicleSearch(e.target.value); setVehicleDropOpen(true); }}
+                                            onFocus={() => setVehicleDropOpen(true)}
+                                        />
+                                        {reassignData.newVehicleId && (
+                                            <button onClick={e => { e.stopPropagation(); setReassignData({ ...reassignData, newVehicleId: '' }); setVehicleSearch(''); }}
+                                                className="text-slate-400 hover:text-rose-500 transition-colors text-lg leading-none">×</button>
+                                        )}
+                                    </div>
+                                    {/* Dropdown */}
+                                    {vehicleDropOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-10" onClick={() => setVehicleDropOpen(false)} />
+                                            <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto">
+                                                {availableVehicles
+                                                    .filter((v: any) => {
+                                                        const q = vehicleSearch.toLowerCase();
+                                                        return !q || v.plate?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q);
+                                                    })
+                                                    .map((v: any) => (
+                                                        <button key={v.id}
+                                                            className={`w-full text-left px-4 py-3 text-sm font-bold hover:bg-indigo-50 hover:text-indigo-700 transition-colors
+                                                                ${reassignData.newVehicleId === v.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'}`}
+                                                            onClick={() => {
+                                                                setReassignData({ ...reassignData, newVehicleId: v.id });
+                                                                setVehicleSearch('');
+                                                                setVehicleDropOpen(false);
+                                                            }}>
+                                                            <span className="font-black">{v.plate}</span>
+                                                            {v.driverName && <span className="text-slate-500 font-normal"> — {v.driverName}</span>}
+                                                        </button>
+                                                    ))}
+                                                {availableVehicles.filter((v: any) => {
+                                                    const q = vehicleSearch.toLowerCase();
+                                                    return !q || v.plate?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q);
+                                                }).length === 0 && (
+                                                    <p className="px-4 py-3 text-xs text-slate-400 font-bold">Sin resultados</p>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
 
                             <div>
@@ -1968,7 +2013,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <div className="p-8 bg-slate-50 flex gap-4">
                             <button 
                                 className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
-                                onClick={() => setShowReassignModal({ isOpen: false, route: null })}
+                                onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setVehicleSearch(''); setVehicleDropOpen(false); }}
                             >
                                 Cancelar
                             </button>
