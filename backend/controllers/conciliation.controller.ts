@@ -390,15 +390,18 @@ export const saveConciliation = async (req: Request, res: Response) => {
             );
         }
 
-        // 5. Calcular valores para historial
+        // 5. COMMIT — la conciliación queda guardada independiente del historial
+        await client.query('COMMIT');
+        res.json({ success: true, data: result.rows[0] });
+
+        // 6. Historial: best-effort fuera de la transacción (no bloquea si la tabla no existe aún)
         const valorNum   = Number(valor) || 0;
         const facturaNum = Number(valorFactura) || 0;
         const valorEntregado = esDevolucion || estadoEntrega === 'devolucion' ? 0 : valorNum;
         const valorDevuelto  = estadoEntrega === 'parcial' && facturaNum > valorNum
             ? facturaNum - valorNum : 0;
 
-        // 6. Insertar en historial
-        await client.query(`
+        pool.query(`
             INSERT INTO invoice_status_history
                 (document_id, invoice_number, evento, estado_anterior, estado_nuevo,
                  valor_factura, valor_entregado, valor_devuelto,
@@ -412,10 +415,8 @@ export const saveConciliation = async (req: Request, res: Response) => {
             valorDevuelto  > 0 ? valorDevuelto  : null,
             conciliadoPor  || null,
             usuarioNombre  || null,
-        ]);
+        ]).catch(e => console.warn('[CONCILIATION] history insert skipped:', e.message));
 
-        await client.query('COMMIT');
-        res.json({ success: true, data: result.rows[0] });
     } catch (err: any) {
         await client.query('ROLLBACK');
         console.error('[CONCILIATION] saveConciliation error:', err.message);

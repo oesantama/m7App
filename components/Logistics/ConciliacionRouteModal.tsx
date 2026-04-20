@@ -212,10 +212,24 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const handleSave = async (inv: InvoiceRow) => {
         const form = forms.get(inv.invoice_number);
         if (!form) return;
-        const esDevolucion = form.estadoEntrega === 'devolucion';
-        const valorNum     = Number(form.valor);
+        const esDevolucion  = form.estadoEntrega === 'devolucion';
+        const valorNum      = Number(form.valor);
+        const invoiceVal    = Number(inv.invoice_value) || 0;
+        const sobrecostoNum = Number(form.sobrecosto) || 0;
+        const expectedTotal = invoiceVal + sobrecostoNum;
+
         if (!esDevolucion && (isNaN(valorNum) || valorNum <= 0)) {
             toast.error('Ingrese un valor mayor a 0');
+            return;
+        }
+        // Entregado: el total a pagar debe coincidir con valor factura + sobrecosto (±1500)
+        if (form.estadoEntrega === 'entregado' && expectedTotal > 0 && Math.abs(valorNum - expectedTotal) > 1500) {
+            toast.error(`Entregado requiere el valor completo: ${fmtCOP(expectedTotal)}. Diferencia: ${fmtCOP(Math.abs(valorNum - expectedTotal))}`);
+            return;
+        }
+        // Parcial: el valor debe ser menor al total esperado
+        if (form.estadoEntrega === 'parcial' && expectedTotal > 0 && valorNum >= expectedTotal) {
+            toast.error(`Parcial: el valor (${fmtCOP(valorNum)}) no puede ser igual o mayor al total de la factura (${fmtCOP(expectedTotal)})`);
             return;
         }
         updateForm(inv.invoice_number, { saving: true });
@@ -520,6 +534,39 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         </div>
                                                     </div>
 
+                                                    {/* Indicador de validación */}
+                                                    {(() => {
+                                                        const valN  = Number(form.valor) || 0;
+                                                        const scN   = Number(form.sobrecosto) || 0;
+                                                        const total = invoiceVal + scN;
+                                                        if (total <= 0 || valN <= 0) return null;
+                                                        const diff  = valN - total;
+                                                        const absDiff = Math.abs(diff);
+
+                                                        if (form.estadoEntrega === 'entregado') {
+                                                            const ok = absDiff <= 1500;
+                                                            return (
+                                                                <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-[9px] font-black border
+                                                                    ${ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
+                                                                    <span>{ok ? '✓ Valor completo' : `⚠ Faltan ${fmtCOP(absDiff)}`}</span>
+                                                                    <span>{fmtCOP(valN)} / {fmtCOP(total)}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (form.estadoEntrega === 'parcial') {
+                                                            const ok = valN > 0 && valN < total;
+                                                            const devuelto = total - valN;
+                                                            return (
+                                                                <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-[9px] font-black border
+                                                                    ${ok ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
+                                                                    <span>{ok ? `📦 Entrega: ${fmtCOP(valN)} · Devuelve: ${fmtCOP(devuelto)}` : '⚠ Debe ser menor al total'}</span>
+                                                                    <span>{fmtCOP(total)}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
+
                                                     {/* Método */}
                                                     <div>
                                                         <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
@@ -573,9 +620,27 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     Cancelar
                                                 </button>
                                                 <button onClick={() => handleSave(inv)}
-                                                    disabled={form.saving || (form.estadoEntrega !== 'devolucion' && (!form.valor || Number(form.valor) <= 0))}
+                                                    disabled={form.saving || (() => {
+                                                        if (form.estadoEntrega === 'devolucion') return false;
+                                                        const valN  = Number(form.valor) || 0;
+                                                        const scN   = Number(form.sobrecosto) || 0;
+                                                        const total = (Number(inv.invoice_value) || 0) + scN;
+                                                        if (valN <= 0) return true;
+                                                        if (form.estadoEntrega === 'entregado' && total > 0 && Math.abs(valN - total) > 1500) return true;
+                                                        if (form.estadoEntrega === 'parcial'   && total > 0 && valN >= total) return true;
+                                                        return false;
+                                                    })()}
                                                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all
-                                                        ${form.saving || (form.estadoEntrega !== 'devolucion' && (!form.valor || Number(form.valor) <= 0))
+                                                        ${form.saving || (() => {
+                                                            if (form.estadoEntrega === 'devolucion') return false;
+                                                            const valN  = Number(form.valor) || 0;
+                                                            const scN   = Number(form.sobrecosto) || 0;
+                                                            const total = (Number(inv.invoice_value) || 0) + scN;
+                                                            if (valN <= 0) return true;
+                                                            if (form.estadoEntrega === 'entregado' && total > 0 && Math.abs(valN - total) > 1500) return true;
+                                                            if (form.estadoEntrega === 'parcial'   && total > 0 && valN >= total) return true;
+                                                            return false;
+                                                        })()
                                                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                                             : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-900/20'}`}>
                                                     {form.saving && <Icons.Loader className="w-3 h-3 animate-spin" />}
