@@ -272,12 +272,17 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                          AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFE%'
                     THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
                 ), 0)                                               AS credito,
-                -- Conteo por estado de entrega (delivery)
+                -- Conteo por estado de entrega (delivery) y conciliación
                 COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-12','ENTREGADO','COMPLETED','FINALIZADO') THEN di.invoice END) AS completadas,
-                COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-13','DEVUELTO') THEN di.invoice END)                           AS devueltas,
+                COUNT(DISTINCT CASE WHEN ic2.es_devolucion = true OR di.item_status IN ('EST-13','DEVUELTO') THEN di.invoice END) AS devueltas,
                 COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN di.invoice END)                    AS parciales,
                 -- Legalizadas = conciliadas (tienen forma_pago registrada)
-                COUNT(DISTINCT CASE WHEN ic2.forma_pago IS NOT NULL THEN di.invoice END)                                        AS legalizadas
+                COUNT(DISTINCT CASE WHEN ic2.forma_pago IS NOT NULL THEN di.invoice END)                                        AS legalizadas,
+                -- Valores financieros ($)
+                SUM(COALESCE(ic2.valor, 0))                                         AS valor_legalizado,
+                SUM(CASE WHEN ic2.es_devolucion = true THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END) AS valor_devuelto,
+                SUM(CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN COALESCE(ic2.valor, 0) ELSE 0 END) AS valor_parcial,
+                SUM(COALESCE(ic2.sobrecosto, 0))                                    AS total_sobrecosto
             FROM route_invoices ri
             JOIN  routes   r   ON r.id::text = ri.route_id::text
             LEFT JOIN vehicles v   ON v.id::text  = r.vehicle_id::text

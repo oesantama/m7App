@@ -17,7 +17,7 @@ export const initDispatch = async (req: Request, res: Response) => {
         signatures // { userId: string, password?: string, signNow: boolean }[]
     } = req.body;
 
-    const dispatchId = `DIS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const generatedDispatchId = `DIS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     try {
         await pool.query('BEGIN');
@@ -57,9 +57,8 @@ export const initDispatch = async (req: Request, res: Response) => {
             }
 
             await pool.query(`
-                INSERT INTO dispatch_signatures_pending (id, dispatch_id, user_id, role_type, signed, signed_at)
-                SELECT COALESCE(MAX(id::integer),0)+1, $1, $2, $3, $4, $5
-                FROM dispatch_signatures_pending
+                INSERT INTO dispatch_signatures_pending (dispatch_id, user_id, role_type, signed, signed_at)
+                VALUES ($1, $2, $3, $4, $5)
             `, [dispatchId, sig.userId, sig.role, isSigned, signedAt]);
         }
 
@@ -67,10 +66,14 @@ export const initDispatch = async (req: Request, res: Response) => {
         const updatedItems = await pool.query(`
             UPDATE document_items
             SET item_status = 'EST-11'
-            WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = $1
-            OR TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = $1
+            WHERE TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = $1
+               OR CONCAT(TRIM(document_id), '_', TRIM(COALESCE(NULLIF(invoice, ''), order_number))) = $1
             RETURNING id, document_id, article_id, expected_qty, batch, invoice, order_number, unit, customer_name, city, address
         `, [invoiceId]);
+
+        if (updatedItems.rowCount === 0) {
+            throw new Error(`No se encontraron registros para la factura ${invoiceId} en document_items.`);
+        }
 
         // 3b. Poblar vehicle_inventory y route_assignment_items con lo que sale de bodega
         if (updatedItems.rows.length > 0) {
@@ -346,8 +349,8 @@ export const confirmDelivery = async (req: Request, res: Response) => {
         // EST-15 = REPICE (pendiente de re-entrega, distinto de EST-01 pendiente inicial)
         const statusMap: Record<string, string> = {
             FULL:    'EST-12',  // Entregado completo
-            PARTIAL: 'EST-13',  // Entrega parcial con devolución
-            RETURN:  'EST-01',  // Devolución total → vuelve a pendiente inicial
+            PARTIAL: 'EST-14',  // Entrega parcial
+            RETURN:  'EST-13',  // Devolución total
             REPICE: repiceDestination === 'SAME_PLATE' ? 'EST-11' : 'EST-15', // EST-15 = repice a bodega para re-entrega
         };
         const newStatus = statusMap[deliveryType] ?? 'EST-11';
@@ -399,8 +402,8 @@ export const confirmDelivery = async (req: Request, res: Response) => {
         await pool.query(`
             UPDATE document_items
             SET item_status = $1
-            WHERE TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = $2
-               OR CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = $2
+            WHERE TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = TRIM($2)
+               OR CONCAT(TRIM(document_id), '_', TRIM(COALESCE(NULLIF(invoice, ''), order_number))) = TRIM($2)
         `, [newStatus, invoiceId]);
 
         // 6. Ajustar vehicle_inventory según el tipo de entrega

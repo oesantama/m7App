@@ -39,6 +39,7 @@ interface ConciliacionModalProps {
     conductorId?: string;
     conductorName?: string;
     onSaved: (invoiceNumber: string) => void;
+    isReadOnly?: boolean;
 }
 
 const FORMAS_PAGO: { value: FormaPago; label: string; icon: string; color: string }[] = [
@@ -54,6 +55,7 @@ const COLOR_MAP: Record<string, { active: string; inactive: string }> = {
 const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
     isOpen, onClose, invoice, documentId,
     currentUserId, vehiclePlate, conductorId, conductorName, onSaved,
+    isReadOnly = false
 }) => {
     const [formaPago, setFormaPago]     = useState<FormaPago | ''>('');
     const [banco, setBanco]             = useState('');
@@ -139,6 +141,12 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                             <Icons.X className="w-4 h-4 text-white" />
                         </button>
                     </div>
+                    {isReadOnly && (
+                        <div className="mt-2 flex items-center gap-1.5 bg-emerald-500/20 w-fit px-2 py-0.5 rounded-full border border-emerald-500/30">
+                            <Icons.Eye className="w-2.5 h-2.5 text-emerald-400" />
+                            <span className="text-[8px] font-black text-emerald-300 uppercase tracking-widest">Modo Consulta</span>
+                        </div>
+                    )}
 
                     {/* Datos de entrega */}
                     {(invoice.city || invoice.address) && (
@@ -165,9 +173,10 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                                 return (
                                     <button
                                         key={fp.value}
-                                        onClick={() => setFormaPago(fp.value)}
+                                        onClick={() => !isReadOnly && setFormaPago(fp.value)}
+                                        disabled={isReadOnly}
                                         className={`flex flex-col items-center gap-1.5 py-4 rounded-2xl border-2 transition-all text-[9px] font-black uppercase tracking-wide
-                                            ${COLOR_MAP[fp.color][active ? 'active' : 'inactive']}`}
+                                            ${isReadOnly && active ? 'bg-slate-100 border-slate-300 text-slate-500' : COLOR_MAP[fp.color][active ? 'active' : 'inactive']}`}
                                     >
                                         <span className="text-2xl">{fp.icon}</span>
                                         {fp.label}
@@ -188,8 +197,10 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                                 type="number" min={0} step="0.01"
                                 value={valor}
                                 onChange={e => setValor(e.target.value)}
+                                readOnly={isReadOnly}
                                 placeholder="0"
-                                className="w-full pl-7 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white rounded-2xl text-sm font-black text-slate-900 outline-none transition-all"
+                                className={`w-full pl-7 pr-4 py-3 border focus:border-emerald-500 focus:bg-white rounded-2xl text-sm font-black outline-none transition-all
+                                    ${isReadOnly ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                             />
                         </div>
                     </div>
@@ -201,8 +212,10 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                             type="text"
                             value={banco}
                             onChange={e => setBanco(e.target.value)}
+                            readOnly={isReadOnly}
                             placeholder="Ej: Bancolombia, Davivienda..."
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
+                            className={`w-full px-4 py-3 border focus:border-blue-500 focus:bg-white rounded-2xl text-sm outline-none transition-all
+                                ${isReadOnly ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                         />
                     </div>
 
@@ -215,8 +228,10 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                             type="text"
                             value={comprobante}
                             onChange={e => setComprobante(e.target.value)}
+                            readOnly={isReadOnly}
                             placeholder="Ej: 0012345678, REF-987..."
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-slate-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
+                            className={`w-full px-4 py-3 border focus:border-slate-500 focus:bg-white rounded-2xl text-sm outline-none transition-all
+                                ${isReadOnly ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                         />
                     </div>
 
@@ -227,7 +242,9 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                             type="date"
                             value={fechaPago}
                             onChange={e => setFechaPago(e.target.value)}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-slate-500 focus:bg-white rounded-2xl text-sm text-slate-900 outline-none transition-all"
+                            readOnly={isReadOnly}
+                            className={`w-full px-4 py-3 border focus:border-slate-500 focus:bg-white rounded-2xl text-sm outline-none transition-all
+                                ${isReadOnly ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                         />
                     </div>
                 </div>
@@ -235,20 +252,22 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                 {/* Footer */}
                 <div className="px-6 py-5 border-t border-slate-100 flex gap-3">
                     <button onClick={onClose}
-                        className="flex-none px-5 py-3.5 rounded-2xl text-slate-500 font-black text-[9px] uppercase tracking-widest border border-slate-200 hover:bg-slate-50 transition-all">
-                        Cancelar
+                        className="flex-1 px-5 py-3.5 rounded-2xl text-slate-500 font-black text-[9px] uppercase tracking-widest border border-slate-200 hover:bg-slate-50 transition-all">
+                        {isReadOnly ? 'Cerrar' : 'Cancelar'}
                     </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={!canSave || saving}
-                        className={`flex-1 py-3.5 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-2
-                            ${canSave && !saving
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'
-                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-                    >
-                        {saving && <Icons.Loader className="w-3.5 h-3.5 animate-spin" />}
-                        {saving ? 'Guardando...' : '✅ Guardar Conciliación'}
-                    </button>
+                    {!isReadOnly && (
+                        <button
+                            onClick={handleSave}
+                            disabled={!canSave || saving}
+                            className={`flex-[2] py-3.5 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-2
+                                ${canSave && !saving
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'
+                                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                        >
+                            {saving && <Icons.Loader className="w-3.5 h-3.5 animate-spin" />}
+                            {saving ? 'Guardando...' : '✅ Guardar Conciliación'}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

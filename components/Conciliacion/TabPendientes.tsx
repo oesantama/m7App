@@ -36,6 +36,10 @@ interface RouteGroup {
     devueltas: number;
     parciales: number;
     legalizadas: number;
+    valor_legalizado: number;
+    valor_devuelto: number;
+    valor_parcial: number;
+    total_sobrecosto: number;
 }
 
 interface InvoiceRow {
@@ -242,14 +246,25 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
     // ── Métricas globales del documento ───────────────────────────────────────
     const stats = useMemo(() => {
-        const total       = invoices.length;
-        const legalizadas = invoices.filter(i => !!i.forma_pago).length;
-        const entregadas  = invoices.filter(i => ENTREGADO_STATUS.includes(i.item_status || '')).length;
-        const devueltas   = invoices.filter(i => DEVUELTO_STATUS.includes(i.item_status || '')).length;
-        const parciales   = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).length;
-        const valorTotal  = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const assigned    = total - unassigned;
-        return { total, legalizadas, entregadas, devueltas, parciales, valorTotal, assigned };
+        const total           = invoices.length;
+        const legalizadas     = invoices.filter(i => !!i.forma_pago).length;
+        const entregadas      = invoices.filter(i => ENTREGADO_STATUS.includes(i.item_status || '')).length;
+        const devueltas       = invoices.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes(i.item_status || '')).length;
+        const parciales       = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).length;
+        
+        const valorTotal      = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        const valorLegalizado = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
+        const valorDevuelto   = invoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        const valorParcial    = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).reduce((s, i) => s + (Number(i.valor) || 0), 0);
+        const totalSobrecosto = invoices.reduce((s, i) => s + (Number(i.sobrecosto) || 0), 0);
+
+        const assigned        = total - unassigned;
+        
+        return { 
+            total, legalizadas, entregadas, devueltas, parciales, 
+            valorTotal, valorLegalizado, valorDevuelto, valorParcial, totalSobrecosto,
+            assigned 
+        };
     }, [invoices, unassigned]);
 
     const isAllLegalized = stats.total > 0 && stats.legalizadas === stats.total;
@@ -444,27 +459,70 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
 
                                 {/* ── Bloque de métricas del documento ─────── */}
-                                <div className="bg-white border-b border-slate-200 px-5 py-3">
-                                    {/* Fila 1: valor + distribución de facturas */}
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {stats.valorTotal > 0 && (
-                                            <div className="flex flex-col px-3 py-2 rounded-xl bg-slate-900 text-white">
-                                                <span className="text-[8px] font-black uppercase tracking-widest opacity-60 leading-none mb-0.5">Valor Total</span>
-                                                <span className="text-sm font-black leading-none">{fmtCOP(stats.valorTotal)}</span>
+                                <div className="bg-white border-b border-slate-200 px-5 py-4">
+                                    {/* Fila 1: Resumen de Valores ($) */}
+                                    <div className="flex flex-wrap gap-2 mb-4">
+                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/10 min-w-[120px]">
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Placa</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotal)}</span>
+                                        </div>
+                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-900/10 min-w-[120px]">
+                                            <span className="text-[8px] font-black text-emerald-100 uppercase tracking-widest leading-none mb-1">Legalizado</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorLegalizado)}</span>
+                                        </div>
+                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10 min-w-[120px]">
+                                            <span className="text-[8px] font-black text-amber-100 uppercase tracking-widest leading-none mb-1">Pendiente</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotal - stats.valorLegalizado)}</span>
+                                        </div>
+                                        {stats.totalSobrecosto > 0 && (
+                                            <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-900/10 min-w-[100px]">
+                                                <span className="text-[8px] font-black text-rose-100 uppercase tracking-widest leading-none mb-1">Sobre Costo</span>
+                                                <span className="text-base font-black leading-none">{fmtCOP(stats.totalSobrecosto)}</span>
                                             </div>
                                         )}
-                                        <Metric label="Total Fact."  value={stats.total}    color="bg-slate-100 text-slate-700" />
-                                        <Metric label="Asignadas"    value={stats.assigned}  color="bg-blue-50 text-blue-700" />
-                                        {unassigned > 0 && (
-                                            <Metric label="Sin Asignar" value={unassigned}   color="bg-rose-50 text-rose-700" />
-                                        )}
                                     </div>
-                                    {/* Fila 2: estados */}
-                                    <div className="flex flex-wrap gap-2">
-                                        <Metric label="Legalizadas"  value={stats.legalizadas} color="bg-emerald-100 text-emerald-700" />
-                                        <Metric label="Entregadas"   value={stats.entregadas}  color="bg-teal-50 text-teal-700" />
-                                        <Metric label="Devueltas"    value={stats.devueltas}   color="bg-amber-100 text-amber-700" />
-                                        <Metric label="Parciales"    value={stats.parciales}   color="bg-orange-100 text-orange-700" />
+
+                                    {/* Fila 2: Barra de Progreso Principal (AVANCE DE LEGALIZACIÓN) */}
+                                    <div className="mb-4">
+                                        <div className="flex justify-between items-end mb-1.5">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Avance de Legalización</p>
+                                            <span className="text-[10px] font-black text-emerald-600">
+                                                {stats.legalizadas}/{stats.total} · {Math.round((stats.legalizadas/stats.total)*100) || 0}%
+                                            </span>
+                                        </div>
+                                        <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                                                style={{ width: `${(stats.legalizadas/stats.total)*100 || 0}%` }} />
+                                        </div>
+                                    </div>
+
+                                    {/* Fila 3: Otros Valores y Conteo de Estados */}
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <div className="flex items-center gap-4 border-r border-slate-100 pr-4">
+                                            <Metric label="Asignadas" value={stats.assigned} color="bg-blue-50 text-blue-700" />
+                                            {unassigned > 0 && <Metric label="Sin Asignar" value={unassigned} color="bg-rose-50 text-rose-700" />}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Metric label="Entregadas"   value={stats.entregadas}  color="bg-teal-50 text-teal-700" />
+                                            <Metric label="Devueltas"    value={stats.devueltas}   color="bg-amber-100 text-amber-700" />
+                                            <Metric label="Parciales"    value={stats.parciales}   color="bg-orange-100 text-orange-700" />
+                                        </div>
+                                        
+                                        {/* Valores de Devolución y Parcial */}
+                                        <div className="flex gap-2 ml-auto">
+                                            {stats.valorDevuelto > 0 && (
+                                                <div className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200">
+                                                    <span className="text-[7px] font-bold text-amber-600 uppercase block leading-none mb-0.5">Val. Devuelto</span>
+                                                    <span className="text-[10px] font-black text-amber-800 leading-none">{fmtCOP(stats.valorDevuelto)}</span>
+                                                </div>
+                                            )}
+                                            {stats.valorParcial > 0 && (
+                                                <div className="px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200">
+                                                    <span className="text-[7px] font-bold text-orange-600 uppercase block leading-none mb-0.5">Val. Parcial</span>
+                                                    <span className="text-[10px] font-black text-orange-800 leading-none">{fmtCOP(stats.valorParcial)}</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -541,19 +599,43 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                         <p className="text-[7px] font-bold text-orange-600 uppercase mt-0.5">Parciales</p>
                                                                     </div>
                                                                 </div>
-                                                                {/* Efectivo / Crédito */}
+                                                                {/* Valores financieros de la ruta */}
+                                                                <div className="grid grid-cols-2 gap-2 mt-3 mb-2">
+                                                                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-2.5 py-2">
+                                                                        <p className="text-[7px] font-black text-emerald-600 uppercase tracking-wider mb-0.5">💵 Legalizado</p>
+                                                                        <p className="text-xs font-black text-emerald-800">{fmtCOP(route.valor_legalizado)}</p>
+                                                                    </div>
+                                                                    <div className="bg-amber-50/50 border border-amber-100 rounded-xl px-2.5 py-2">
+                                                                        <p className="text-[7px] font-black text-amber-600 uppercase tracking-wider mb-0.5">🔄 Devuelto</p>
+                                                                        <p className="text-xs font-black text-amber-800">{fmtCOP(route.valor_devuelto)}</p>
+                                                                    </div>
+                                                                    {route.valor_parcial > 0 && (
+                                                                        <div className="bg-orange-50/50 border border-orange-100 rounded-xl px-2.5 py-2">
+                                                                            <p className="text-[7px] font-black text-orange-600 uppercase tracking-wider mb-0.5">📦 Parcial</p>
+                                                                            <p className="text-xs font-black text-orange-800">{fmtCOP(route.valor_parcial)}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {route.total_sobrecosto > 0 && (
+                                                                        <div className="bg-rose-50/50 border border-rose-100 rounded-xl px-2.5 py-2">
+                                                                            <p className="text-[7px] font-black text-rose-600 uppercase tracking-wider mb-0.5">⚠️ Sobrecosto</p>
+                                                                            <p className="text-xs font-black text-rose-800">{fmtCOP(route.total_sobrecosto)}</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Efectivo / Crédito (Original) */}
                                                                 {((route.efectivo > 0) || (route.credito > 0)) && (
-                                                                    <div className="flex gap-2 mt-2">
+                                                                    <div className="flex gap-2">
                                                                         {route.efectivo > 0 && (
-                                                                            <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1">
-                                                                                <p className="text-[7px] font-black text-emerald-600 uppercase">💵 Efectivo</p>
-                                                                                <p className="text-[10px] font-black text-emerald-800">{fmtCOP(route.efectivo)}</p>
+                                                                            <div className="flex-1 bg-white border border-emerald-50 rounded-lg px-2 py-1 flex items-center justify-between">
+                                                                                <span className="text-[7px] font-black text-emerald-600 uppercase">EFE</span>
+                                                                                <span className="text-[9px] font-black text-emerald-700">{fmtCOP(route.efectivo)}</span>
                                                                             </div>
                                                                         )}
                                                                         {route.credito > 0 && (
-                                                                            <div className="flex-1 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1">
-                                                                                <p className="text-[7px] font-black text-blue-600 uppercase">💳 Crédito</p>
-                                                                                <p className="text-[10px] font-black text-blue-800">{fmtCOP(route.credito)}</p>
+                                                                            <div className="flex-1 bg-white border border-blue-50 rounded-lg px-2 py-1 flex items-center justify-between">
+                                                                                <span className="text-[7px] font-black text-blue-600 uppercase">CRE</span>
+                                                                                <span className="text-[9px] font-black text-blue-700">{fmtCOP(route.credito)}</span>
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -726,6 +808,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     conductorId={selectedDoc.conductor_id}
                     conductorName={selectedDoc.conductor_name}
                     onSaved={handleInvoiceSaved}
+                    isReadOnly={!!modalInvoice.forma_pago}
                 />
             )}
 
