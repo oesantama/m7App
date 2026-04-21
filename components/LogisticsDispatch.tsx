@@ -156,19 +156,21 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         invoiceId: '', driverId: '', vehicleId: '', dateFrom: '', dateTo: '', deliveryType: '', status: ''
     });
 
-    // ── Populate filtered clients from prop ──────────────────────────────────
+    // ── Load filtered clients via API (same pattern as other pages) ──────────
     useEffect(() => {
         const allowedIds: string[] = (user as any)?.clientIds?.length
             ? (user as any).clientIds
             : user?.clientId ? [user.clientId] : [];
-        const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
-        const filtered = isAdmin || allowedIds.length === 0
-            ? clients
-            : clients.filter((c: any) => allowedIds.includes(c.id));
-        setFilteredClients(filtered);
-        if (filtered.length === 1) setInternalClientId(filtered[0].id);
-        setClientsReady(true);
-    }, [clients, user]);
+        api.getClients().then((all: any[]) => {
+            const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
+            const filtered = isAdmin || allowedIds.length === 0
+                ? all
+                : all.filter((c: any) => allowedIds.includes(c.id));
+            setFilteredClients(filtered);
+            if (filtered.length === 1) setInternalClientId(filtered[0].id);
+            setClientsReady(true);
+        }).catch(() => setClientsReady(true));
+    }, [user]);
 
     // 1. Inicialización del Mapa
     useEffect(() => {
@@ -1609,7 +1611,20 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             <div className="flex justify-between items-start mb-4">
                                                 <div>
                                                     <h3 className="text-xl font-black text-slate-900 tracking-tighter leading-none">{route.plate}</h3>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{route.driver_name || 'PENDIENTE'}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">{route.driver_name || 'PENDIENTE'}</p>
+                                                    {(() => {
+                                                        const raw = route.createdAt || (route as any).created_at;
+                                                        if (!raw) return null;
+                                                        const d = new Date(raw);
+                                                        if (isNaN(d.getTime())) return null;
+                                                        const fecha = d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+                                                        const hora  = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                                        return (
+                                                            <p className="text-[9px] font-bold text-slate-300 mt-1 flex items-center gap-1">
+                                                                <span>📅</span>{fecha} · {hora}
+                                                            </p>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
