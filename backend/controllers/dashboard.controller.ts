@@ -88,193 +88,143 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 };
 
 export const getAjoverStats = async (req: Request, res: Response) => {
+  const clientId: string = (req.query.clientId as string) || 'CLI-01';
+  const p = [clientId]; // Each query has its own .catch() so a single failure never kills the whole response
+  const [
+    vehiclesRes, driversRes, routesRes, invoicesRes,
+    topCitiesRes, activeRoutesRes, vehicleEffRes,
+    concRow, devRow, stkRow,
+  ] = await Promise.all([
+    pool.query(`
+      SELECT COUNT(*) as total,
+        COUNT(*) FILTER (WHERE LOWER(status_id) IN ('est-01','disponible','available')) as available,
+        COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-02') as on_route,
+        COALESCE(SUM(capacity_m3),0) as total_capacity_m3, 0 as total_capacity_kg
+      FROM vehicles WHERE (client_id=$1 OR client_id IS NULL)
+    `, p).catch(() => ({ rows: [{ total:0, available:0, on_route:0, total_capacity_m3:0, total_capacity_kg:0 }] })),
+
+    pool.query(`
+      SELECT COUNT(*) as total,
+        COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-01') as active
+      FROM drivers WHERE (client_id=$1 OR client_id IS NULL)
+    `, p).catch(() => ({ rows: [{ total:0, active:0 }] })),
+
+    pool.query(`
+      SELECT COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status_id = 'EST-11') as active,
+        COUNT(*) FILTER (WHERE status_id IN ('EST-12','EST-07')) as completed,
+        COUNT(*) FILTER (WHERE status_id IN ('EST-10','EST-03')) as pending
+      FROM routes WHERE (client_id=$1 OR client_id IS NULL)
+    `, p).catch(() => ({ rows: [{ total:0, active:0, completed:0, pending:0 }] })),
+
+    pool.query(`
+      SELECT COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status IN ('EST-12','EST-14')) as delivered,
+        COUNT(*) FILTER (WHERE status = 'EST-11') as in_route,
+        COUNT(*) FILTER (WHERE status IN ('EST-03','EST-04','EST-05')) as pending,
+        COUNT(*) FILTER (WHERE status = 'EST-13') as returned,
+        0 as delivered_weight
+      FROM documents_l WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+        AND (client_id=$1 OR client_id IS NULL)
+    `, p).catch(() => ({ rows: [{ total:0, delivered:0, in_route:0, pending:0, returned:0, delivered_weight:0 }] })),
+
+    pool.query(`
+      SELECT di.city,
+        COUNT(DISTINCT d.id) as total,
+        COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('EST-12','EST-14')) as delivered,
+        COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'EST-13') as returned
+      FROM documents_l d
+      JOIN document_items di ON d.id = di.document_id
+      WHERE di.city IS NOT NULL AND d.created_at >= CURRENT_DATE - INTERVAL '30 days'
+        AND d.client_id = $1
+      GROUP BY di.city ORDER BY total DESC LIMIT 10
+    `, p).catch(() => ({ rows: [] })),
+
+    pool.query(`
+      SELECT r.name as route_name, r.status_id as status, v.plate, d.name as driver_name
+      FROM routes r
+      LEFT JOIN vehicles v ON r.vehicle_id = v.id
+      LEFT JOIN drivers d ON r.driver_id = d.id
+      WHERE (r.client_id=$1 OR r.client_id IS NULL)
+        AND r.status_id = 'EST-11'
+      ORDER BY r.created_at DESC LIMIT 10
+    `, p).catch(() => ({ rows: [] })),
+
+    pool.query(`
+      SELECT v.plate, COALESCE(v.capacity_m3,0) as capacity_m3,
+        COUNT(r.id) as total_routes,
+        ROUND(AVG(COALESCE(r.utilization_pct,0)),1) as avg_utilization,
+        ROUND(AVG(COALESCE(r.total_volume_m3,0)),3) as avg_volume,
+        MAX(COALESCE(r.utilization_pct,0)) as max_utilization,
+        SUM(COALESCE(r.total_volume_m3,0)) as total_volume_dispatched
+      FROM routes r
+      JOIN vehicles v ON r.vehicle_id = v.id
+      WHERE r.created_at >= CURRENT_DATE - INTERVAL '30 days'
+        AND (r.client_id=$1 OR r.client_id IS NULL)
+        AND COALESCE(r.utilization_pct,0) > 0
+      GROUP BY v.plate, v.capacity_m3
+      ORDER BY avg_utilization DESC LIMIT 20
+    `, p).catch(() => ({ rows: [] })),
+
+    pool.query(`
+      SELECT COUNT(*) as total,
+        COUNT(*) FILTER (WHERE ic.estado = 'COMPLETADO') as completadas,
+        COUNT(*) FILTER (WHERE ic.estado IS NULL OR ic.estado != 'COMPLETADO') as pendientes,
+        COUNT(*) FILTER (WHERE ic.es_devolucion = true) as devoluciones,
+        0 as devoluciones_pendientes_bodega
+      FROM invoice_conciliations ic
+      JOIN documents_l dl ON dl.id = ic.document_id
+      WHERE dl.client_id=$1 AND dl.created_at >= CURRENT_DATE - INTERVAL '30 days'
+    `, p).catch(() => ({ rows: [{ total:0, completadas:0, pendientes:0, devoluciones:0, devoluciones_pendientes_bodega:0 }] })),
+
+    pool.query(`
+      SELECT COUNT(*) as pendientes_ruta
+      FROM delivery_returns dr
+      JOIN document_items di ON di.invoice = dr.invoice_id
+      JOIN documents_l dl ON dl.id = di.document_id
+      WHERE dr.status = 'PENDING' AND dl.client_id=$1
+    `, p).catch(() => ({ rows: [{ pendientes_ruta:0 }] })),
+
+    pool.query(`
+      SELECT COALESCE(SUM(qty),0) as bodega_qty, COUNT(DISTINCT article_id) as bodega_skus
+      FROM inventario_clientes WHERE client_id=$1
+    `, p).catch(() => ({ rows: [{ bodega_qty:0, bodega_skus:0 }] })),
+  ]);
+
   try {
-    const clientId: string = (req.query.clientId as string) || 'CLI-01';
-    const clientCond = `(client_id = $1 OR client_id IS NULL)`;
-
-    const [vehiclesRes, driversRes, routesRes, invoicesRes, returnsRes, topRoutesRes, vehicleEfficiencyRes] = await Promise.all([
-      pool.query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE LOWER(status_id) IN ('est-01','disponible','available') OR LOWER(status) IN ('disponible','available')) as available,
-          COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-02' OR LOWER(status) IN ('en ruta','in route','activo')) as on_route,
-          COALESCE(SUM(capacity_m3), 0) as total_capacity_m3,
-          0 as total_capacity_kg
-        FROM vehicles WHERE ${clientCond}
-      `, [clientId]),
-      pool.query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-01' OR LOWER(status) IN ('activo','active')) as active
-        FROM drivers WHERE ${clientCond}
-      `, [clientId]),
-      pool.query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE status_id IN ('EST-11') OR LOWER(status) IN ('activo','active','en ruta')) as active,
-          COUNT(*) FILTER (WHERE status_id IN ('EST-12','EST-07') OR LOWER(status) IN ('completado','completed','finalizado')) as completed,
-          COUNT(*) FILTER (WHERE status_id IN ('EST-10','EST-03') OR LOWER(status) IN ('pendiente','pending')) as pending
-        FROM routes WHERE ${clientCond}
-      `, [clientId]),
-      pool.query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE status IN ('EST-12','EST-14') OR LOWER(status) IN ('entregado','finalizado','delivered')) as delivered,
-          COUNT(*) FILTER (WHERE status IN ('EST-11') OR LOWER(status) IN ('en ruta','in route','despachado')) as in_route,
-          COUNT(*) FILTER (WHERE status IN ('EST-03','EST-04','EST-05') OR LOWER(status) IN ('pendiente','pending','procesando')) as pending,
-          COUNT(*) FILTER (WHERE status IN ('EST-13') OR LOWER(status) IN ('devuelto','returned','retorno')) as returned,
-          COALESCE(SUM(CASE WHEN status IN ('EST-12','EST-14') OR LOWER(status) IN ('entregado','finalizado','delivered')
-            THEN (SELECT COALESCE(SUM(COALESCE(peso,0)),0) FROM document_items WHERE document_id = d.id) ELSE 0 END), 0) as delivered_weight
-        FROM documents_l d WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' AND ${clientCond}
-      `, [clientId]),
-      pool.query(`
-        SELECT
-          di.city,
-          COUNT(DISTINCT d.id) as total,
-          COUNT(DISTINCT d.id) FILTER (WHERE LOWER(d.status) IN ('entregado','finalizado','delivered')) as delivered,
-          COUNT(DISTINCT d.id) FILTER (WHERE LOWER(d.status) IN ('devuelto','returned','retorno')) as returned
-        FROM documents_l d
-        JOIN document_items di ON d.id = di.document_id
-        WHERE di.city IS NOT NULL AND d.created_at >= CURRENT_DATE - INTERVAL '30 days' AND d.client_id = $1
-        GROUP BY di.city ORDER BY total DESC LIMIT 10
-      `, [clientId]),
-      pool.query(`
-        SELECT r.name as route_name, r.status,
-          COUNT(DISTINCT r.id) FILTER (WHERE LOWER(r.status) IN ('activo','active','en ruta')) as active_count,
-          v.plate, d.name as driver_name
-        FROM routes r
-        LEFT JOIN vehicles v ON r.vehicle_id = v.id
-        LEFT JOIN drivers d ON r.driver_id = d.id
-        WHERE (r.client_id = $1 OR r.client_id IS NULL)
-        GROUP BY r.name, r.status, v.plate, d.name
-        ORDER BY active_count DESC LIMIT 10
-      `, [clientId]),
-      pool.query(`
-        SELECT
-          v.plate,
-          v.capacity_m3,
-          COUNT(r.id) as total_routes,
-          ROUND(AVG(COALESCE(r.utilization_pct, 0)), 1) as avg_utilization,
-          ROUND(AVG(COALESCE(r.total_volume_m3, 0)), 3) as avg_volume,
-          MAX(COALESCE(r.utilization_pct, 0)) as max_utilization,
-          SUM(COALESCE(r.total_volume_m3, 0)) as total_volume_dispatched
-        FROM routes r
-        JOIN vehicles v ON r.vehicle_id = v.id
-        WHERE r.created_at >= CURRENT_DATE - INTERVAL '30 days'
-          AND (r.client_id = $1 OR r.client_id IS NULL)
-          AND COALESCE(r.utilization_pct, 0) > 0
-        GROUP BY v.plate, v.capacity_m3
-        ORDER BY avg_utilization DESC
-        LIMIT 20
-      `, [clientId]),
-    ]);
-
-    const veh = vehiclesRes.rows[0];
-    const drv = driversRes.rows[0];
-    const rts = routesRes.rows[0];
-    const inv = invoicesRes.rows[0];
-
-    // These queries touch columns/tables that may not exist yet (pending migration)
-    const [concRow, devRow, stkRow] = await Promise.all([
-      pool.query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE ic.estado = 'COMPLETADO') as completadas,
-          COUNT(*) FILTER (WHERE ic.estado IS NULL OR ic.estado != 'COMPLETADO') as pendientes,
-          COUNT(*) FILTER (WHERE ic.es_devolucion = true) as devoluciones,
-          COUNT(*) FILTER (WHERE ic.es_devolucion = true AND EXISTS (
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name='invoice_conciliations' AND column_name='bodega_received_at'
-          ) AND ic.bodega_received_at IS NULL) as devoluciones_pendientes_bodega
-        FROM invoice_conciliations ic
-        JOIN documents_l dl ON dl.id = ic.document_id
-        WHERE dl.client_id = $1 AND dl.created_at >= CURRENT_DATE - INTERVAL '30 days'
-      `, [clientId]).catch(() => ({ rows: [{ total:0, completadas:0, pendientes:0, devoluciones:0, devoluciones_pendientes_bodega:0 }] })),
-      pool.query(`
-        SELECT COUNT(*) as pendientes_ruta
-        FROM delivery_returns dr
-        JOIN documents_l dl ON dl.id::text = dr.document_id::text
-        WHERE dr.status = 'PENDING' AND dl.client_id = $1
-      `, [clientId]).catch(() => ({ rows: [{ pendientes_ruta: 0 }] })),
-      pool.query(`
-        SELECT COALESCE(SUM(qty), 0) as bodega_qty, COUNT(DISTINCT article_id) as bodega_skus
-        FROM inventario_clientes WHERE client_id = $1
-      `, [clientId]).catch(() => ({ rows: [{ bodega_qty: 0, bodega_skus: 0 }] })),
-    ]);
-
+    const veh  = vehiclesRes.rows[0];
+    const drv  = driversRes.rows[0];
+    const rts  = routesRes.rows[0];
+    const inv  = invoicesRes.rows[0];
     const conc = concRow.rows[0];
     const devR = devRow.rows[0];
     const stk  = stkRow.rows[0];
 
     const totalDocs = Number(inv.delivered) + Number(inv.in_route) + Number(inv.pending) + Number(inv.returned);
     const effectivenessRate = totalDocs > 0 ? Math.round((Number(inv.delivered) / totalDocs) * 100) : 0;
-    const returnRate = totalDocs > 0 ? Math.round((Number(inv.returned) / totalDocs) * 100) : 0;
+    const returnRate        = totalDocs > 0 ? Math.round((Number(inv.returned)  / totalDocs) * 100) : 0;
 
     res.json({
-      vehicles: {
-        total: Number(veh.total),
-        available: Number(veh.available),
-        onRoute: Number(veh.on_route),
-        totalCapacityM3: Number(veh.total_capacity_m3),
-        totalCapacityKg: Number(veh.total_capacity_kg),
-      },
-      drivers: {
-        total: Number(drv.total),
-        active: Number(drv.active),
-      },
-      routes: {
-        total: Number(rts.total),
-        active: Number(rts.active),
-        completed: Number(rts.completed),
-        pending: Number(rts.pending),
-      },
-      invoices: {
-        total: Number(inv.total),
-        delivered: Number(inv.delivered),
-        inRoute: Number(inv.in_route),
-        pending: Number(inv.pending),
-        returned: Number(inv.returned),
-        deliveredWeight: Number(inv.delivered_weight),
-        effectivenessRate,
-        returnRate,
-      },
-      topCities: returnsRes.rows.map(r => ({
-        city: r.city,
-        total: Number(r.total),
-        delivered: Number(r.delivered),
-        returned: Number(r.returned),
+      vehicles: { total: Number(veh.total), available: Number(veh.available), onRoute: Number(veh.on_route), totalCapacityM3: Number(veh.total_capacity_m3), totalCapacityKg: Number(veh.total_capacity_kg) },
+      drivers:  { total: Number(drv.total), active: Number(drv.active) },
+      routes:   { total: Number(rts.total), active: Number(rts.active), completed: Number(rts.completed), pending: Number(rts.pending) },
+      invoices: { total: Number(inv.total), delivered: Number(inv.delivered), inRoute: Number(inv.in_route), pending: Number(inv.pending), returned: Number(inv.returned), deliveredWeight: Number(inv.delivered_weight), effectivenessRate, returnRate },
+      topCities: topCitiesRes.rows.map((r: any) => ({
+        city: r.city, total: Number(r.total), delivered: Number(r.delivered), returned: Number(r.returned),
         effectiveness: Number(r.total) > 0 ? Math.round((Number(r.delivered) / Number(r.total)) * 100) : 0,
       })),
-      activeRoutes: topRoutesRes.rows.map(r => ({
-        name: r.route_name,
-        status: r.status,
-        plate: r.plate,
-        driver: r.driver_name,
+      activeRoutes: activeRoutesRes.rows.map((r: any) => ({ name: r.route_name, status: r.status, plate: r.plate, driver: r.driver_name })),
+      vehicleEfficiency: vehicleEffRes.rows.map((r: any) => ({
+        plate: r.plate, capacityM3: Number(r.capacity_m3), totalRoutes: Number(r.total_routes),
+        avgUtilization: Number(r.avg_utilization), avgVolume: Number(r.avg_volume),
+        maxUtilization: Number(r.max_utilization), totalVolumeDispatched: Number(r.total_volume_dispatched),
       })),
-      vehicleEfficiency: vehicleEfficiencyRes.rows.map(r => ({
-        plate: r.plate,
-        capacityM3: Number(r.capacity_m3),
-        totalRoutes: Number(r.total_routes),
-        avgUtilization: Number(r.avg_utilization),
-        avgVolume: Number(r.avg_volume),
-        maxUtilization: Number(r.max_utilization),
-        totalVolumeDispatched: Number(r.total_volume_dispatched),
-      })),
-      conciliation: {
-        total:                      Number(conc.total),
-        completadas:                Number(conc.completadas),
-        pendientes:                 Number(conc.pendientes),
-        devoluciones:               Number(conc.devoluciones),
-        devolucionesPendientesBodega: Number(conc.devoluciones_pendientes_bodega),
-      },
+      conciliation: { total: Number(conc.total), completadas: Number(conc.completadas), pendientes: Number(conc.pendientes), devoluciones: Number(conc.devoluciones), devolucionesPendientesBodega: Number(conc.devoluciones_pendientes_bodega) },
       devolucionesPendientesRuta: Number(devR.pendientes_ruta),
-      stock: {
-        bodegaQty:  Number(stk.bodega_qty),
-        bodegaSkus: Number(stk.bodega_skus),
-      },
+      stock: { bodegaQty: Number(stk.bodega_qty), bodegaSkus: Number(stk.bodega_skus) },
     });
   } catch (err: any) {
-    console.error('[M7-AJOVER-DASHBOARD] Error:', err.message);
+    console.error('[M7-AJOVER-DASHBOARD] Error building response:', err.message);
     res.status(500).json({ error: 'Error al obtener estadísticas Ajover' });
   }
 };
