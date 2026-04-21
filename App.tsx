@@ -931,7 +931,7 @@ const App: React.FC = () => {
       case 'devoluciones-bodega':
         return <DevolucionesBodega user={user!} />;
       case 'consulta-inventario':
-        return <ConsultaInventario />;
+        return <ConsultaInventario user={user!} />;
       case 'capacitaciones':
         return <CentroCapacitaciones user={user!} />;
       case 'chatbot':

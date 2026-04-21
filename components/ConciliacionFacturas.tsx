@@ -5,31 +5,61 @@ import TabPendientes, { DocSummary } from './Conciliacion/TabPendientes';
 import TabConciliado from './Conciliacion/TabConciliado';
 import TabPlanilla from './Conciliacion/TabPlanilla';
 
-// ── Tipos ─────────────────────────────────────────────────────────────────────
-
 interface Props { user: any; }
 
-type Tab = 'pendientes' | 'conciliado' | 'planilla';
+interface Client { id: string; name: string; }
 
-// ── Componente principal ──────────────────────────────────────────────────────
+type Tab = 'pendientes' | 'conciliado' | 'planilla';
 
 const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
     const [activeTab, setActiveTab] = useState<Tab>('pendientes');
     const [docs, setDocs]           = useState<DocSummary[]>([]);
     const [loadingDocs, setLoadingDocs] = useState(false);
 
-    const loadDocs = useCallback(async () => {
+    // ── Client selector ──────────────────────────────────────────────────────
+    const [clients, setClients]           = useState<Client[]>([]);
+    const [selectedClientId, setSelectedClientId] = useState<string>('');
+    const [clientsReady, setClientsReady] = useState(false);
+
+    useEffect(() => {
+        const allowedIds: string[] = user?.clientIds?.length
+            ? user.clientIds
+            : user?.clientId ? [user.clientId] : [];
+
+        api.getClients().then((all: any[]) => {
+            const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
+            const filtered = isAdmin
+                ? all
+                : all.filter((c: any) => allowedIds.includes(c.id));
+            const mapped: Client[] = filtered.map((c: any) => ({ id: c.id, name: c.name || c.id }));
+            setClients(mapped);
+            if (mapped.length === 1) {
+                setSelectedClientId(mapped[0].id);  // auto-select único cliente
+            }
+            setClientsReady(true);
+        }).catch(() => setClientsReady(true));
+    }, [user]);
+
+    // ── Load docs when client is selected ────────────────────────────────────
+    const loadDocs = useCallback(async (clientId: string) => {
+        if (!clientId) return;
         setLoadingDocs(true);
         try {
-            const res = await api.getConciliationPending();
+            const res = await api.getConciliationPending({ clientId });
             setDocs(res.data || []);
         } catch { toast.error('Error cargando documentos'); }
         finally { setLoadingDocs(false); }
     }, []);
 
-    useEffect(() => { loadDocs(); }, [loadDocs]);
+    useEffect(() => {
+        if (selectedClientId) {
+            setDocs([]);
+            loadDocs(selectedClientId);
+        }
+    }, [selectedClientId, loadDocs]);
 
     const pendingBadge = docs.filter(d => d.pendientes > 0).length;
+    const selectedClientName = clients.find(c => c.id === selectedClientId)?.name ?? '';
 
     return (
         <div className="flex flex-col h-full min-h-screen bg-slate-50">
@@ -40,11 +70,35 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
                     <div className="w-8 h-8 bg-emerald-600 rounded-xl flex items-center justify-center shrink-0">
                         <span className="text-white text-sm">💰</span>
                     </div>
-                    <div>
+                    <div className="flex-1 min-w-0">
                         <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Conciliación Facturas</h2>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Plan R</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                            {selectedClientName ? selectedClientName : 'Selecciona un cliente'}
+                        </p>
+                    </div>
+
+                    {/* Client selector */}
+                    <div className="shrink-0">
+                        {!clientsReady ? (
+                            <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                        ) : clients.length === 1 ? (
+                            <span className="text-[9px] bg-emerald-50 border border-emerald-200 text-emerald-700 font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                                {clients[0].name}
+                            </span>
+                        ) : (
+                            <select
+                                value={selectedClientId}
+                                onChange={e => setSelectedClientId(e.target.value)}
+                                className="px-3 py-1.5 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-emerald-500 transition-all min-w-[160px]">
+                                <option value="">— Seleccionar cliente —</option>
+                                {clients.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                 </div>
+
                 <div className="flex gap-1">
                     {([
                         { id: 'pendientes' as Tab, label: 'Pendientes',       icon: '⏳', badge: pendingBadge },
@@ -70,16 +124,24 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
             </div>
 
             {/* ── CONTENIDO POR TAB ───────────────────────────────────────── */}
-            {activeTab === 'pendientes' && (
+            {!selectedClientId ? (
+                <div className="flex flex-col items-center justify-center flex-1 py-24 gap-3">
+                    <span className="text-5xl">💰</span>
+                    <p className="text-[13px] font-black text-slate-400 uppercase tracking-widest">Selecciona un cliente</p>
+                    <p className="text-[10px] text-slate-400">para ver sus documentos pendientes de legalización</p>
+                </div>
+            ) : activeTab === 'pendientes' ? (
                 <TabPendientes
                     docs={docs}
                     loadingDocs={loadingDocs}
-                    onRefresh={loadDocs}
+                    onRefresh={() => loadDocs(selectedClientId)}
                     user={user}
                 />
+            ) : activeTab === 'conciliado' ? (
+                <TabConciliado />
+            ) : (
+                <TabPlanilla />
             )}
-            {activeTab === 'conciliado' && <TabConciliado />}
-            {activeTab === 'planilla'   && <TabPlanilla />}
         </div>
     );
 };
