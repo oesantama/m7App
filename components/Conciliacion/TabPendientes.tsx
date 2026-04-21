@@ -67,6 +67,7 @@ interface InvoiceRow {
     mastersuite_fecha_despacho?: string;
     mastersuite_fecha_entrega?: string;
     mastersuite_motivo_dev?: string;
+    items?: any[];
 }
 
 interface Props {

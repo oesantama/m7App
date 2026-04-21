@@ -297,6 +297,8 @@ export const initDeliveryTables = async () => {
             -- Nuevas columnas y tablas para Devoluciones de Bodega (Conciliación)
             ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS bodega_received_at TIMESTAMPTZ;
             ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS bodega_received_by TEXT;
+            ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS sobrecosto NUMERIC DEFAULT 0;
+            ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS items_returned JSONB DEFAULT '[]';
 
             CREATE TABLE IF NOT EXISTS bodega_receipts (
                 id SERIAL PRIMARY KEY,

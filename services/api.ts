@@ -179,6 +179,7 @@ export const api = {
     formaPago?: string; numeroCheque?: string; esDevolucion?: boolean;
     conciliadoPor?: string; vehiclePlate?: string; conductorId?: string; conductorName?: string;
     estadoEntrega?: string; valorFactura?: number; usuarioNombre?: string;
+    sobrecosto?: number; itemsReturned?: any[];
   }) => fetchJson(`${API_URL}/conciliation/save`, { method: 'POST', body: JSON.stringify(data) }),
   generateConciliationReport: (documentId: string, targetEmail: string | string[]) =>
     fetchJson(`${API_URL}/conciliation/report`, { method: 'POST', body: JSON.stringify({ documentId, targetEmail }) }),

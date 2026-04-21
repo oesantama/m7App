@@ -37,6 +37,16 @@ interface InvoiceRow {
     mastersuite_fecha_despacho?: string;
     mastersuite_fecha_entrega?: string;
     mastersuite_motivo_dev?: string;
+    items?: InvoiceItem[];
+}
+
+interface InvoiceItem {
+    id: string | number;
+    article_id: string;
+    article_name: string;
+    qty: number;
+    unit: string;
+    returned_qty?: number;
 }
 
 interface RouteGroup {
@@ -61,6 +71,7 @@ interface InvoiceFormState {
     fecha: string;
     expanded: boolean;
     saving: boolean;
+    items: InvoiceItem[];
 }
 
 // Fila de consignación grupal
@@ -135,6 +146,7 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
                             : new Date().toISOString().slice(0, 10),
         expanded:         false,
         saving:           false,
+        items:            (inv.items || []).map(it => ({ ...it, returned_qty: 0 })),
     };
 }
 
@@ -213,6 +225,20 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         });
     }, []);
 
+    const updateItem = useCallback((invoiceNum: string, itemId: string | number, returnedQty: number) => {
+        setForms(prev => {
+            const next = new Map(prev);
+            const cur  = next.get(invoiceNum);
+            if (cur) {
+                const nextItems = cur.items.map(it => 
+                    it.id === itemId ? { ...it, returned_qty: returnedQty } : it
+                );
+                next.set(invoiceNum, { ...cur, items: nextItems });
+            }
+            return next;
+        });
+    }, []);
+
     // ── Totales de placa ──────────────────────────────────────────────────────
     const plateTotals = useMemo(() => {
         const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
@@ -244,22 +270,30 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         const valorNum      = Number(form.valor);
         const invoiceVal    = Number(inv.invoice_value) || 0;
         const sobrecostoNum = Number(form.sobrecosto) || 0;
-        const expectedTotal = invoiceVal + sobrecostoNum;
+        const expectedConsignment = invoiceVal - sobrecostoNum;
 
-        if (!esDevolucion && (isNaN(valorNum) || valorNum <= 0)) {
-            toast.error('Ingrese un valor mayor a 0');
+        if (!esDevolucion && (isNaN(valorNum) || (valorNum < 0))) {
+            toast.error('Ingrese un valor válido');
             return;
         }
-        // Entregado: el total a pagar debe coincidir con valor factura + sobrecosto (±1500)
-        if (form.estadoEntrega === 'entregado' && expectedTotal > 0 && Math.abs(valorNum - expectedTotal) > 1500) {
-            toast.error(`Entregado requiere el valor completo: ${fmtCOP(expectedTotal)}. Diferencia: ${fmtCOP(Math.abs(valorNum - expectedTotal))}`);
+        // Entregado: el total a consignar debe ser Valor Factura - Sobrecosto
+        if (form.estadoEntrega === 'entregado' && Math.abs(valorNum - expectedConsignment) > 1500) {
+            toast.error(`Entregado requiere: ${fmtCOP(expectedConsignment)}. Diferencia: ${fmtCOP(Math.abs(valorNum - expectedConsignment))}`);
             return;
         }
-        // Parcial: el valor debe ser menor al total esperado
-        if (form.estadoEntrega === 'parcial' && expectedTotal > 0 && valorNum >= expectedTotal) {
-            toast.error(`Parcial: el valor (${fmtCOP(valorNum)}) no puede ser igual o mayor al total de la factura (${fmtCOP(expectedTotal)})`);
-            return;
+        // Parcial: la suma (Consignado + Sobrecosto + Devuelto) debe coincidir con el total de la factura
+        if (form.estadoEntrega === 'parcial') {
+            const totalQtyItems = form.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+            const unitPrice = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
+            const totalDevVal = form.items.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0);
+            const totalSum = valorNum + (Number(form.sobrecosto) || 0) + totalDevVal;
+            
+            if (Math.abs(totalSum - invoiceVal) > 1500) {
+                toast.error(`Parcial: La suma no coincide con el total. Diferencia: ${fmtCOP(invoiceVal - totalSum)}`);
+                return;
+            }
         }
+
         updateForm(inv.invoice_number, { saving: true });
         try {
             await api.saveConciliation({
@@ -276,6 +310,8 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 conductorName:  inv.conductor_name || route.driver_name || undefined,
                 estadoEntrega:  form.estadoEntrega,
                 valorFactura:   Number(inv.invoice_value) || undefined,
+                sobrecosto:     Number(form.sobrecosto) || 0,
+                itemsReturned:  form.items.filter(it => (Number(it.returned_qty) || 0) > 0),
             });
             toast.success(`✅ ${inv.invoice_number} legalizada`);
             updateForm(inv.invoice_number, { saving: false, expanded: false });
@@ -527,7 +563,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     )}
                                                 </div>
                                                 <div className="flex gap-2">
-                                                    <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!msAllowed.has('entregado')}  onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'entregado',  valor: String(invoiceVal + sobrecostoNum || '') })} />
+                                                    <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!msAllowed.has('entregado')}  onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal - overcostVal)) })} />
                                                     <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!msAllowed.has('parcial')}    onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'parcial'    })} />
                                                     <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!msAllowed.has('devolucion')} onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'devolucion', valor: '0' })} />
                                                 </div>
@@ -535,6 +571,67 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
                                             {form.estadoEntrega !== 'devolucion' && (
                                                 <>
+                                                    {/* Sección de Items para Parcial */}
+                                                    {form.estadoEntrega === 'parcial' && form.items.length > 0 && (
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Detalle de Factura (Devolución Parcial)</p>
+                                                                <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                                                    Precio Unid. Prom: {fmtCOP(totalQtyItems > 0 ? invoiceVal / totalQtyItems : 0)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                                                                <table className="w-full text-[9px] text-left">
+                                                                    <thead className="bg-slate-50 text-slate-500 font-black uppercase border-b">
+                                                                        <tr>
+                                                                            <th className="px-3 py-2">Artículo</th>
+                                                                            <th className="px-3 py-2 text-center">Cant</th>
+                                                                            <th className="px-3 py-2 text-center">Devolver</th>
+                                                                            <th className="px-3 py-2 text-right">Valor Dev.</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-slate-100">
+                                                                        {form.items.map(it => {
+                                                                            const itQty = Number(it.qty) || 0;
+                                                                            const unitP = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
+                                                                            const devVal = (Number(it.returned_qty) || 0) * unitP;
+                                                                            return (
+                                                                                <tr key={it.id}>
+                                                                                    <td className="px-3 py-2 font-bold text-slate-700">{it.article_name}</td>
+                                                                                    <td className="px-3 py-2 text-center font-black text-slate-500">{it.qty}</td>
+                                                                                    <td className="px-3 py-2">
+                                                                                        <input type="number" min={0} max={itQty}
+                                                                                            value={it.returned_qty}
+                                                                                            onChange={e => {
+                                                                                                const rq = Math.min(itQty, Math.max(0, Number(e.target.value) || 0));
+                                                                                                updateItem(inv.invoice_number, it.id, rq);
+                                                                                                
+                                                                                                // Recalcular valor total sugerido
+                                                                                                const otherItemsDev = form.items
+                                                                                                    .filter(x => x.id !== it.id)
+                                                                                                    .reduce((s, x) => s + (Number(x.returned_qty) || 0) * unitP, 0);
+                                                                                                const totalDev = otherItemsDev + (rq * unitP);
+                                                                                                const finalVal = Math.max(0, invoiceVal - totalDev - overcostVal);
+                                                                                                updateForm(inv.invoice_number, { valor: String(Math.round(finalVal)) });
+                                                                                            }}
+                                                                                            className="w-full text-center bg-amber-50 border border-amber-200 rounded-lg py-1 font-black text-amber-800 outline-none focus:border-amber-500 transition-all" />
+                                                                                    </td>
+                                                                                    <td className="px-3 py-2 text-right font-bold text-rose-500">{fmtCOP(devVal)}</td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
+                                                                    </tbody>
+                                                                    <tfoot className="bg-slate-50/50 border-t">
+                                                                        <tr>
+                                                                            <td colSpan={3} className="px-3 py-2 font-black text-slate-500 uppercase text-right">Total Devolución:</td>
+                                                                            <td className="px-3 py-2 text-right font-black text-rose-600">{fmtCOP(returnedVal)}</td>
+                                                                        </tr>
+                                                                    </tfoot>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
                                                     {/* Valor factura + sobrecosto + total */}
                                                     <div className="grid grid-cols-3 gap-3">
                                                         <div>
@@ -544,13 +641,19 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Sobrecosto</label>
+                                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Sobrecosto (Gasto)</label>
                                                             <div className="relative">
                                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
                                                                 <input type="number" min={0} value={form.sobrecosto}
                                                                     onChange={e => {
                                                                         const sc = e.target.value;
-                                                                        updateForm(inv.invoice_number, { sobrecosto: sc, valor: String(invoiceVal + (Number(sc) || 0)) });
+                                                                        const scN = Number(sc) || 0;
+                                                                        // Valor a consignar = Factura - Devuelto - Sobrecosto
+                                                                        const finalVal = Math.max(0, invoiceVal - returnedVal - scN);
+                                                                        updateForm(inv.invoice_number, { 
+                                                                            sobrecosto: sc, 
+                                                                            valor: String(Math.round(finalVal)) 
+                                                                        });
                                                                     }}
                                                                     placeholder="0"
                                                                     className="w-full pl-6 pr-2 py-2.5 bg-white border border-slate-200 focus:border-amber-500 rounded-xl text-xs font-bold text-slate-900 outline-none transition-all" />
@@ -558,7 +661,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         </div>
                                                         <div>
                                                             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                                                                Total a Pagar <span className="text-rose-500">*</span>
+                                                                Total a Consignar <span className="text-rose-500">*</span>
                                                             </label>
                                                             <div className="relative">
                                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
@@ -574,29 +677,29 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     {(() => {
                                                         const valN  = Number(form.valor) || 0;
                                                         const scN   = Number(form.sobrecosto) || 0;
-                                                        const total = invoiceVal + scN;
-                                                        if (total <= 0 || valN <= 0) return null;
-                                                        const diff  = valN - total;
-                                                        const absDiff = Math.abs(diff);
+                                                        // La formula debe dar: Consignado + Sobrecosto + Devuelto = Valor Factura
+                                                        const sum   = valN + scN + returnedVal;
+                                                        const ok    = Math.abs(sum - invoiceVal) <= 1500;
+                                                        const diff  = invoiceVal - sum;
 
                                                         if (form.estadoEntrega === 'entregado') {
-                                                            const ok = absDiff <= 1500;
                                                             return (
                                                                 <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-[9px] font-black border
                                                                     ${ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
-                                                                    <span>{ok ? '✓ Valor completo' : `⚠ Faltan ${fmtCOP(absDiff)}`}</span>
-                                                                    <span>{fmtCOP(valN)} / {fmtCOP(total)}</span>
+                                                                    <span>{ok ? '✓ Cuadre Perfecto' : `⚠ Diferencia: ${fmtCOP(diff)}`}</span>
+                                                                    <span>{fmtCOP(valN)} (Consig) + {fmtCOP(scN)} (Gasto) = {fmtCOP(valN + scN)} / {fmtCOP(invoiceVal)}</span>
                                                                 </div>
                                                             );
                                                         }
                                                         if (form.estadoEntrega === 'parcial') {
-                                                            const ok = valN > 0 && valN < total;
-                                                            const devuelto = total - valN;
                                                             return (
                                                                 <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-[9px] font-black border
                                                                     ${ok ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
-                                                                    <span>{ok ? `📦 Entrega: ${fmtCOP(valN)} · Devuelve: ${fmtCOP(devuelto)}` : '⚠ Debe ser menor al total'}</span>
-                                                                    <span>{fmtCOP(total)}</span>
+                                                                    <span>{ok ? `✓ Parcial Cuadrado` : `⚠ Diferencia: ${fmtCOP(diff)}`}</span>
+                                                                    <div className="text-right">
+                                                                        <p>Consignar: {fmtCOP(valN)} + Gasto: {fmtCOP(scN)} + Devuelto: {fmtCOP(returnedVal)}</p>
+                                                                        <p>= {fmtCOP(sum)} / {fmtCOP(invoiceVal)}</p>
+                                                                    </div>
                                                                 </div>
                                                             );
                                                         }
