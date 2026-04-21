@@ -123,6 +123,9 @@ export const api = {
   getPendingSignatures(userId: string) {
     return fetchJson(`${API_URL}/dispatch/pending-signatures/${userId}`);
   },
+  getInvoicePendingSignatures(invoiceId: string) {
+    return fetchJson(`${API_URL}/dispatch/invoice-pending-signatures/${encodeURIComponent(invoiceId)}`);
+  },
   confirmDelivery(data: {
     invoiceId: string; dispatchId?: string; driverId: string; vehicleId?: string;
     deliveryType: 'FULL' | 'PARTIAL' | 'RETURN' | 'REPICE';

@@ -59,6 +59,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [helperCount, setHelperCount] = useState(1);
     const [selectedHelpers, setSelectedHelpers] = useState<string[]>([]);
     const [pendingSignatures, setPendingSignatures] = useState<any[]>([]);
+    // All unsigned signatures for each invoice (keyed by invoiceId) — used to block ENTREGAR
+    const [invoiceAllPending, setInvoiceAllPending] = useState<Record<string, any[]>>({});
     const [signatureKeys, setSignatureKeys] = useState<Record<string, string>>({});
     const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
     const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
@@ -686,6 +688,21 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
     // Load route invoices — always via direct ids-based API to get fresh statuses
     // (bypasses the status filter that excludes EST-11/12/13/14 from the general invoices list)
+    const fetchInvoiceAllPending = async (invList: any[]) => {
+        const map: Record<string, any[]> = {};
+        await Promise.all(invList.map(async (inv) => {
+            const invId = inv.invoiceNumber || inv.id;
+            if (!invId) return;
+            try {
+                const data = await api.getInvoicePendingSignatures(invId);
+                map[invId] = Array.isArray(data) ? data : [];
+            } catch {
+                map[invId] = [];
+            }
+        }));
+        setInvoiceAllPending(prev => ({ ...prev, ...map }));
+    };
+
     const loadRouteInvoicesData = async (route: any, setFn: (data: any[]) => void, drawMap: boolean = false) => {
         const rawIds = route.invoice_ids || route.invoiceIds || [];
         if (!rawIds.length) {
@@ -712,6 +729,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 setFetchStatus(`OK (${deduplicated.length})`);
                 setFn(deduplicated);
                 if (drawMap) drawRouteOnMap(deduplicated);
+                fetchInvoiceAllPending(deduplicated);
                 return;
             }
             setFetchStatus('ERROR (Invalid Data)');
@@ -730,6 +748,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         );
         setFn(localMatches);
         if (drawMap) drawRouteOnMap(localMatches);
+        fetchInvoiceAllPending(localMatches);
     };
 
     // Geocodifica una dirección a través del BACKEND (proxy para evitar CORS con Nominatim)
@@ -1316,6 +1335,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             if (res.success) {
                 toast.success("Firma registrada");
                 fetchPendingSignatures();
+                // Refresh invoice-level pending so ENTREGAR / badges update immediately
+                const invKey = inv.invoiceNumber || inv.id;
+                if (invKey) {
+                    try {
+                        const fresh = await api.getInvoicePendingSignatures(invKey);
+                        setInvoiceAllPending(prev => ({ ...prev, [invKey]: Array.isArray(fresh) ? fresh : [] }));
+                    } catch {}
+                }
                 onRefresh();
             }
         } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
@@ -1849,7 +1876,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                            norm(String(inv.id            || '')).includes(query);
                                 })
                                 .map((inv: any, idx: number) => {
+                                    const invKey = inv.invoiceNumber || inv.id;
                                     const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
+                                    // All unsigned signatures for this invoice (any user) — used to block ENTREGAR
+                                    const allPendingForInv = invoiceAllPending[invKey] || [];
+                                    const hasAnyPendingSignature = allPendingForInv.length > 0;
+                                    const pendingBodega = allPendingForInv.some(p => p.role === 'BODEGA');
+                                    const pendingConductor = allPendingForInv.some(p => p.role === 'CONDUCTOR');
                                     return (
                                         <div key={`${inv.id || idx}`} className="p-4 bg-white border border-slate-100 rounded-[1.5rem] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-emerald-400/40 transition-all group">
                                             <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -1857,12 +1890,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     {idx + 1}
                                                 </div>
                                                 <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                         <h5 className="text-[14px] font-black text-slate-900">#{inv.invoiceNumber || inv.id}</h5>
                                                         {(inv.itemStatus||inv.status) === 'EST-11' && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black rounded-full">EN RUTA</span>}
                                                         {(inv.itemStatus||inv.status) === 'EST-12' && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-full">ENTREGADO</span>}
                                                         {(inv.itemStatus||inv.status) === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
-                                                        {hasPendingSignature && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black rounded-full animate-pulse">FIRMA</span>}
+                                                        {pendingBodega && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black rounded-full animate-pulse">FIRMA BODEGA</span>}
+                                                        {pendingConductor && <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-[8px] font-black rounded-full animate-pulse">FIRMA CONDUCTOR</span>}
                                                     </div>
                                                     <p className="text-[10px] font-bold text-slate-500 uppercase leading-none">{inv.customerName || 'S/N'}</p>
                                                 </div>
@@ -1891,8 +1925,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     </button>
                                                 )}
 
-                                                {/* ENTREGAR — cuando ya está en ruta y el usuario ya firmó */}
-                                                {(inv.itemStatus || inv.status) === 'EST-11' && !hasPendingSignature && (
+                                                {/* ENTREGAR — cuando ya está en ruta Y todas las firmas están completas */}
+                                                {(inv.itemStatus || inv.status) === 'EST-11' && !hasPendingSignature && !hasAnyPendingSignature && (
                                                     <button
                                                         onClick={() => {
                                                             const items = (inv.items || []).map((it: any) => ({

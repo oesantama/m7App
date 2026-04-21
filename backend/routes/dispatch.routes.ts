@@ -4,6 +4,7 @@ import {
     initDispatch,
     signDispatchPending,
     getPendingSignaturesForUser,
+    getInvoicePendingSignatures,
     confirmDelivery,
     getDeliveryHistory,
     getReturnHistory,
@@ -22,6 +23,7 @@ const router = Router();
 router.post('/init', initDispatch);
 router.post('/sign-pending', signDispatchPending);
 router.get('/pending-signatures/:userId', getPendingSignaturesForUser);
+router.get('/invoice-pending-signatures/:invoiceId', getInvoicePendingSignatures);
 
 // Entrega al cliente
 router.post('/confirm-delivery', confirmDelivery);

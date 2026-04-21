@@ -229,7 +229,7 @@ export const getPendingSignaturesForUser = async (req: Request, res: Response) =
     const { userId } = req.params;
     try {
         const result = await pool.query(`
-            SELECT 
+            SELECT
                 dsp.dispatch_id AS "dispatchId",
                 da.invoice_id AS "invoiceId",
                 da.created_at AS "createdAt",
@@ -239,6 +239,29 @@ export const getPendingSignaturesForUser = async (req: Request, res: Response) =
             WHERE dsp.user_id = $1 AND dsp.signed = false
             ORDER BY da.created_at DESC
         `, [userId]);
+        res.json(result.rows);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Returns ALL unsigned signatures for a given invoice (to block ENTREGAR until everyone has signed)
+export const getInvoicePendingSignatures = async (req: Request, res: Response) => {
+    const { invoiceId } = req.params;
+    try {
+        const result = await pool.query(`
+            SELECT
+                dsp.dispatch_id AS "dispatchId",
+                dsp.user_id AS "userId",
+                dsp.role_type AS "role",
+                u.name AS "userName",
+                da.invoice_id AS "invoiceId"
+            FROM dispatch_signatures_pending dsp
+            JOIN dispatch_assignments da ON dsp.dispatch_id::integer = da.id
+            JOIN users u ON dsp.user_id::integer = u.id
+            WHERE da.invoice_id = $1 AND dsp.signed = false
+            ORDER BY dsp.role_type
+        `, [invoiceId]);
         res.json(result.rows);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
