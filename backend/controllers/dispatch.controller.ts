@@ -57,9 +57,9 @@ export const initDispatch = async (req: Request, res: Response) => {
             }
 
             await pool.query(`
-                INSERT INTO dispatch_signatures_pending (dispatch_id, user_id, role_type, signed, signed_at)
-                VALUES ($1, $2, $3, $4, $5)
-            `, [dispatchId, sig.userId, sig.role, isSigned, signedAt]);
+                INSERT INTO dispatch_signatures_pending (id, dispatch_id, user_id, role_type, signed, signed_at)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            `, [uuidv4(), dispatchId, sig.userId, sig.role, isSigned, signedAt]);
         }
 
         // 3. Actualizar estado de los ítems en document_items a 'En ruta' (EST-11)

@@ -175,7 +175,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 ic.conductor_name,
                 ic.vehicle_plate,
                 ic.bodega_received_at,
-                COALESCE(ic.sobrecosto, 0)                  AS sobrecosto,
+                COALESCE(ic.sobrecosto::numeric, 0)         AS sobrecosto,
                 ic.created_at                               AS conciliado_at,
                 u.name                                      AS conciliado_por_nombre,
                 MAX(p.vmetodo)                              AS invoice_value,
@@ -279,10 +279,10 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 -- Legalizadas = conciliadas (tienen forma_pago registrada)
                 COUNT(DISTINCT CASE WHEN ic2.forma_pago IS NOT NULL THEN di.invoice END)                                        AS legalizadas,
                 -- Valores financieros ($)
-                SUM(COALESCE(ic2.valor, 0))                                         AS valor_legalizado,
+                SUM(COALESCE(ic2.valor::numeric, 0))                                         AS valor_legalizado,
                 SUM(CASE WHEN ic2.es_devolucion = true THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END) AS valor_devuelto,
-                SUM(CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN COALESCE(ic2.valor, 0) ELSE 0 END) AS valor_parcial,
-                SUM(COALESCE(ic2.sobrecosto, 0))                                    AS total_sobrecosto
+                SUM(CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN COALESCE(ic2.valor::numeric, 0) ELSE 0 END) AS valor_parcial,
+                SUM(COALESCE(ic2.sobrecosto::numeric, 0))                                    AS total_sobrecosto
             FROM route_invoices ri
             JOIN  routes   r   ON r.id::text = ri.route_id::text
             LEFT JOIN vehicles v   ON v.id::text  = r.vehicle_id::text
