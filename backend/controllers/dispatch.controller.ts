@@ -293,6 +293,21 @@ export const initDeliveryTables = async () => {
                 user_name TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Nuevas columnas y tablas para Devoluciones de Bodega (Conciliación)
+            ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS bodega_received_at TIMESTAMPTZ;
+            ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS bodega_received_by TEXT;
+
+            CREATE TABLE IF NOT EXISTS bodega_receipts (
+                id SERIAL PRIMARY KEY,
+                invoice TEXT NOT NULL,
+                document_id TEXT NOT NULL,
+                client_id TEXT,
+                received_by TEXT,
+                observation TEXT,
+                items JSONB DEFAULT '[]',
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
         `);
         console.log('[M7-DISPATCH] initDeliveryTables: Tablas verificadas/creadas correctamente.');
     } catch (err: any) {
@@ -896,7 +911,17 @@ export const confirmBodegaReturn = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'No se encontró devolución pendiente de recepción para esta factura' });
         }
 
-        // 2. Obtener artículos de la factura
+        // 2. Verificar si el conductor ya procesó esta devolución (vía despacho logístico)
+        // Si existe un delivery_return con status=PROCESSED, el inventario ya fue ajustado
+        // → solo cerrar la conciliación, NO volver a sumar al inventario
+        const dispatchReturnRes = await client.query(`
+            SELECT id FROM delivery_returns
+            WHERE invoice_id = $1 AND status = 'PROCESSED'
+            LIMIT 1
+        `, [invoiceNumber]);
+        const alreadyProcessedByDispatch = dispatchReturnRes.rows.length > 0;
+
+        // 3. Obtener artículos de la factura
         const itemsRes = await client.query(`
             SELECT di.article_id, a.name as article_name, SUM(di.expected_qty) as qty,
                    di.batch, dl.client_id, dl.vehicle_plate
@@ -913,14 +938,16 @@ export const confirmBodegaReturn = async (req: Request, res: Response) => {
             const qty = Number(item.qty);
             if (qty <= 0) continue;
 
-            // 3. Sumar a inventario bodega
-            await client.query(`
-                INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-                VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
-                ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-                    quantity = GREATEST(0, inventario_clientes.quantity + $4),
-                    last_user = $5, last_updated = CURRENT_TIMESTAMP
-            `, [item.client_id, item.article_id, item.batch || 'S/L', qty, receivedBy]);
+            // 4. Sumar a inventario bodega solo si el despacho NO lo procesó ya
+            if (!alreadyProcessedByDispatch) {
+                await client.query(`
+                    INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
+                    VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
+                    ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
+                        quantity = GREATEST(0, inventario_clientes.quantity + $4),
+                        last_user = $5, last_updated = CURRENT_TIMESTAMP
+                `, [item.client_id, item.article_id, item.batch || 'S/L', qty, receivedBy]);
+            }
 
             receiptItems.push({ article_id: item.article_id, article_name: item.article_name, batch: item.batch || 'S/L', qty });
         }
@@ -945,7 +972,7 @@ export const confirmBodegaReturn = async (req: Request, res: Response) => {
         `, [documentId, invoiceNumber]);
 
         await client.query('COMMIT');
-        res.json({ success: true, items: receiptItems });
+        res.json({ success: true, items: receiptItems, inventorySkipped: alreadyProcessedByDispatch });
 
         // 7. Kardex: DEVOLUCION_BODEGA por cada artículo (fire-and-forget)
         for (const item of receiptItems) {
@@ -1004,10 +1031,7 @@ export const getPendingBodegaReturns = async (req: Request, res: Response) => {
             LEFT JOIN document_items di ON di.document_id = ic.document_id AND di.invoice = ic.invoice_number
             LEFT JOIN articles a ON a.id = di.article_id
             WHERE ic.es_devolucion = true
-              AND (ic.bodega_received_at IS NULL OR NOT EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name='invoice_conciliations' AND column_name='bodega_received_at'
-              ))
+              AND ic.bodega_received_at IS NULL
               ${clientFilter}
             GROUP BY ic.document_id, ic.invoice_number, ic.vehicle_plate,
                      ic.conductor_name, ic.updated_at, dl.external_doc_id, dl.client_id

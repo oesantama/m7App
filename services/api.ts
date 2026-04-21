@@ -233,6 +233,29 @@ export const api = {
     if (params?.limit)        qs.set('limit',        String(params.limit));
     return fetchJson(`${API_URL}/inventory/movements?${qs}`);
   },
+  // ── Salida a Proveedor ────────────────────────────────────────────────────
+  getSupplierReturns: (params?: { clientId?: string; status?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.clientId) qs.set('clientId', params.clientId);
+    if (params?.status)   qs.set('status',   params.status);
+    return fetchJson(`${API_URL}/inventory/supplier-returns?${qs}`);
+  },
+  createSupplierReturn: (data: {
+    clientId: string; reference?: string; returnReason?: string;
+    notes?: string; createdBy?: string;
+    items: { articleId: string; articleName: string; batch?: string; quantity: number; unit?: string; notes?: string }[];
+  }) => fetchJson(`${API_URL}/inventory/supplier-returns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }),
+  confirmSupplierReturn: (id: number | string, confirmedBy: string) =>
+    fetchJson(`${API_URL}/inventory/supplier-returns/${id}/confirm`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmedBy }),
+    }),
+
   getConciliationPlanillaUrl: (routeId: string | number) => {
     return `${API_URL}/conciliation/planilla?routeId=${routeId}`;
   },
