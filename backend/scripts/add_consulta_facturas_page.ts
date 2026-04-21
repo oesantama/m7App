@@ -28,15 +28,15 @@ const run = async () => {
         }
 
         // Tomamos el parent_id de cualquiera de ellas (deben ser iguales)
-        const parentId  = existing.rows[0].parent_id;
-        const statusId  = existing.rows[0].status_id;
+        const parentId = existing.rows[0].parent_id;
+        const statusId = existing.rows[0].status_id;
 
         // 2. Generar un ID nuevo que no colisione
         const maxId = await pool.query(`
             SELECT id FROM pages WHERE id ~ '^PAG-[0-9]+$' ORDER BY id DESC LIMIT 1
         `);
 
-        let newId = 'PAG-40';
+        let newId = 'PAG-01';
         if (maxId.rows.length) {
             const lastNum = parseInt(maxId.rows[0].id.replace('PAG-', ''), 10);
             newId = `PAG-${lastNum + 1}`;
