@@ -4,6 +4,7 @@ import pool from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { logMovement } from '../utils/kardex.js';
+import { clearInvoicesCache } from './document.controller.js';
 
 export const initDispatch = async (req: Request, res: Response) => {
     const { 
@@ -169,6 +170,7 @@ export const initDispatch = async (req: Request, res: Response) => {
         }
 
         await pool.query('COMMIT');
+        clearInvoicesCache();
         res.json({ success: true, dispatchId, status: parseInt(pendingCount.rows[0].count) === 0 ? 'COMPLETED' : 'PENDING_SIGNATURES' });
     } catch (error: any) {
         await pool.query('ROLLBACK');
@@ -524,6 +526,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
         } catch (_) { /* No crítico — no bloquear la respuesta si falla */ }
 
         await pool.query('COMMIT');
+        clearInvoicesCache();
 
         res.json({
             success: true,

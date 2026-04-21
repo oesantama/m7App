@@ -1020,37 +1020,53 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                 <table className="w-full text-[10px]">
                                     <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
                                         <tr>
-                                            <th className="text-left px-4 py-2.5 font-black text-slate-500 uppercase tracking-widest">Factura</th>
+                                            <th className="text-left px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Factura</th>
                                             <th className="text-left px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Cliente</th>
-                                            <th className="text-center px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Estado</th>
-                                            <th className="text-center px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Pago</th>
-                                            <th className="text-right px-4 py-2.5 font-black text-slate-500 uppercase tracking-widest">Valor</th>
+                                            <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Estado</th>
+                                            <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Pago</th>
+                                            <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Consig./Ref.</th>
+                                            <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Original</th>
+                                            <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Legalizado</th>
+                                            <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Devol.</th>
+                                            <th className="text-right px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Sobrecosto</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {routeInvs.map(inv => {
-                                            const legalizada = !!inv.forma_pago;
-                                            const itemS = (inv.item_status || '').toUpperCase();
-                                            const statusLabel = ENTREGADO_STATUS.includes(itemS) ? { label: 'Entregada', color: 'bg-teal-100 text-teal-700' }
-                                                : DEVUELTO_STATUS.includes(itemS) || inv.es_devolucion ? { label: 'Devuelta', color: 'bg-amber-100 text-amber-700' }
-                                                : PARCIAL_STATUS.includes(itemS) ? { label: 'Parcial', color: 'bg-orange-100 text-orange-700' }
+                                            const legalizada  = !!inv.forma_pago;
+                                            const itemS       = (inv.item_status || '').toUpperCase();
+                                            const isDevuelta  = inv.es_devolucion || DEVUELTO_STATUS.includes(itemS);
+                                            const isParcial   = PARCIAL_STATUS.includes(itemS);
+                                            const statusLabel = ENTREGADO_STATUS.includes(itemS)
+                                                ? { label: 'Entregada', color: 'bg-teal-100 text-teal-700' }
+                                                : isDevuelta ? { label: 'Devuelta', color: 'bg-amber-100 text-amber-700' }
+                                                : isParcial  ? { label: 'Parcial',  color: 'bg-orange-100 text-orange-700' }
                                                 : { label: 'Pendiente', color: 'bg-slate-100 text-slate-500' };
-                                            const pagoLabel = inv.forma_pago
-                                                ? (FORMA_COLOR[inv.forma_pago]?.label || inv.forma_pago)
-                                                : '—';
+                                            const pagoLabel  = inv.forma_pago
+                                                ? (FORMA_COLOR[inv.forma_pago]?.label || inv.forma_pago) : '—';
+                                            const vOriginal  = Number(inv.invoice_value) || 0;
+                                            const vLegal     = legalizada ? (Number(inv.valor) || 0) : 0;
+                                            const vDevol     = isDevuelta  ? vOriginal : 0;
+                                            const sc         = Number(inv.sobrecosto) || 0;
                                             return (
-                                                <tr key={inv.invoice_number} className={`hover:bg-slate-50 ${legalizada ? 'bg-emerald-50/30' : ''}`}>
-                                                    <td className="px-4 py-2.5 font-black text-slate-900">{inv.invoice_number}</td>
-                                                    <td className="px-3 py-2.5 text-slate-600 max-w-[160px] truncate">{inv.customer_name || '—'}</td>
-                                                    <td className="px-3 py-2.5 text-center">
+                                                <tr key={inv.invoice_number} className={`hover:bg-slate-50/80 ${legalizada ? 'bg-emerald-50/20' : ''}`}>
+                                                    <td className="px-3 py-2.5 font-black text-slate-900 whitespace-nowrap">{inv.invoice_number}</td>
+                                                    <td className="px-3 py-2.5 text-slate-600 max-w-[140px] truncate">{inv.customer_name || '—'}</td>
+                                                    <td className="px-2 py-2.5 text-center">
                                                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${statusLabel.color}`}>
                                                             {statusLabel.label}
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-center text-slate-500">{pagoLabel}</td>
-                                                    <td className="px-4 py-2.5 text-right font-black text-slate-800">
-                                                        {legalizada ? fmtCOP(Number(inv.valor)) : fmtCOP(Number(inv.invoice_value))}
+                                                    <td className="px-2 py-2.5 text-center text-slate-500 whitespace-nowrap">{pagoLabel}</td>
+                                                    <td className="px-2 py-2.5 text-center font-bold text-slate-700">
+                                                        {inv.comprobante ? (
+                                                            <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg text-[9px] font-black">{inv.comprobante}</span>
+                                                        ) : '—'}
                                                     </td>
+                                                    <td className="px-2 py-2.5 text-right text-slate-500">{vOriginal > 0 ? fmtCOP(vOriginal) : '—'}</td>
+                                                    <td className="px-2 py-2.5 text-right font-black text-emerald-700">{vLegal > 0 ? fmtCOP(vLegal) : '—'}</td>
+                                                    <td className="px-2 py-2.5 text-right font-black text-amber-700">{vDevol > 0 ? fmtCOP(vDevol) : '—'}</td>
+                                                    <td className="px-3 py-2.5 text-right font-black text-rose-600">{fmtCOP(sc) !== '—' ? fmtCOP(sc) : '$0'}</td>
                                                 </tr>
                                             );
                                         })}

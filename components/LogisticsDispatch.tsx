@@ -1506,6 +1506,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             </div>
                         )}
 
+                        {/* Guard: require client selection when multiple clients exist */}
+                        {clientsReady && filteredClients.length > 1 && !internalClientId && (
+                            <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 mt-2">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Seleccione un cliente para ver las rutas</p>
+                            </div>
+                        )}
+
+                        {(filteredClients.length <= 1 || internalClientId) && <>
+
                         <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Unidades en Ruta</h3>
 
                         {/* ── RESUMEN TOTAL DE TODAS LAS RUTAS ── */}
@@ -1517,7 +1526,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     return sv + Number(inv?.volumeM3 || 0);
                                 }, 0);
                             }, 0);
-                            const delivered = invoices.filter(i => ['EST-12','EST-13','EST-14'].includes(i.status as string)).length;
+                            const delivered = invoices.filter(i => ['EST-12','EST-13','EST-14'].includes(((i as any).itemStatus || i.status) as string)).length;
                             const pct = totalInvoices > 0 ? Math.round((delivered / totalInvoices) * 100) : 0;
                             return (
                                 <div className="bg-slate-900 rounded-2xl p-3 mb-1 space-y-2">
@@ -1599,7 +1608,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     return targetIds.includes(invId) || targetIds.includes(invNum);
                                 });
                                 const totalRouteInvoices = route.total_invoices ?? routeInvList.length;
-                                const deliveredRouteCount = route.delivered_invoices ?? routeInvList.filter(i => ['EST-12','EST-13','EST-14','ENTREGADO'].includes(i.status as string)).length;
+                                const deliveredRouteCount = route.delivered_invoices ?? routeInvList.filter(i => ['EST-12','EST-13','EST-14','ENTREGADO'].includes(((i as any).itemStatus || i.status) as string)).length;
                                 const percent = totalRouteInvoices > 0 ? (deliveredRouteCount / totalRouteInvoices) * 100 : 0;
 
                                  return (
@@ -1690,6 +1699,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 );
                             })
                         )}
+                        </> }
                     </div>
 
                     {/* MAPA EXPANDIDO TOTAL */}

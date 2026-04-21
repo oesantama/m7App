@@ -9,6 +9,10 @@ import { logMovement } from '../utils/kardex.js';
 const invoicesCache = new Map<string, { data: any[]; ts: number }>();
 const INVOICES_CACHE_TTL_MS = 45_000;
 
+export function clearInvoicesCache() {
+    invoicesCache.clear();
+}
+
 function getCacheKey(query: Record<string, any>): string {
   // Incluye solo los params que afectan el resultado
   return JSON.stringify({ clientId: query.clientId, history: query.history, routeId: query.routeId });
