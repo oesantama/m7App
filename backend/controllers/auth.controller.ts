@@ -10,8 +10,8 @@ export const login = async (req: Request, res: Response) => {
     const identifier = email?.trim().toLowerCase();
 
     const result = await pool.query(
-      `SELECT id, email, password, name, role_id, client_ids, two_factor_enabled, two_factor_secret 
-       FROM users 
+      `SELECT id, email, password, name, role_id, client_ids, document_number, two_factor_enabled, two_factor_secret
+       FROM users
        WHERE (LOWER(TRIM(email)) = $1 OR LOWER(TRIM(document_number)) = $1 OR LOWER(TRIM(phone)) = $1)`,
       [identifier]
     );
@@ -66,13 +66,14 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // GENERAR TOKEN JWT (Seguridad Arquitectónica)
-    const userData = { 
-        id: user.id, 
-        email: user.email, 
-        name: user.name, 
+    const userData = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
         role_id: user.role_id,
-        client_ids: user.client_ids || [], // NUEVO: Incluir clientes permitidos
-        permissions: permissions 
+        document_number: user.document_number || '',
+        client_ids: user.client_ids || [],
+        permissions: permissions
     };
 
     const accessToken = signAccessToken(userData);

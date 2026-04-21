@@ -35,7 +35,7 @@ export const getRoutes = async (req: Request, res: Response) => {
             OR TRIM(COALESCE(NULLIF(di.invoice, ''), di.order_number)) = ri.invoice_id
           )
           WHERE ri.route_id::text = r.id::text
-            AND di.item_status IN ('EST-12', 'EST-13', 'EST-14', 'COMPLETED', 'ENTREGADO', 'FINALIZADO')
+            AND di.item_status IN ('EST-11', 'EST-12', 'EST-13', 'EST-14', 'COMPLETED', 'ENTREGADO', 'FINALIZADO')
         ) as delivered_invoices
       FROM routes r
       LEFT JOIN vehicles v ON r.vehicle_id::text = v.id::text
@@ -57,7 +57,7 @@ export const getRoutes = async (req: Request, res: Response) => {
         d.name as driver_name,
         json_build_array(da.invoice_id) as invoice_ids,
         1 as total_invoices,
-        CASE WHEN da.status IN ('COMPLETED', 'EST-12', 'ENTREGADO') THEN 1 ELSE 0 END as delivered_invoices
+        CASE WHEN da.status IN ('COMPLETED', 'PENDING_SIGNATURES', 'EN_RUTA', 'EST-11', 'EST-12', 'ENTREGADO') THEN 1 ELSE 0 END as delivered_invoices
       FROM dispatch_assignments da
       LEFT JOIN assignments a ON da.driver_id::text = a.driver_id::text AND a.is_active::boolean = true
       LEFT JOIN vehicles v ON a.vehicle_id::text = v.id::text

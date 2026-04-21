@@ -1137,18 +1137,25 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
 
         // Si es CONDUCTOR (ROL-03), solo mostrar sus rutas por documento
-        if (user.roleId === 'ROL-03' || user.roleId === 'CONDUCTOR') {
-            const userDoc = String(user.documentNumber || '').trim();
+        const userRoleId = user.role_id || user.roleId || '';
+        if (userRoleId === 'ROL-03' || userRoleId === 'CONDUCTOR') {
+            const userDoc = String(user.document_number || user.documentNumber || '').trim();
             if (!userDoc) return [];
 
             return routes.filter(route => {
                 // 1. Verificar si la ruta tiene el documento pegado
                 if (String(route.driver_document || '').trim() === userDoc) return true;
 
-                // 2. Verificar vía asignación activa
-                const link = assignments.find(a => a.driverId === route.driver_id && a.isActive);
-                const drv = drivers.find(d => d.id === link?.driverId);
-                return String(drv?.documentNumber || '').trim() === userDoc;
+                // 2. Verificar vía asignación activa (manejar tanto camelCase como snake_case)
+                const link = assignments.find(a => {
+                    const aDriverId = a.driverId || (a as any).driver_id;
+                    const aActive = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+                    return String(aDriverId) === String(route.driver_id) && aActive;
+                });
+                const linkDriverId = link?.driverId || (link as any)?.driver_id;
+                const drv = drivers.find(d => String(d.id) === String(linkDriverId));
+                const drvDoc = String((drv as any)?.document_number || (drv as any)?.documentNumber || '').trim();
+                return drvDoc === userDoc;
             });
         }
         // Admin u otros roles ven todo (filtrado por cliente)
@@ -1526,7 +1533,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     return sv + Number(inv?.volumeM3 || 0);
                                 }, 0);
                             }, 0);
-                            const delivered = invoices.filter(i => ['EST-12','EST-13','EST-14'].includes(((i as any).itemStatus || i.status) as string)).length;
+                            const delivered = invoices.filter(i => ['EST-11','EST-12','EST-13','EST-14'].includes(((i as any).itemStatus || i.status) as string)).length;
                             const pct = totalInvoices > 0 ? Math.round((delivered / totalInvoices) * 100) : 0;
                             return (
                                 <div className="bg-slate-900 rounded-2xl p-3 mb-1 space-y-2">
@@ -1608,7 +1615,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     return targetIds.includes(invId) || targetIds.includes(invNum);
                                 });
                                 const totalRouteInvoices = route.total_invoices ?? routeInvList.length;
-                                const deliveredRouteCount = route.delivered_invoices ?? routeInvList.filter(i => ['EST-12','EST-13','EST-14','ENTREGADO'].includes(((i as any).itemStatus || i.status) as string)).length;
+                                const deliveredRouteCount = route.delivered_invoices ?? routeInvList.filter(i => ['EST-11','EST-12','EST-13','EST-14','ENTREGADO'].includes(((i as any).itemStatus || i.status) as string)).length;
                                 const percent = totalRouteInvoices > 0 ? (deliveredRouteCount / totalRouteInvoices) * 100 : 0;
 
                                  return (
