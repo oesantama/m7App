@@ -684,7 +684,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // Helper for robust ID matching
     const cleanId = (id: any) => String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
 
-    // Unified function to load invoices (Hybrid: Local + Fetch Fallback)
+    // Load route invoices — always via direct ids-based API to get fresh statuses
+    // (bypasses the status filter that excludes EST-11/12/13/14 from the general invoices list)
     const loadRouteInvoicesData = async (route: any, setFn: (data: any[]) => void, drawMap: boolean = false) => {
         const rawIds = route.invoice_ids || route.invoiceIds || [];
         if (!rawIds.length) {
@@ -692,52 +693,41 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             return;
         }
 
-        // 1. Clean IDs
+        const idsParam = rawIds.map((id: any) => {
+            const val = typeof id === 'object' && id !== null ? (id.id || id.invoice_id) : id;
+            return cleanId(val);
+        }).join(',');
+
+        setFetchStatus('FETCHING');
+        try {
+            const paramsData = await api.getInvoices(undefined, idsParam);
+            if (Array.isArray(paramsData)) {
+                const seen = new Set<string>();
+                const deduplicated = paramsData.filter(inv => {
+                    const key = cleanId(inv.invoiceNumber || inv.id || '');
+                    if (!key || seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+                setFetchStatus(`OK (${deduplicated.length})`);
+                setFn(deduplicated);
+                if (drawMap) drawRouteOnMap(deduplicated);
+                return;
+            }
+            setFetchStatus('ERROR (Invalid Data)');
+        } catch (e: any) {
+            if (import.meta.env.DEV) console.error('[M7-INVOICES-FALLBACK]', e);
+            setFetchStatus(`ERROR: ${e.message}`);
+        }
+
+        // Fallback to local match only if API failed
         const targetIds = rawIds.map((id: any) => {
             const val = typeof id === 'object' && id !== null ? (id.id || id.invoice_id) : id;
             return cleanId(val);
         });
-
-        // 2. Try Local Match
-        const localMatches = invoices.filter(inv => {
-            const invId = cleanId(inv.id);
-            const invNum = cleanId(inv.invoiceNumber); 
-            return targetIds.includes(invId) || targetIds.includes(invNum);
-        });
-
-        // 3. Fallback to API if we don't have all invoices locally
-        if (localMatches.length < rawIds.length) {
-            setFetchStatus('FETCHING'); 
-            try {
-                const idsParam = targetIds.join(',');
-                // Use centralized API method
-                const paramsData = await api.getInvoices(undefined, idsParam);
-                
-                if (Array.isArray(paramsData)) {
-                    // Deduplicar por invoiceNumber — el JOIN del backend puede generar duplicados
-                    const seen = new Set<string>();
-                    const deduplicated = paramsData.filter(inv => {
-                        const key = cleanId(inv.invoiceNumber || inv.id || '');
-                        if (!key || seen.has(key)) return false;
-                        seen.add(key);
-                        return true;
-                    });
-                    setFetchStatus(`OK (${deduplicated.length})`);
-                    setFn(deduplicated);
-                    if (drawMap) drawRouteOnMap(deduplicated);
-                    return; // Exit, we have fresh data
-                } else {
-                    setFetchStatus('ERROR (Invalid Data)');
-                }
-            } catch (e: any) {
-                if (import.meta.env.DEV) console.error('[M7-INVOICES-FALLBACK]', e);
-                setFetchStatus(`ERROR: ${e.message}`);
-            }
-        } else {
-            setFetchStatus('SKIPPED (Local Match OK)');
-        }
-
-        // Default to local matches if fetch skipped or failed
+        const localMatches = invoices.filter(inv =>
+            targetIds.includes(cleanId(inv.id)) || targetIds.includes(cleanId(inv.invoiceNumber))
+        );
         setFn(localMatches);
         if (drawMap) drawRouteOnMap(localMatches);
     };
@@ -1045,12 +1035,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         };
     }, []);
 
-    // Effect to load data for MODAL specifically
+    // Load route invoices when user opens a route — does NOT re-fire on invoices prop changes
+    // (re-firing on invoices would overwrite dispatch optimistic updates with stale cached data)
     useEffect(() => {
         if (selectedActiveRoute) {
             loadRouteInvoicesData(selectedActiveRoute, setRouteInvoices, false);
+        } else {
+            setRouteInvoices([]);
         }
-    }, [selectedActiveRoute, invoices]);
+    }, [selectedActiveRoute]);
 
     // 5. Auto-reporte de ubicación y WakeLock (Mantener pantalla encendida)
     useEffect(() => {
@@ -1279,7 +1272,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             });
             if (res.success) {
                 toast.success("✅ Despacho confirmado — el conductor debe FIRMAR para proceder");
-                // Actualización optimista: marcar factura como EN RUTA localmente
+                // Optimistic update: show EN RUTA immediately
                 setRouteInvoices(prev => prev.map(inv =>
                     (inv.id === assigningInvoice.id || inv.invoiceNumber === assigningInvoice.invoiceNumber)
                         ? { ...inv, itemStatus: 'EST-11' }
@@ -1288,6 +1281,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 setAssigningInvoice(null);
                 setScannedItems({});
                 fetchPendingSignatures();
+                // Refresh route invoices from server (fresh statuses) then trigger global refresh
+                if (selectedActiveRoute) {
+                    loadRouteInvoicesData(selectedActiveRoute, setRouteInvoices, false);
+                }
                 onRefresh();
             }
         } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
