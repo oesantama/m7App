@@ -1,6 +1,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
+import { logMovement } from '../utils/kardex.js';
 
 // ─── INVENTARIO DE VEHÍCULO ───────────────────────────────────────────────────
 
@@ -124,6 +125,23 @@ export const createSupplierReturn = async (req: Request, res: Response) => {
         SET quantity = GREATEST(0, quantity - $1), last_user = $2, last_updated = CURRENT_TIMESTAMP
         WHERE client_id = $3 AND article_id = $4 AND batch = $5
       `, [Number(item.quantity), createdBy, clientId, item.article_id, item.batch || 'S/L']);
+
+      // Kardex: SALIDA_PROVEEDOR
+      logMovement({
+        clientId,
+        articleId:     item.article_id,
+        articleName:   item.article_name || item.article_id,
+        batch:         item.batch || 'S/L',
+        movementType:  'SALIDA_PROVEEDOR',
+        quantity:      Number(item.quantity),
+        locationFrom:  'BODEGA',
+        locationTo:    'PROVEEDOR',
+        referenceType: 'PROVEEDOR',
+        referenceId:   String(returnId),
+        vehiclePlate:  vehiclePlate || undefined,
+        userId:        createdBy,
+        notes:         notes || undefined,
+      });
     }
 
     // Confirmar automáticamente si se pasa confirmed_by
@@ -298,6 +316,84 @@ export const approveConciliationHeader = async (req: Request, res: Response) => 
       [status, approvedBy, id]
     );
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── STOCK ACTUAL (Consulta de Inventario) ────────────────────────────────────
+export const getInventoryStock = async (req: Request, res: Response) => {
+  const { clientId, articleId, location = 'all' } = req.query as Record<string, string>;
+  try {
+    const results: { bodega: any[]; vehiculos: any[] } = { bodega: [], vehiculos: [] };
+
+    if (location === 'all' || location === 'bodega') {
+      const conds: string[] = ["ic.quantity::numeric > 0"];
+      const params: any[] = [];
+      if (clientId)  { params.push(clientId);         conds.push(`ic.client_id = $${params.length}`); }
+      if (articleId) { params.push(`%${articleId}%`); conds.push(`ic.article_id ILIKE $${params.length}`); }
+      const r = await pool.query(`
+        SELECT ic.client_id, ic.article_id, a.name AS article_name, ic.batch,
+               ic.quantity::numeric AS quantity, ic.last_updated, ic.last_user
+        FROM inventario_clientes ic
+        LEFT JOIN articles a ON a.id = ic.article_id
+        WHERE ${conds.join(' AND ')}
+        ORDER BY ic.article_id
+      `, params);
+      results.bodega = r.rows;
+    }
+
+    if (location === 'all' || location === 'vehiculos') {
+      const conds: string[] = ['vi.quantity > 0'];
+      const params: any[] = [];
+      if (clientId)  { params.push(clientId);         conds.push(`vi.client_id = $${params.length}`); }
+      if (articleId) { params.push(`%${articleId}%`); conds.push(`vi.article_id ILIKE $${params.length}`); }
+      const r = await pool.query(`
+        SELECT vi.vehicle_plate, vi.driver_name, vi.client_id,
+               vi.article_id, vi.article_name, vi.batch, vi.quantity, vi.last_updated
+        FROM vehicle_inventory vi
+        WHERE ${conds.join(' AND ')}
+        ORDER BY vi.vehicle_plate, vi.article_id
+      `, params);
+      results.vehiculos = r.rows;
+    }
+
+    res.json({ success: true, ...results });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── KARDEX / MOVIMIENTOS ─────────────────────────────────────────────────────
+export const getInventoryMovements = async (req: Request, res: Response) => {
+  const {
+    clientId, articleId, movementType, vehiclePlate, invoice,
+    dateFrom, dateTo, page = '1', limit = '100'
+  } = req.query as Record<string, string>;
+  try {
+    const conds: string[] = [];
+    const params: any[] = [];
+    if (clientId)     { params.push(clientId);         conds.push(`m.client_id = $${params.length}`); }
+    if (articleId)    { params.push(`%${articleId}%`); conds.push(`m.article_id ILIKE $${params.length}`); }
+    if (movementType) { params.push(movementType);     conds.push(`m.movement_type = $${params.length}`); }
+    if (vehiclePlate) { params.push(vehiclePlate);     conds.push(`m.vehicle_plate = $${params.length}`); }
+    if (invoice)      { params.push(`%${invoice}%`);   conds.push(`m.invoice ILIKE $${params.length}`); }
+    if (dateFrom)     { params.push(dateFrom);         conds.push(`m.created_at >= $${params.length}`); }
+    if (dateTo)       { params.push(dateTo);           conds.push(`m.created_at <= $${params.length}`); }
+
+    const where  = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const [dataRes, countRes] = await Promise.all([
+      pool.query(`
+        SELECT m.* FROM inventory_movements m ${where}
+        ORDER BY m.created_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `, [...params, parseInt(limit), offset]),
+      pool.query(`SELECT COUNT(*) FROM inventory_movements m ${where}`, params),
+    ]);
+
+    res.json({ success: true, data: dataRes.rows, total: parseInt(countRes.rows[0].count), page: parseInt(page), limit: parseInt(limit) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

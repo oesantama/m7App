@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { logMovement } from '../utils/kardex.js';
 
 // ─── Caché en memoria para getInvoices ───────────────────────────────────────
 // TTL de 45 segundos: reduce carga en Postgres en refrescos frecuentes
@@ -219,6 +220,20 @@ export const syncInventory = async (req: Request, res: Response) => {
             last_updated = CURRENT_TIMESTAMP
           `, [clientId, sku, skuAggregates[sku].batch || 'S/L', delta, user]);
           console.log(`[M7-SYNC-INV] SKU ${sku} actualizado. Delta: ${delta}`);
+          // Kardex: INGRESO a bodega (fire-and-forget, fuera de la transacción principal)
+          logMovement({
+            clientId,
+            articleId:     sku,
+            batch:         skuAggregates[sku].batch || 'S/L',
+            movementType:  'INGRESO',
+            quantity:      delta,
+            locationFrom:  'PROVEEDOR',
+            locationTo:    'BODEGA',
+            referenceType: 'DOCUMENTO',
+            referenceId:   String(docId),
+            userId:        user,
+            notes:         notes || undefined,
+          });
         } catch (invErr: any) {
           console.error(`[M7-SYNC-INV-ERR] Falló SKU ${sku}:`, invErr.message);
           throw new Error(`Error actualizando stock para ${sku}: ${invErr.message}`);

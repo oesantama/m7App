@@ -189,6 +189,50 @@ export const api = {
   },
   getInvoiceStatusHistory: (documentId: string) =>
     fetchJson(`${API_URL}/conciliation/${encodeURIComponent(documentId)}/history`),
+
+  // ── Devoluciones Bodega ────────────────────────────────────────────────────
+  getPendingRouteReturns: () =>
+    fetchJson(`${API_URL}/dispatch/returns-pending`),
+  confirmRouteReturn: (id: number | string, data: { status: 'PROCESSED' | 'CANCELLED'; handledBy?: string; notes?: string }) =>
+    fetchJson(`${API_URL}/dispatch/returns/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  getPendingBodegaReturns: () =>
+    fetchJson(`${API_URL}/dispatch/pending-bodega-returns`),
+  confirmBodegaReturn: (data: { invoiceNumber: string; documentId: string; receivedBy: string; observation?: string }) =>
+    fetchJson(`${API_URL}/dispatch/bodega-receipt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  // ── Consulta de Inventario / Kardex ───────────────────────────────────────
+  getInventoryStock: (params?: { clientId?: string; articleId?: string; location?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.clientId)   qs.set('clientId',   params.clientId);
+    if (params?.articleId)  qs.set('articleId',  params.articleId);
+    if (params?.location)   qs.set('location',   params.location);
+    return fetchJson(`${API_URL}/inventory/stock?${qs}`);
+  },
+  getInventoryMovements: (params?: {
+    clientId?: string; articleId?: string; movementType?: string;
+    vehiclePlate?: string; invoice?: string;
+    dateFrom?: string; dateTo?: string; page?: number; limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.clientId)     qs.set('clientId',     params.clientId);
+    if (params?.articleId)    qs.set('articleId',    params.articleId);
+    if (params?.movementType) qs.set('movementType', params.movementType);
+    if (params?.vehiclePlate) qs.set('vehiclePlate', params.vehiclePlate);
+    if (params?.invoice)      qs.set('invoice',      params.invoice);
+    if (params?.dateFrom)     qs.set('dateFrom',     params.dateFrom);
+    if (params?.dateTo)       qs.set('dateTo',       params.dateTo);
+    if (params?.page)         qs.set('page',         String(params.page));
+    if (params?.limit)        qs.set('limit',        String(params.limit));
+    return fetchJson(`${API_URL}/inventory/movements?${qs}`);
+  },
   getConciliationPlanillaUrl: (routeId: string | number) => {
     return `${API_URL}/conciliation/planilla?routeId=${routeId}`;
   },

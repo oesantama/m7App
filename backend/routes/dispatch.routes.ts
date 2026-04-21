@@ -12,6 +12,8 @@ import {
     getVoucherFile,
     getPendingReturns,
     updateReturnStatus,
+    confirmBodegaReturn,
+    getPendingBodegaReturns,
 } from '../controllers/dispatch.controller.js';
 
 const router = Router();
@@ -31,8 +33,12 @@ router.post('/voucher', uploadVoucher);
 router.get('/vouchers/:invoiceId', getVouchers);
 router.get('/voucher-file/:id', getVoucherFile);
 
-// Control de devoluciones (bodega)
+// Control de devoluciones de ruta (bodega confirma recepción de conductor)
 router.get('/returns-pending', getPendingReturns);
 router.put('/returns/:id/status', updateReturnStatus);
+
+// Devoluciones post-legalización (bodega confirma mercancía de conciliación DEVOLUCION)
+router.get('/pending-bodega-returns', getPendingBodegaReturns);
+router.post('/bodega-receipt', confirmBodegaReturn);
 
 export default router;

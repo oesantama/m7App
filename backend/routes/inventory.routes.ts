@@ -10,6 +10,8 @@ import {
   getConciliationHeaders,
   saveConciliationHeader,
   approveConciliationHeader,
+  getInventoryStock,
+  getInventoryMovements,
 } from '../controllers/inventory.controller.js';
 
 const router = Router();
@@ -52,5 +54,9 @@ router.patch('/supplier-returns/:id/confirm', requireInventoryEdit, confirmSuppl
 router.get('/conciliation-headers', requireInventoryView, getConciliationHeaders);
 router.post('/conciliation-headers', requireInventoryEdit, saveConciliationHeader);
 router.patch('/conciliation-headers/:id/approve', requireInventoryEdit, approveConciliationHeader);
+
+// ─── Consulta de Stock e Inventario ──────────────────────────────────────────
+router.get('/stock',     requireInventoryView, getInventoryStock);
+router.get('/movements', requireInventoryView, getInventoryMovements);
 
 export default router;

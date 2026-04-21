@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { logMovement } from '../utils/kardex.js';
 
 export const initDispatch = async (req: Request, res: Response) => {
     const { 
@@ -130,6 +131,24 @@ export const initDispatch = async (req: Request, res: Response) => {
                 (route_id, document_id, invoice, article_id, article_name, batch, client_id, vehicle_plate, driver_id, driver_name, assigned_qty, unit, customer_name, city, address, assigned_by, assigned_at)
               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,CURRENT_TIMESTAMP)
             `, [routeId, d.docId, invoiceId, articleId, articleName, d.batch, clientId, vehiclePlate, driverId, driverName, d.qty, d.unit, d.customerName, d.city, d.address, createdBy]);
+
+            // Kardex: DESPACHO de bodega al vehículo
+            logMovement({
+              clientId,
+              articleId,
+              articleName,
+              batch:         d.batch,
+              movementType:  'DESPACHO',
+              quantity:      d.qty,
+              locationFrom:  'BODEGA',
+              locationTo:    `PLACA-${vehiclePlate}`,
+              referenceType: 'DESPACHO',
+              referenceId:   String(routeId || invoiceId),
+              invoice:       invoiceId,
+              vehiclePlate,
+              driverId,
+              userId:        createdBy,
+            });
           }
         }
 
@@ -382,27 +401,32 @@ export const confirmDelivery = async (req: Request, res: Response) => {
             const batch = item.batch || 'S/L';
 
             if (deliveryType === 'FULL') {
-              // Descontar todo del vehículo
               await pool.query(`
                 UPDATE vehicle_inventory SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
                 WHERE vehicle_plate = $3 AND article_id = $4 AND batch = $5
               `, [deliveredQty, driverId, vehiclePlate, sku, batch]);
+              logMovement({ articleId: sku, batch, movementType: 'ENTREGA', quantity: deliveredQty,
+                locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'CLIENTE',
+                referenceType: 'ENTREGA', referenceId: String(confirmationId),
+                invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
 
             } else if (deliveryType === 'PARTIAL') {
-              // Descontar lo entregado; lo devuelto queda en vehículo (hasta que bodega procese)
+              // Descontar lo entregado; lo devuelto queda en vehículo hasta que bodega procese
               await pool.query(`
                 UPDATE vehicle_inventory SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
                 WHERE vehicle_plate = $3 AND article_id = $4 AND batch = $5
               `, [deliveredQty, driverId, vehiclePlate, sku, batch]);
+              if (deliveredQty > 0) logMovement({ articleId: sku, batch, movementType: 'ENTREGA_PARCIAL', quantity: deliveredQty,
+                locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'CLIENTE',
+                referenceType: 'ENTREGA', referenceId: String(confirmationId),
+                invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
 
             } else if (deliveryType === 'RETURN') {
-              // Devolución total: sacar del vehículo y sumar a inventario cliente
               await pool.query(`
                 UPDATE vehicle_inventory SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
                 WHERE vehicle_plate = $3 AND article_id = $4 AND batch = $5
               `, [returnedQty, driverId, vehiclePlate, sku, batch]);
 
-              // Devolver a inventario cliente
               const clientRes2 = await pool.query(
                 `SELECT d.client_id FROM documents_l d JOIN document_items i ON i.document_id = d.id WHERE (TRIM(COALESCE(NULLIF(i.invoice,''),i.order_number)) = $1) LIMIT 1`,
                 [invoiceId]
@@ -416,9 +440,12 @@ export const confirmDelivery = async (req: Request, res: Response) => {
                     quantity = GREATEST(0, inventario_clientes.quantity + $4), last_user = $5, last_updated = CURRENT_TIMESTAMP
                 `, [clientId2, sku, batch, returnedQty, driverId]);
               }
+              logMovement({ clientId: clientId2 || undefined, articleId: sku, batch, movementType: 'DEVOLUCION_BODEGA', quantity: returnedQty,
+                locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'BODEGA',
+                referenceType: 'DEVOLUCION', referenceId: String(returnId || confirmationId),
+                invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
 
             } else if (deliveryType === 'REPIQUE' && repiqueDestination !== 'SAME_PLATE') {
-              // Repique a bodega: sacar del vehículo y sumar a inventario cliente (para re-despacho)
               const totalQty = deliveredQty + returnedQty || Number(item.quantityDelivered ?? item.qty ?? 0);
               await pool.query(`
                 UPDATE vehicle_inventory SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
@@ -438,6 +465,10 @@ export const confirmDelivery = async (req: Request, res: Response) => {
                     quantity = GREATEST(0, inventario_clientes.quantity + $4), last_user = $5, last_updated = CURRENT_TIMESTAMP
                 `, [clientId3, sku, batch, totalQty, driverId]);
               }
+              logMovement({ clientId: clientId3 || undefined, articleId: sku, batch, movementType: 'REPIQUE', quantity: totalQty,
+                locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'BODEGA',
+                referenceType: 'DEVOLUCION', referenceId: String(confirmationId),
+                invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
             }
           }
         }
@@ -742,7 +773,7 @@ export const getPendingReturns = async (req: Request, res: Response) => {
 export const updateReturnStatus = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const { status, destination, handledBy, notes } = req.body;
+        const { status, handledBy, notes } = req.body;
 
         if (!['PROCESSED', 'CANCELLED'].includes(status)) {
             return res.status(400).json({ error: 'Estado inválido. Use PROCESSED o CANCELLED' });
@@ -757,13 +788,71 @@ export const updateReturnStatus = async (req: Request, res: Response) => {
             [status, notes || null, id]
         );
 
-        // Si se procesó, revertir estado de la factura a pendiente para reingreso
         if (status === 'PROCESSED') {
-            const ret = await pool.query(`SELECT invoice_id FROM delivery_returns WHERE id = $1`, [id]);
-            if (ret.rows.length > 0) {
+            // Obtener datos de la devolución y sus items
+            const retRes = await pool.query(`
+                SELECT dr.invoice_id, dr.vehicle_id, dc.delivery_type,
+                       json_agg(json_build_object(
+                           'sku', dri.sku, 'qty', dri.quantity_returned, 'batch', 'S/L'
+                       )) AS items
+                FROM delivery_returns dr
+                LEFT JOIN delivery_confirmations dc ON dc.id = dr.confirmation_id
+                LEFT JOIN delivery_return_items dri ON dri.return_id = dr.id
+                WHERE dr.id = $1
+                GROUP BY dr.invoice_id, dr.vehicle_id, dc.delivery_type
+            `, [id]);
+
+            if (retRes.rows.length > 0) {
+                const row = retRes.rows[0];
+                const invoiceId = row.invoice_id;
+                const originalType = row.delivery_type;
+
+                // Para PARTIAL: los items devueltos aún están en vehicle_inventory → mover a bodega
+                if (originalType === 'PARTIAL') {
+                    const vehicleRes = await pool.query('SELECT plate FROM vehicles WHERE id=$1 LIMIT 1', [row.vehicle_id]);
+                    const vehiclePlate = vehicleRes.rows[0]?.plate || row.vehicle_id;
+
+                    const clientRes = await pool.query(
+                        `SELECT d.client_id FROM documents_l d JOIN document_items i ON i.document_id=d.id
+                         WHERE TRIM(COALESCE(NULLIF(i.invoice,''),i.order_number))=$1 LIMIT 1`,
+                        [invoiceId]
+                    );
+                    const clientId = clientRes.rows[0]?.client_id;
+
+                    const items: any[] = Array.isArray(row.items) ? row.items.filter((i: any) => i.sku) : [];
+                    for (const item of items) {
+                        const qty = Number(item.qty);
+                        if (qty <= 0) continue;
+                        // Sacar del vehículo
+                        await pool.query(`
+                            UPDATE vehicle_inventory
+                            SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
+                            WHERE vehicle_plate = $3 AND article_id = $4
+                        `, [qty, handledBy || 'BODEGA', vehiclePlate, item.sku]);
+                        // Sumar a bodega
+                        if (clientId) {
+                            await pool.query(`
+                                INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
+                                VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
+                                ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
+                                    quantity = GREATEST(0, inventario_clientes.quantity + $4),
+                                    last_user = $5, last_updated = CURRENT_TIMESTAMP
+                            `, [clientId, item.sku, item.batch || 'S/L', qty, handledBy || 'BODEGA']);
+                        }
+                        // Kardex: DEVOLUCION_BODEGA
+                        logMovement({ clientId: clientId || undefined, articleId: item.sku, batch: item.batch || 'S/L',
+                            movementType: 'DEVOLUCION_BODEGA', quantity: qty,
+                            locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'BODEGA',
+                            referenceType: 'DEVOLUCION', referenceId: String(id),
+                            invoice: invoiceId, vehiclePlate, userId: handledBy || 'BODEGA' });
+                    }
+                }
+                // Para FULL RETURN: el inventario ya fue ajustado en confirmDelivery, no repetir
+
+                // Resetear item_status a EST-03 (Para Despacho)
                 await pool.query(
-                    `UPDATE document_items SET item_status = 'EST-01' WHERE invoice = $1 OR order_number = $1`,
-                    [ret.rows[0].invoice_id]
+                    `UPDATE document_items SET item_status = 'EST-03' WHERE invoice = $1 OR order_number = $1`,
+                    [invoiceId]
                 );
             }
         }
@@ -771,6 +860,151 @@ export const updateReturnStatus = async (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (error: any) {
         console.error('[M7-RETURNS] updateReturnStatus error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// ─── CONFIRMAR RECEPCIÓN BODEGA (devoluciones post-legalización) ──────────────
+// POST /api/dispatch/bodega-receipt
+// Cuando conciliación marcó la factura como DEVOLUCION, bodega confirma recepción física
+// y el inventario se actualiza en ese momento (no antes).
+export const confirmBodegaReturn = async (req: Request, res: Response) => {
+    const { invoiceNumber, documentId, receivedBy, observation } = req.body;
+    if (!invoiceNumber || !documentId) {
+        return res.status(400).json({ error: 'invoiceNumber y documentId son requeridos' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Verificar que existe conciliación como DEVOLUCION y no ha sido recibida
+        const concRes = await client.query(`
+            SELECT ic.id FROM invoice_conciliations ic
+            WHERE ic.document_id = $1 AND ic.invoice_number = $2
+              AND ic.es_devolucion = true
+              AND ic.bodega_received_at IS NULL
+        `, [documentId, invoiceNumber]);
+
+        if (concRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'No se encontró devolución pendiente de recepción para esta factura' });
+        }
+
+        // 2. Obtener artículos de la factura
+        const itemsRes = await client.query(`
+            SELECT di.article_id, a.name as article_name, SUM(di.expected_qty) as qty,
+                   di.batch, dl.client_id, dl.vehicle_plate
+            FROM document_items di
+            JOIN documents_l dl ON dl.id = di.document_id
+            LEFT JOIN articles a ON a.id = di.article_id
+            WHERE di.document_id = $1 AND di.invoice = $2
+            GROUP BY di.article_id, a.name, di.batch, dl.client_id, dl.vehicle_plate
+        `, [documentId, invoiceNumber]);
+
+        const receiptItems: any[] = [];
+
+        for (const item of itemsRes.rows) {
+            const qty = Number(item.qty);
+            if (qty <= 0) continue;
+
+            // 3. Sumar a inventario bodega
+            await client.query(`
+                INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
+                VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
+                ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
+                    quantity = GREATEST(0, inventario_clientes.quantity + $4),
+                    last_user = $5, last_updated = CURRENT_TIMESTAMP
+            `, [item.client_id, item.article_id, item.batch || 'S/L', qty, receivedBy]);
+
+            receiptItems.push({ article_id: item.article_id, article_name: item.article_name, batch: item.batch || 'S/L', qty });
+        }
+
+        // 4. Registrar en bodega_receipts
+        await client.query(`
+            INSERT INTO bodega_receipts (invoice, document_id, client_id, received_by, observation, items, created_at)
+            VALUES ($1,$2,$3,$4,$5,$6::jsonb,NOW())
+        `, [invoiceNumber, documentId, itemsRes.rows[0]?.client_id || null, receivedBy, observation || null, JSON.stringify(receiptItems)]);
+
+        // 5. Marcar conciliación como recibida
+        await client.query(`
+            UPDATE invoice_conciliations
+            SET bodega_received_at = NOW(), bodega_received_by = $1
+            WHERE document_id = $2 AND invoice_number = $3
+        `, [receivedBy, documentId, invoiceNumber]);
+
+        // 6. Actualizar item_status a EST-03 (Para Despacho / disponible)
+        await client.query(`
+            UPDATE document_items SET item_status = 'EST-03'
+            WHERE document_id = $1 AND invoice = $2
+        `, [documentId, invoiceNumber]);
+
+        await client.query('COMMIT');
+        res.json({ success: true, items: receiptItems });
+
+        // 7. Kardex: DEVOLUCION_BODEGA por cada artículo (fire-and-forget)
+        for (const item of receiptItems) {
+            logMovement({
+                clientId:      itemsRes.rows[0]?.client_id || undefined,
+                articleId:     item.article_id,
+                articleName:   item.article_name,
+                batch:         item.batch,
+                movementType:  'DEVOLUCION_BODEGA',
+                quantity:      item.qty,
+                locationFrom:  'CLIENTE',
+                locationTo:    'BODEGA',
+                referenceType: 'DEVOLUCION',
+                referenceId:   documentId,
+                invoice:       invoiceNumber,
+                userId:        receivedBy,
+                notes:         observation || undefined,
+            });
+        }
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        console.error('[M7-BODEGA] confirmBodegaReturn error:', error.message);
+        res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
+};
+
+// ─── DEVOLUCIONES PENDIENTES POST-LEGALIZACIÓN ────────────────────────────────
+// GET /api/dispatch/pending-bodega-returns
+export const getPendingBodegaReturns = async (req: Request, res: Response) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                ic.document_id          AS "documentId",
+                ic.invoice_number       AS "invoiceNumber",
+                ic.vehicle_plate        AS "vehiclePlate",
+                ic.conductor_name       AS "conductorName",
+                ic.updated_at           AS "legalizadoAt",
+                dl.external_doc_id      AS "externalDocId",
+                dl.client_id            AS "clientId",
+                COALESCE(
+                    json_agg(json_build_object(
+                        'article_id',   di.article_id,
+                        'article_name', a.name,
+                        'batch',        di.batch,
+                        'qty',          di.expected_qty,
+                        'unit',         di.unit
+                    )) FILTER (WHERE di.id IS NOT NULL),
+                    '[]'
+                ) AS items
+            FROM invoice_conciliations ic
+            JOIN documents_l dl ON dl.id = ic.document_id
+            LEFT JOIN document_items di ON di.document_id = ic.document_id AND di.invoice = ic.invoice_number
+            LEFT JOIN articles a ON a.id = di.article_id
+            WHERE ic.es_devolucion = true
+              AND ic.bodega_received_at IS NULL
+            GROUP BY ic.document_id, ic.invoice_number, ic.vehicle_plate,
+                     ic.conductor_name, ic.updated_at, dl.external_doc_id, dl.client_id
+            ORDER BY ic.updated_at DESC
+        `);
+        res.json({ success: true, data: result.rows });
+    } catch (error: any) {
+        console.error('[M7-BODEGA] getPendingBodegaReturns error:', error.message);
         res.status(500).json({ error: error.message });
     }
 };
