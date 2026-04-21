@@ -95,18 +95,24 @@ export const getAjoverStats = async (req: Request, res: Response) => {
     topCitiesRes, activeRoutesRes, vehicleEffRes,
     concRow, devRow, stkRow,
   ] = await Promise.all([
+    // Vehicles associated to the client via assignments
     pool.query(`
-      SELECT COUNT(*) as total,
-        COUNT(*) FILTER (WHERE LOWER(status_id) IN ('est-01','disponible','available')) as available,
-        COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-02') as on_route,
-        COALESCE(SUM(capacity_m3),0) as total_capacity_m3, 0 as total_capacity_kg
-      FROM vehicles WHERE (client_id=$1 OR client_id IS NULL)
+      SELECT COUNT(DISTINCT v.id) as total,
+        COUNT(DISTINCT v.id) FILTER (WHERE LOWER(v.status_id) IN ('est-01','disponible','available')) as available,
+        COUNT(DISTINCT v.id) FILTER (WHERE LOWER(v.status_id) = 'est-02') as on_route,
+        COALESCE(SUM(DISTINCT v.capacity_m3), 0) as total_capacity_m3, 0 as total_capacity_kg
+      FROM assignments a
+      JOIN vehicles v ON v.id::text = a.vehicle_id::text
+      WHERE a.client_id = $1
     `, p).catch(() => ({ rows: [{ total:0, available:0, on_route:0, total_capacity_m3:0, total_capacity_kg:0 }] })),
 
+    // Drivers associated to the client via assignments
     pool.query(`
-      SELECT COUNT(*) as total,
-        COUNT(*) FILTER (WHERE LOWER(status_id) = 'est-01') as active
-      FROM drivers WHERE (client_id=$1 OR client_id IS NULL)
+      SELECT COUNT(DISTINCT d.id) as total,
+        COUNT(DISTINCT d.id) FILTER (WHERE LOWER(d.status_id) = 'est-01') as active
+      FROM assignments a
+      JOIN drivers d ON d.id::text = a.driver_id::text
+      WHERE a.client_id = $1
     `, p).catch(() => ({ rows: [{ total:0, active:0 }] })),
 
     pool.query(`
