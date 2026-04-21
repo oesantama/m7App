@@ -177,7 +177,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [auditModal, setAuditModal] = useState<{ isOpen: boolean; action: any; data: any } | null>(null);
   const [auditComment, setAuditComment] = useState('');
-  const [addInvoiceModal, setAddInvoiceModal] = useState<{ isOpen: boolean; routeIndex: number | null; tab: 'plan' | 'repique' }>({ isOpen: false, routeIndex: null, tab: 'plan' });
+  const [addInvoiceModal, setAddInvoiceModal] = useState<{ isOpen: boolean; routeIndex: number | null; tab: 'plan' | 'repice' }>({ isOpen: false, routeIndex: null, tab: 'plan' });
   const [isSaving, setIsSaving] = useState(false);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<Invoice | null>(null);
   const [manualRouteModal, setManualRouteModal] = useState(false);
@@ -975,8 +975,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const route = newSuggestions[addInvoiceModal.routeIndex];
 
     // Marcar como repice si viene del tab repice
-    const invoiceToAdd = addInvoiceModal.tab === 'repique'
-      ? { ...invoice, isRepique: true, status: 'EST-15' } as any
+    const invoiceToAdd = addInvoiceModal.tab === 'repice'
+      ? { ...invoice, isRepice: true, status: 'EST-15' } as any
       : invoice;
     route.assignedInvoices.push(invoiceToAdd);
     const realCapacity = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) > 0 ? Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) : 30; // Fallback
@@ -1460,12 +1460,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         .map((inv, idx) => {
           const fi = (inv.items?.[0] || {}) as any;
           const method = String((inv as any).paymentMethod || fi.paymentMethod || fi.payment_method || '-').toUpperCase();
-          const isRepique = !!(inv as any).isRepique;
+          const isRepice = !!(inv as any).isRepice;
           return [
             String(idx + 1),
             String(inv.unCode || fi.unCode || fi.un_code || '-'),
             String(inv.docLId || '-'),
-            isRepique ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
+            isRepice ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
             String(inv.orderNumber || '-'),
             String(inv.totalItems || '-'),
             String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
@@ -1493,7 +1493,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       didParseCell: (data: any) => {
         if (data.section === 'body') {
           const inv = route.assignedInvoices[data.row.index] as any;
-          if (inv?.isRepique) {
+          if (inv?.isRepice) {
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.textColor = [0, 0, 0];
           }
@@ -2265,7 +2265,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 </div>
               )}
 
-              {/* Tabs: Plan / Repique */}
+              {/* Tabs: Plan / Repice */}
               <div className="flex gap-2 bg-slate-100 p-1 rounded-2xl">
                 <button
                   onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'plan' }))}
@@ -2274,8 +2274,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   📋 Del Plan
                 </button>
                 <button
-                  onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'repique' }))}
-                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'repique' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'repice' }))}
+                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'repice' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   ⚡ Repice
                 </button>
@@ -2369,7 +2369,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-3">
               {(() => {
                 // Para repice: solo facturas en estado EST-15
-                const pool = addInvoiceModal.tab === 'repique'
+                const pool = addInvoiceModal.tab === 'repice'
                   ? invoices.filter(inv => {
                       if ((inv as any).status !== 'EST-15' && (inv as any).item_status !== 'EST-15') return false;
                       const term = modalSearchTerm.toLowerCase().trim();
@@ -2380,7 +2380,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     })
                   : unassignedInvoices;
 
-                const filtered = addInvoiceModal.tab === 'repique' ? pool : pool.filter(inv => {
+                const filtered = addInvoiceModal.tab === 'repice' ? pool : pool.filter(inv => {
                   const term = modalSearchTerm.toLowerCase();
                   return (inv.invoiceNumber || '').toLowerCase().includes(term) ||
                     (inv.customerName || '').toLowerCase().includes(term) ||
@@ -2394,7 +2394,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         <Icons.Plus className="w-8 h-8" />
                       </div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                        {addInvoiceModal.tab === 'repique'
+                        {addInvoiceModal.tab === 'repice'
                           ? 'No hay facturas en estado Repice (EST-15)'
                           : 'Sin resultados para tu búsqueda'}
                       </p>
@@ -2425,7 +2425,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                               DOC: {inv.externalDocId}
                             </span>
                           )}
-                          {addInvoiceModal.tab === 'repique' && (
+                          {addInvoiceModal.tab === 'repice' && (
                             <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-black uppercase border border-amber-300 animate-pulse">
                               ⚡ REPICE
                             </span>

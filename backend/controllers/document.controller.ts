@@ -859,7 +859,7 @@ export const getInvoices = async (req: Request, res: Response) => {
       if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;
     } else if (history !== 'true') {
       // Planificador: solo facturas pendientes o en repique a bodega
-      // EST-01 = pendiente inicial | EST-15 = repique (devuelto para re-entrega)
+      // EST-01 = pendiente inicial | EST-15 = repice (devuelto para re-entrega)
       // NULL = registros legacy antes del backfill (compatibilidad con producción)
       query += ` AND (document_items.item_status IN ('EST-01', 'EST-03', 'EST-08', 'EST-15') OR document_items.item_status IS NULL)
         AND documents_l.status NOT IN ('EST-16','EST-12','EST-07','EST-17')`;

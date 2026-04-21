@@ -2,8 +2,8 @@
 import React from 'react';
 import { Icons } from '../../constants';
 
-type DeliveryType = 'FULL' | 'PARTIAL' | 'RETURN' | 'REPIQUE';
-type RepiqueDestination = 'BODEGA' | 'SAME_PLATE';
+type DeliveryType = 'FULL' | 'PARTIAL' | 'RETURN' | 'REPICE';
+type RepiceDestination = 'BODEGA' | 'SAME_PLATE';
 
 interface CustomerDeliveryModalProps {
     isOpen: boolean;
@@ -19,8 +19,8 @@ interface CustomerDeliveryModalProps {
     setDeliveryNotes: (notes: string) => void;
     deliveryPassword: string;
     setDeliveryPassword: (pass: string) => void;
-    repiqueDestination: RepiqueDestination;
-    setRepiqueDestination: (dest: RepiqueDestination) => void;
+    repiceDestination: RepiceDestination;
+    setRepiceDestination: (dest: RepiceDestination) => void;
     isConfirmingDelivery: boolean;
     handleConfirmDelivery: () => void;
 }
@@ -29,7 +29,7 @@ const MODE_INFO: Record<DeliveryType, { label: string; desc: string; color: 'eme
     FULL:    { label: '✅ Completa',  desc: 'Se entregó todo al cliente.',                          color: 'emerald' },
     PARTIAL: { label: '⚠️ Parcial',   desc: 'Parte entregada — el resto regresa a bodega.',         color: 'amber'   },
     RETURN:  { label: '🔄 Devolver',  desc: 'Nada entregado — toda la mercancía regresa a bodega.', color: 'rose'    },
-    REPIQUE: { label: '🔁 Repice',   desc: 'No recibido — se reasigna o devuelve según destino.',  color: 'violet'  },
+    REPICE:  { label: '🔁 Repice',   desc: 'No recibido — se reasigna o devuelve según destino.',  color: 'violet'  },
 } as const;
 
 const COLOR_MAP = {
@@ -45,7 +45,7 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
     deliveryItems, setDeliveryItems,
     deliveryReturnReason, setDeliveryReturnReason,
     deliveryNotes, setDeliveryNotes,
-    repiqueDestination, setRepiqueDestination,
+    repiceDestination, setRepiceDestination,
     isConfirmingDelivery, handleConfirmDelivery
 }) => {
     if (!isOpen) return null;
@@ -63,13 +63,13 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
     const confirmLabel =
         deliveryType === 'FULL'    ? '✅ Confirmar Entrega'        :
         deliveryType === 'PARTIAL' ? '⚠️ Guardar Entrega Parcial'  :
-        deliveryType === 'REPIQUE' ? '🔁 Registrar Repice'        :
+        deliveryType === 'REPICE' ? '🔁 Registrar Repice'        :
                                      '🔄 Registrar Devolución';
 
     const confirmBtnColor =
         deliveryType === 'FULL'    ? 'bg-emerald-600 hover:bg-emerald-700' :
         deliveryType === 'PARTIAL' ? 'bg-amber-500 hover:bg-amber-600'     :
-        deliveryType === 'REPIQUE' ? 'bg-violet-600 hover:bg-violet-700'   :
+        deliveryType === 'REPICE' ? 'bg-violet-600 hover:bg-violet-700'   :
                                      'bg-rose-600 hover:bg-rose-700';
 
     return (
@@ -98,7 +98,7 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
                     <div>
                         <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Tipo de Entrega</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                            {(['FULL', 'PARTIAL', 'RETURN', 'REPIQUE'] as DeliveryType[]).map(opt => {
+                            {(['FULL', 'PARTIAL', 'RETURN', 'REPICE'] as DeliveryType[]).map(opt => {
                                 const m = MODE_INFO[opt];
                                 const active = deliveryType === opt;
                                 return (
@@ -113,22 +113,22 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
                         <p className={`text-[9px] font-bold px-3 py-1.5 rounded-lg ${
                             deliveryType === 'FULL'    ? 'bg-emerald-50 text-emerald-700' :
                             deliveryType === 'PARTIAL' ? 'bg-amber-50 text-amber-700'     :
-                            deliveryType === 'REPIQUE' ? 'bg-violet-50 text-violet-700'   :
+                            deliveryType === 'REPICE' ? 'bg-violet-50 text-violet-700'   :
                                                          'bg-rose-50 text-rose-700'
                         }`}>{mode.desc}</p>
                     </div>
 
-                    {/* DESTINO REPIQUE */}
-                    {deliveryType === 'REPIQUE' && (
+                    {/* DESTINO REPICE */}
+                    {deliveryType === 'REPICE' && (
                         <div>
                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
                                 Destino del Repice <span className="text-violet-500">*</span>
                             </p>
                             <div className="grid grid-cols-2 gap-3">
                                 <button
-                                    onClick={() => setRepiqueDestination('BODEGA')}
+                                    onClick={() => setRepiceDestination('BODEGA')}
                                     className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
-                                        repiqueDestination === 'BODEGA'
+                                        repiceDestination === 'BODEGA'
                                             ? 'bg-violet-600 border-violet-600 text-white'
                                             : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-violet-300'
                                     }`}
@@ -137,15 +137,15 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
                                     <span className="text-[9px] font-black uppercase tracking-wide leading-tight text-center">
                                         Devolver<br />a Bodega
                                     </span>
-                                    <span className={`text-[8px] font-medium leading-tight text-center ${repiqueDestination === 'BODEGA' ? 'text-violet-200' : 'text-slate-400'}`}>
+                                    <span className={`text-[8px] font-medium leading-tight text-center ${repiceDestination === 'BODEGA' ? 'text-violet-200' : 'text-slate-400'}`}>
                                         Vuelve a pendiente
                                     </span>
                                 </button>
 
                                 <button
-                                    onClick={() => setRepiqueDestination('SAME_PLATE')}
+                                    onClick={() => setRepiceDestination('SAME_PLATE')}
                                     className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
-                                        repiqueDestination === 'SAME_PLATE'
+                                        repiceDestination === 'SAME_PLATE'
                                             ? 'bg-violet-600 border-violet-600 text-white'
                                             : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-violet-300'
                                     }`}
@@ -154,7 +154,7 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
                                     <span className="text-[9px] font-black uppercase tracking-wide leading-tight text-center">
                                         Reasignar<br />Misma Placa
                                     </span>
-                                    <span className={`text-[8px] font-medium leading-tight text-center ${repiqueDestination === 'SAME_PLATE' ? 'text-violet-200' : 'text-slate-400'}`}>
+                                    <span className={`text-[8px] font-medium leading-tight text-center ${repiceDestination === 'SAME_PLATE' ? 'text-violet-200' : 'text-slate-400'}`}>
                                         Sigue en ruta
                                     </span>
                                 </button>
@@ -163,7 +163,7 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
                     )}
 
                     {/* ARTÍCULOS */}
-                    {deliveryItems.length > 0 && deliveryType !== 'REPIQUE' && (
+                    {deliveryItems.length > 0 && deliveryType !== 'REPICE' && (
                         <div>
                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
                                 Artículos
@@ -211,11 +211,11 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
                         </div>
                     )}
 
-                    {/* ARTÍCULOS REPIQUE — solo lectura (todos vuelven) */}
-                    {deliveryItems.length > 0 && deliveryType === 'REPIQUE' && (
+                    {/* ARTÍCULOS REPICE — solo lectura (todos vuelven) */}
+                    {deliveryItems.length > 0 && deliveryType === 'REPICE' && (
                         <div>
                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                                Artículos — <span className="text-violet-600 normal-case font-bold">todos se {repiqueDestination === 'BODEGA' ? 'devuelven a bodega' : 'reasignan a la misma placa'}</span>
+                                Artículos — <span className="text-violet-600 normal-case font-bold">todos se {repiceDestination === 'BODEGA' ? 'devuelven a bodega' : 'reasignan a la misma placa'}</span>
                             </p>
                             <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
                                 {deliveryItems.map((item, i) => (
@@ -240,14 +240,14 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
                             value={observations}
                             onChange={e => setObservations(e.target.value)}
                             placeholder={
-                                deliveryType === 'REPIQUE'
+                                deliveryType === 'REPICE'
                                     ? 'Ej: Cliente ausente en segunda visita, reagendar para mañana...'
                                     : needsReason
                                     ? 'Ej: Cliente ausente, rechazo de mercancía, dirección incorrecta...'
                                     : 'Ej: Cliente firmó conforme, entrega en portería...'
                             }
                             className={`w-full px-3 py-2 border rounded-xl text-[10px] outline-none transition-all resize-none ${
-                                deliveryType === 'REPIQUE' ? 'border-violet-200 focus:border-violet-500' :
+                                deliveryType === 'REPICE' ? 'border-violet-200 focus:border-violet-500' :
                                 needsReason               ? 'border-rose-200 focus:border-rose-500'     :
                                                             'border-slate-200 focus:border-emerald-500'
                             }`}

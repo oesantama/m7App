@@ -26,7 +26,7 @@ export enum DocStatus {
   DELIVERED  = 'EST-12',
   RETURNED   = 'EST-13',
   PARTIAL    = 'EST-14',
-  REPIQUE    = 'EST-15',
+  REPICE     = 'EST-15',
   ELIMINATED = 'EST-16',
   REJECTED   = 'EST-17',
 }
@@ -45,7 +45,7 @@ export const DOC_STATUS_LABELS: Record<string, string> = {
   'EST-12': 'Entregado',
   'EST-13': 'Devuelto',
   'EST-14': 'Entrega Parcial',
-  'EST-15': 'Repique',
+  'EST-15': 'Repice',
   'EST-16': 'Eliminado',
   'EST-17': 'Rechazado',
   // Compatibilidad retroactiva (texto legado → label)
@@ -62,7 +62,7 @@ export const DOC_STATUS_LABELS: Record<string, string> = {
   'ENTREGADO':       'Entregado',
   'DEVUELTO':        'Devuelto',
   'ENTREGA PARCIAL': 'Entrega Parcial',
-  'REPIQUE':         'Repique',
+  'REPICE':          'Repice',
   'ELIMINADO':       'Eliminado',
   'RECHAZADO':       'Rechazado',
 };

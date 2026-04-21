@@ -124,8 +124,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         invoice: any;
         route: any;
     } | null>(null);
-    const [deliveryType, setDeliveryType] = useState<'FULL' | 'PARTIAL' | 'RETURN' | 'REPIQUE'>('FULL');
-    const [repiqueDestination, setRepiqueDestination] = useState<'BODEGA' | 'SAME_PLATE'>('BODEGA');
+    const [deliveryType, setDeliveryType] = useState<'FULL' | 'PARTIAL' | 'RETURN' | 'REPICE'>('FULL');
+    const [repiceDestination, setRepiceDestination] = useState<'BODEGA' | 'SAME_PLATE'>('BODEGA');
     const [deliveryItems, setDeliveryItems] = useState<any[]>([]);
     const [deliveryNotes, setDeliveryNotes] = useState('');
     const [deliveryReturnReason, setDeliveryReturnReason] = useState('');
@@ -1308,19 +1308,19 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 deliveredItems: deliveryItems,
                 notes: deliveryNotes || undefined,
                 returnReason: deliveryReturnReason || undefined,
-                repiqueDestination: deliveryType === 'REPIQUE' ? repiqueDestination : undefined,
+                repiceDestination: deliveryType === 'REPICE' ? repiceDestination : undefined,
             });
 
             if (res.success) {
                 const newItemStatus =
                     deliveryType === 'FULL'    ? 'EST-12' :
                     deliveryType === 'PARTIAL' ? 'EST-13' :
-                    deliveryType === 'REPIQUE' ? (repiqueDestination === 'SAME_PLATE' ? 'EST-11' : 'EST-15') :
+                    deliveryType === 'REPICE' ? (repiceDestination === 'SAME_PLATE' ? 'EST-11' : 'EST-15') :
                     'EST-01';
                 const msg =
                     deliveryType === 'FULL'    ? '✅ Entrega completa registrada'              :
                     deliveryType === 'PARTIAL' ? '⚠️ Entrega parcial – devolución creada'      :
-                    deliveryType === 'REPIQUE' ? (repiqueDestination === 'SAME_PLATE'
+                    deliveryType === 'REPICE' ? (repiceDestination === 'SAME_PLATE'
                         ? '🔁 Repice — reasignado a la misma placa'
                         : '🔁 Repice — devuelto a bodega')                                    :
                     '🔄 Devolución total registrada';
@@ -1932,8 +1932,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 setDeliveryNotes={setDeliveryNotes}
                 deliveryPassword={deliveryPassword}
                 setDeliveryPassword={setDeliveryPassword}
-                repiqueDestination={repiqueDestination}
-                setRepiqueDestination={setRepiqueDestination}
+                repiceDestination={repiceDestination}
+                setRepiceDestination={setRepiceDestination}
                 isConfirmingDelivery={isConfirmingDelivery}
                 handleConfirmDelivery={handleConfirmDelivery}
             />

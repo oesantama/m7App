@@ -125,7 +125,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 
   // ─── CABECERA DE CONCILIACIÓN ─────────────────────────────────────────────
   // Una conciliación por conductor/vehículo/fecha. Agrupa todas las facturas del día.
-  // Valida: lo entregado vs lo recaudado vs lo devuelto vs lo en repique.
+  // Valida: lo entregado vs lo recaudado vs lo devuelto vs lo en repice.
   'conciliation_headers': [
     'route_id',              // ruta de referencia
     'vehicle_plate',         // placa
@@ -136,7 +136,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'total_delivered',       // facturas entregadas (FULL)
     'total_partial',         // facturas con entrega parcial
     'total_returned',        // facturas devueltas totalmente
-    'total_repique',         // facturas en repique
+    'total_repice',         // facturas en repice
     'total_collected',       // valor total recaudado ($)
     'total_pending_collect', // valor pendiente por recaudar ($)
     'total_to_return',       // valor mercancía devuelta a bodega ($)
@@ -158,10 +158,10 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'article_id',           // artículo (si aplica desglose por ítem)
     'customer_name',        // destinatario
     'city',                 // ciudad
-    'transaction_type',     // entrega | devolucion | repique | parcial | pago
+    'transaction_type',     // entrega | devolucion | repice | parcial | pago
     'delivery_qty',         // cantidad entregada
     'returned_qty',         // cantidad devuelta
-    'repique_qty',          // cantidad en repique
+    'repice_qty',          // cantidad en repice
     'invoice_value',        // valor de la factura ($)
     'collected_value',      // valor recaudado ($)
     'payment_method',       // forma de pago
@@ -210,7 +210,7 @@ const healSchema = async (client: any) => {
           let type = 'TEXT';
           if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at' || col === 'f_ultimo_corte' || col === 'fecha_carge' || col === 'fecha_entregado' || col === 'create_at' || col === 'update_at') {
             type = 'TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP';
-          } else if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repique' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repique_qty' || col === 'invoice_value' || col === 'collected_value' || col === 'total_volume_m3' || col === 'vehicle_capacity_m3' || col === 'utilization_pct') {
+          } else if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repice' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repice_qty' || col === 'invoice_value' || col === 'collected_value' || col === 'total_volume_m3' || col === 'vehicle_capacity_m3' || col === 'utilization_pct') {
             type = 'NUMERIC DEFAULT 0';
           } else if (col === 'client_ids') {
              type = 'TEXT[]';
@@ -278,7 +278,7 @@ const healSchema = async (client: any) => {
     `CREATE INDEX IF NOT EXISTS idx_grupo_inter_historico_pedido_id ON grupo_inter_pedidos_historico (pedido_id)`,
     `CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_f_ultimo_corte ON grupo_inter_pedidos (f_ultimo_corte DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_estado ON grupo_inter_pedidos (estado)`,
-    // document_items: item_status para filtro planificador (solo pendiente/repique)
+    // document_items: item_status para filtro planificador (solo pendiente/repice)
     `CREATE INDEX IF NOT EXISTS idx_document_items_item_status ON document_items (item_status)`,
     // vehicle_inventory: consultas por placa y artículo
     `CREATE INDEX IF NOT EXISTS idx_vehicle_inventory_plate       ON vehicle_inventory (vehicle_plate)`,
@@ -493,7 +493,7 @@ const healSchema = async (client: any) => {
           WHEN item_status ILIKE '%devuelto%'                                THEN 'EST-13'
           WHEN item_status ILIKE '%devoluci%'                                THEN 'EST-13'
           WHEN item_status ILIKE '%parcial%'                                 THEN 'EST-14'
-          WHEN item_status ILIKE '%repique%'                                 THEN 'EST-15'
+          WHEN item_status ILIKE '%repice%'                                  THEN 'EST-15'
           WHEN item_status ILIKE '%inactivo%'                                THEN 'EST-02'
           WHEN item_status ILIKE '%elimina%'                                 THEN 'ELIMINADO'
           ELSE item_status
@@ -617,7 +617,7 @@ export const restoreSystem = async () => {
       ('EST-12', 'ENTREGADO',       'EST-01'),
       ('EST-13', 'DEVUELTO',        'EST-01'),
       ('EST-14', 'ENTREGA PARCIAL', 'EST-01'),
-      ('EST-15', 'REPIQUE',         'EST-01'),
+      ('EST-15', 'REPICE',         'EST-01'),
       ('EST-16', 'ELIMINADO',       'EST-01'),
       ('EST-17', 'RECHAZADO',       'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;

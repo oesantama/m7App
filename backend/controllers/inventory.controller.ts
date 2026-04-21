@@ -217,13 +217,13 @@ export const getConciliationHeaders = async (req: Request, res: Response) => {
 /**
  * POST /api/inventory/conciliation-headers
  * Crea o actualiza la cabecera de conciliación de un conductor/fecha.
- * Vincula automáticamente las entregas, devoluciones y repiques del día.
+ * Vincula automáticamente las entregas, devoluciones y repices del día.
  */
 export const saveConciliationHeader = async (req: Request, res: Response) => {
   const {
     routeId, vehiclePlate, driverId, driverName,
     conciliationDate, notes, createdBy,
-    transactions = []  // array de { invoice, documentId, transactionType, deliveryQty, returnedQty, repiqueQty, invoiceValue, collectedValue, paymentMethod, paymentRef, banco, comprobante, returnReason, notes }
+    transactions = []  // array de { invoice, documentId, transactionType, deliveryQty, returnedQty, repiceQty, invoiceValue, collectedValue, paymentMethod, paymentRef, banco, comprobante, returnReason, notes }
   } = req.body;
 
   if (!vehiclePlate || !driverId) {
@@ -239,17 +239,17 @@ export const saveConciliationHeader = async (req: Request, res: Response) => {
       if (t.transactionType === 'entrega')    acc.delivered++;
       if (t.transactionType === 'parcial')    acc.partial++;
       if (t.transactionType === 'devolucion') acc.returned++;
-      if (t.transactionType === 'repique')    acc.repique++;
+      if (t.transactionType === 'repice')    acc.repice++;
       acc.collected   += Number(t.collectedValue  || 0);
       acc.pending     += Number(t.invoiceValue    || 0) - Number(t.collectedValue || 0);
       acc.toReturn    += Number(t.returnedQty     || 0) * Number(t.invoiceValue   || 0);
       return acc;
-    }, { delivered: 0, partial: 0, returned: 0, repique: 0, collected: 0, pending: 0, toReturn: 0 });
+    }, { delivered: 0, partial: 0, returned: 0, repice: 0, collected: 0, pending: 0, toReturn: 0 });
 
     const headerRes = await client.query(`
       INSERT INTO conciliation_headers
         (route_id, vehicle_plate, driver_id, driver_name, conciliation_date, total_invoices,
-         total_delivered, total_partial, total_returned, total_repique,
+         total_delivered, total_partial, total_returned, total_repice,
          total_collected, total_pending_collect, total_to_return,
          status, notes, created_by, created_at, updated_at)
       VALUES ($1,$2,$3,$4,COALESCE($5::date, CURRENT_DATE),$6,$7,$8,$9,$10,$11,$12,$13,'borrador',$14,$15,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
@@ -258,7 +258,7 @@ export const saveConciliationHeader = async (req: Request, res: Response) => {
     `, [
       routeId || null, vehiclePlate, driverId, driverName || driverId,
       conciliationDate || null,
-      transactions.length, totals.delivered, totals.partial, totals.returned, totals.repique,
+      transactions.length, totals.delivered, totals.partial, totals.returned, totals.repice,
       totals.collected, Math.max(0, totals.pending), totals.toReturn,
       notes || null, createdBy
     ]);
@@ -274,7 +274,7 @@ export const saveConciliationHeader = async (req: Request, res: Response) => {
       await client.query(`
         INSERT INTO conciliation_transactions
           (conciliation_id, document_id, invoice, article_id, customer_name, city,
-           transaction_type, delivery_qty, returned_qty, repique_qty,
+           transaction_type, delivery_qty, returned_qty, repice_qty,
            invoice_value, collected_value, payment_method, payment_ref,
            banco, comprobante, return_reason, notes, created_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,CURRENT_TIMESTAMP)
@@ -282,7 +282,7 @@ export const saveConciliationHeader = async (req: Request, res: Response) => {
         headerId, t.documentId || null, t.invoice, t.articleId || null,
         t.customerName || null, t.city || null,
         t.transactionType || 'entrega',
-        Number(t.deliveryQty  || 0), Number(t.returnedQty || 0), Number(t.repiqueQty || 0),
+        Number(t.deliveryQty  || 0), Number(t.returnedQty || 0), Number(t.repiceQty || 0),
         Number(t.invoiceValue || 0), Number(t.collectedValue || 0),
         t.paymentMethod || null, t.paymentRef || null,
         t.banco || null, t.comprobante || null,

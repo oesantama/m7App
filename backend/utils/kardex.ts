@@ -7,7 +7,7 @@ export type MovementType =
     | 'ENTREGA_PARCIAL'
     | 'DEVOLUCION_BODEGA'
     | 'SALIDA_PROVEEDOR'
-    | 'REPIQUE'
+    | 'REPICE'
     | 'AJUSTE';
 
 interface LogMovementParams {

@@ -40,7 +40,7 @@ const MOVEMENT_LABELS: Record<string, { label: string; color: string }> = {
     ENTREGA_PARCIAL:   { label: 'Parcial',          color: 'bg-amber-100 text-amber-700' },
     DEVOLUCION_BODEGA: { label: 'Devolución',       color: 'bg-rose-100 text-rose-700' },
     SALIDA_PROVEEDOR:  { label: 'Salida Prov.',     color: 'bg-slate-100 text-slate-600' },
-    REPIQUE:           { label: 'Repice',           color: 'bg-cyan-100 text-cyan-700' },
+    REPICE:            { label: 'Repice',           color: 'bg-cyan-100 text-cyan-700' },
     AJUSTE:            { label: 'Ajuste',           color: 'bg-orange-100 text-orange-700' },
 };
 
