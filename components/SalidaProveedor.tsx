@@ -106,7 +106,15 @@ const SalidaProveedor: React.FC<{ user: any }> = ({ user }) => {
         if (view !== 'new' || !selectedClientId) return;
         setStockLoading(true);
         api.getInventoryStock({ clientId: selectedClientId })
-            .then((r: any) => setStock(Array.isArray(r) ? r : (r?.data ?? [])))
+            .then((r: any) => {
+                if (Array.isArray(r)) {
+                    setStock(r);
+                } else if (r?.bodega) {
+                    setStock(r.bodega);
+                } else {
+                    setStock(r?.data ?? []);
+                }
+            })
             .catch(() => setStock([]))
             .finally(() => setStockLoading(false));
     }, [view, selectedClientId]);

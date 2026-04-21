@@ -17,6 +17,7 @@ import SignatureInputModal from './Logistics/SignatureInputModal';
 import GenericConfirmModal from './Logistics/GenericConfirmModal';
 import PaymentVoucherModal from './Logistics/PaymentVoucherModal';
 import ReturnsControlModal from './Logistics/ReturnsControlModal';
+import ConciliacionModal from '../Logistics/ConciliacionModal';
 
 interface LogisticsDispatchProps {
     user: any;
@@ -61,10 +62,18 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [pendingSignatures, setPendingSignatures] = useState<any[]>([]);
     // All unsigned signatures for each invoice (keyed by invoiceId) — used to block ENTREGAR
     const [invoiceAllPending, setInvoiceAllPending] = useState<Record<string, any[]>>({});
+    // IDs of invoices dispatched this session — bulletproof guard against any stale-data overwrite
+    const [dispatchedIds, setDispatchedIds] = useState<Set<string>>(new Set());
     const [signatureKeys, setSignatureKeys] = useState<Record<string, string>>({});
     const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
-    const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
     const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Control colapsable
+    const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
+    
+    // PAGINACIÓN Y EXPORTACIÓN
+    const [routePage, setRoutePage] = useState(1);
+    const [routePageSize, setRoutePageSize] = useState<number | 'all'>(10);
+    const [invoicePage, setInvoicePage] = useState(1);
+    const [invoicePageSize, setInvoicePageSize] = useState<number | 'all'>(10);
 
     // ── Client selector ──────────────────────────────────────────────────────
     const [internalClientId, setInternalClientId] = useState<string>('');
@@ -1290,8 +1299,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 signatures
             });
             if (res.success) {
-                toast.success("✅ Despacho confirmado — el conductor debe FIRMAR para proceder");
-                // Optimistic update: show EN RUTA immediately
+                toast.success("✅ Despacho confirmado — revise estado de firmas para proceder");
+                // Registrar en Set local — inmune a cualquier stale-data refresh
+                const dispKey = cleanId(assigningInvoice.invoiceNumber || assigningInvoice.id);
+                setDispatchedIds(prev => new Set([...prev, dispKey]));
+                // Optimistic update del estado
                 setRouteInvoices(prev => prev.map(inv =>
                     (inv.id === assigningInvoice.id || inv.invoiceNumber === assigningInvoice.invoiceNumber)
                         ? { ...inv, itemStatus: 'EST-11' }
@@ -1299,12 +1311,19 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 ));
                 setAssigningInvoice(null);
                 setScannedItems({});
+                // Refrescar firmas pendientes del usuario actual
                 fetchPendingSignatures();
-                // Refresh route invoices from server (fresh statuses) then trigger global refresh
+                // Refrescar firmas de TODOS para esta factura (badges FIRMA BODEGA / FIRMA CONDUCTOR)
+                const invIdForSigs = assigningInvoice.invoiceNumber || assigningInvoice.id;
+                if (invIdForSigs) {
+                    api.getInvoicePendingSignatures(invIdForSigs).then((data: any) => {
+                        setInvoiceAllPending(prev => ({ ...prev, [invIdForSigs]: Array.isArray(data) ? data : [] }));
+                    }).catch(() => {});
+                }
+                // Refrescar datos del servidor en segundo plano (NO bloquea la UI)
                 if (selectedActiveRoute) {
                     loadRouteInvoicesData(selectedActiveRoute, setRouteInvoices, false);
                 }
-                onRefresh();
             }
         } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
     };
@@ -1590,21 +1609,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         })()}
 
                         {/* Buscador de rutas */}
-                        <div className="relative mb-1">
-                            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
-                            <input
-                                type="text"
-                                placeholder="Buscar placa, conductor..."
-                                value={routeSearch}
-                                onChange={e => setRouteSearch(e.target.value.toUpperCase())}
-                                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold uppercase outline-none focus:border-emerald-400 transition-all"
-                            />
-                            {routeSearch && (
-                                <button onClick={() => setRouteSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                                    <Icons.X className="w-3 h-3 text-slate-300 hover:text-slate-500" />
-                                </button>
-                            )}
-                        </div>
+                        <TableControls 
+                            searchValue={routeSearch}
+                            onSearchChange={(v) => { setRouteSearch(v.toUpperCase()); setRoutePage(1); }}
+                            pageSize={routePageSize}
+                            onPageSizeChange={(s) => { setRoutePageSize(s); setRoutePage(1); }}
+                            placeholder="Buscar placa, conductor..."
+                            compact
+                        />
 
                         {filteredRoutes.length === 0 ? (
                             <div className="text-center p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
@@ -1619,6 +1631,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 return norm(route.plate || '').includes(q)
                                     || norm(route.driver_name || '').includes(q);
                             })
+                            .slice((routePage - 1) * (typeof routePageSize === 'number' ? routePageSize : filteredRoutes.length), routePage * (typeof routePageSize === 'number' ? routePageSize : filteredRoutes.length))
                             .map((route) => {
                                 const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
                                 const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
@@ -1730,6 +1743,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 );
                             })
                         )}
+
+                        <Pagination 
+                            currentPage={routePage}
+                            totalPages={routePageSize === 'all' ? 1 : Math.ceil(filteredRoutes.length / (typeof routePageSize === 'number' ? routePageSize : 1))}
+                            onPageChange={setRoutePage}
+                            totalResults={filteredRoutes.length}
+                            pageSize={routePageSize}
+                        />
                         </> }
                     </div>
 
@@ -1841,13 +1862,17 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             
                             <div className="flex flex-wrap gap-2 items-center">
                                 <div className="flex-1 min-w-[200px] relative">
-                                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input 
+                                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                    <input
                                         type="text"
                                         placeholder="BUSCAR FACTURA O CLIENTE..."
-                                        value={invoiceSearchQuery}
-                                        onChange={(e) => setInvoiceSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-emerald-500 transition-all shadow-sm"
+                                                'Valor': inv.invoiceValue || 0,
+                                                'Volumen': inv.volumeM3 || 0,
+                                                'Estado': inv.itemStatus || inv.status || 'PENDIENTE'
+                                            }));
+                                            exportToExcel(data, `Ruta_${selectedActiveRoute.plate}_${new Date().toISOString().split('T')[0]}`);
+                                        }}
+                                        compact
                                     />
                                 </div>
                                 <div className="flex gap-2">
@@ -1877,6 +1902,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 })
                                 .map((inv: any, idx: number) => {
                                     const invKey = inv.invoiceNumber || inv.id;
+                                    // dispatchedIds: override inmune a stale-data
+                                    const wasDispatched = dispatchedIds.has(cleanId(invKey));
+                                    const effectiveStatus = wasDispatched ? 'EST-11' : (inv.itemStatus || inv.status || '');
                                     const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
                                     // All unsigned signatures for this invoice (any user) — used to block ENTREGAR
                                     const allPendingForInv = invoiceAllPending[invKey] || [];
@@ -1892,9 +1920,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                         <h5 className="text-[14px] font-black text-slate-900">#{inv.invoiceNumber || inv.id}</h5>
-                                                        {(inv.itemStatus||inv.status) === 'EST-11' && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black rounded-full">EN RUTA</span>}
-                                                        {(inv.itemStatus||inv.status) === 'EST-12' && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-full">ENTREGADO</span>}
-                                                        {(inv.itemStatus||inv.status) === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
+                                                        {effectiveStatus === 'EST-11' && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black rounded-full">EN RUTA</span>}
+                                                        {effectiveStatus === 'EST-12' && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-full">ENTREGADO</span>}
+                                                        {effectiveStatus === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
                                                         {pendingBodega && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black rounded-full animate-pulse">FIRMA BODEGA</span>}
                                                         {pendingConductor && <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-[8px] font-black rounded-full animate-pulse">FIRMA CONDUCTOR</span>}
                                                     </div>
@@ -1911,11 +1939,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     <Icons.Eye className="w-4 h-4" />
                                                 </button>
 
-                                                {/* DESPACHAR — si no ha sido enviado al camión aún */}
-                                                {(() => {
-                                                    const ds = inv.itemStatus || inv.status || '';
-                                                    return !['EST-11','EST-12','EST-13','EST-14'].includes(ds) && !hasPendingSignature;
-                                                })() && (
+                                                {/* DESPACHAR — solo si NO está en ruta y no tiene firma pendiente */}
+                                                {!['EST-11','EST-12','EST-13','EST-14'].includes(effectiveStatus) && !hasPendingSignature && (
                                                     <button
                                                         onClick={() => setAssigningInvoice(inv)}
                                                         className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg"
@@ -1925,8 +1950,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     </button>
                                                 )}
 
-                                                {/* ENTREGAR — cuando ya está en ruta Y todas las firmas están completas */}
-                                                {(inv.itemStatus || inv.status) === 'EST-11' && !hasPendingSignature && !hasAnyPendingSignature && (
+                                                {/* ENTREGAR — EN RUTA + usuario sin firma pendiente + nadie más con firma pendiente */}
+                                                {effectiveStatus === 'EST-11' && !hasPendingSignature && !hasAnyPendingSignature && (
                                                     <button
                                                         onClick={() => {
                                                             const items = (inv.items || []).map((it: any) => ({

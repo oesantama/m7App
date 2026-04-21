@@ -10,6 +10,7 @@ interface TableControlsProps {
   compact?: boolean;
   showSearch?: boolean;
   showPageSize?: boolean;
+  onExport?: () => void;
 }
 
 /**
@@ -24,23 +25,37 @@ const TableControls: React.FC<TableControlsProps> = ({
   placeholder = "BUSCAR...",
   compact = false,
   showSearch = true,
-  showPageSize = true
+  showPageSize = true,
+  onExport
 }) => {
   return (
     <div className={`flex flex-col md:flex-row justify-between items-center gap-4 ${showSearch ? (compact ? 'bg-slate-50/50 p-2' : 'bg-white p-4 shadow-sm') : ''} rounded-2xl border border-slate-100 transition-all hover:shadow-md`}>
-      {/* Input de Búsqueda */}
-      {showSearch && (
-        <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full md:w-80 shadow-inner border border-slate-100 transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10">
-          <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
-          <input
-            type="text"
-            placeholder={placeholder}
-            value={searchValue || ''}
-            onChange={(e) => onSearchChange?.(e.target.value)}
-            className="bg-transparent border-none outline-none font-bold text-[10px] uppercase w-full text-slate-700 placeholder:text-slate-300 tracking-wide"
-          />
-        </div>
-      )}
+      <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+        {/* Input de Búsqueda */}
+        {showSearch && (
+          <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full md:w-80 shadow-inner border border-slate-100 transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10">
+            <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder={placeholder}
+              value={searchValue || ''}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+              className="bg-transparent border-none outline-none font-bold text-[10px] uppercase w-full text-slate-700 placeholder:text-slate-300 tracking-wide"
+            />
+          </div>
+        )}
+
+        {/* Botón Exportar */}
+        {onExport && (
+          <button
+            onClick={onExport}
+            className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 whitespace-nowrap"
+          >
+            <Icons.Download className="w-3.5 h-3.5" />
+            Exportar Excel
+          </button>
+        )}
+      </div>
 
       {/* Selectores de Paginación */}
       {showPageSize && (
