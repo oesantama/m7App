@@ -174,6 +174,8 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 ic.conductor_id,
                 ic.conductor_name,
                 ic.vehicle_plate,
+                ic.bodega_received_at,
+                COALESCE(ic.sobrecosto, 0)                  AS sobrecosto,
                 ic.created_at                               AS conciliado_at,
                 u.name                                      AS conciliado_por_nombre,
                 MAX(p.vmetodo)                              AS invoice_value,
@@ -185,7 +187,15 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     'article_id', di2.article_id,
                     'article_name', a.name,
                     'qty', di2.expected_qty,
-                    'unit', di2.unit
+                    'unit', di2.unit,
+                    'returned_qty', (
+                        SELECT SUM(dri.quantity_returned)
+                        FROM delivery_return_items dri
+                        JOIN delivery_returns dr ON dr.id = dri.return_id
+                        WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(di2.invoice))
+                          AND dri.sku = di2.article_id
+                          AND dr.status <> 'CANCELLED'
+                    )
                  )) FROM document_items di2 
                     LEFT JOIN articles a ON a.id = di2.article_id
                     WHERE di2.document_id = $1 AND di2.invoice = di.invoice

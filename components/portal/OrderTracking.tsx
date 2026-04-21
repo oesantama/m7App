@@ -60,7 +60,7 @@ const OrderTracking: React.FC = () => {
             'EST-09': 'Alistado',     'EST-10': 'Asignado',
             'EST-11': 'En Ruta',      'EST-12': 'Entregado',
             'EST-13': 'Devuelto',     'EST-14': 'Entrega Parcial',
-            'EST-15': 'Repique',      'EST-16': 'Eliminado',
+            'EST-15': 'Repice',      'EST-16': 'Eliminado',
             'EST-17': 'Rechazado',
         };
         return labels[status] ?? status;

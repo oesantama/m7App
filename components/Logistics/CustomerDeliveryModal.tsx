@@ -29,7 +29,7 @@ const MODE_INFO: Record<DeliveryType, { label: string; desc: string; color: 'eme
     FULL:    { label: '✅ Completa',  desc: 'Se entregó todo al cliente.',                          color: 'emerald' },
     PARTIAL: { label: '⚠️ Parcial',   desc: 'Parte entregada — el resto regresa a bodega.',         color: 'amber'   },
     RETURN:  { label: '🔄 Devolver',  desc: 'Nada entregado — toda la mercancía regresa a bodega.', color: 'rose'    },
-    REPIQUE: { label: '🔁 Repique',   desc: 'No recibido — se reasigna o devuelve según destino.',  color: 'violet'  },
+    REPIQUE: { label: '🔁 Repice',   desc: 'No recibido — se reasigna o devuelve según destino.',  color: 'violet'  },
 } as const;
 
 const COLOR_MAP = {
@@ -63,7 +63,7 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
     const confirmLabel =
         deliveryType === 'FULL'    ? '✅ Confirmar Entrega'        :
         deliveryType === 'PARTIAL' ? '⚠️ Guardar Entrega Parcial'  :
-        deliveryType === 'REPIQUE' ? '🔁 Registrar Repique'        :
+        deliveryType === 'REPIQUE' ? '🔁 Registrar Repice'        :
                                      '🔄 Registrar Devolución';
 
     const confirmBtnColor =
@@ -122,7 +122,7 @@ const CustomerDeliveryModal: React.FC<CustomerDeliveryModalProps> = ({
                     {deliveryType === 'REPIQUE' && (
                         <div>
                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                                Destino del Repique <span className="text-violet-500">*</span>
+                                Destino del Repice <span className="text-violet-500">*</span>
                             </p>
                             <div className="grid grid-cols-2 gap-3">
                                 <button

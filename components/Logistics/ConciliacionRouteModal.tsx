@@ -38,6 +38,8 @@ interface InvoiceRow {
     mastersuite_fecha_entrega?: string;
     mastersuite_motivo_dev?: string;
     items?: InvoiceItem[];
+    bodega_received_at?: string;
+    sobrecosto?: number;
 }
 
 interface InvoiceItem {
@@ -135,7 +137,7 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
     const isLegalized   = !!inv.forma_pago;
     return {
         estadoEntrega,
-        sobrecosto:       '',
+        sobrecosto:       inv.sobrecosto ? String(inv.sobrecosto) : '',
         valor:            isLegalized ? String(inv.valor ?? '')
                           : estadoEntrega === 'devolucion' ? '0'
                           : String(inv.invoice_value ?? ''),
@@ -146,7 +148,7 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
                             : new Date().toISOString().slice(0, 10),
         expanded:         false,
         saving:           false,
-        items:            (inv.items || []).map(it => ({ ...it, returned_qty: 0 })),
+        items:            (inv.items || []).map(it => ({ ...it, returned_qty: it.returned_qty || 0 })),
     };
 }
 
@@ -468,10 +470,17 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         ) : invoices.map(inv => {
                             const form        = forms.get(inv.invoice_number);
                             if (!form) return null;
-                            const isLegalized = !!inv.forma_pago;
+                            const isLegalized   = !!inv.forma_pago;
                             const isExpanded  = form.expanded;
                             const invoiceVal  = Number(inv.invoice_value) || 0;
-                            const sobrecostoNum = Number(form.sobrecosto) || 0;
+                            const overcostVal = Number(form.sobrecosto) || 0;
+                            
+                            // Cálculos para evitar ReferenceError y manejar Parcial
+                            const totalQtyItems = form.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+                            const unitPrice     = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
+                            const returnedVal   = form.items.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0);
+                            const isWarehouseReceived = !!inv.bodega_received_at;
+
                             const { allowed: msAllowed, hint: msHint } = getMsConstraint(inv);
 
                             const itemBadge = ENTREGADO_STATUS.includes(inv.item_status || '')
@@ -542,7 +551,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                         <button onClick={() => updateForm(inv.invoice_number, { expanded: !isExpanded })}
                                             className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all
                                                 ${isExpanded ? 'bg-emerald-600 text-white' : isLegalized ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                                            {isExpanded ? 'Cerrar' : isLegalized ? 'Editar' : 'Legalizar'}
+                                            {isExpanded ? 'Cerrar' : isLegalized ? 'Detalle' : 'Legalizar'}
                                         </button>
                                     </div>
 
@@ -753,38 +762,46 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 </div>
                                             )}
 
+                                            {isWarehouseReceived && isLegalized && (
+                                                <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 text-center">
+                                                    <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest">✅ Recibido en Bodega</p>
+                                                    <p className="text-[8px] text-blue-500 mt-0.5 font-bold">Esta factura ya fue procesada por almacén y no puede ser editada para evitar inconsistencias.</p>
+                                                </div>
+                                            )}
+
                                             <div className="flex gap-2 pt-1">
                                                 <button onClick={() => updateForm(inv.invoice_number, { expanded: false })}
                                                     className="px-4 py-2.5 rounded-xl text-slate-500 font-black text-[9px] uppercase tracking-widest border border-slate-200 hover:bg-slate-100 transition-all">
-                                                    Cancelar
+                                                    {isWarehouseReceived ? 'Cerrar Detalle' : 'Cancelar'}
                                                 </button>
-                                                <button onClick={() => handleSave(inv)}
-                                                    disabled={form.saving || (() => {
-                                                        if (form.estadoEntrega === 'devolucion') return false;
-                                                        const valN  = Number(form.valor) || 0;
-                                                        const scN   = Number(form.sobrecosto) || 0;
-                                                        const total = (Number(inv.invoice_value) || 0) + scN;
-                                                        if (valN <= 0) return true;
-                                                        if (form.estadoEntrega === 'entregado' && total > 0 && Math.abs(valN - total) > 1500) return true;
-                                                        if (form.estadoEntrega === 'parcial'   && total > 0 && valN >= total) return true;
-                                                        return false;
-                                                    })()}
-                                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all
-                                                        ${form.saving || (() => {
+                                                {!isWarehouseReceived && (
+                                                    <button onClick={() => handleSave(inv)}
+                                                        disabled={form.saving || (() => {
                                                             if (form.estadoEntrega === 'devolucion') return false;
                                                             const valN  = Number(form.valor) || 0;
                                                             const scN   = Number(form.sobrecosto) || 0;
-                                                            const total = (Number(inv.invoice_value) || 0) + scN;
-                                                            if (valN <= 0) return true;
-                                                            if (form.estadoEntrega === 'entregado' && total > 0 && Math.abs(valN - total) > 1500) return true;
-                                                            if (form.estadoEntrega === 'parcial'   && total > 0 && valN >= total) return true;
+                                                            // La suma debe dar el total de la factura
+                                                            const sum   = valN + scN + returnedVal;
+                                                            if (valN < 0) return true;
+                                                            if (Math.abs(sum - invoiceVal) > 1500) return true;
                                                             return false;
-                                                        })()
-                                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-900/20'}`}>
-                                                    {form.saving && <Icons.Loader className="w-3 h-3 animate-spin" />}
-                                                    {form.saving ? 'Guardando...' : '✅ Guardar'}
-                                                </button>
+                                                        })()}
+                                                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all
+                                                            ${form.saving || (() => {
+                                                                if (form.estadoEntrega === 'devolucion') return false;
+                                                                const valN  = Number(form.valor) || 0;
+                                                                const scN   = Number(form.sobrecosto) || 0;
+                                                                const sum   = valN + scN + returnedVal;
+                                                                if (valN < 0) return true;
+                                                                if (Math.abs(sum - invoiceVal) > 1500) return true;
+                                                                return false;
+                                                            })()
+                                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-900/20'}`}>
+                                                        {form.saving && <Icons.Loader className="w-3 h-3 animate-spin" />}
+                                                        {form.saving ? 'Guardando...' : '✅ Guardar Cambios'}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     )}

@@ -697,7 +697,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                         ${legalizada
                                                                             ? 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                                                                             : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                                                                    {legalizada ? 'Editar' : 'Legalizar'}
+                                                                    {legalizada ? 'Detalle' : 'Legalizar'}
                                                                 </button>
                                                             </div>
                                                         </div>

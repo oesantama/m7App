@@ -140,7 +140,7 @@ const STEPS: StepDef[] = [
     key: 'entregado',
     label: 'Entrega',
     icon: <Icons.Package />,
-    statuses: ['EST-12', 'EST-13', 'EST-14', 'EST-15', 'EST-17', 'ENTREGADO', 'DEVUELTO', 'ENTREGA PARCIAL', 'REPIQUE', 'RECHAZADO'],
+    statuses: ['EST-12', 'EST-13', 'EST-14', 'EST-15', 'EST-17', 'ENTREGADO', 'DEVUELTO', 'ENTREGA PARCIAL', 'REPICE', 'RECHAZADO'],
   },
   {
     key: 'conciliado',
@@ -161,7 +161,7 @@ function getStepStatuses(data: TraceabilityData): Record<StepKey, StepStatus> {
   const hasConciliation = !!data.conciliation;
 
   const isDelivered = ['EST-12','EST-13','EST-14','EST-15','EST-17',
-    'ENTREGADO','DEVUELTO','ENTREGA PARCIAL','REPIQUE','RECHAZADO',
+    'ENTREGADO','DEVUELTO','ENTREGA PARCIAL','REPICE','RECHAZADO',
     'COMPLETED','FINALIZADO'].some(s => itemStatus === s || docStatus === s);
 
   const isInRoute    = isDelivered || ['EST-11','EN RUTA'].some(s => itemStatus === s || docStatus === s);
@@ -189,7 +189,7 @@ const DELIVERY_COLOR: Record<string, { bg: string; text: string; border: string 
   'EST-14':         { bg: 'bg-orange-50',   text: 'text-orange-700',   border: 'border-orange-200'   },
   'ENTREGA PARCIAL':{ bg: 'bg-orange-50',   text: 'text-orange-700',   border: 'border-orange-200'   },
   'EST-15':         { bg: 'bg-violet-50',   text: 'text-violet-700',   border: 'border-violet-200'   },
-  'REPIQUE':        { bg: 'bg-violet-50',   text: 'text-violet-700',   border: 'border-violet-200'   },
+  'REPICE':         { bg: 'bg-violet-50',   text: 'text-violet-700',   border: 'border-violet-200'   },
   'EST-17':         { bg: 'bg-rose-50',     text: 'text-rose-700',     border: 'border-rose-200'     },
   'RECHAZADO':      { bg: 'bg-rose-50',     text: 'text-rose-700',     border: 'border-rose-200'     },
 };

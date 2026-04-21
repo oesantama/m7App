@@ -974,7 +974,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const newSuggestions = [...suggestedRoutes];
     const route = newSuggestions[addInvoiceModal.routeIndex];
 
-    // Marcar como repique si viene del tab repique
+    // Marcar como repice si viene del tab repice
     const invoiceToAdd = addInvoiceModal.tab === 'repique'
       ? { ...invoice, isRepique: true, status: 'EST-15' } as any
       : invoice;
@@ -2233,7 +2233,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Agregar Factura</h3>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase">{addInvoiceModal.tab === 'plan' ? 'Seleccione una factura pendiente' : 'Factura de repique (no está en el plan)'}</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">{addInvoiceModal.tab === 'plan' ? 'Seleccione una factura pendiente' : 'Factura de repice (no está en el plan)'}</p>
                   </div>
                 </div>
                 <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null }); setModalSearchTerm(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
@@ -2277,7 +2277,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'repique' }))}
                   className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'repique' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
-                  ⚡ Repique
+                  ⚡ Repice
                 </button>
               </div>
 
@@ -2287,7 +2287,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   ref={addInvoiceInputRef}
                   autoFocus
                   type="text"
-                  placeholder={addInvoiceModal.tab === 'plan' ? 'Buscar por factura, cliente o pedido...' : 'Buscar factura de repique por número...'}
+                  placeholder={addInvoiceModal.tab === 'plan' ? 'Buscar por factura, cliente o pedido...' : 'Buscar factura de repice por número...'}
                   value={modalSearchTerm}
                   onChange={(e) => {
                     const raw = e.target.value;
@@ -2368,7 +2368,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-3">
               {(() => {
-                // Para repique: solo facturas en estado EST-15
+                // Para repice: solo facturas en estado EST-15
                 const pool = addInvoiceModal.tab === 'repique'
                   ? invoices.filter(inv => {
                       if ((inv as any).status !== 'EST-15' && (inv as any).item_status !== 'EST-15') return false;
@@ -2395,7 +2395,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       </div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
                         {addInvoiceModal.tab === 'repique'
-                          ? 'No hay facturas en estado Repique (EST-15)'
+                          ? 'No hay facturas en estado Repice (EST-15)'
                           : 'Sin resultados para tu búsqueda'}
                       </p>
                     </div>
@@ -2427,7 +2427,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                           )}
                           {addInvoiceModal.tab === 'repique' && (
                             <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-black uppercase border border-amber-300 animate-pulse">
-                              ⚡ REPIQUE
+                              ⚡ REPICE
                             </span>
                           )}
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Orbit (R)' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>

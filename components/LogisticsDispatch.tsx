@@ -1321,8 +1321,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     deliveryType === 'FULL'    ? '✅ Entrega completa registrada'              :
                     deliveryType === 'PARTIAL' ? '⚠️ Entrega parcial – devolución creada'      :
                     deliveryType === 'REPIQUE' ? (repiqueDestination === 'SAME_PLATE'
-                        ? '🔁 Repique — reasignado a la misma placa'
-                        : '🔁 Repique — devuelto a bodega')                                    :
+                        ? '🔁 Repice — reasignado a la misma placa'
+                        : '🔁 Repice — devuelto a bodega')                                    :
                     '🔄 Devolución total registrada';
                 toast.success(msg);
                 // Optimistic update
