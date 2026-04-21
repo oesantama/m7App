@@ -613,7 +613,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             // Acumular cantidad si ya existe
             await client.query(`
               UPDATE document_items SET
-                expected_qty = expected_qty + $1,
+                expected_qty = expected_qty::numeric + $1::numeric,
                 unit = $2, volume = $3, unit_volume = $4,
                 city = $5, address = $6, observation = $7,
                 batch = $8, peso = $9, un_code = $10, client_ref = $11,
@@ -1635,7 +1635,7 @@ export const updateConsolidatedCount2 = async (req: any, res: Response) => {
         const batch = batchRes.rows[0]?.batch || 'S/L';
         await client.query(
           `UPDATE inventario_clientes
-           SET quantity = GREATEST(0, quantity + $1::numeric), last_user = $2, last_updated = CURRENT_TIMESTAMP
+           SET quantity = GREATEST(0, quantity::numeric + $1::numeric), last_user = $2, last_updated = CURRENT_TIMESTAMP
            WHERE client_id = $3::text AND article_id = $4::text AND batch = $5::text`,
           [delta, user, clientId, String(articleId), batch]
         );

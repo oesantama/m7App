@@ -552,7 +552,7 @@ export const getConciliationHistory = async (req: Request, res: Response) => {
         const conds: string[] = ['ic.forma_pago IS NOT NULL'];
 
         if (from)    { conds.push(`ic.created_at >= $${p++}`); params.push(from); }
-        if (to)      { conds.push(`ic.created_at <= $${p++} + interval '1 day'`); params.push(to); }
+        if (to)      { conds.push(`ic.created_at <= $${p++}::timestamp + interval '1 day'`); params.push(to); }
         if (doc_id)  { conds.push(`dl.external_doc_id ILIKE $${p++}`); params.push(`%${doc_id}%`); }
         if (invoice) { conds.push(`ic.invoice_number ILIKE $${p++}`); params.push(`%${invoice}%`); }
         if (plate)   { conds.push(`ic.vehicle_plate ILIKE $${p++}`); params.push(`%${plate}%`); }

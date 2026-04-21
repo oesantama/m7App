@@ -452,9 +452,9 @@ export const confirmDelivery = async (req: Request, res: Response) => {
               if (clientId2) {
                 await pool.query(`
                   INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-                  VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
+                  VALUES ($1,$2,$3,$4::numeric,$5,CURRENT_TIMESTAMP)
                   ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-                    quantity = GREATEST(0, inventario_clientes.quantity + $4), last_user = $5, last_updated = CURRENT_TIMESTAMP
+                    quantity = GREATEST(0, inventario_clientes.quantity::numeric + $4::numeric), last_user = $5, last_updated = CURRENT_TIMESTAMP
                 `, [clientId2, sku, batch, returnedQty, driverId]);
               }
               logMovement({ clientId: clientId2 || undefined, articleId: sku, batch, movementType: 'DEVOLUCION_BODEGA', quantity: returnedQty,
@@ -477,9 +477,9 @@ export const confirmDelivery = async (req: Request, res: Response) => {
               if (clientId3) {
                 await pool.query(`
                   INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-                  VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
+                  VALUES ($1,$2,$3,$4::numeric,$5,CURRENT_TIMESTAMP)
                   ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-                    quantity = GREATEST(0, inventario_clientes.quantity + $4), last_user = $5, last_updated = CURRENT_TIMESTAMP
+                    quantity = GREATEST(0, inventario_clientes.quantity::numeric + $4::numeric), last_user = $5, last_updated = CURRENT_TIMESTAMP
                 `, [clientId3, sku, batch, totalQty, driverId]);
               }
               logMovement({ clientId: clientId3 || undefined, articleId: sku, batch, movementType: 'REPIQUE', quantity: totalQty,
@@ -761,7 +761,13 @@ export const getVoucherFile = async (req: Request, res: Response) => {
 export const getPendingReturns = async (req: Request, res: Response) => {
     try {
         const { clientId } = req.query as Record<string, string>;
-        const clientFilter = clientId ? `AND dl.client_id = '${clientId.replace(/'/g, "''")}'` : '';
+        const params: any[] = [];
+        let whereClause = '';
+        if (clientId) {
+            whereClause = 'AND dl.client_id = $1';
+            params.push(clientId);
+        }
+
         const result = await pool.query(`
             SELECT
                 dr.id, dr.invoice_id, dr.driver_id, dr.return_reason, dr.notes,
@@ -781,10 +787,10 @@ export const getPendingReturns = async (req: Request, res: Response) => {
             LEFT JOIN delivery_return_items dri ON dri.return_id = dr.id
             LEFT JOIN document_items di ON di.invoice = dr.invoice_id
             LEFT JOIN documents_l dl ON dl.id = di.document_id
-            WHERE dr.status = 'PENDING' ${clientFilter}
+            WHERE dr.status = 'PENDING' ${whereClause}
             GROUP BY dr.id, d.name, dl.client_id
             ORDER BY dr.created_at DESC
-        `);
+        `, params);
         res.json(result.rows);
     } catch (error: any) {
         console.error('[M7-RETURNS] getPendingReturns error:', error.message);
@@ -855,9 +861,9 @@ export const updateReturnStatus = async (req: Request, res: Response) => {
                         if (clientId) {
                             await pool.query(`
                                 INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-                                VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
+                                VALUES ($1,$2,$3,$4::numeric,$5,CURRENT_TIMESTAMP)
                                 ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-                                    quantity = GREATEST(0, inventario_clientes.quantity + $4),
+                                    quantity = GREATEST(0, inventario_clientes.quantity::numeric + $4::numeric),
                                     last_user = $5, last_updated = CURRENT_TIMESTAMP
                             `, [clientId, item.sku, item.batch || 'S/L', qty, handledBy || 'BODEGA']);
                         }
@@ -944,9 +950,9 @@ export const confirmBodegaReturn = async (req: Request, res: Response) => {
             if (!alreadyProcessedByDispatch) {
                 await client.query(`
                     INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-                    VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)
+                    VALUES ($1,$2,$3,$4::numeric,$5,CURRENT_TIMESTAMP)
                     ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-                        quantity = GREATEST(0, inventario_clientes.quantity + $4),
+                        quantity = GREATEST(0, inventario_clientes.quantity::numeric + $4::numeric),
                         last_user = $5, last_updated = CURRENT_TIMESTAMP
                 `, [item.client_id, item.article_id, item.batch || 'S/L', qty, receivedBy]);
             }
@@ -1008,7 +1014,12 @@ export const confirmBodegaReturn = async (req: Request, res: Response) => {
 export const getPendingBodegaReturns = async (req: Request, res: Response) => {
     try {
         const { clientId } = req.query as Record<string, string>;
-        const clientFilter = clientId ? `AND dl.client_id = '${clientId.replace(/'/g, "''")}'` : '';
+        const params: any[] = [];
+        let whereClause = '';
+        if (clientId) {
+            whereClause = 'AND dl.client_id = $1';
+            params.push(clientId);
+        }
         const result = await pool.query(`
             SELECT
                 ic.document_id          AS "documentId",
@@ -1034,11 +1045,11 @@ export const getPendingBodegaReturns = async (req: Request, res: Response) => {
             LEFT JOIN articles a ON a.id = di.article_id
             WHERE ic.es_devolucion = true
               AND ic.bodega_received_at IS NULL
-              ${clientFilter}
+              ${whereClause}
             GROUP BY ic.document_id, ic.invoice_number, ic.vehicle_plate,
                      ic.conductor_name, ic.updated_at, dl.external_doc_id, dl.client_id
             ORDER BY ic.updated_at DESC
-        `);
+        `, params);
         res.json({ success: true, data: result.rows });
     } catch (error: any) {
         console.error('[M7-BODEGA] getPendingBodegaReturns error:', error.message);
