@@ -66,6 +66,7 @@ interface InvoiceRow {
     invoice_metodo_pago?: string;
     item_status?: string;
     route_vehicle_plate?: string;
+    sobrecosto?: number;
     mastersuite_estado?: string;
     mastersuite_id_carga?: string;
     mastersuite_fecha_despacho?: string;
@@ -124,6 +125,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [reportEmail, setReportEmail]     = useState('');
     const [sendingReport, setSendingReport] = useState(false);
     const [modalRoute, setModalRoute]           = useState<RouteGroup | null>(null);
+    const [detailRoute, setDetailRoute]         = useState<RouteGroup | null>(null);
     const [searchInvoice, setSearchInvoice]     = useState('');
     const [searchRoute, setSearchRoute]         = useState('');
     const [importingMS, setImportingMS]         = useState(false);
@@ -243,6 +245,43 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             inv.customer_name?.toLowerCase().includes(q)
         );
     }, [invoices, searchInvoice]);
+
+    // ── Valores financieros por placa calculados desde invoices individuales ──
+    // Evita el doble conteo que ocurre en el SQL cuando hay múltiples JOINs.
+    const routeFinancials = useMemo(() => {
+        const map = new Map<string, {
+            valor_legalizado: number; valor_devuelto: number;
+            valor_parcial: number; total_sobrecosto: number;
+            efectivo: number; credito: number;
+            completadas: number; devueltas: number; parciales: number; legalizadas: number;
+        }>();
+        invoices.forEach(inv => {
+            const plate = inv.route_vehicle_plate || inv.vehicle_plate || '';
+            if (!plate) return;
+            const cur = map.get(plate) ?? {
+                valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
+                efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
+            };
+            const val    = Number(inv.valor) || 0;
+            const invVal = Number(inv.invoice_value) || 0;
+            const sc     = Number(inv.sobrecosto) || 0;
+            const metodo = (inv.forma_pago || '').toUpperCase();
+            const status = (inv.item_status || '').toUpperCase();
+            if (inv.forma_pago) {
+                cur.valor_legalizado += val;
+                cur.legalizadas += 1;
+                if (metodo === 'EFECTIVO' || metodo.includes('EFE')) cur.efectivo += val;
+                else cur.credito += val;
+            }
+            if (inv.es_devolucion) cur.valor_devuelto += invVal;
+            if (PARCIAL_STATUS.includes(status)) { cur.valor_parcial += val; cur.parciales += 1; }
+            if (inv.es_devolucion || DEVUELTO_STATUS.includes(status)) cur.devueltas += 1;
+            if (ENTREGADO_STATUS.includes(status)) cur.completadas += 1;
+            cur.total_sobrecosto += sc;
+            map.set(plate, cur);
+        });
+        return map;
+    }, [invoices]);
 
     // ── Métricas globales del documento ───────────────────────────────────────
     const stats = useMemo(() => {
@@ -547,8 +586,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             </div>
                                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                                                 {filteredRoutes.map(route => {
+                                                    // Usar valores calculados desde invoices individuales (sin multiplicación SQL)
+                                                    const fin = routeFinancials.get(route.plate) ?? {
+                                                        valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
+                                                        efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
+                                                    };
                                                     const pct = route.invoice_count > 0
-                                                        ? Math.round((route.legalizadas / route.invoice_count) * 100) : 0;
+                                                        ? Math.round((fin.legalizadas / route.invoice_count) * 100) : 0;
                                                     return (
                                                         <div key={route.route_id}
                                                             className="rounded-2xl border-2 border-slate-100 bg-white transition-all overflow-hidden hover:border-slate-200">
@@ -580,73 +624,78 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                     </div>
                                                                     <span className="text-[8px] font-black text-emerald-700 shrink-0">{pct}% leg.</span>
                                                                 </div>
-                                                                {/* Contadores estado */}
+                                                                {/* Contadores estado (desde invoices individuales) */}
                                                                 <div className="grid grid-cols-4 gap-1 text-center">
                                                                     <div className="bg-emerald-50 rounded-lg py-1.5">
-                                                                        <p className="text-sm font-black text-emerald-700 leading-none">{route.legalizadas}</p>
+                                                                        <p className="text-sm font-black text-emerald-700 leading-none">{fin.legalizadas}</p>
                                                                         <p className="text-[7px] font-bold text-emerald-600 uppercase mt-0.5">Leg.</p>
                                                                     </div>
                                                                     <div className="bg-teal-50 rounded-lg py-1.5">
-                                                                        <p className="text-sm font-black text-teal-700 leading-none">{route.completadas}</p>
+                                                                        <p className="text-sm font-black text-teal-700 leading-none">{fin.completadas}</p>
                                                                         <p className="text-[7px] font-bold text-teal-600 uppercase mt-0.5">Entregadas</p>
                                                                     </div>
                                                                     <div className="bg-amber-50 rounded-lg py-1.5">
-                                                                        <p className="text-sm font-black text-amber-700 leading-none">{route.devueltas}</p>
+                                                                        <p className="text-sm font-black text-amber-700 leading-none">{fin.devueltas}</p>
                                                                         <p className="text-[7px] font-bold text-amber-600 uppercase mt-0.5">Devueltas</p>
                                                                     </div>
                                                                     <div className="bg-orange-50 rounded-lg py-1.5">
-                                                                        <p className="text-sm font-black text-orange-700 leading-none">{route.parciales}</p>
+                                                                        <p className="text-sm font-black text-orange-700 leading-none">{fin.parciales}</p>
                                                                         <p className="text-[7px] font-bold text-orange-600 uppercase mt-0.5">Parciales</p>
                                                                     </div>
                                                                 </div>
-                                                                {/* Valores financieros de la ruta */}
+                                                                {/* Valores financieros (calculados desde invoices, sin doble conteo) */}
                                                                 <div className="grid grid-cols-2 gap-2 mt-3 mb-2">
                                                                     <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-2.5 py-2">
                                                                         <p className="text-[7px] font-black text-emerald-600 uppercase tracking-wider mb-0.5">💵 Legalizado</p>
-                                                                        <p className="text-xs font-black text-emerald-800">{fmtCOP(route.valor_legalizado)}</p>
+                                                                        <p className="text-xs font-black text-emerald-800">{fmtCOP(fin.valor_legalizado)}</p>
                                                                     </div>
                                                                     <div className="bg-amber-50/50 border border-amber-100 rounded-xl px-2.5 py-2">
                                                                         <p className="text-[7px] font-black text-amber-600 uppercase tracking-wider mb-0.5">🔄 Devuelto</p>
-                                                                        <p className="text-xs font-black text-amber-800">{fmtCOP(route.valor_devuelto)}</p>
+                                                                        <p className="text-xs font-black text-amber-800">{fmtCOP(fin.valor_devuelto)}</p>
                                                                     </div>
-                                                                    {route.valor_parcial > 0 && (
+                                                                    {fin.valor_parcial > 0 && (
                                                                         <div className="bg-orange-50/50 border border-orange-100 rounded-xl px-2.5 py-2">
                                                                             <p className="text-[7px] font-black text-orange-600 uppercase tracking-wider mb-0.5">📦 Parcial</p>
-                                                                            <p className="text-xs font-black text-orange-800">{fmtCOP(route.valor_parcial)}</p>
+                                                                            <p className="text-xs font-black text-orange-800">{fmtCOP(fin.valor_parcial)}</p>
                                                                         </div>
                                                                     )}
-                                                                    {route.total_sobrecosto > 0 && (
+                                                                    {fin.total_sobrecosto > 0 && (
                                                                         <div className="bg-rose-50/50 border border-rose-100 rounded-xl px-2.5 py-2">
                                                                             <p className="text-[7px] font-black text-rose-600 uppercase tracking-wider mb-0.5">⚠️ Sobrecosto</p>
-                                                                            <p className="text-xs font-black text-rose-800">{fmtCOP(route.total_sobrecosto)}</p>
+                                                                            <p className="text-xs font-black text-rose-800">{fmtCOP(fin.total_sobrecosto)}</p>
                                                                         </div>
                                                                     )}
                                                                 </div>
 
-                                                                {/* Efectivo / Crédito (Original) */}
-                                                                {((route.efectivo > 0) || (route.credito > 0)) && (
+                                                                {/* Efectivo / Crédito */}
+                                                                {(fin.efectivo > 0 || fin.credito > 0) && (
                                                                     <div className="flex gap-2">
-                                                                        {route.efectivo > 0 && (
+                                                                        {fin.efectivo > 0 && (
                                                                             <div className="flex-1 bg-white border border-emerald-50 rounded-lg px-2 py-1 flex items-center justify-between">
                                                                                 <span className="text-[7px] font-black text-emerald-600 uppercase">EFE</span>
-                                                                                <span className="text-[9px] font-black text-emerald-700">{fmtCOP(route.efectivo)}</span>
+                                                                                <span className="text-[9px] font-black text-emerald-700">{fmtCOP(fin.efectivo)}</span>
                                                                             </div>
                                                                         )}
-                                                                        {route.credito > 0 && (
+                                                                        {fin.credito > 0 && (
                                                                             <div className="flex-1 bg-white border border-blue-50 rounded-lg px-2 py-1 flex items-center justify-between">
                                                                                 <span className="text-[7px] font-black text-blue-600 uppercase">CRE</span>
-                                                                                <span className="text-[9px] font-black text-blue-700">{fmtCOP(route.credito)}</span>
+                                                                                <span className="text-[9px] font-black text-blue-700">{fmtCOP(fin.credito)}</span>
                                                                             </div>
                                                                         )}
                                                                     </div>
                                                                 )}
                                                             </div>
 
-                                                            {/* Botón conciliar */}
-                                                            <div className="px-4 pb-3 pt-2">
+                                                            {/* Botones: Consultar (solo lectura) + Conciliar (edición) */}
+                                                            <div className="px-4 pb-3 pt-2 flex gap-2">
+                                                                <button
+                                                                    onClick={() => setDetailRoute(route)}
+                                                                    className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
+                                                                    Ver detalle
+                                                                </button>
                                                                 <button
                                                                     onClick={() => setModalRoute(route)}
-                                                                    className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-emerald-600 transition-all">
+                                                                    className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-emerald-600 transition-all">
                                                                     Conciliar →
                                                                 </button>
                                                             </div>
@@ -880,6 +929,152 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     </div>
                 </div>
             )}
+
+            {/* ── Dialog SOLO LECTURA — detalle de placa ────────────────────── */}
+            {detailRoute && selectedDoc && (() => {
+                const fin = routeFinancials.get(detailRoute.plate) ?? {
+                    valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
+                    efectivo: 0, credito: 0,
+                };
+                const routeInvs = invoices.filter(inv =>
+                    inv.route_vehicle_plate === detailRoute.plate ||
+                    inv.vehicle_plate === detailRoute.plate
+                );
+                const totalVal = routeInvs.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+                const legalPct = detailRoute.invoice_count > 0
+                    ? Math.round(((routeFinancials.get(detailRoute.plate)?.legalizadas ?? 0) / detailRoute.invoice_count) * 100)
+                    : 0;
+                return (
+                    <div className="fixed inset-0 z-[700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                            {/* Header */}
+                            <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-emerald-50 flex items-center justify-between shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center shadow">
+                                        <span className="text-lg">🚛</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Detalle de placa — solo lectura</p>
+                                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">{detailRoute.plate}</h3>
+                                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">👤 {detailRoute.driver_name || 'Sin conductor'}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setDetailRoute(null)}
+                                    className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-all">
+                                    <Icons.X className="w-4 h-4 text-slate-500" />
+                                </button>
+                            </div>
+
+                            {/* Resumen financiero */}
+                            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+                                <div className="mb-2 flex items-center gap-2">
+                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${legalPct}%` }} />
+                                    </div>
+                                    <span className="text-[9px] font-black text-emerald-700 shrink-0">{legalPct}% leg.</span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    <div className="bg-white border border-slate-100 rounded-xl px-3 py-2 text-center">
+                                        <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Total placa</p>
+                                        <p className="text-sm font-black text-slate-900">{fmtCOP(totalVal)}</p>
+                                    </div>
+                                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 text-center">
+                                        <p className="text-[8px] font-black text-emerald-600 uppercase mb-0.5">💵 Legalizado</p>
+                                        <p className="text-sm font-black text-emerald-800">{fmtCOP(fin.valor_legalizado)}</p>
+                                    </div>
+                                    {fin.valor_devuelto > 0 && (
+                                        <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-center">
+                                            <p className="text-[8px] font-black text-amber-600 uppercase mb-0.5">🔄 Devuelto</p>
+                                            <p className="text-sm font-black text-amber-800">{fmtCOP(fin.valor_devuelto)}</p>
+                                        </div>
+                                    )}
+                                    {fin.valor_parcial > 0 && (
+                                        <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2 text-center">
+                                            <p className="text-[8px] font-black text-orange-600 uppercase mb-0.5">📦 Parcial</p>
+                                            <p className="text-sm font-black text-orange-800">{fmtCOP(fin.valor_parcial)}</p>
+                                        </div>
+                                    )}
+                                    {fin.total_sobrecosto > 0 && (
+                                        <div className="bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 text-center">
+                                            <p className="text-[8px] font-black text-rose-600 uppercase mb-0.5">⚠️ Sobrecosto</p>
+                                            <p className="text-sm font-black text-rose-800">{fmtCOP(fin.total_sobrecosto)}</p>
+                                        </div>
+                                    )}
+                                    {fin.efectivo > 0 && (
+                                        <div className="bg-white border border-emerald-100 rounded-xl px-3 py-2 text-center">
+                                            <p className="text-[8px] font-black text-emerald-600 uppercase mb-0.5">EFE</p>
+                                            <p className="text-sm font-black text-emerald-700">{fmtCOP(fin.efectivo)}</p>
+                                        </div>
+                                    )}
+                                    {fin.credito > 0 && (
+                                        <div className="bg-white border border-blue-100 rounded-xl px-3 py-2 text-center">
+                                            <p className="text-[8px] font-black text-blue-600 uppercase mb-0.5">CRE</p>
+                                            <p className="text-sm font-black text-blue-700">{fmtCOP(fin.credito)}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Tabla de facturas — solo lectura */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                <table className="w-full text-[10px]">
+                                    <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
+                                        <tr>
+                                            <th className="text-left px-4 py-2.5 font-black text-slate-500 uppercase tracking-widest">Factura</th>
+                                            <th className="text-left px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Cliente</th>
+                                            <th className="text-center px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Estado</th>
+                                            <th className="text-center px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Pago</th>
+                                            <th className="text-right px-4 py-2.5 font-black text-slate-500 uppercase tracking-widest">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {routeInvs.map(inv => {
+                                            const legalizada = !!inv.forma_pago;
+                                            const itemS = (inv.item_status || '').toUpperCase();
+                                            const statusLabel = ENTREGADO_STATUS.includes(itemS) ? { label: 'Entregada', color: 'bg-teal-100 text-teal-700' }
+                                                : DEVUELTO_STATUS.includes(itemS) || inv.es_devolucion ? { label: 'Devuelta', color: 'bg-amber-100 text-amber-700' }
+                                                : PARCIAL_STATUS.includes(itemS) ? { label: 'Parcial', color: 'bg-orange-100 text-orange-700' }
+                                                : { label: 'Pendiente', color: 'bg-slate-100 text-slate-500' };
+                                            const pagoLabel = inv.forma_pago
+                                                ? (FORMA_COLOR[inv.forma_pago]?.label || inv.forma_pago)
+                                                : '—';
+                                            return (
+                                                <tr key={inv.invoice_number} className={`hover:bg-slate-50 ${legalizada ? 'bg-emerald-50/30' : ''}`}>
+                                                    <td className="px-4 py-2.5 font-black text-slate-900">{inv.invoice_number}</td>
+                                                    <td className="px-3 py-2.5 text-slate-600 max-w-[160px] truncate">{inv.customer_name || '—'}</td>
+                                                    <td className="px-3 py-2.5 text-center">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${statusLabel.color}`}>
+                                                            {statusLabel.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center text-slate-500">{pagoLabel}</td>
+                                                    <td className="px-4 py-2.5 text-right font-black text-slate-800">
+                                                        {legalizada ? fmtCOP(Number(inv.valor)) : fmtCOP(Number(inv.invoice_value))}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                                {routeInvs.length === 0 && (
+                                    <div className="text-center py-12">
+                                        <p className="text-slate-400 text-xs font-bold">Sin facturas asignadas a esta placa</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
+                                <p className="text-[9px] text-slate-400 font-bold">{routeInvs.length} facturas · {detailRoute.invoice_count} en ruta</p>
+                                <button onClick={() => setDetailRoute(null)}
+                                    className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all">
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Modal de conciliación por placa/ruta */}
             {modalRoute && selectedDoc && (

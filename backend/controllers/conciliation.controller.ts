@@ -254,55 +254,77 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
         }
 
         // ── Rutas/placas que cargaron facturas de este documento ─────────────
+        // CTE para evitar multiplicación de filas: primero agrega a nivel de
+        // factura única, luego se cruza con rutas.
         const routesRes = await pool.query(`
-            SELECT
-                r.id::text                                          AS route_id,
-                COALESCE(v.plate, r.vehicle_id::text)               AS plate,
-                d.name                                              AS driver_name,
-                COUNT(DISTINCT ri.invoice_id)                       AS invoice_count,
-                -- Efectivo desde payments
-                COALESCE(SUM(
-                    CASE WHEN UPPER(TRIM(p.metodo_pago)) LIKE '%EFECTIVO%' OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
-                    THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
-                ), 0)                                               AS efectivo,
-                -- Crédito = todo lo que no es efectivo
-                COALESCE(SUM(
-                    CASE WHEN p.metodo_pago IS NOT NULL
-                         AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFECTIVO%'
-                         AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFE%'
-                    THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
-                ), 0)                                               AS credito,
-                -- Conteo por estado de entrega (delivery) y conciliación
-                COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-12','ENTREGADO','COMPLETED','FINALIZADO') THEN di.invoice END) AS completadas,
-                COUNT(DISTINCT CASE WHEN ic2.es_devolucion = true OR di.item_status IN ('EST-13','DEVUELTO') THEN di.invoice END) AS devueltas,
-                COUNT(DISTINCT CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN di.invoice END)                    AS parciales,
-                -- Legalizadas = conciliadas (tienen forma_pago registrada)
-                COUNT(DISTINCT CASE WHEN ic2.forma_pago IS NOT NULL THEN di.invoice END)                                        AS legalizadas,
-                -- Valores financieros ($)
-                SUM(COALESCE(ic2.valor::numeric, 0))                                         AS valor_legalizado,
-                SUM(CASE WHEN ic2.es_devolucion = true THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END) AS valor_devuelto,
-                SUM(CASE WHEN di.item_status IN ('EST-14','ENTREGA PARCIAL') THEN COALESCE(ic2.valor::numeric, 0) ELSE 0 END) AS valor_parcial,
-                SUM(COALESCE(ic2.sobrecosto::numeric, 0))                                    AS total_sobrecosto
-            FROM route_invoices ri
-            JOIN  routes   r   ON r.id::text = ri.route_id::text
-            LEFT JOIN vehicles v   ON v.id::text  = r.vehicle_id::text
-            LEFT JOIN drivers  d   ON d.id::text  = r.driver_id::text
-            LEFT JOIN document_items di ON (
-                di.document_id = $1
-                AND (
-                    TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = TRIM(ri.invoice_id)
-                    OR CONCAT(di.document_id,'_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = ri.invoice_id
-                )
+            WITH inv_base AS (
+                -- Una fila por factura única del documento
+                SELECT
+                    TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))  AS inv_key,
+                    MAX(di.item_status)                                     AS item_status,
+                    -- Conciliación (a lo sumo una fila por factura por doc)
+                    MAX(ic.forma_pago)                                      AS forma_pago,
+                    MAX(ic.es_devolucion::int)::boolean                     AS es_devolucion,
+                    COALESCE(MAX(ic.valor::numeric), 0)                     AS valor_conc,
+                    COALESCE(MAX(ic.sobrecosto::numeric), 0)                AS sobrecosto,
+                    -- Pago original (tomar el MAYOR vmetodo por factura para evitar doble conteo)
+                    COALESCE(MAX(p.vmetodo::numeric), 0)                    AS invoice_value,
+                    MAX(p.metodo_pago)                                      AS metodo_pago
+                FROM document_items di
+                LEFT JOIN invoice_conciliations ic
+                    ON ic.document_id = $1
+                    AND TRIM(UPPER(ic.invoice_number)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+                LEFT JOIN LATERAL (
+                    SELECT vmetodo, metodo_pago
+                    FROM document_l_payments
+                    WHERE TRIM(UPPER(invoice)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+                    ORDER BY id DESC LIMIT 1
+                ) p ON true
+                WHERE di.document_id = $1
+                  AND di.invoice IS NOT NULL AND di.invoice <> ''
+                GROUP BY TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))
+            ),
+            route_inv AS (
+                -- Relacionar cada factura con su ruta (DISTINCT para ignorar reasignaciones)
+                SELECT DISTINCT ON (ib.inv_key)
+                    ib.*,
+                    r.id::text  AS route_id,
+                    COALESCE(v.plate, r.vehicle_id::text) AS plate,
+                    d.name      AS driver_name
+                FROM inv_base ib
+                JOIN route_invoices ri
+                    ON ri.invoice_id = ib.inv_key
+                    OR ri.invoice_id = CONCAT($1::text, '_', ib.inv_key)
+                JOIN routes  r ON r.id::text = ri.route_id::text
+                LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+                LEFT JOIN drivers  d ON d.id::text = r.driver_id::text
+                ORDER BY ib.inv_key, ri.id DESC
             )
-            LEFT JOIN document_l_payments p
-                ON p.invoice IS NOT NULL
-                AND TRIM(UPPER(p.invoice)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
-            LEFT JOIN invoice_conciliations ic2
-                ON ic2.document_id = $1
-                AND TRIM(UPPER(ic2.invoice_number)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
-            WHERE di.document_id = $1
-            GROUP BY r.id, v.plate, r.vehicle_id, d.name
-            ORDER BY COUNT(DISTINCT ri.invoice_id) DESC
+            SELECT
+                route_id,
+                plate,
+                driver_name,
+                COUNT(*)                                                              AS invoice_count,
+                -- Efectivo / Crédito originales
+                COALESCE(SUM(CASE WHEN UPPER(TRIM(metodo_pago)) LIKE '%EFECTIVO%' OR UPPER(TRIM(metodo_pago)) LIKE '%EFE%'
+                    THEN invoice_value ELSE 0 END), 0)                               AS efectivo,
+                COALESCE(SUM(CASE WHEN metodo_pago IS NOT NULL
+                    AND UPPER(TRIM(metodo_pago)) NOT LIKE '%EFECTIVO%'
+                    AND UPPER(TRIM(metodo_pago)) NOT LIKE '%EFE%'
+                    THEN invoice_value ELSE 0 END), 0)                               AS credito,
+                -- Conteos por estado
+                COUNT(*) FILTER (WHERE item_status IN ('EST-12','ENTREGADO','COMPLETED','FINALIZADO')) AS completadas,
+                COUNT(*) FILTER (WHERE es_devolucion = true OR item_status IN ('EST-13','DEVUELTO'))   AS devueltas,
+                COUNT(*) FILTER (WHERE item_status IN ('EST-14','ENTREGA PARCIAL'))                    AS parciales,
+                COUNT(*) FILTER (WHERE forma_pago IS NOT NULL)                                         AS legalizadas,
+                -- Valores financieros correctos (sin multiplicación)
+                COALESCE(SUM(CASE WHEN forma_pago IS NOT NULL THEN valor_conc ELSE 0 END), 0)          AS valor_legalizado,
+                COALESCE(SUM(CASE WHEN es_devolucion = true THEN invoice_value ELSE 0 END), 0)         AS valor_devuelto,
+                COALESCE(SUM(CASE WHEN item_status IN ('EST-14','ENTREGA PARCIAL') THEN valor_conc ELSE 0 END), 0) AS valor_parcial,
+                COALESCE(SUM(sobrecosto), 0)                                                           AS total_sobrecosto
+            FROM route_inv
+            GROUP BY route_id, plate, driver_name
+            ORDER BY invoice_count DESC
         `, [documentId]);
 
         // ── Facturas sin asignar a ruta ───────────────────────────────────────

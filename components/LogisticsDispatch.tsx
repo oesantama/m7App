@@ -1620,7 +1620,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         const fecha = d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
                                                         const hora  = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
                                                         return (
-                                                            <p className="text-[9px] font-bold text-slate-300 mt-1 flex items-center gap-1">
+                                                            <p className="text-[10px] font-black text-slate-600 mt-1 flex items-center gap-1">
                                                                 <span>📅</span>{fecha} · {hora}
                                                             </p>
                                                         );
