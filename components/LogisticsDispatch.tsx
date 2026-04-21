@@ -68,12 +68,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
     const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Control colapsable
     const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
-    
-    // PAGINACIÓN Y EXPORTACIÓN
-    const [routePage, setRoutePage] = useState(1);
-    const [routePageSize, setRoutePageSize] = useState<number | 'all'>(10);
-    const [invoicePage, setInvoicePage] = useState(1);
-    const [invoicePageSize, setInvoicePageSize] = useState<number | 'all'>(10);
 
     // ── Client selector ──────────────────────────────────────────────────────
     const [internalClientId, setInternalClientId] = useState<string>('');
@@ -150,7 +144,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [voucherModal, setVoucherModal]   = useState<{ isOpen: boolean; invoice: any } | null>(null);
     const [showReturnsModal, setShowReturnsModal] = useState(false);
     const [routeSearch, setRouteSearch]     = useState('');
-    const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
     const [showMap, setShowMap]             = useState(false);
     const drawMapRunRef = useRef<number>(0); // cancel concurrent drawRouteOnMap calls
     const [mapRouteInfo, setMapRouteInfo] = useState<{
@@ -1610,14 +1603,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         })()}
 
                         {/* Buscador de rutas */}
-                        <TableControls 
-                            searchValue={routeSearch}
-                            onSearchChange={(v) => { setRouteSearch(v.toUpperCase()); setRoutePage(1); }}
-                            pageSize={routePageSize}
-                            onPageSizeChange={(s) => { setRoutePageSize(s); setRoutePage(1); }}
-                            placeholder="Buscar placa, conductor..."
-                            compact
-                        />
+                        <div className="px-1">
+                            <input 
+                                type="text"
+                                placeholder="Buscar placa, conductor..."
+                                value={routeSearch}
+                                onChange={(e) => setRouteSearch(e.target.value.toUpperCase())}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 outline-none focus:border-emerald-500"
+                            />
+                        </div>
 
                         {filteredRoutes.length === 0 ? (
                             <div className="text-center p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
@@ -1632,7 +1626,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 return norm(route.plate || '').includes(q)
                                     || norm(route.driver_name || '').includes(q);
                             })
-                            .slice((routePage - 1) * (typeof routePageSize === 'number' ? routePageSize : filteredRoutes.length), routePage * (typeof routePageSize === 'number' ? routePageSize : filteredRoutes.length))
                             .map((route) => {
                                 const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
                                 const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
@@ -1745,13 +1738,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             })
                         )}
 
-                        <Pagination 
-                            currentPage={routePage}
-                            totalPages={routePageSize === 'all' ? 1 : Math.ceil(filteredRoutes.length / (typeof routePageSize === 'number' ? routePageSize : 1))}
-                            onPageChange={setRoutePage}
-                            totalResults={filteredRoutes.length}
-                            pageSize={routePageSize}
-                        />
+                        </div>
                         </> }
                     </div>
 
