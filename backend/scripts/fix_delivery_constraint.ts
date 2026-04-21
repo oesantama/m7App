@@ -28,7 +28,7 @@ async function fixDeliveryConstraint() {
     console.log('[M7-FIX] Restricción actualizada con éxito.');
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('[M7-FIX] ERROR:', err.message);
+    console.error('[M7-FIX] ERROR:', (err as any).message);
   } finally {
     client.release();
     process.exit();
