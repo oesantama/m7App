@@ -139,6 +139,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [voucherModal, setVoucherModal]   = useState<{ isOpen: boolean; invoice: any } | null>(null);
     const [showReturnsModal, setShowReturnsModal] = useState(false);
     const [routeSearch, setRouteSearch]     = useState('');
+    const [showMap, setShowMap]             = useState(false);
     const drawMapRunRef = useRef<number>(0); // cancel concurrent drawRouteOnMap calls
     const [mapRouteInfo, setMapRouteInfo] = useState<{
         plate: string; driverName: string;
@@ -1441,6 +1442,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
                 <div className="flex items-center gap-3">
                     <button
+                        onClick={() => setShowMap(v => !v)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-all group ${showMap ? 'bg-sky-500/20 text-sky-300 border-sky-500/30 hover:bg-sky-500/30' : 'bg-white/5 text-white border-white/5 hover:bg-white/10'}`}
+                    >
+                        <Icons.MapPin className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                        <span>{showMap ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
+                    </button>
+                    <button
                         onClick={() => setShowHistoryModal(true)}
                         className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-white/5 text-[8px] font-black uppercase tracking-widest transition-all group"
                     >
@@ -1469,8 +1477,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             </header>
 
                 <main className="flex-1 flex overflow-hidden">
-                    {/* Lista de Rutas Lateral - Más delgada y sólida */}
-                    <div className="w-[340px] border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar p-4 space-y-3 shrink-0">
+                    {/* Lista de Rutas - ancho fijo con mapa, expandida sin mapa */}
+                    <div className={`${showMap ? 'w-[380px] shrink-0' : 'flex-1'} border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar p-4 space-y-3`}>
                         {/* Client selector */}
                         {clientsReady && filteredClients.length !== 1 && (
                             <div className="mb-3">
@@ -1499,9 +1507,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Unidades en Ruta</h3>
 
                         {/* ── RESUMEN TOTAL DE TODAS LAS RUTAS ── */}
-                        {activeRoutes.length > 0 && (() => {
-                            const totalInvoices = activeRoutes.reduce((s, r) => s + (r.invoice_ids?.length || 0), 0);
-                            const totalVol = activeRoutes.reduce((s, r) => {
+                        {filteredRoutes.length > 0 && (() => {
+                            const totalInvoices = filteredRoutes.reduce((s, r) => s + (r.invoice_ids?.length || 0), 0);
+                            const totalVol = filteredRoutes.reduce((s, r) => {
                                 return s + (r.invoice_ids || []).reduce((sv: number, id: string) => {
                                     const inv = invoices.find(i => String(i.id).trim() === String(id).trim() || String(i.invoiceNumber).trim() === String(id).trim());
                                     return sv + Number(inv?.volumeM3 || 0);
@@ -1514,7 +1522,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Resumen Total de Despacho</p>
                                     <div className="grid grid-cols-3 gap-2">
                                         <div className="text-center">
-                                            <div className="text-lg font-black text-white">{activeRoutes.length}</div>
+                                            <div className="text-lg font-black text-white">{filteredRoutes.length}</div>
                                             <div className="text-[7px] font-bold text-slate-500 uppercase">Rutas</div>
                                         </div>
                                         <div className="text-center">
@@ -1619,19 +1627,26 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             </div>
 
                                             <div className="flex gap-2">
-                                                <button 
-                                                    className="flex-1 py-3 bg-slate-50 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white hover:shadow-md transition-all flex items-center justify-center gap-2"
-                                                    onClick={(e) => { e.stopPropagation(); setVisualizedRoute(route); }}
+                                                <button
+                                                    className="flex-1 py-2.5 bg-slate-50 text-slate-600 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-white hover:shadow-md transition-all flex items-center justify-center gap-1.5"
+                                                    onClick={(e) => { e.stopPropagation(); setVisualizedRoute(route); setShowMap(true); }}
                                                 >
-                                                    <Icons.MapPin className="w-3.5 h-3.5" />
-                                                    {visualizedRoute?.id === route.id ? 'TRACKER ON' : 'VER MAPA'}
+                                                    <Icons.MapPin className="w-3 h-3" />
+                                                    {visualizedRoute?.id === route.id ? 'Tracker' : 'Mapa'}
                                                 </button>
-                                                <button 
-                                                    className="flex-1 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg"
+                                                <button
+                                                    className="flex-1 py-2.5 bg-indigo-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 shadow-lg"
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedActiveRoute(route); }}
+                                                >
+                                                    <Icons.Package className="w-3 h-3" />
+                                                    Despacho
+                                                </button>
+                                                <button
+                                                    className="flex-1 py-2.5 bg-slate-900 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center justify-center gap-1.5 shadow-lg"
                                                     onClick={(e) => { e.stopPropagation(); generateRoutePDF(route); }}
                                                 >
-                                                    <Icons.FileText className="w-3.5 h-3.5" />
-                                                    PLANILLABN
+                                                    <Icons.FileText className="w-3 h-3" />
+                                                    Planilla
                                                 </button>
                                             </div>
                                         </div>
@@ -1663,7 +1678,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     </div>
 
                     {/* MAPA EXPANDIDO TOTAL */}
-                    <div className="flex-1 relative bg-slate-950">
+                    <div className={`flex-1 relative bg-slate-950 ${showMap ? '' : 'hidden'}`}>
                         <div id="logistics-dispatch-map" className="absolute inset-0 w-full h-full grayscale-[0.1] contrast-[1.05]" />
                         
                         {/* Indicador Flotante Sutil */}
