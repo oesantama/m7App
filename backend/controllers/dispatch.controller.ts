@@ -258,7 +258,7 @@ export const getInvoicePendingSignatures = async (req: Request, res: Response) =
                 da.invoice_id AS "invoiceId"
             FROM dispatch_signatures_pending dsp
             JOIN dispatch_assignments da ON dsp.dispatch_id::integer = da.id
-            JOIN users u ON dsp.user_id::integer = u.id
+            JOIN users u ON dsp.user_id::text = u.id::text
             WHERE da.invoice_id = $1 AND dsp.signed = false
             ORDER BY dsp.role_type
         `, [invoiceId]);

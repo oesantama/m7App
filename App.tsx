@@ -62,6 +62,7 @@ const ConciliacionFacturas = lazyWithRetry(() => import('./components/Conciliaci
 const ConsultaFacturas = lazyWithRetry(() => import('./components/ConsultaFacturas'));
 const DevolucionesBodega = lazyWithRetry(() => import('./components/Devoluciones/DevolucionesBodega'));
 const ConsultaInventario = lazyWithRetry(() => import('./components/ConsultaInventario'));
+const SalidaProveedor   = lazyWithRetry(() => import('./components/SalidaProveedor'));
 
 
 // Import Admin Module
@@ -932,6 +933,8 @@ const App: React.FC = () => {
         return <DevolucionesBodega user={user!} />;
       case 'consulta-inventario':
         return <ConsultaInventario user={user!} />;
+      case 'salida-proveedor':
+        return <SalidaProveedor user={user!} />;
       case 'capacitaciones':
         return <CentroCapacitaciones user={user!} />;
       case 'chatbot':
