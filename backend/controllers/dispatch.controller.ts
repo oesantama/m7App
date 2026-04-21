@@ -253,7 +253,7 @@ export const initDeliveryTables = async () => {
                 invoice_id  TEXT NOT NULL,
                 driver_id   TEXT NOT NULL,
                 vehicle_id  TEXT,
-                delivery_type TEXT NOT NULL CHECK (delivery_type IN ('FULL','PARTIAL','RETURN')),
+                delivery_type TEXT NOT NULL CHECK (delivery_type IN ('FULL','PARTIAL','RETURN','REPIQUE')),
                 delivered_items JSONB DEFAULT '[]',
                 notes       TEXT,
                 delivered_at TIMESTAMPTZ DEFAULT NOW(),

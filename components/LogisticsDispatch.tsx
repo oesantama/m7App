@@ -1315,7 +1315,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 const newItemStatus =
                     deliveryType === 'FULL'    ? 'EST-12' :
                     deliveryType === 'PARTIAL' ? 'EST-13' :
-                    deliveryType === 'REPIQUE' ? (repiqueDestination === 'SAME_PLATE' ? 'EST-11' : 'EST-01') :
+                    deliveryType === 'REPIQUE' ? (repiqueDestination === 'SAME_PLATE' ? 'EST-11' : 'EST-15') :
                     'EST-01';
                 const msg =
                     deliveryType === 'FULL'    ? '✅ Entrega completa registrada'              :

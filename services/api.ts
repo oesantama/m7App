@@ -125,8 +125,9 @@ export const api = {
   },
   confirmDelivery(data: {
     invoiceId: string; dispatchId?: string; driverId: string; vehicleId?: string;
-    deliveryType: 'FULL' | 'PARTIAL' | 'RETURN';
+    deliveryType: 'FULL' | 'PARTIAL' | 'RETURN' | 'REPIQUE';
     deliveredItems: any[]; notes?: string; returnReason?: string; password?: string;
+    repiqueDestination?: 'BODEGA' | 'SAME_PLATE';
   }) {
     return fetchJson(`${API_URL}/dispatch/confirm-delivery`, {
       method: 'POST',
