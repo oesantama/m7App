@@ -64,6 +64,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
     const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Control colapsable
 
+    // ── Client selector ──────────────────────────────────────────────────────
+    const [internalClientId, setInternalClientId] = useState<string>('');
+    const [filteredClients, setFilteredClients] = useState<any[]>([]);
+    const [clientsReady, setClientsReady] = useState(false);
+
     const [vehicleLocations, setVehicleLocations] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
@@ -76,7 +81,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         const activeLinks = assignments.filter(a => {
             const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
             const cId = a.clientId || (a as any).client_id;
-            const currentClientId = user.clientId || (user as any).client_id || 'CLI-01';
+            const currentClientId = internalClientId || user.clientId || (user as any).client_id || 'CLI-01';
             return active && String(cId) === String(currentClientId);
         });
 
@@ -149,6 +154,20 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [historyFilters, setHistoryFilters] = useState({
         invoiceId: '', driverId: '', vehicleId: '', dateFrom: '', dateTo: '', deliveryType: '', status: ''
     });
+
+    // ── Populate filtered clients from prop ──────────────────────────────────
+    useEffect(() => {
+        const allowedIds: string[] = (user as any)?.clientIds?.length
+            ? (user as any).clientIds
+            : user?.clientId ? [user.clientId] : [];
+        const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
+        const filtered = isAdmin || allowedIds.length === 0
+            ? clients
+            : clients.filter((c: any) => allowedIds.includes(c.id));
+        setFilteredClients(filtered);
+        if (filtered.length === 1) setInternalClientId(filtered[0].id);
+        setClientsReady(true);
+    }, [clients, user]);
 
     // 1. Inicialización del Mapa
     useEffect(() => {
@@ -1101,27 +1120,37 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         return () => clearInterval(interval);
     }, []);
 
-    // FILTRO DE PRIVACIDAD POR ROL DE CONDUCTOR
+    // FILTRO DE PRIVACIDAD POR ROL DE CONDUCTOR + CLIENTE
     const filteredRoutes = React.useMemo(() => {
         if (!user) return [];
+        let routes = activeRoutes;
+
+        // Filtro por cliente seleccionado
+        if (internalClientId) {
+            routes = routes.filter(route => {
+                const rClientId = (route as any).client_id || (route as any).clientId;
+                return !rClientId || String(rClientId) === String(internalClientId);
+            });
+        }
+
         // Si es CONDUCTOR (ROL-03), solo mostrar sus rutas por documento
         if (user.roleId === 'ROL-03' || user.roleId === 'CONDUCTOR') {
             const userDoc = String(user.documentNumber || '').trim();
             if (!userDoc) return [];
-            
-            return activeRoutes.filter(route => {
+
+            return routes.filter(route => {
                 // 1. Verificar si la ruta tiene el documento pegado
                 if (String(route.driver_document || '').trim() === userDoc) return true;
-                
+
                 // 2. Verificar vía asignación activa
                 const link = assignments.find(a => a.driverId === route.driver_id && a.isActive);
                 const drv = drivers.find(d => d.id === link?.driverId);
                 return String(drv?.documentNumber || '').trim() === userDoc;
             });
         }
-        // Admin u otros roles ven todo
-        return activeRoutes;
-    }, [activeRoutes, user, assignments, drivers]);
+        // Admin u otros roles ven todo (filtrado por cliente)
+        return routes;
+    }, [activeRoutes, user, assignments, drivers, internalClientId]);
 
     // DIAGNÓSTICO DE DATOS (M7-DEBUG)
     useEffect(() => {
@@ -1442,6 +1471,31 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 <main className="flex-1 flex overflow-hidden">
                     {/* Lista de Rutas Lateral - Más delgada y sólida */}
                     <div className="w-[340px] border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar p-4 space-y-3 shrink-0">
+                        {/* Client selector */}
+                        {clientsReady && filteredClients.length !== 1 && (
+                            <div className="mb-3">
+                                {filteredClients.length === 0 ? null : (
+                                    <select
+                                        value={internalClientId}
+                                        onChange={e => setInternalClientId(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-emerald-500 transition-all"
+                                    >
+                                        <option value="">— Seleccionar cliente —</option>
+                                        {filteredClients.map((c: any) => (
+                                            <option key={c.id} value={c.id}>{c.name || c.id}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        )}
+                        {clientsReady && filteredClients.length === 1 && (
+                            <div className="mb-3 px-1">
+                                <span className="text-[9px] bg-emerald-50 border border-emerald-200 text-emerald-700 font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                                    {filteredClients[0].name || filteredClients[0].id}
+                                </span>
+                            </div>
+                        )}
+
                         <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Unidades en Ruta</h3>
 
                         {/* ── RESUMEN TOTAL DE TODAS LAS RUTAS ── */}

@@ -7,9 +7,10 @@ import { DocumentL } from '../types';
 
 interface PickingHistoryProps {
     onBack?: () => void;
+    clientId?: string;
 }
 
-const PickingHistory: React.FC<PickingHistoryProps> = ({ onBack }) => {
+const PickingHistory: React.FC<PickingHistoryProps> = ({ onBack, clientId }) => {
     const [invoices, setInvoices] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -28,7 +29,7 @@ const PickingHistory: React.FC<PickingHistoryProps> = ({ onBack }) => {
     useEffect(() => {
         loadHistory();
         loadUsers();
-    }, []);
+    }, [clientId]);
 
     async function loadUsers() {
         try {
@@ -47,12 +48,18 @@ const PickingHistory: React.FC<PickingHistoryProps> = ({ onBack }) => {
             // usamos fetch manual temporalmente o confiamos en que api.getInvoices sea actualizado.
             // Por ahora, asumimos que api.getInvoices(undefined, undefined, true) fue actualizado en nuestro pensamiento previo,
             // pero para asegurar la reactividad del cambio de estado, filtramos los que tengan actividad.
-            const history = Array.isArray(data) ? data.filter((inv: any) => 
-                inv.pickingId || inv.pickerLeader ||
-                inv.status === 'Entregado' || 
-                inv.status === 'EST-11' ||
-                inv.status === 'ALISTADO'
-            ) : [];
+            const history = Array.isArray(data) ? data.filter((inv: any) => {
+                const hasActivity = inv.pickingId || inv.pickerLeader ||
+                    inv.status === 'Entregado' ||
+                    inv.status === 'EST-11' ||
+                    inv.status === 'ALISTADO';
+                if (!hasActivity) return false;
+                if (clientId) {
+                    const invClient = inv.clientId || inv.client_id;
+                    return !invClient || String(invClient) === String(clientId);
+                }
+                return true;
+            }) : [];
             setInvoices(history);
         } catch (e) {
             toast.error("Error al cargar historial");

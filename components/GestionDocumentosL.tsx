@@ -24,6 +24,8 @@ interface SyncError {
   duplicates: { placa: string; carga: string }[];
 }
 
+interface GDocClient { id: string; name: string; }
+
 interface GestionDocumentosLProps {
   documents: DocumentL[];
   invoices: Invoice[];
@@ -50,8 +52,9 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [previewPage, setPreviewPage] = useState(1);
   const [previewPageSize, setPreviewPageSize] = useState<number | 'all'>(5);
   const [detectedHeaders, setDetectedHeaders] = useState<{ placa: string; carga: string } | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState(user.clientId || 'CLI-01');
-  const [allClients, setAllClients] = useState<{id: string, name: string}[]>([]);
+  const [clients, setClients] = useState<GDocClient[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [clientsReady, setClientsReady] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
   // Estados para Modal de Detalle (Recepción/Auditoría)
@@ -75,7 +78,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [editAuditLoading, setEditAuditLoading] = useState(false);
   const [editAuditError, setEditAuditError] = useState<string | null>(null);
 
-  const canEditAudit = user.roleId === 'ROL-01' || user.role === 'ADMIN' ||
+  const canEditAudit = user.roleId === 'ROL-01' || (user.role as string) === 'ADMIN' ||
     user.permissions?.some((p: any) =>
       (p.module === 'PAG-17' || p.module === 'PAG-16' || p.module === 'PAG-30') &&
       p.actions.includes('edit')
@@ -173,10 +176,18 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   }, [documents, searchTerm]);
 
   React.useEffect(() => {
-    api.getClients().then(data => {
-      if (Array.isArray(data)) setAllClients(data);
-    }).catch(() => { /* clients load failed — non-critical */ });
-  }, []);
+    const allowedIds: string[] = (user as any)?.clientIds?.length
+      ? (user as any).clientIds
+      : user?.clientId ? [user.clientId] : [];
+    api.getClients().then((all: any[]) => {
+      const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
+      const filtered = isAdmin ? all : all.filter((c: any) => allowedIds.includes(c.id));
+      const mapped: GDocClient[] = filtered.map((c: any) => ({ id: c.id, name: c.name || c.id }));
+      setClients(mapped);
+      if (mapped.length === 1) setSelectedClientId(mapped[0].id);
+      setClientsReady(true);
+    }).catch(() => setClientsReady(true));
+  }, [user]);
 
   const handleDeleteDocument = (docId: string) => {
     setDocToDelete(docId);
@@ -270,6 +281,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    if (!selectedClientId) {
+      toast.error('Selecciona un cliente antes de cargar el plan');
+      e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -619,7 +635,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
   const handleSync = async () => {
     if (!preview) return;
-    
+    if (!selectedClientId) {
+      toast.error('Selecciona un cliente antes de sincronizar');
+      return;
+    }
+
     // Restaurada lógica de BLOQUEO de duplicados a petición del usuario
     // Separamos nuevos de duplicados
     const newDocs = preview.mapped.filter(d => !d.isDuplicate);
@@ -628,9 +648,9 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     // Preparar payload: Los que son HeaderUpdate se envían SIN items para evitar duplicar cantidades
     const payloadDocs = newDocs.map(d => {
       if (d.isHeaderUpdate) {
-        return { ...d, items: [], consolidatedItems: [] };
+        return { ...d, clientId: selectedClientId, items: [], consolidatedItems: [] };
       }
-      return d;
+      return { ...d, clientId: selectedClientId };
     });
 
     if (payloadDocs.length > 0) {
@@ -720,6 +740,30 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             <div className="max-w-7xl mx-auto space-y-12">
               {!preview ? (
                 <div className="space-y-12 animate-in fade-in">
+                  {/* Client selector */}
+                  <div className="flex items-center gap-4 px-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Cliente</label>
+                    {!clientsReady ? (
+                      <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    ) : clients.length === 1 ? (
+                      <span className="text-[10px] bg-emerald-50 border border-emerald-200 text-emerald-700 font-black px-3 py-1.5 rounded-xl uppercase tracking-widest">
+                        {clients[0].name}
+                      </span>
+                    ) : (
+                      <select
+                        value={selectedClientId}
+                        onChange={e => setSelectedClientId(e.target.value)}
+                        className="px-3 py-1.5 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-emerald-500 transition-all min-w-[200px]">
+                        <option value="">— Seleccionar cliente —</option>
+                        {clients.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    {!selectedClientId && clientsReady && (
+                      <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wide">Selecciona un cliente para cargar planes</span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="bg-emerald-50/20 p-8 rounded-[2rem] border-2 border-dashed border-emerald-100 flex flex-col items-center justify-center text-center hover:border-emerald-500 hover:bg-emerald-50/40 transition-all group">
                         <div className="w-12 h-12 bg-white text-emerald-600 rounded-xl flex items-center justify-center mb-4 shadow-sm border border-emerald-50 group-hover:scale-110 transition-transform"><Icons.Excel className="w-6 h-6" /></div>

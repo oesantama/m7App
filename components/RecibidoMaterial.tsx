@@ -29,6 +29,35 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   masterArticulo,
   onUpdateDocuments, onAddArticleToMaster, onAddNotificationToMaster, onUpdateNotificationEmail
 }) => {
+  // ── Client selector ────────────────────────────────────────────────────────
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [clientsReady, setClientsReady] = useState(false);
+
+  useEffect(() => {
+    const allowedIds: string[] = (user as any)?.clientIds?.length
+      ? (user as any).clientIds
+      : user?.clientId ? [user.clientId] : [];
+    api.getClients().then((all: any[]) => {
+      const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
+      const filtered = isAdmin ? all : all.filter((c: any) => allowedIds.includes(c.id));
+      const mapped = filtered.map((c: any) => ({ id: c.id, name: c.name || c.id }));
+      setClients(mapped);
+      if (mapped.length === 1) setSelectedClientId(mapped[0].id);
+      setClientsReady(true);
+    }).catch(() => setClientsReady(true));
+  }, [user]);
+
+  const filteredDocuments = useMemo(() =>
+    selectedClientId
+      ? documents.filter(d => {
+          const dClient = (d as any).clientId || (d as any).client_id;
+          return !dClient || String(dClient) === String(selectedClientId);
+        })
+      : documents,
+    [documents, selectedClientId]
+  );
+
   const [selectedDocForCount, setSelectedDocForCount] = useState<DocumentL | null>(null);
 
   // Bloquear pull-to-refresh y overscroll del navegador móvil mientras el conteo está activo.
@@ -73,13 +102,13 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
     s === DocStatus.INVENTORED || s === 'INVENTARIADO';
 
   const pendingRecibo = useMemo(() =>
-    documents.filter(d => isPendingOrCounting(d.status || '')),
-    [documents]
+    filteredDocuments.filter(d => isPendingOrCounting(d.status || '')),
+    [filteredDocuments]
   );
 
   const completedRecibo = useMemo(() =>
-    documents.filter(d => isInventored(d.status || '')),
-    [documents]
+    filteredDocuments.filter(d => isInventored(d.status || '')),
+    [filteredDocuments]
   );
 
   const activeList = showHistory ? completedRecibo : pendingRecibo;
@@ -397,6 +426,29 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         </div>
       ) : (
         <div className="bg-white overflow-hidden h-full flex flex-col">
+          {/* Client selector */}
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50/50 shrink-0">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Cliente</span>
+            {!clientsReady ? (
+              <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            ) : clients.length === 1 ? (
+              <span className="text-[9px] bg-emerald-50 border border-emerald-200 text-emerald-700 font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                {clients[0].name}
+              </span>
+            ) : (
+              <select
+                value={selectedClientId}
+                onChange={e => setSelectedClientId(e.target.value)}
+                className="px-3 py-1.5 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-emerald-500 transition-all min-w-[180px]"
+              >
+                <option value="">— Seleccionar cliente —</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
           {/* TABS DE NAVEGACIÓN */}
           <div className="flex bg-slate-100/50 p-2 shrink-0 border-b border-slate-200">
             <button
@@ -666,15 +718,15 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           </>
         ) : activeTab === 'picking' ? (
           <div className="p-8 flex-1 overflow-hidden flex flex-col">
-            <PickingView user={user} documents={documents} />
+            <PickingView user={user} documents={filteredDocuments} />
           </div>
         ) : activeTab === 'novedades' ? (
           <div className="p-8 flex-1 overflow-hidden flex flex-col h-full">
-            <NovedadesView 
-              documents={documents} 
-              user={user} 
-              masterArticulo={masterArticulo} 
-              masterNotificaciones={masterNotificaciones} 
+            <NovedadesView
+              documents={filteredDocuments}
+              user={user}
+              masterArticulo={masterArticulo}
+              masterNotificaciones={masterNotificaciones}
               onRefresh={async () => {
                 try {
                   const res = await api.getDocuments();
@@ -687,7 +739,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           </div>
         ) : (
           <div className="p-8 flex-1 overflow-hidden flex flex-col">
-            <PickingHistory />
+            <PickingHistory clientId={selectedClientId} />
           </div>
         )}
       </div>
