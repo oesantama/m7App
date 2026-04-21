@@ -75,7 +75,7 @@ export const getSupplierReturns = async (req: Request, res: Response) => {
     const [dataRes, countRes] = await Promise.all([
       pool.query(`
         SELECT sr.*,
-          (SELECT json_agg(i) FROM supplier_return_items i WHERE i.return_id = sr.id) as items
+          (SELECT json_agg(i) FROM supplier_return_items i WHERE i.return_id::text = sr.id::text) as items
         FROM supplier_returns sr ${where}
         ORDER BY sr.created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}
       `, [...params, parseInt(limit), offset]),
