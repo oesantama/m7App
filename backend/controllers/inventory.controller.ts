@@ -395,6 +395,10 @@ export const getInventoryMovements = async (req: Request, res: Response) => {
 
     res.json({ success: true, data: dataRes.rows, total: parseInt(countRes.rows[0].count), page: parseInt(page), limit: parseInt(limit) });
   } catch (err: any) {
+    // Table may not exist yet (pending migration) — return empty gracefully
+    if (err.message?.includes('does not exist')) {
+      return res.json({ success: true, data: [], total: 0, page: parseInt(page ?? '1'), limit: parseInt(limit ?? '50') });
+    }
     res.status(500).json({ error: err.message });
   }
 };

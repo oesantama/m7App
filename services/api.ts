@@ -191,16 +191,16 @@ export const api = {
     fetchJson(`${API_URL}/conciliation/${encodeURIComponent(documentId)}/history`),
 
   // ── Devoluciones Bodega ────────────────────────────────────────────────────
-  getPendingRouteReturns: () =>
-    fetchJson(`${API_URL}/dispatch/returns-pending`),
+  getPendingRouteReturns: (clientId?: string) =>
+    fetchJson(`${API_URL}/dispatch/returns-pending${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
   confirmRouteReturn: (id: number | string, data: { status: 'PROCESSED' | 'CANCELLED'; handledBy?: string; notes?: string }) =>
     fetchJson(`${API_URL}/dispatch/returns/${id}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
-  getPendingBodegaReturns: () =>
-    fetchJson(`${API_URL}/dispatch/pending-bodega-returns`),
+  getPendingBodegaReturns: (clientId?: string) =>
+    fetchJson(`${API_URL}/dispatch/pending-bodega-returns${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
   confirmBodegaReturn: (data: { invoiceNumber: string; documentId: string; receivedBy: string; observation?: string }) =>
     fetchJson(`${API_URL}/dispatch/bodega-receipt`, {
       method: 'POST',

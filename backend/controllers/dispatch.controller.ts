@@ -743,11 +743,14 @@ export const getVoucherFile = async (req: Request, res: Response) => {
 
 export const getPendingReturns = async (req: Request, res: Response) => {
     try {
+        const { clientId } = req.query as Record<string, string>;
+        const clientFilter = clientId ? `AND dl.client_id = '${clientId.replace(/'/g, "''")}'` : '';
         const result = await pool.query(`
             SELECT
                 dr.id, dr.invoice_id, dr.driver_id, dr.return_reason, dr.notes,
                 dr.status, dr.created_at,
                 d.name AS driver_name,
+                dl.client_id,
                 json_agg(json_build_object(
                     'sku',               dri.sku,
                     'article_name',      dri.article_name,
@@ -759,8 +762,10 @@ export const getPendingReturns = async (req: Request, res: Response) => {
             FROM delivery_returns dr
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
             LEFT JOIN delivery_return_items dri ON dri.return_id = dr.id
-            WHERE dr.status = 'PENDING'
-            GROUP BY dr.id, d.name
+            LEFT JOIN document_items di ON di.invoice = dr.invoice_id
+            LEFT JOIN documents_l dl ON dl.id = di.document_id
+            WHERE dr.status = 'PENDING' ${clientFilter}
+            GROUP BY dr.id, d.name, dl.client_id
             ORDER BY dr.created_at DESC
         `);
         res.json(result.rows);
@@ -973,6 +978,8 @@ export const confirmBodegaReturn = async (req: Request, res: Response) => {
 // GET /api/dispatch/pending-bodega-returns
 export const getPendingBodegaReturns = async (req: Request, res: Response) => {
     try {
+        const { clientId } = req.query as Record<string, string>;
+        const clientFilter = clientId ? `AND dl.client_id = '${clientId.replace(/'/g, "''")}'` : '';
         const result = await pool.query(`
             SELECT
                 ic.document_id          AS "documentId",
@@ -997,7 +1004,11 @@ export const getPendingBodegaReturns = async (req: Request, res: Response) => {
             LEFT JOIN document_items di ON di.document_id = ic.document_id AND di.invoice = ic.invoice_number
             LEFT JOIN articles a ON a.id = di.article_id
             WHERE ic.es_devolucion = true
-              AND ic.bodega_received_at IS NULL
+              AND (ic.bodega_received_at IS NULL OR NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='invoice_conciliations' AND column_name='bodega_received_at'
+              ))
+              ${clientFilter}
             GROUP BY ic.document_id, ic.invoice_number, ic.vehicle_plate,
                      ic.conductor_name, ic.updated_at, dl.external_doc_id, dl.client_id
             ORDER BY ic.updated_at DESC
@@ -1005,6 +1016,10 @@ export const getPendingBodegaReturns = async (req: Request, res: Response) => {
         res.json({ success: true, data: result.rows });
     } catch (error: any) {
         console.error('[M7-BODEGA] getPendingBodegaReturns error:', error.message);
+        // Column may not exist yet (pending migration) — return empty gracefully
+        if (error.message?.includes('does not exist')) {
+            return res.json({ success: true, data: [] });
+        }
         res.status(500).json({ error: error.message });
     }
 };
