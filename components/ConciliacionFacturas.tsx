@@ -140,7 +140,7 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
             ) : activeTab === 'conciliado' ? (
                 <TabConciliado />
             ) : (
-                <TabPlanilla />
+                <TabPlanilla user={user} />
             )}
         </div>
     );

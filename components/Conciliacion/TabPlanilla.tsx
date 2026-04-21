@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-const TabPlanilla: React.FC = () => {
+const TabPlanilla: React.FC<{ user?: any }> = ({ user }) => {
     const [clients, setClients]         = useState<any[]>([]);
     const [selectedClient, setSelectedClient] = useState('');
     const [planDate, setPlanDate]       = useState(new Date().toISOString().split('T')[0]);
@@ -15,10 +15,18 @@ const TabPlanilla: React.FC = () => {
 
     const loadClients = useCallback(async () => {
         try {
-            const res = await api.getClients();
-            setClients(res || []);
+            const all = await api.getClients();
+            const allowedIds: string[] = user?.clientIds?.length
+                ? user.clientIds
+                : user?.clientId ? [user.clientId] : [];
+            const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
+            const filtered = isAdmin || allowedIds.length === 0
+                ? all
+                : all.filter((c: any) => allowedIds.includes(c.id));
+            setClients(filtered || []);
+            if (filtered.length === 1) setSelectedClient(filtered[0].id);
         } catch { console.error('Error cargando clientes'); }
-    }, []);
+    }, [user]);
 
     useEffect(() => { loadClients(); }, [loadClients]);
 

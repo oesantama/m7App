@@ -39,36 +39,34 @@ export const getAllUserPermissions = async (req: Request, res: Response) => {
 export const getUserPermissions = async (req: Request, res: Response) => {
   const { userId } = req.params;
   const email = req.query.email as string;
-  
-  // SOLUCIÓN MEJORADA: Verificación por ID    // Lógica de Super Admin: admin (legacy), USR-01 (M7 Local/Prod) o email específico
-    const uId = String(userId);
-    const isSuperAdmin = uId.toLowerCase() === 'admin' || 
-                        uId.toUpperCase() === 'USR-01' || 
-                        email?.toLowerCase() === 'admin@millasiete.com';
 
-  // Si necesitamos la lista completa de páginas para el admin, lo ideal sería consultarla de la DB
-  // pero mantendremos la lista hardcoded por ahora solo para el fallback de admin real.
-  const pages = [
-    'PAG-01', 'PAG-02', 'PAG-03', 'PAG-04', 'PAG-05', 'PAG-06', 'PAG-07', 'PAG-08', 'PAG-09', 'PAG-10',
-    'PAG-11', 'PAG-12', 'PAG-13', 'PAG-14', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-18', 'PAG-19', 'PAG-20', 'PAG-21', 'PAG-22',
-    'PAG-23', 'PAG-24', 'PAG-25', 'PAG-26', 'PAG-27', 'PAG-28', 'PAG-29'
-  ];
+  const uId = String(userId);
+  const isSuperAdmin = uId.toLowerCase() === 'admin' ||
+                       uId.toUpperCase() === 'USR-01' ||
+                       email?.toLowerCase() === 'admin@millasiete.com';
 
   if (isSuperAdmin) {
-    console.log(`[M7-PERMISSIONS] Forzando permisos completos para Admin: ${userId}`);
-    const permissionsArray = pages.map(pageId => ({
-      module: pageId,
-      actions: ['view', 'create', 'edit', 'delete', 'active']
-    }));
-    
-    return res.json(permissionsArray);
+    try {
+      // Obtener todas las páginas activas de la DB para el admin
+      const pagesRes = await pool.query(`SELECT id FROM pages WHERE status_id = 'EST-01' ORDER BY id`);
+      const pageIds = pagesRes.rows.map((r: any) => r.id);
+      return res.json(pageIds.map((pageId: string) => ({
+        module: pageId,
+        actions: ['view', 'create', 'edit', 'delete', 'active']
+      })));
+    } catch {
+      // Fallback si la tabla pages no está disponible
+      const fallbackPages = Array.from({ length: 45 }, (_, i) => `PAG-${String(i + 1).padStart(2, '0')}`);
+      return res.json(fallbackPages.map(pageId => ({
+        module: pageId,
+        actions: ['view', 'create', 'edit', 'delete', 'active']
+      })));
+    }
   }
-
-  // Nota: En una fase posterior, esto debería consultar la tabla 'users' para verificar el role_id.
 
   try {
     const result = await pool.query('SELECT * FROM user_permissions WHERE user_id = $1', [userId]);
-    
+
     if (result.rows.length > 0) {
       const row = result.rows[0];
       let perms = row.permissions || {};
@@ -76,23 +74,17 @@ export const getUserPermissions = async (req: Request, res: Response) => {
         try { perms = JSON.parse(perms); } catch (e) { perms = {}; }
       }
 
-      // Asegurar que campos del a tabla sobreescriban al JSON si hay conflicto
-      const flatPerms = {
+      // Devolver objeto plano con solo los campos necesarios para el editor de checkboxes.
+      // La transformación a array para el login la hace auth.controller.ts.
+      return res.json({
         ...perms,
         id: row.id,
         userId: row.user_id,
         statusId: row.status_id
-      };
-
-      // Retornar el objeto plano para que el Editor de Permisos (MasterModule) pueda 
-      // mapear los checkboxes correctamente (formData['page_X_view']).
-      // La transformación a array se hace en auth.controller.ts para el login.
-      return res.json(flatPerms);
-
-      return res.json(flatPerms);
+      });
     }
-    
-    res.json([]); 
+
+    res.json([]);
   } catch (err: any) {
     console.warn('[M7-USER-PERMISSIONS] Error en DB, devolviendo array vacío');
     res.json([]);
@@ -102,29 +94,39 @@ export const getUserPermissions = async (req: Request, res: Response) => {
 export const saveUserPermission = async (req: Request, res: Response) => {
   const p = req.body;
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
 
-    // 1. DELETE EXISTING PERMISSIONS FOR USER (Clean Slate Strategy)
-    // This ensures no old keys remain if they were removed from the frontend payload.
-    await client.query('DELETE FROM user_permissions WHERE user_id = $1', [p.userId]);
+    // Extraer únicamente las claves page_* (evita guardar userId, id, statusId, etc. en el JSON)
+    const cleanPerms: Record<string, boolean> = {};
+    Object.keys(p).forEach(key => {
+      if (key.startsWith('page_')) cleanPerms[key] = !!p[key];
+    });
+    // También aceptar el sub-objeto permissions si el frontend lo envió anidado
+    if (p.permissions && typeof p.permissions === 'object') {
+      Object.keys(p.permissions).forEach(key => {
+        if (key.startsWith('page_')) cleanPerms[key] = !!p.permissions[key];
+      });
+    }
 
-    // 2. INSERT NEW PERMISSIONS
     const newId = p.id || `PUS-${p.userId}`;
+    const userId = p.userId || p.user_id;
+    const statusId = p.statusId || p.status_id || 'EST-01';
+    const actor = p.updatedBy || p.createdBy || 'System';
+
+    await client.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
     await client.query(`
       INSERT INTO user_permissions (id, user_id, permissions, status_id, created_by, updated_by, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `, [newId, p.userId, JSON.stringify(p), p.statusId, p.createdBy || p.updatedBy || 'System']);
+    `, [newId, userId, JSON.stringify(cleanPerms), statusId, actor]);
 
     await client.query('COMMIT');
-    
-    console.log(`[M7-PERMISSIONS] Permissions reset and updated for User: ${p.userId}`);
-    res.json({ success: true, message: 'Permisos de usuario actualizados correctamente (Reset Completo)' });
+    res.json({ success: true, message: 'Permisos de usuario guardados correctamente' });
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[M7-PERMISSIONS] Error saving:', err);
-    res.status(500).json({ error: "Error al guardar permisos de usuario" });
+    res.status(500).json({ error: 'Error al guardar permisos de usuario' });
   } finally {
     client.release();
   }

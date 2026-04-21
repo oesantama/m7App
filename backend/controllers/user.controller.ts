@@ -46,7 +46,7 @@ import bcrypt from 'bcryptjs';
 export const saveUser = async (req: Request, res: Response) => {
   const u = req.body;
   try {
-    const check = await pool.query('SELECT password FROM users WHERE id = $1', [u.id]);
+    const check = await pool.query('SELECT password, role_id FROM users WHERE id = $1', [u.id]);
     
     if (check.rows.length > 0) {
         // UPDATE
@@ -61,25 +61,32 @@ export const saveUser = async (req: Request, res: Response) => {
                            ? u.clientIds 
                            : (u.clientId ? [u.clientId] : []);
 
+        // Detect role change BEFORE updating
+        const currentRoleId = check.rows[0]?.role_id;
+
         await pool.query(`
-          UPDATE users 
+          UPDATE users
           SET email = $2, name = $3, password = $4, role_id = $5, client_ids = $6, status_id = $7,
               phone = $8, avatar = $9, document_type = $10, document_number = $11, two_factor_enabled = $12,
               updated_by = $13, updated_at = CURRENT_TIMESTAMP
           WHERE id = $1
         `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled, u.updatedBy || 'System']);
-        
-        // M7 FIX: Sincronización automática de permisos en UPDATE
-        const rolePermsResult = await pool.query('SELECT permissions FROM role_permissions WHERE role_id = $1', [u.roleId]);
-        const initialPermissions = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : '{}';
 
-        await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
-        await pool.query(`
-          INSERT INTO user_permissions (id, user_id, permissions, status_id)
-          VALUES ($1, $2, $3, $4)
-        `, [`PUS-${u.id}`, u.id, initialPermissions, u.statusId]);
+        // Solo sincronizar permisos si el rol CAMBIÓ y el usuario pidió heredar del nuevo rol.
+        // Si el rol no cambió o eligió "Conservar actuales", los permisos en user_permissions
+        // permanecen intactos (respeta cambios manuales hechos en Permisos por Usuario).
+        const roleActuallyChanged = u.roleId && currentRoleId && String(u.roleId) !== String(currentRoleId);
+        if (roleActuallyChanged && u.inheritRolePerms !== false) {
+            const rolePermsResult = await pool.query('SELECT permissions FROM role_permissions WHERE role_id = $1', [u.roleId]);
+            const newRolePerms = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : '{}';
+            await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
+            await pool.query(`
+              INSERT INTO user_permissions (id, user_id, permissions, status_id)
+              VALUES ($1, $2, $3, $4)
+            `, [`PUS-${u.id}`, u.id, newRolePerms, u.statusId || 'EST-01']);
+        }
 
-        res.json({ success: true, message: 'Usuario y permisos actualizados correctamente' });
+        res.json({ success: true, message: 'Usuario actualizado correctamente' });
     } else {
         // INSERT
         if (!u.password) {
@@ -152,21 +159,6 @@ export const deleteUser = async (req: Request, res: Response) => {
       );
     }
     
-    // The diff provided a snippet that looks like a Layout.tsx change.
-    // `    menuGroups.push({
-    //       id: 'admin-group',
-    //       label: 'ADMINISTRACIÓN',
-    //       icon: getIcon('Shield'), // Assuming Shield icon exists, or use Lock/Settings
-    //       items: [
-    //         { id: 'admin-db-page', label: 'Gestor DB', module: 'admin-db' as any, masterCat: '' as any }
-    //       ]
-    //     });
-    //   } */
-    //
-    //   const selectItem = (item: any) => {`
-    // This is completely out of context for a user controller.
-    // I will ignore this part of the diff as it's not applicable to this file.
-
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
     
     if (result.rowCount === 0) {
