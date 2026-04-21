@@ -150,6 +150,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [voucherModal, setVoucherModal]   = useState<{ isOpen: boolean; invoice: any } | null>(null);
     const [showReturnsModal, setShowReturnsModal] = useState(false);
     const [routeSearch, setRouteSearch]     = useState('');
+    const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
     const [showMap, setShowMap]             = useState(false);
     const drawMapRunRef = useRef<number>(0); // cancel concurrent drawRouteOnMap calls
     const [mapRouteInfo, setMapRouteInfo] = useState<{
@@ -1866,13 +1867,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <input
                                         type="text"
                                         placeholder="BUSCAR FACTURA O CLIENTE..."
-                                                'Valor': inv.invoiceValue || 0,
-                                                'Volumen': inv.volumeM3 || 0,
-                                                'Estado': inv.itemStatus || inv.status || 'PENDIENTE'
-                                            }));
-                                            exportToExcel(data, `Ruta_${selectedActiveRoute.plate}_${new Date().toISOString().split('T')[0]}`);
-                                        }}
-                                        compact
+                                        value={invoiceSearchQuery}
+                                        onChange={(e) => { setInvoiceSearchQuery(e.target.value); }}
+                                        className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold uppercase outline-none focus:border-slate-300"
                                     />
                                 </div>
                                 <div className="flex gap-2">

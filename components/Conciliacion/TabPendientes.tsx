@@ -769,9 +769,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             </div>
                                         ) : (
                                             <div className="space-y-2">
-                                                {visibleInvoices
-                                                    .slice(invoicePageSize === 'all' ? 0 : (invoicePage - 1) * invoicePageSize, invoicePageSize === 'all' ? visibleInvoices.length : invoicePage * invoicePageSize)
-                                                    .map(inv => {
+                                                {visibleInvoices.map(inv => {
                                                     const legalizada = !!inv.forma_pago;
                                                     const cfg = inv.forma_pago
                                                         ? (FORMA_COLOR[inv.forma_pago] || { bg: 'bg-slate-100', text: 'text-slate-700', label: inv.forma_pago })
