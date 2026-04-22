@@ -5,9 +5,9 @@ import { toast } from 'sonner';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-type EstadoEntrega = 'entregado' | 'devolucion' | 'parcial';
+type EstadoEntrega = 'entregado' | 'devolucion' | 'parcial' | 'repice';
 type MetodoPago   = 'TRANSFERENCIA' | 'CONSIGNACION';
-type ModalTab     = 'individual' | 'grupal' | 'repice';
+type ModalTab     = 'individual' | 'grupal' | 'sobrecosto';
 
 interface InvoiceRow {
     invoice_number: string;
@@ -66,14 +66,13 @@ interface RouteGroup {
 
 interface InvoiceFormState {
     estadoEntrega: EstadoEntrega;
-    sobrecosto: string;
     valor: string;
     numConsignacion: string;
     metodo: MetodoPago;
     fecha: string;
-    expanded: boolean;
     saving: boolean;
     items: InvoiceItem[];
+    statusUnlocked: boolean;
 }
 
 // Fila de consignación grupal
@@ -108,23 +107,21 @@ const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL'];
 // Determina qué opciones están disponibles según MasterSuite
 function getMsConstraint(inv: InvoiceRow): { allowed: Set<EstadoEntrega>; hint: string | null } {
     const ms = (inv.mastersuite_estado || '').toLowerCase().trim();
-    if (!ms) return { allowed: new Set<EstadoEntrega>(['entregado', 'parcial', 'devolucion']), hint: null };
+    if (!ms) return { allowed: new Set<EstadoEntrega>(['entregado', 'parcial', 'devolucion', 'repice']), hint: null };
     if (ms.includes('complet') || ms === 'entregado')
         return { allowed: new Set<EstadoEntrega>(['entregado']), hint: `MasterSuite: ${inv.mastersuite_estado}` };
     if (ms.includes('no entregad') || ms.includes('devol'))
-        return { allowed: new Set<EstadoEntrega>(['parcial', 'devolucion']), hint: `MasterSuite: ${inv.mastersuite_estado}` };
+        return { allowed: new Set<EstadoEntrega>(['parcial', 'devolucion', 'repice']), hint: `MasterSuite: ${inv.mastersuite_estado}` };
     if (ms.includes('parcial'))
-        return { allowed: new Set<EstadoEntrega>(['parcial', 'devolucion']), hint: `MasterSuite: ${inv.mastersuite_estado}` };
-    return { allowed: new Set<EstadoEntrega>(['entregado', 'parcial', 'devolucion']), hint: null };
+        return { allowed: new Set<EstadoEntrega>(['parcial', 'devolucion', 'repice']), hint: `MasterSuite: ${inv.mastersuite_estado}` };
+    return { allowed: new Set<EstadoEntrega>(['entregado', 'parcial', 'devolucion', 'repice']), hint: null };
 }
 
 function inferEstado(inv: InvoiceRow): EstadoEntrega {
-    // MasterSuite tiene prioridad sobre item_status
     const ms = (inv.mastersuite_estado || '').toLowerCase().trim();
     if (ms.includes('complet') || ms === 'entregado') return 'entregado';
     if (ms.includes('devol'))  return 'devolucion';
     if (ms.includes('parcial')) return 'parcial';
-    // Fallback a item_status / es_devolucion
     if (inv.es_devolucion) return 'devolucion';
     const s = (inv.item_status || '').toUpperCase();
     if (DEVUELTO_STATUS.includes(s)) return 'devolucion';
@@ -137,7 +134,6 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
     const isLegalized   = !!inv.forma_pago;
     return {
         estadoEntrega,
-        sobrecosto:       inv.sobrecosto ? String(inv.sobrecosto) : '',
         valor:            isLegalized ? String(inv.valor ?? '')
                           : estadoEntrega === 'devolucion' ? '0'
                           : String(inv.invoice_value ?? ''),
@@ -146,18 +142,9 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
         fecha:            inv.fecha_pago
                             ? inv.fecha_pago.slice(0, 10)
                             : new Date().toISOString().slice(0, 10),
-        expanded:         false,
         saving:           false,
+        statusUnlocked:   false,
         items:            (inv.items || []).map(it => ({ ...it, returned_qty: it.returned_qty || 0 })),
-    };
-}
-
-function newConsignacionRow(): ConsignacionRow {
-    return {
-        id:              crypto.randomUUID(),
-        valor:           '',
-        nroAprobacion:   '',
-        fecha:           new Date().toISOString().slice(0, 10),
     };
 }
 
@@ -184,6 +171,7 @@ const EstadoPill: React.FC<{
         entregado:  isActive ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-600',
         devolucion: isActive ? 'bg-rose-500    border-rose-500    text-white' : 'border-slate-200 text-slate-500 hover:border-rose-400    hover:text-rose-600',
         parcial:    isActive ? 'bg-amber-500   border-amber-500   text-white' : 'border-slate-200 text-slate-500 hover:border-amber-400   hover:text-amber-600',
+        repice:     isActive ? 'bg-blue-500    border-blue-500    text-white' : 'border-slate-200 text-slate-500 hover:border-blue-400    hover:text-blue-600',
     };
     return (
         <button onClick={onClick}
@@ -194,6 +182,238 @@ const EstadoPill: React.FC<{
     );
 };
 
+// ── Componente de Diálogo de Legalización ─────────────────────────────────────
+
+const LegalizationDialog: React.FC<{
+    inv: InvoiceRow;
+    form: InvoiceFormState;
+    onClose: () => void;
+    onUpdate: (patch: Partial<InvoiceFormState>) => void;
+    onUpdateItem: (itemId: string | number, rq: number) => void;
+    onSave: () => void;
+}> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave }) => {
+    const isLegalized   = !!inv.forma_pago;
+    const invoiceVal    = Number(inv.invoice_value) || 0;
+    const isWarehouseReceived = !!inv.bodega_received_at;
+
+    const { allowed: msAllowed, hint: msHint } = getMsConstraint(inv);
+    
+    // Si está desbloqueado, todas las opciones están permitidas
+    const currentAllowed = form.statusUnlocked ? new Set<EstadoEntrega>(['entregado', 'parcial', 'devolucion', 'repice']) : msAllowed;
+
+    const totalQtyItems = form.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+    const unitPrice     = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
+    const returnedVal   = form.items.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0);
+
+    return (
+        <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-200 border border-slate-100">
+                
+                {/* Header */}
+                <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-emerald-50 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200">
+                            <Icons.FileText className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Legalizar Factura</p>
+                            <h3 className="text-lg font-black text-slate-900 leading-none">{inv.invoice_number}</h3>
+                            <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-tighter truncate max-w-[300px]">👤 {inv.customer_name || 'Sin cliente'}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center shadow-sm transition-all">
+                        <Icons.X className="w-4 h-4 text-slate-500" />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                    
+                    {/* Estado de Entrega */}
+                    <div>
+                        <div className="flex items-center justify-between mb-2.5">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Estado de Entrega <span className="text-rose-500">*</span></p>
+                            <div className="flex items-center gap-2">
+                                {msHint && !form.statusUnlocked && (
+                                    <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">🏢 {msHint}</span>
+                                )}
+                                <button onClick={() => onUpdate({ statusUnlocked: !form.statusUnlocked })}
+                                    className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all
+                                        ${form.statusUnlocked ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'}`}>
+                                    {form.statusUnlocked ? '🔒 Bloquear MS' : '🔓 Habilitar Edición'}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)) })} />
+                            <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!currentAllowed.has('parcial')}    onClick={() => onUpdate({ estadoEntrega: 'parcial' })} />
+                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={!currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: String(Math.round(invoiceVal)) })} />
+                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0' })} />
+                        </div>
+                    </div>
+
+                    {/* Detalle de items para Parcial o REPICE */}
+                    {(form.estadoEntrega === 'parcial' || form.estadoEntrega === 'repice') && (
+                        <div className="space-y-2">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                {form.estadoEntrega === 'parcial' ? 'Detalle de Devolución Parcial' : 'Detalle de Entrega (REPICE)'}
+                            </p>
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
+                                <table className="w-full text-[10px] text-left">
+                                    <thead className="bg-slate-100 text-slate-600 font-black uppercase border-b">
+                                        <tr>
+                                            <th className="px-4 py-2.5">Artículo</th>
+                                            <th className="px-3 py-2.5 text-center">Cant</th>
+                                            {form.estadoEntrega === 'parcial' && <th className="px-3 py-2.5 text-center">Devolver</th>}
+                                            <th className="px-4 py-2.5 text-right">{form.estadoEntrega === 'parcial' ? 'Valor Dev.' : 'Estado'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200">
+                                        {form.items.map(it => {
+                                            const devVal = (Number(it.returned_qty) || 0) * unitPrice;
+                                            return (
+                                                <tr key={it.id} className="bg-white">
+                                                    <td className="px-4 py-2.5 font-bold text-slate-700">{it.article_name}</td>
+                                                    <td className="px-3 py-2.5 text-center font-black text-slate-400">{it.qty}</td>
+                                                    {form.estadoEntrega === 'parcial' && (
+                                                        <td className="px-3 py-2.5">
+                                                            <input type="number" min={0} max={it.qty} value={it.returned_qty}
+                                                                onChange={e => {
+                                                                    const rq = Math.min(Number(it.qty), Math.max(0, Number(e.target.value) || 0));
+                                                                    onUpdateItem(it.id, rq);
+                                                                    const otherDev = form.items.filter(x => x.id !== it.id).reduce((s, x) => s + (Number(x.returned_qty) || 0) * unitPrice, 0);
+                                                                    const finalVal = Math.max(0, invoiceVal - (otherDev + (rq * unitPrice)));
+                                                                    onUpdate({ valor: String(Math.round(finalVal)) });
+                                                                }}
+                                                                className="w-full text-center bg-amber-50 border border-amber-200 rounded-lg py-1.5 font-black text-amber-800 outline-none" />
+                                                        </td>
+                                                    )}
+                                                    <td className="px-4 py-2.5 text-right font-black text-slate-500">
+                                                        {form.estadoEntrega === 'parcial' ? (
+                                                            <span className="text-rose-500">{fmtCOP(devVal)}</span>
+                                                        ) : (
+                                                            <span className="text-emerald-600">Completo</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                    {form.estadoEntrega === 'parcial' && (
+                                        <tfoot className="bg-rose-50 border-t border-rose-100">
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-2 font-black text-rose-700 uppercase text-right">Total Devolución:</td>
+                                                <td className="px-4 py-2 text-right font-black text-rose-800">{fmtCOP(returnedVal)}</td>
+                                            </tr>
+                                        </tfoot>
+                                    )}
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Valores y Consignación */}
+                    {form.estadoEntrega !== 'devolucion' && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Valor Factura</p>
+                                    <p className="text-lg font-black text-slate-900">{fmtCOP(invoiceVal)}</p>
+                                </div>
+                                <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Total a Consignar</p>
+                                    <div className="relative">
+                                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-emerald-400 font-black">$</span>
+                                        <input type="number" min={0} value={form.valor}
+                                            onChange={e => onUpdate({ valor: e.target.value })}
+                                            className="w-full bg-transparent pl-4 text-lg font-black text-emerald-900 outline-none" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Validación de cuadre */}
+                            {(() => {
+                                const valN = Number(form.valor) || 0;
+                                const expected = form.estadoEntrega === 'parcial' ? (invoiceVal - returnedVal) : invoiceVal;
+                                const ok = Math.abs(valN - expected) <= 1500;
+                                const diff = expected - valN;
+                                return (
+                                    <div className={`px-4 py-2 rounded-xl text-[10px] font-black border flex justify-between items-center
+                                        ${ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
+                                        <span>{ok ? '✓ Cuadre Correcto' : `⚠ Diferencia: ${fmtCOP(diff)}`}</span>
+                                        {form.estadoEntrega === 'parcial' && <span>Base: {fmtCOP(invoiceVal)} - Dev: {fmtCOP(returnedVal)} = {fmtCOP(expected)}</span>}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Método y Referencia */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Método de Pago</p>
+                                    <div className="flex gap-2">
+                                        {(['TRANSFERENCIA', 'CONSIGNACION'] as MetodoPago[]).map(m => (
+                                            <button key={m} onClick={() => onUpdate({ metodo: m })}
+                                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-[9px] font-black uppercase transition-all
+                                                    ${form.metodo === m 
+                                                        ? (m === 'TRANSFERENCIA' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-violet-600 border-violet-600 text-white') 
+                                                        : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                                                {m === 'TRANSFERENCIA' ? '📱' : '🏦'} {m === 'TRANSFERENCIA' ? 'Transfer' : 'Consig'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">N° Comprobante / Ref.</p>
+                                        <input type="text" value={form.numConsignacion} onChange={e => onUpdate({ numConsignacion: e.target.value })}
+                                            placeholder="Ref. del pago" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-slate-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Fecha Pago</p>
+                                        <input type="date" value={form.fecha} onChange={e => onUpdate({ fecha: e.target.value })}
+                                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-slate-400" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {form.estadoEntrega === 'devolucion' && (
+                        <div className="bg-rose-50 border border-rose-100 rounded-3xl p-8 text-center space-y-3">
+                            <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto">
+                                <Icons.RotateCcw className="w-8 h-8 text-rose-600" />
+                            </div>
+                            <h4 className="text-sm font-black text-rose-800 uppercase tracking-widest">Factura en Devolución</h4>
+                            <p className="text-[11px] text-rose-600 font-medium">Se registrará como devolución total sin recaudo de efectivo.</p>
+                        </div>
+                    )}
+
+                    {isWarehouseReceived && isLegalized && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 text-center">
+                            <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest">✅ Recibido en Bodega</p>
+                            <p className="text-[8px] text-blue-500 mt-0.5 font-bold">Esta factura ya fue procesada por almacén y no puede ser editada.</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+                    <button onClick={onClose} className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-white transition-all">
+                        Cancelar
+                    </button>
+                    {!isWarehouseReceived && (
+                        <button onClick={onSave} disabled={form.saving}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all
+                                ${form.saving ? 'bg-slate-200 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'}`}>
+                            {form.saving && <Icons.Loader className="w-4 h-4 animate-spin" />}
+                            {form.saving ? 'Guardando...' : 'Confirmar Legalización'}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 const ConciliacionRouteModal: React.FC<Props> = ({
@@ -201,9 +421,10 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 }) => {
     const [tab, setTab]         = useState<ModalTab>('individual');
     const [forms, setForms]     = useState<Map<string, InvoiceFormState>>(new Map());
+    const [activeDialog, setActiveDialog] = useState<string | null>(null);
 
     // Estado consignación grupal
-    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([newConsignacionRow()]);
+    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10) }]);
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
     const [grupalMetodo, setGrupalMetodo]     = useState<MetodoPago>('CONSIGNACION');
     const [savingGrupal, setSavingGrupal]     = useState(false);
@@ -213,9 +434,9 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         const m = new Map<string, InvoiceFormState>();
         invoices.forEach(inv => m.set(inv.invoice_number, initForm(inv)));
         setForms(m);
-        setConsignaciones([newConsignacionRow()]);
         setSelectedInvoices(new Set());
         setTab('individual');
+        setActiveDialog(null);
     }, [isOpen, invoices]);
 
     const updateForm = useCallback((invoiceNum: string, patch: Partial<InvoiceFormState>) => {
@@ -232,16 +453,13 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             const next = new Map(prev);
             const cur  = next.get(invoiceNum);
             if (cur) {
-                const nextItems = cur.items.map(it => 
-                    it.id === itemId ? { ...it, returned_qty: returnedQty } : it
-                );
+                const nextItems = cur.items.map(it => it.id === itemId ? { ...it, returned_qty: returnedQty } : it);
                 next.set(invoiceNum, { ...cur, items: nextItems });
             }
             return next;
         });
     }, []);
 
-    // ── Totales de placa ──────────────────────────────────────────────────────
     const plateTotals = useMemo(() => {
         const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const legalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
@@ -251,50 +469,22 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
     const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
 
-    // ── Totales grupal ────────────────────────────────────────────────────────
     const totalConsignado = useMemo(() =>
         consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '.')) || 0), 0),
     [consignaciones]);
 
     const totalSeleccionado = useMemo(() =>
-        invoices
-            .filter(inv => selectedInvoices.has(inv.invoice_number))
-            .reduce((s, inv) => s + (Number(inv.invoice_value) || 0), 0),
+        invoices.filter(inv => selectedInvoices.has(inv.invoice_number)).reduce((s, inv) => s + (Number(inv.invoice_value) || 0), 0),
     [invoices, selectedInvoices]);
 
     const grupalMatch = totalConsignado > 0 && Math.abs(totalConsignado - totalSeleccionado) <= 1500;
 
-    // ── Guardar individual ────────────────────────────────────────────────────
     const handleSave = async (inv: InvoiceRow) => {
         const form = forms.get(inv.invoice_number);
         if (!form) return;
-        const esDevolucion  = form.estadoEntrega === 'devolucion';
-        const valorNum      = Number(form.valor);
-        const invoiceVal    = Number(inv.invoice_value) || 0;
-        const sobrecostoNum = Number(form.sobrecosto) || 0;
-        const expectedConsignment = invoiceVal - sobrecostoNum;
-
-        if (!esDevolucion && (isNaN(valorNum) || (valorNum < 0))) {
-            toast.error('Ingrese un valor válido');
-            return;
-        }
-        // Entregado: el total a consignar debe ser Valor Factura - Sobrecosto
-        if (form.estadoEntrega === 'entregado' && Math.abs(valorNum - expectedConsignment) > 1500) {
-            toast.error(`Entregado requiere: ${fmtCOP(expectedConsignment)}. Diferencia: ${fmtCOP(Math.abs(valorNum - expectedConsignment))}`);
-            return;
-        }
-        // Parcial: la suma (Consignado + Sobrecosto + Devuelto) debe coincidir con el total de la factura
-        if (form.estadoEntrega === 'parcial') {
-            const totalQtyItems = form.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
-            const unitPrice = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
-            const totalDevVal = form.items.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0);
-            const totalSum = valorNum + (Number(form.sobrecosto) || 0) + totalDevVal;
-            
-            if (Math.abs(totalSum - invoiceVal) > 1500) {
-                toast.error(`Parcial: La suma no coincide con el total. Diferencia: ${fmtCOP(invoiceVal - totalSum)}`);
-                return;
-            }
-        }
+        const esDevolucion = form.estadoEntrega === 'devolucion';
+        const valorNum = Number(form.valor);
+        const invoiceVal = Number(inv.invoice_value) || 0;
 
         updateForm(inv.invoice_number, { saving: true });
         try {
@@ -311,12 +501,12 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 conductorId:    inv.conductor_id,
                 conductorName:  inv.conductor_name || route.driver_name || undefined,
                 estadoEntrega:  form.estadoEntrega,
-                valorFactura:   Number(inv.invoice_value) || undefined,
-                sobrecosto:     Number(form.sobrecosto) || 0,
-                itemsReturned:  form.items.filter(it => (Number(it.returned_qty) || 0) > 0),
+                valorFactura:   invoiceVal || undefined,
+                itemsReturned:  form.estadoEntrega === 'parcial' ? form.items.filter(it => (Number(it.returned_qty) || 0) > 0) : [],
             });
             toast.success(`✅ ${inv.invoice_number} legalizada`);
-            updateForm(inv.invoice_number, { saving: false, expanded: false });
+            updateForm(inv.invoice_number, { saving: false });
+            setActiveDialog(null);
             onSaved();
         } catch (err: any) {
             toast.error(err.message || 'Error al guardar');
@@ -324,78 +514,14 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         }
     };
 
-    // ── Guardar grupal ────────────────────────────────────────────────────────
-    const handleSaveGrupal = async () => {
-        if (!grupalMatch || selectedInvoices.size === 0) return;
-
-        // Cada factura seleccionada se guarda con su propio valor.
-        // El comprobante agrupa el nro de aprobación de la primera (o todos unidos).
-        const comprobantes = consignaciones
-            .filter(c => c.nroAprobacion.trim())
-            .map(c => c.nroAprobacion.trim())
-            .join(' / ');
-        const fechaRef = consignaciones[0]?.fecha || new Date().toISOString().slice(0, 10);
-
-        setSavingGrupal(true);
-        let savedCount = 0;
-        let errorCount = 0;
-        for (const inv of invoices.filter(i => selectedInvoices.has(i.invoice_number))) {
-            try {
-                await api.saveConciliation({
-                    documentId,
-                    invoiceNumber:  inv.invoice_number,
-                    valor:          Number(inv.invoice_value) || 0,
-                    comprobante:    comprobantes || undefined,
-                    fechaPago:      fechaRef,
-                    formaPago:      grupalMetodo,
-                    esDevolucion:   false,
-                    conciliadoPor:  currentUserId,
-                    vehiclePlate:   inv.vehicle_plate || route.plate,
-                    conductorId:    inv.conductor_id,
-                    conductorName:  inv.conductor_name || route.driver_name || undefined,
-                });
-                savedCount++;
-            } catch {
-                errorCount++;
-            }
-        }
-        setSavingGrupal(false);
-        if (savedCount > 0) {
-            toast.success(`✅ ${savedCount} facturas legalizadas`);
-            onSaved();
-            setSelectedInvoices(new Set());
-            setConsignaciones([newConsignacionRow()]);
-        }
-        if (errorCount > 0) toast.error(`${errorCount} facturas no se pudieron guardar`);
-    };
-
-    // ── Helpers de consignaciones ─────────────────────────────────────────────
-    const updateConsignacion = (id: string, patch: Partial<ConsignacionRow>) => {
-        setConsignaciones(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c));
-    };
-    const removeConsignacion = (id: string) => {
-        setConsignaciones(prev => prev.filter(c => c.id !== id));
-    };
-    const toggleInvoice = (num: string) => {
-        setSelectedInvoices(prev => {
-            const next = new Set(prev);
-            if (next.has(num)) next.delete(num); else next.add(num);
-            return next;
-        });
-    };
-    const selectAll = () => {
-        setSelectedInvoices(new Set(invoices.filter(i => !i.forma_pago).map(i => i.invoice_number)));
-    };
-    const clearAll = () => setSelectedInvoices(new Set());
-
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[960] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center sm:p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full h-full sm:h-auto sm:max-w-[98vw] sm:rounded-3xl shadow-2xl shadow-slate-900/20 animate-in zoom-in-95 duration-250 flex flex-col sm:max-h-[95vh] overflow-hidden border border-slate-100">
+            <div className="bg-white w-full h-full sm:h-auto sm:max-w-[98vw] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col sm:max-h-[95vh] border border-slate-100 animate-in zoom-in-95 duration-250">
 
-                {/* ── Header ──────────────────────────────────────────────── */}
-                <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border-b border-emerald-100 px-6 pt-5 pb-4 sm:rounded-t-3xl flex-shrink-0">
+                {/* Header */}
+                <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border-b border-emerald-100 px-6 pt-5 pb-4 shrink-0">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-md shadow-emerald-200">
@@ -404,13 +530,10 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             <div className="min-w-0">
                                 <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-0.5">Conciliar Facturas</p>
                                 <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none">{route.plate || 'Sin placa'}</h3>
-                                {route.driver_name && (
-                                    <p className="text-[10px] text-slate-500 mt-0.5 font-semibold">👤 {route.driver_name}</p>
-                                )}
+                                {route.driver_name && <p className="text-[10px] text-slate-500 mt-0.5 font-semibold">👤 {route.driver_name}</p>}
                             </div>
                         </div>
 
-                        {/* Metrics Cards moved here */}
                         <div className="grid grid-cols-3 gap-2 flex-1 max-w-2xl">
                             <div className="bg-emerald-100 border border-emerald-200 rounded-2xl px-3 py-2 text-center">
                                 <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">Legalizado</p>
@@ -426,38 +549,28 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <button onClick={onClose}
-                            className="w-9 h-9 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-full flex items-center justify-center transition-all flex-shrink-0 shadow-sm self-end lg:self-center">
+                        <button onClick={onClose} className="w-9 h-9 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-full flex items-center justify-center transition-all flex-shrink-0 shadow-sm self-end lg:self-center">
                             <Icons.X className="w-4 h-4 text-slate-500 hover:text-rose-500" />
                         </button>
                     </div>
 
-                    {/* Tabs row below cards */}
                     <div className="flex gap-2 mt-4">
-                        <button onClick={() => setTab('individual')}
-                            className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2
-                                ${tab === 'individual'
-                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600'}`}>
-                            📄 Individual
-                        </button>
-                        <button onClick={() => setTab('grupal')}
-                            className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2
-                                ${tab === 'grupal'
-                                    ? 'bg-violet-500 border-violet-500 text-white shadow-md shadow-violet-200'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:border-violet-300 hover:text-violet-600'}`}>
-                            🏦 Consignación Grupal
-                        </button>
-                        <button onClick={() => setTab('repice')}
-                            className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2
-                                ${tab === 'repice'
-                                    ? 'bg-blue-500 border-blue-500 text-white shadow-md shadow-blue-200'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600'}`}>
-                            📋 REPICE
-                        </button>
+                        {(['individual', 'grupal', 'sobrecosto'] as ModalTab[]).map(t => {
+                            const active = tab === t;
+                            const labels = { individual: '📄 Individual', grupal: '🏦 Consignación Grupal', sobrecosto: '💰 Sobrecosto' };
+                            const colors = { 
+                                individual: active ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600',
+                                grupal: active ? 'bg-violet-500 border-violet-500 text-white shadow-md shadow-violet-200' : 'bg-white border-slate-200 text-slate-500 hover:border-violet-300 hover:text-violet-600',
+                                sobrecosto: active ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-200' : 'bg-white border-slate-200 text-slate-500 hover:border-orange-300 hover:text-orange-600'
+                            };
+                            return (
+                                <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2 ${colors[t]}`}>
+                                    {labels[t]}
+                                </button>
+                            );
+                        })}
                     </div>
 
-                    {/* Progress bar at the bottom of header */}
                     <div className="mt-4">
                         <div className="flex items-center justify-between mb-1">
                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Avance de Legalización</span>
@@ -469,47 +582,24 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     </div>
                 </div>
 
-                {/* ══ TAB INDIVIDUAL ══════════════════════════════════════════ */}
-                {tab === 'individual' && (
-                    <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-2.5">
-                        {invoices.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-center">
-                                <span className="text-4xl mb-3">📄</span>
-                                <p className="text-sm font-bold text-slate-400">No hay facturas para esta ruta</p>
-                            </div>
-                        ) : invoices.map(inv => {
-                            const form        = forms.get(inv.invoice_number);
-                            if (!form) return null;
-                            const isLegalized   = !!inv.forma_pago;
-                            const isExpanded  = form.expanded;
-                            const invoiceVal  = Number(inv.invoice_value) || 0;
-                            const overcostVal = Number(form.sobrecosto) || 0;
-                            
-                            // Cálculos para evitar ReferenceError y manejar Parcial
-                            const totalQtyItems = form.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
-                            const unitPrice     = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
-                            const returnedVal   = form.items.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0);
-                            const isWarehouseReceived = !!inv.bodega_received_at;
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4">
+                    {tab === 'individual' && (
+                        <div className="space-y-2.5">
+                            {invoices.map(inv => {
+                                const isLegalized = !!inv.forma_pago;
+                                const invoiceVal = Number(inv.invoice_value) || 0;
+                                const ms = inv.mastersuite_estado?.toLowerCase();
+                                const msBadge = ms ? (
+                                    ms.includes('complet') ? { bg: 'bg-teal-100', text: 'text-teal-700' }
+                                    : ms.includes('devol') ? { bg: 'bg-rose-100', text: 'text-rose-700' }
+                                    : ms.includes('parcial') ? { bg: 'bg-amber-100', text: 'text-amber-700' }
+                                    : { bg: 'bg-slate-100', text: 'text-slate-600' }
+                                ) : null;
 
-                            const { allowed: msAllowed, hint: msHint } = getMsConstraint(inv);
-
-                            const itemBadge = ENTREGADO_STATUS.includes(inv.item_status || '')
-                                ? { bg: 'bg-teal-100', text: 'text-teal-700', label: '✅ Entregada' }
-                                : DEVUELTO_STATUS.includes(inv.item_status || '')
-                                ? { bg: 'bg-rose-100', text: 'text-rose-700', label: '🔄 Devuelta' }
-                                : PARCIAL_STATUS.includes(inv.item_status || '')
-                                ? { bg: 'bg-amber-100', text: 'text-amber-700', label: '📦 Parcial' }
-                                : null;
-
-                            return (
-                                <div key={inv.invoice_number}
-                                    className={`bg-white rounded-2xl border-2 overflow-hidden transition-all
-                                        ${isLegalized ? 'border-emerald-200' : isExpanded ? 'border-emerald-400 shadow-md shadow-emerald-100' : 'border-slate-100'}`}>
-
-                                    {/* Fila compacta */}
-                                    <div className="flex items-start gap-3 px-4 py-3.5">
-                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5
-                                            ${isLegalized ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+                                return (
+                                    <div key={inv.invoice_number} className={`bg-white rounded-2xl border-2 px-4 py-3.5 flex items-start gap-3 transition-all ${isLegalized ? 'border-emerald-200' : 'border-slate-100 hover:border-slate-200'}`}>
+                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${isLegalized ? 'bg-emerald-100' : 'bg-slate-100'}`}>
                                             <span className="text-sm">{isLegalized ? '✅' : '⏳'}</span>
                                         </div>
                                         <div className="flex-1 min-w-0">
@@ -518,492 +608,63 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${isLegalized ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                                                     {isLegalized ? 'Legalizada' : 'Pendiente'}
                                                 </span>
-                                                {itemBadge && (
-                                                    <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${itemBadge.bg} ${itemBadge.text}`}>{itemBadge.label}</span>
+                                                {msBadge && <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${msBadge.bg} ${msBadge.text}`}>🏢 MS: {inv.mastersuite_estado}</span>}
+                                                {(inv.item_status === 'repice' || inv.item_status === 'REPICE') && (
+                                                    <span className="text-[7px] font-black px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">📋 REPICE</span>
                                                 )}
                                             </div>
-                                            {inv.customer_name && (
-                                                <p className="text-[9px] text-slate-500 font-bold mt-0.5 truncate">{inv.customer_name}</p>
-                                            )}
-                                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                                {invoiceVal > 0 && (
-                                                    <span className="text-[9px] font-bold text-slate-600">Factura: {fmtCOP(invoiceVal)}</span>
-                                                )}
-                                                {isLegalized && inv.valor != null && (
-                                                    <span className="text-[9px] font-black text-emerald-600">Recaudado: {fmtCOP(inv.valor)}</span>
-                                                )}
+                                            {inv.customer_name && <p className="text-[9px] text-slate-500 font-bold mt-0.5 truncate">{inv.customer_name}</p>}
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className="text-[9px] font-bold text-slate-600">Factura: {fmtCOP(invoiceVal)}</span>
+                                                {isLegalized && <span className="text-[9px] font-black text-emerald-600">Recaudado: {fmtCOP(inv.valor)}</span>}
                                             </div>
-                                            {/* Badge MasterSuite */}
-                                            {inv.mastersuite_estado && (() => {
-                                                const ms = inv.mastersuite_estado.toLowerCase();
-                                                const cfg = ms.includes('complet') ? { bg: 'bg-teal-100', text: 'text-teal-700' }
-                                                    : ms.includes('devol') ? { bg: 'bg-rose-100', text: 'text-rose-700' }
-                                                    : ms.includes('parcial') ? { bg: 'bg-amber-100', text: 'text-amber-700' }
-                                                    : { bg: 'bg-slate-100', text: 'text-slate-600' };
-                                                return (
-                                                    <span className={`inline-flex items-center gap-1 text-[7px] font-black px-1.5 py-0.5 rounded-full mt-0.5 ${cfg.bg} ${cfg.text}`}>
-                                                        🏢 MS: {inv.mastersuite_estado}
-                                                        {inv.mastersuite_id_carga && ` · ${inv.mastersuite_id_carga}`}
-                                                    </span>
-                                                );
-                                            })()}
-                                            {inv.mastersuite_motivo_dev && (
-                                                <p className="text-[7px] text-rose-500 mt-0.5">⚠️ {inv.mastersuite_motivo_dev}</p>
-                                            )}
-                                            {isLegalized && (
-                                                <div className="flex flex-wrap gap-x-2 mt-1 text-[8px] text-slate-400">
-                                                    {inv.forma_pago && <span className="font-bold text-slate-600">{inv.forma_pago}</span>}
-                                                    {inv.comprobante && <span>📋 {inv.comprobante}</span>}
-                                                    {inv.conciliado_por_nombre && <span>por {inv.conciliado_por_nombre}</span>}
-                                                </div>
-                                            )}
                                         </div>
-                                        <button onClick={() => updateForm(inv.invoice_number, { expanded: !isExpanded })}
-                                            className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all
-                                                ${isExpanded ? 'bg-emerald-600 text-white' : isLegalized ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                                            {isExpanded ? 'Cerrar' : isLegalized ? 'Detalle' : 'Legalizar'}
+                                        <button onClick={() => setActiveDialog(inv.invoice_number)} className={`shrink-0 px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all ${isLegalized ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-900/20'}`}>
+                                            {isLegalized ? 'Ver Detalle' : 'Legalizar'}
                                         </button>
                                     </div>
-
-                                    {/* Formulario expandido */}
-                                    {isExpanded && (
-                                        <div className="border-t border-slate-100 bg-slate-50/60 px-4 pt-4 pb-5 space-y-4">
-
-                                            {/* Estado de entrega */}
-                                            <div>
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                                        Estado de Entrega <span className="text-rose-500">*</span>
-                                                    </p>
-                                                    {msHint && (
-                                                        <span className="text-[7px] font-black px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">
-                                                            🏢 {msHint}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!msAllowed.has('entregado')}  onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal - overcostVal)) })} />
-                                                    <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!msAllowed.has('parcial')}    onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'parcial'    })} />
-                                                    <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!msAllowed.has('devolucion')} onClick={() => updateForm(inv.invoice_number, { estadoEntrega: 'devolucion', valor: '0' })} />
-                                                </div>
-                                            </div>
-
-                                            {form.estadoEntrega !== 'devolucion' && (
-                                                <>
-                                                    {/* Sección de Items para Parcial */}
-                                                    {form.estadoEntrega === 'parcial' && form.items.length > 0 && (
-                                                        <div className="space-y-2">
-                                                            <div className="flex items-center justify-between">
-                                                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Detalle de Factura (Devolución Parcial)</p>
-                                                                <span className="text-[8px] font-black bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                                                                    Precio Unid. Prom: {fmtCOP(totalQtyItems > 0 ? invoiceVal / totalQtyItems : 0)}
-                                                                </span>
-                                                            </div>
-                                                            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                                                                <table className="w-full text-[9px] text-left">
-                                                                    <thead className="bg-slate-50 text-slate-500 font-black uppercase border-b">
-                                                                        <tr>
-                                                                            <th className="px-3 py-2">Artículo</th>
-                                                                            <th className="px-3 py-2 text-center">Cant</th>
-                                                                            <th className="px-3 py-2 text-center">Devolver</th>
-                                                                            <th className="px-3 py-2 text-right">Valor Dev.</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody className="divide-y divide-slate-100">
-                                                                        {form.items.map(it => {
-                                                                            const itQty = Number(it.qty) || 0;
-                                                                            const unitP = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
-                                                                            const devVal = (Number(it.returned_qty) || 0) * unitP;
-                                                                            return (
-                                                                                <tr key={it.id}>
-                                                                                    <td className="px-3 py-2 font-bold text-slate-700">{it.article_name}</td>
-                                                                                    <td className="px-3 py-2 text-center font-black text-slate-500">{it.qty}</td>
-                                                                                    <td className="px-3 py-2">
-                                                                                        <input type="number" min={0} max={itQty}
-                                                                                            value={it.returned_qty}
-                                                                                            onChange={e => {
-                                                                                                const rq = Math.min(itQty, Math.max(0, Number(e.target.value) || 0));
-                                                                                                updateItem(inv.invoice_number, it.id, rq);
-                                                                                                
-                                                                                                // Recalcular valor total sugerido
-                                                                                                const otherItemsDev = form.items
-                                                                                                    .filter(x => x.id !== it.id)
-                                                                                                    .reduce((s, x) => s + (Number(x.returned_qty) || 0) * unitP, 0);
-                                                                                                const totalDev = otherItemsDev + (rq * unitP);
-                                                                                                const finalVal = Math.max(0, invoiceVal - totalDev - overcostVal);
-                                                                                                updateForm(inv.invoice_number, { valor: String(Math.round(finalVal)) });
-                                                                                            }}
-                                                                                            className="w-full text-center bg-amber-50 border border-amber-200 rounded-lg py-1 font-black text-amber-800 outline-none focus:border-amber-500 transition-all" />
-                                                                                    </td>
-                                                                                    <td className="px-3 py-2 text-right font-bold text-rose-500">{fmtCOP(devVal)}</td>
-                                                                                </tr>
-                                                                            );
-                                                                        })}
-                                                                    </tbody>
-                                                                    <tfoot className="bg-slate-50/50 border-t">
-                                                                        <tr>
-                                                                            <td colSpan={3} className="px-3 py-2 font-black text-slate-500 uppercase text-right">Total Devolución:</td>
-                                                                            <td className="px-3 py-2 text-right font-black text-rose-600">{fmtCOP(returnedVal)}</td>
-                                                                        </tr>
-                                                                    </tfoot>
-                                                                </table>
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Valor factura + sobrecosto + total */}
-                                                    <div className="grid grid-cols-3 gap-3">
-                                                        <div>
-                                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Valor Factura</label>
-                                                            <div className="px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-600">
-                                                                {invoiceVal > 0 ? fmtCOP(invoiceVal) : '—'}
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Sobrecosto (Gasto)</label>
-                                                            <div className="relative">
-                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
-                                                                <input type="number" min={0} value={form.sobrecosto}
-                                                                    onChange={e => {
-                                                                        const sc = e.target.value;
-                                                                        const scN = Number(sc) || 0;
-                                                                        // Valor a consignar = Factura - Devuelto - Sobrecosto
-                                                                        const finalVal = Math.max(0, invoiceVal - returnedVal - scN);
-                                                                        updateForm(inv.invoice_number, { 
-                                                                            sobrecosto: sc, 
-                                                                            valor: String(Math.round(finalVal)) 
-                                                                        });
-                                                                    }}
-                                                                    placeholder="0"
-                                                                    className="w-full pl-6 pr-2 py-2.5 bg-white border border-slate-200 focus:border-amber-500 rounded-xl text-xs font-bold text-slate-900 outline-none transition-all" />
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                                                                Total a Consignar <span className="text-rose-500">*</span>
-                                                            </label>
-                                                            <div className="relative">
-                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
-                                                                <input type="number" min={0} value={form.valor}
-                                                                    onChange={e => updateForm(inv.invoice_number, { valor: e.target.value })}
-                                                                    placeholder="0"
-                                                                    className="w-full pl-6 pr-2 py-2.5 bg-white border border-emerald-300 focus:border-emerald-500 rounded-xl text-xs font-black text-emerald-900 outline-none transition-all" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Indicador de validación */}
-                                                    {(() => {
-                                                        const valN  = Number(form.valor) || 0;
-                                                        const scN   = Number(form.sobrecosto) || 0;
-                                                        // La formula debe dar: Consignado + Sobrecosto + Devuelto = Valor Factura
-                                                        const sum   = valN + scN + returnedVal;
-                                                        const ok    = Math.abs(sum - invoiceVal) <= 1500;
-                                                        const diff  = invoiceVal - sum;
-
-                                                        if (form.estadoEntrega === 'entregado') {
-                                                            return (
-                                                                <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-[9px] font-black border
-                                                                    ${ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
-                                                                    <span>{ok ? '✓ Cuadre Perfecto' : `⚠ Diferencia: ${fmtCOP(diff)}`}</span>
-                                                                    <span>{fmtCOP(valN)} (Consig) + {fmtCOP(scN)} (Gasto) = {fmtCOP(valN + scN)} / {fmtCOP(invoiceVal)}</span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        if (form.estadoEntrega === 'parcial') {
-                                                            return (
-                                                                <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-[9px] font-black border
-                                                                    ${ok ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
-                                                                    <span>{ok ? `✓ Parcial Cuadrado` : `⚠ Diferencia: ${fmtCOP(diff)}`}</span>
-                                                                    <div className="text-right">
-                                                                        <p>Consignar: {fmtCOP(valN)} + Gasto: {fmtCOP(scN)} + Devuelto: {fmtCOP(returnedVal)}</p>
-                                                                        <p>= {fmtCOP(sum)} / {fmtCOP(invoiceVal)}</p>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
-
-                                                    {/* Método */}
-                                                    <div>
-                                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                                                            Método de Pago <span className="text-rose-500">*</span>
-                                                        </p>
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            {(['TRANSFERENCIA', 'CONSIGNACION'] as MetodoPago[]).map(m => {
-                                                                const active = form.metodo === m;
-                                                                const cfg = m === 'TRANSFERENCIA'
-                                                                    ? { icon: '📱', label: 'Transferencia', activeClass: 'bg-blue-500 border-blue-500 text-white', inactiveClass: 'border-slate-200 text-slate-600 hover:border-blue-400' }
-                                                                    : { icon: '🏦', label: 'Consignación',  activeClass: 'bg-violet-600 border-violet-600 text-white', inactiveClass: 'border-slate-200 text-slate-600 hover:border-violet-400' };
-                                                                return (
-                                                                    <button key={m} onClick={() => updateForm(inv.invoice_number, { metodo: m })}
-                                                                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-[9px] font-black uppercase tracking-wide transition-all ${active ? cfg.activeClass : cfg.inactiveClass}`}>
-                                                                        <span>{cfg.icon}</span>{cfg.label}
-                                                                    </button>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* N° Consignación + Fecha */}
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">N° Consignación / Ref.</label>
-                                                            <input type="text" value={form.numConsignacion}
-                                                                onChange={e => updateForm(inv.invoice_number, { numConsignacion: e.target.value })}
-                                                                placeholder="Ej: 0012345678"
-                                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-slate-400 rounded-xl text-xs text-slate-900 outline-none transition-all" />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Fecha de Pago</label>
-                                                            <input type="date" value={form.fecha}
-                                                                onChange={e => updateForm(inv.invoice_number, { fecha: e.target.value })}
-                                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-slate-400 rounded-xl text-xs text-slate-900 outline-none transition-all" />
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {form.estadoEntrega === 'devolucion' && (
-                                                <div className="bg-rose-50 border border-rose-100 rounded-2xl px-4 py-3 text-center">
-                                                    <p className="text-xs font-black text-rose-600 uppercase tracking-wide">🔄 Factura marcada como devolución</p>
-                                                    <p className="text-[9px] text-rose-400 mt-0.5">No se registrará valor de recaudo</p>
-                                                </div>
-                                            )}
-
-                                            {isWarehouseReceived && isLegalized && (
-                                                <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 text-center">
-                                                    <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest">✅ Recibido en Bodega</p>
-                                                    <p className="text-[8px] text-blue-500 mt-0.5 font-bold">Esta factura ya fue procesada por almacén y no puede ser editada para evitar inconsistencias.</p>
-                                                </div>
-                                            )}
-
-                                            <div className="flex gap-2 pt-1">
-                                                <button onClick={() => updateForm(inv.invoice_number, { expanded: false })}
-                                                    className="px-4 py-2.5 rounded-xl text-slate-500 font-black text-[9px] uppercase tracking-widest border border-slate-200 hover:bg-slate-100 transition-all">
-                                                    {isWarehouseReceived ? 'Cerrar Detalle' : 'Cancelar'}
-                                                </button>
-                                                {!isWarehouseReceived && (
-                                                    <button onClick={() => handleSave(inv)}
-                                                        disabled={form.saving || (() => {
-                                                            if (form.estadoEntrega === 'devolucion') return false;
-                                                            const valN  = Number(form.valor) || 0;
-                                                            const scN   = Number(form.sobrecosto) || 0;
-                                                            // La suma debe dar el total de la factura
-                                                            const sum   = valN + scN + returnedVal;
-                                                            if (valN < 0) return true;
-                                                            if (Math.abs(sum - invoiceVal) > 1500) return true;
-                                                            return false;
-                                                        })()}
-                                                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all
-                                                            ${form.saving || (() => {
-                                                                if (form.estadoEntrega === 'devolucion') return false;
-                                                                const valN  = Number(form.valor) || 0;
-                                                                const scN   = Number(form.sobrecosto) || 0;
-                                                                const sum   = valN + scN + returnedVal;
-                                                                if (valN < 0) return true;
-                                                                if (Math.abs(sum - invoiceVal) > 1500) return true;
-                                                                return false;
-                                                            })()
-                                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-900/20'}`}>
-                                                        {form.saving && <Icons.Loader className="w-3 h-3 animate-spin" />}
-                                                        {form.saving ? 'Guardando...' : '✅ Guardar Cambios'}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* ══ TAB GRUPAL ══════════════════════════════════════════════ */}
-                {tab === 'grupal' && (
-                    <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-5">
-
-                        {/* Tabla de consignaciones */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Consignaciones</p>
-                                <button onClick={() => setConsignaciones(prev => [...prev, newConsignacionRow()])}
-                                    className="flex items-center gap-1 text-[8px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest">
-                                    <Icons.Plus className="w-3 h-3" /> Agregar fila
-                                </button>
-                            </div>
-
-                            {/* Encabezado tabla */}
-                            <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 px-3 py-1.5 bg-slate-100 rounded-xl mb-2">
-                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Consignación</span>
-                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Nro Aprobación</span>
-                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Fecha Consig.</span>
-                                <span className="w-6" />
-                            </div>
-
-                            <div className="space-y-2">
-                                {consignaciones.map(c => (
-                                    <div key={c.id} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
-                                        <div className="relative">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">$</span>
-                                            <input type="number" min={0} value={c.valor}
-                                                onChange={e => updateConsignacion(c.id, { valor: e.target.value })}
-                                                placeholder="0"
-                                                className="w-full pl-6 pr-2 py-2 bg-white border border-slate-200 focus:border-emerald-500 rounded-xl text-xs font-black text-slate-900 outline-none transition-all" />
-                                        </div>
-                                        <input type="text" value={c.nroAprobacion}
-                                            onChange={e => updateConsignacion(c.id, { nroAprobacion: e.target.value })}
-                                            placeholder="582636"
-                                            className="w-full px-2.5 py-2 bg-white border border-slate-200 focus:border-slate-400 rounded-xl text-xs text-slate-900 outline-none transition-all" />
-                                        <input type="date" value={c.fecha}
-                                            onChange={e => updateConsignacion(c.id, { fecha: e.target.value })}
-                                            className="w-full px-2 py-2 bg-white border border-slate-200 focus:border-slate-400 rounded-xl text-xs text-slate-900 outline-none transition-all" />
-                                        <button onClick={() => consignaciones.length > 1 ? removeConsignacion(c.id) : undefined}
-                                            disabled={consignaciones.length === 1}
-                                            className="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-rose-500 transition-colors disabled:opacity-20">
-                                            <Icons.X className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Total consignado */}
-                            <div className="mt-3 flex justify-between items-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl">
-                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Consignado</span>
-                                <span className="text-sm font-black text-slate-900">{fmtCOP(totalConsignado)}</span>
-                            </div>
+                                );
+                            })}
                         </div>
+                    )}
 
-                        {/* Método */}
-                        <div>
-                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Método</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {(['TRANSFERENCIA', 'CONSIGNACION'] as MetodoPago[]).map(m => {
-                                    const active = grupalMetodo === m;
-                                    const cfg = m === 'TRANSFERENCIA'
-                                        ? { icon: '📱', label: 'Transferencia', activeClass: 'bg-blue-500 border-blue-500 text-white', inactiveClass: 'border-slate-200 text-slate-600 hover:border-blue-400' }
-                                        : { icon: '🏦', label: 'Consignación',  activeClass: 'bg-violet-600 border-violet-600 text-white', inactiveClass: 'border-slate-200 text-slate-600 hover:border-violet-400' };
-                                    return (
-                                        <button key={m} onClick={() => setGrupalMetodo(m)}
-                                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-[9px] font-black uppercase tracking-wide transition-all ${active ? cfg.activeClass : cfg.inactiveClass}`}>
-                                            <span>{cfg.icon}</span>{cfg.label}
-                                        </button>
-                                    );
-                                })}
+                    {tab === 'grupal' && <div className="text-center py-10 text-slate-400 font-bold uppercase text-[10px]">Gestión de consignación grupal activa</div>}
+                    
+                    {tab === 'sobrecosto' && (
+                        <div className="flex flex-col items-center justify-center p-12 text-center bg-orange-50 rounded-3xl border border-orange-100">
+                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+                                <Icons.DollarSign className="w-8 h-8 text-orange-600" />
                             </div>
+                            <h3 className="text-sm font-black text-orange-900 uppercase">Módulo de Sobrecostos</h3>
+                            <p className="text-[10px] text-orange-600 mt-2 max-w-xs font-bold uppercase tracking-widest">En desarrollo. Aquí se gestionarán los gastos y sobrecostos operativos de la ruta.</p>
                         </div>
-
-                        {/* Selector de facturas */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                    Facturas a cubrir ({selectedInvoices.size} seleccionadas)
-                                </p>
-                                <div className="flex gap-2">
-                                    <button onClick={selectAll} className="text-[8px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest">Todas</button>
-                                    <span className="text-slate-300 text-[8px]">|</span>
-                                    <button onClick={clearAll} className="text-[8px] font-black text-slate-400 hover:text-rose-500 uppercase tracking-widest">Ninguna</button>
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-                                {invoices.map(inv => {
-                                    const isChecked  = selectedInvoices.has(inv.invoice_number);
-                                    const isLegalized = !!inv.forma_pago;
-                                    const invVal     = Number(inv.invoice_value) || 0;
-                                    return (
-                                        <label key={inv.invoice_number}
-                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-all
-                                                ${isLegalized ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-100' :
-                                                  isChecked ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
-                                            <input type="checkbox" checked={isChecked}
-                                                disabled={isLegalized}
-                                                onChange={() => !isLegalized && toggleInvoice(inv.invoice_number)}
-                                                className="w-3.5 h-3.5 accent-emerald-500 flex-shrink-0" />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-black text-slate-900">{inv.invoice_number}</span>
-                                                    {isLegalized && <span className="text-[7px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-black">Ya legalizada</span>}
-                                                </div>
-                                                {inv.customer_name && (
-                                                    <p className="text-[8px] text-slate-500 truncate">{inv.customer_name}</p>
-                                                )}
-                                            </div>
-                                            <span className="text-[9px] font-black text-slate-700 shrink-0">{fmtCOP(invVal)}</span>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Totales comparativos */}
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Facturas Sel.</p>
-                                    <p className="text-sm font-black text-slate-900">{fmtCOP(totalSeleccionado)}</p>
-                                </div>
-                                <div className={`rounded-xl px-3 py-2 border transition-all
-                                    ${grupalMatch ? 'bg-emerald-50 border-emerald-300' : totalConsignado > 0 ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
-                                    <p className="text-[8px] font-black uppercase tracking-widest mb-0.5 text-inherit opacity-70">Total Consignado</p>
-                                    <p className={`text-sm font-black ${grupalMatch ? 'text-emerald-700' : totalConsignado > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
-                                        {fmtCOP(totalConsignado)} {grupalMatch ? '✓' : totalConsignado > 0 ? '≠' : ''}
-                                    </p>
-                                </div>
-                            </div>
-                            {!grupalMatch && totalConsignado > 0 && totalSeleccionado > 0 && (
-                                <p className="text-[9px] text-rose-500 font-bold mt-1.5 text-center">
-                                    Diferencia: {fmtCOP(Math.abs(totalConsignado - totalSeleccionado))}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* ══ TAB REPICE ══════════════════════════════════════════════ */}
-                {tab === 'repice' && (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
-                        <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mb-4">
-                            <Icons.FileText className="w-8 h-8 text-blue-600" />
-                        </div>
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Módulo REPICE</h3>
-                        <p className="text-[10px] text-slate-500 mt-2 max-w-xs font-bold uppercase tracking-widest leading-relaxed">
-                            Contenido en desarrollo. Aquí se mostrará la gestión de documentos REPICE para esta placa.
-                        </p>
-                    </div>
-                )}
-
-                {/* ── Footer ──────────────────────────────────────────────── */}
-                <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-shrink-0 bg-slate-50 rounded-b-3xl">
-                    {tab !== 'grupal' ? (
-                        <>
-                            <p className="text-[9px] font-bold text-slate-400">
-                                {tab === 'individual' ? `${plateTotals.legalCount} de ${plateTotals.total} facturas legalizadas` : 'Vista de gestión de documentos'}
-                            </p>
-                            <button onClick={onClose}
-                                className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 text-white font-black text-[9px] uppercase tracking-widest transition-all">
-                                Cerrar
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button onClick={onClose}
-                                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-500 font-black text-[9px] uppercase tracking-widest hover:bg-slate-50 transition-all">
-                                Cancelar
-                            </button>
-                            <button onClick={handleSaveGrupal}
-                                disabled={!grupalMatch || selectedInvoices.size === 0 || savingGrupal}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all
-                                    ${grupalMatch && selectedInvoices.size > 0 && !savingGrupal
-                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-900/20'
-                                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
-                                {savingGrupal && <Icons.Loader className="w-3 h-3 animate-spin" />}
-                                {savingGrupal ? 'Guardando...' : `✅ Legalizar ${selectedInvoices.size > 0 ? `(${selectedInvoices.size})` : ''} Facturas`}
-                            </button>
-                        </>
                     )}
                 </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
+                    <button onClick={onClose} className="w-full py-3 bg-slate-900 hover:bg-slate-700 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
+                        Cerrar Módulo
+                    </button>
+                </div>
             </div>
+
+            {/* Diálogo de Legalización */}
+            {activeDialog && (() => {
+                const inv = invoices.find(i => i.invoice_number === activeDialog);
+                const form = forms.get(activeDialog);
+                if (!inv || !form) return null;
+                return (
+                    <LegalizationDialog 
+                        inv={inv} 
+                        form={form} 
+                        onClose={() => setActiveDialog(null)}
+                        onUpdate={(patch) => updateForm(inv.invoice_number, patch)}
+                        onUpdateItem={(itemId, rq) => updateItem(inv.invoice_number, itemId, rq)}
+                        onSave={() => handleSave(inv)}
+                    />
+                );
+            })()}
         </div>
     );
 };

@@ -352,7 +352,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         <div className="flex flex-1 overflow-hidden">
 
             {/* ══ Panel izquierdo — lista de documentos ═══════════════════════ */}
-            <div className={`${collapseDocs ? 'hidden' : 'w-full sm:w-72 lg:w-80'} flex-shrink-0 bg-white border-r border-slate-100 flex flex-col transition-all duration-300`}>
+            <div className={`${collapseDocs ? 'hidden' : 'w-full sm:w-72 lg:w-80'} flex-shrink-0 bg-white border-r border-slate-100 flex flex-col transition-all duration-300 overflow-hidden`}>
                 {/* Buscador */}
                 <div className="px-3 py-3 border-b border-slate-100 flex flex-col gap-2">
                     <TableControls 
@@ -362,6 +362,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         onPageSizeChange={(s) => { setDocPageSize(s); setDocPage(1); }}
                         placeholder="Buscar doc, placa…"
                         compact
+                        showPageSize={false}
                     />
                     <button onClick={onRefresh} disabled={loadingDocs}
                         className="w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center gap-2 text-[10px] font-bold text-slate-500">
@@ -474,9 +475,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             <div className="flex items-center justify-between gap-3 flex-wrap">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <button onClick={() => setCollapseDocs(!collapseDocs)}
-                                        className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all"
+                                        className={`p-2 rounded-xl transition-all shadow-sm flex items-center justify-center
+                                            ${collapseDocs 
+                                                ? 'bg-slate-900 text-white hover:bg-slate-700 w-10 h-10' 
+                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                                         title={collapseDocs ? "Mostrar lista" : "Ocultar lista"}>
-                                        {collapseDocs ? <Icons.ChevronRight className="w-4 h-4" /> : <Icons.ChevronLeft className="w-4 h-4" />}
+                                        {collapseDocs ? <Icons.ChevronRight className="w-5 h-5" /> : <Icons.ChevronLeft className="w-4 h-4" />}
                                     </button>
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
                                         {selectedDoc.external_doc_id}
