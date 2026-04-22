@@ -193,7 +193,6 @@ export const signDispatchPending = async (req: Request, res: Response) => {
         const valid = await bcrypt.compare(password, userRes.rows[0].password);
         if (!valid) {
             await client.query('ROLLBACK');
-            client.release();
             return res.status(401).json({ error: 'Contraseña incorrecta' });
         }
 
