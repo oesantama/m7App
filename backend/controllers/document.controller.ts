@@ -1034,57 +1034,77 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
       LIMIT 1
     `, [inv]);
 
-    // 7. Historial de modificaciones: por invoice_id + cambios de placa en rutas que tuvieron esta factura
+    // 7. Historial de modificaciones de ruta para esta factura
+    // Busca por: columna invoice_id, details JSON (formato viejo), y cambios de placa en rutas que tuvieron la factura
     const logsRes = await pool.query(`
       WITH
-      -- Rutas que actualmente tienen la factura
-      current_routes AS (
-        SELECT DISTINCT route_id::text AS route_id
-        FROM route_invoices
-        WHERE invoice_id = $1
-           OR invoice_id = CONCAT($2::text, '_', $1::text)
-      ),
-      -- Rutas que tuvieron la factura (por logs con invoice_id)
-      log_routes AS (
+      -- Todos los route_ids que tuvieron esta factura (columna + details JSON + route_invoices actual)
+      all_invoice_routes AS (
+        -- Columna invoice_id directa
         SELECT DISTINCT route_id::text AS route_id
         FROM route_modifications_log
         WHERE invoice_id = $1
            OR invoice_id = CONCAT($2::text, '_', $1::text)
+        UNION
+        -- invoice_id guardado en details JSON (formato viejo de LogisticsDispatch)
+        SELECT DISTINCT route_id::text
+        FROM route_modifications_log
+        WHERE details IS NOT NULL
+          AND details::text ~ $3
+          AND (
+            (details::jsonb)->>'invoice_id' = $1
+            OR (details::jsonb)->>'invoice_id' = CONCAT($2::text, '_', $1::text)
+          )
+        UNION
+        -- Rutas actuales en route_invoices
+        SELECT DISTINCT route_id::text
+        FROM route_invoices
+        WHERE invoice_id = $1
+           OR invoice_id = CONCAT($2::text, '_', $1::text)
       ),
-      -- Rutas VIEJAS de REASSIGN_PLATE cuya ruta nueva es una current_route
-      old_reassign_routes AS (
+      -- Rutas VIEJAS de REASSIGN_PLATE cuya nueva ruta tuvo esta factura
+      reassign_source_routes AS (
         SELECT DISTINCT rml.route_id::text AS route_id
         FROM route_modifications_log rml
         WHERE rml.action IN ('REASSIGN_PLATE', 'REASSIGN_VEHICLE')
           AND rml.details IS NOT NULL
-          AND rml.details::text <> ''
-          AND (rml.details::jsonb)->>'new_route_id' IN (SELECT route_id FROM current_routes)
-      ),
-      all_routes AS (
-        SELECT route_id FROM current_routes
-        UNION SELECT route_id FROM log_routes
-        UNION SELECT route_id FROM old_reassign_routes
+          AND rml.details::text ~ 'new_route_id'
+          AND (rml.details::jsonb)->>'new_route_id' IN (SELECT route_id FROM all_invoice_routes)
       )
       SELECT
         rml.id,
         rml.route_id::text,
         rml.action,
-        COALESCE(rml.previous_plate, rml.new_plate)  AS previous_plate_col,
         rml.previous_plate,
         rml.new_plate,
-        rml.details::text                             AS details,
-        rml.timestamp                                 AS created_at,
-        u.name AS user_name
+        rml.details::text AS details,
+        rml.timestamp     AS created_at,
+        u.name            AS user_name
       FROM route_modifications_log rml
       LEFT JOIN users u ON u.id::text = rml.user_id::text
-      WHERE rml.invoice_id = $1
-         OR rml.invoice_id = CONCAT($2::text, '_', $1::text)
-         OR (
-           rml.route_id::text IN (SELECT route_id FROM all_routes)
-           AND rml.action IN ('REASSIGN_PLATE', 'REASSIGN_VEHICLE')
-         )
+      WHERE
+        -- Por columna invoice_id
+        rml.invoice_id = $1
+        OR rml.invoice_id = CONCAT($2::text, '_', $1::text)
+        -- Por invoice_id dentro del JSON details (formato viejo)
+        OR (
+          rml.details IS NOT NULL
+          AND rml.details::text ~ $3
+          AND (
+            (rml.details::jsonb)->>'invoice_id' = $1
+            OR (rml.details::jsonb)->>'invoice_id' = CONCAT($2::text, '_', $1::text)
+          )
+        )
+        -- Cambios de placa en rutas que tuvieron esta factura
+        OR (
+          rml.action IN ('REASSIGN_PLATE', 'REASSIGN_VEHICLE')
+          AND rml.route_id::text IN (
+            SELECT route_id FROM all_invoice_routes
+            UNION SELECT route_id FROM reassign_source_routes
+          )
+        )
       ORDER BY rml.timestamp DESC
-    `, [inv, invoiceData.document_id]);
+    `, [inv, invoiceData.document_id, '"invoice_id"']);
 
     res.json({
       success: true,
