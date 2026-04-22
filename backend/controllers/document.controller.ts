@@ -972,6 +972,8 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
     `, [invoiceData.document_id, inv]);
 
     // 3. Asignación a ruta
+    // Usa invoice_number resuelto (para que búsqueda por pedido también encuentre la ruta)
+    const resolvedInv = invoiceData.invoice_number || inv;
     const routeRes = await pool.query(`
       SELECT
         r.id::text                            AS route_id,
@@ -980,6 +982,7 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
         v.plate,
         d.name                                AS driver_name,
         d.document_number                     AS driver_document,
+        d.phone                               AS driver_phone,
         est.name                              AS route_status_name,
         r.status_id
       FROM route_invoices ri
@@ -989,9 +992,11 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
       LEFT JOIN estados  est ON est.id = r.status_id
       WHERE TRIM(UPPER(ri.invoice_id)) = TRIM(UPPER($1))
          OR ri.invoice_id = CONCAT($2::text, '_', $1::text)
+         OR TRIM(UPPER(ri.invoice_id)) = TRIM(UPPER($3))
+         OR ri.invoice_id = CONCAT($2::text, '_', $3::text)
       ORDER BY r.created_at DESC
       LIMIT 1
-    `, [inv, invoiceData.document_id]);
+    `, [inv, invoiceData.document_id, resolvedInv]);
 
     // 4. Despacho (dispatch_assignments)
     const dispatchRes = await pool.query(`

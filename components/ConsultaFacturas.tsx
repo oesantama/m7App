@@ -50,6 +50,7 @@ interface TraceabilityData {
     plate: string | null;
     driver_name: string | null;
     driver_document: string | null;
+    driver_phone: string | null;
     route_status_name: string | null;
     status_id: string | null;
   } | null;
@@ -856,6 +857,7 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                   <InfoRow label="Fecha Asignación" value={fmtDateTime(data.route.assigned_at)} />
                   <InfoRow label="Conductor"         value={data.route.driver_name} />
                   <InfoRow label="Documento"         value={data.route.driver_document} />
+                  <InfoRow label="Celular Conductor" value={data.route.driver_phone} />
                   <InfoRow label="Placa"             value={data.route.plate} />
                   <InfoRow label="Estado Ruta"       value={data.route.route_status_name} />
                   <InfoRow label="ID Ruta"           value={data.route.route_id} />
