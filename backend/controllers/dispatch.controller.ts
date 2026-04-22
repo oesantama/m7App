@@ -7,32 +7,32 @@ import { logMovement } from '../utils/kardex.js';
 import { clearInvoicesCache } from './document.controller.js';
 
 export const initDispatch = async (req: Request, res: Response) => {
-    const { 
-        invoiceId, 
-        driverId, 
-        helperIds, 
-        scannedItems, 
-        isAccompanied, 
-        helperCount, 
+    const {
+        invoiceId,
+        driverId,
+        helperIds,
+        scannedItems,
+        isAccompanied,
+        helperCount,
         createdBy,
         signatures // { userId: string, password?: string, signNow: boolean }[]
     } = req.body;
 
-    const generatedDispatchId = `DIS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
+    // Use a dedicated client so BEGIN/COMMIT wrap all queries in the same connection
+    const client = await pool.connect();
     try {
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
         // 1. Crear registro de despacho
-        const insertRes = await pool.query(`
+        const insertRes = await client.query(`
             INSERT INTO dispatch_assignments (
-                invoice_id, driver_id, helper_ids, scanned_items, 
+                invoice_id, driver_id, helper_ids, scanned_items,
                 is_accompanied, helper_count, status, created_by
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id
         `, [
-            invoiceId, driverId, JSON.stringify(helperIds || []), 
-            JSON.stringify(scannedItems || []), isAccompanied, helperCount, 
+            invoiceId, driverId, JSON.stringify(helperIds || []),
+            JSON.stringify(scannedItems || []), isAccompanied, helperCount,
             'PENDING_SIGNATURES', createdBy
         ]);
 
@@ -44,8 +44,7 @@ export const initDispatch = async (req: Request, res: Response) => {
             let signedAt: Date | null = null;
 
             if (sig.signNow && sig.password) {
-                // Validar firma inmediata
-                const userRes = await pool.query('SELECT password FROM users WHERE id = $1', [sig.userId]);
+                const userRes = await client.query('SELECT password FROM users WHERE id = $1', [sig.userId]);
                 if (userRes.rows.length > 0) {
                     const valid = await bcrypt.compare(sig.password, userRes.rows[0].password);
                     if (valid) {
@@ -57,14 +56,14 @@ export const initDispatch = async (req: Request, res: Response) => {
                 }
             }
 
-            await pool.query(`
+            await client.query(`
                 INSERT INTO dispatch_signatures_pending (id, dispatch_id, user_id, role_type, signed, signed_at)
                 VALUES ($1, $2, $3, $4, $5, $6)
             `, [uuidv4(), dispatchId, sig.userId, sig.role, isSigned, signedAt]);
         }
 
         // 3. Actualizar estado de los ítems en document_items a 'En ruta' (EST-11)
-        const updatedItems = await pool.query(`
+        const updatedItems = await client.query(`
             UPDATE document_items
             SET item_status = 'EST-11'
             WHERE TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = $1
@@ -72,14 +71,15 @@ export const initDispatch = async (req: Request, res: Response) => {
             RETURNING id, document_id, article_id, expected_qty, batch, invoice, order_number, unit, customer_name, city, address
         `, [invoiceId]);
 
+        console.log(`[DISPATCH] invoiceId=${invoiceId} → updatedItems.rowCount=${updatedItems.rowCount}`);
+
         if (updatedItems.rowCount === 0) {
             throw new Error(`No se encontraron registros para la factura ${invoiceId} en document_items.`);
         }
 
-        // 3b. Poblar vehicle_inventory y route_assignment_items con lo que sale de bodega
+        // 3b. Poblar vehicle_inventory y route_assignment_items
         if (updatedItems.rows.length > 0) {
-          // Obtener placa del vehículo desde assignments del conductor
-          const vehicleRes = await pool.query(
+          const vehicleRes = await client.query(
             `SELECT v.plate, d.name as driver_name FROM assignments a
              JOIN vehicles v ON a.vehicle_id::text = v.id::text
              JOIN drivers d ON a.driver_id::text = d.id::text
@@ -89,21 +89,23 @@ export const initDispatch = async (req: Request, res: Response) => {
           const vehiclePlate = vehicleRes.rows[0]?.plate || 'S/P';
           const driverName   = vehicleRes.rows[0]?.driver_name || createdBy || 'S/C';
 
-          // Obtener ruta activa para esta factura
-          const routeRes = await pool.query(
-            `SELECT ri.route_id FROM route_invoices ri WHERE ri.invoice_id = $1 ORDER BY ri.created_at DESC LIMIT 1`,
-            [invoiceId]
+          // Buscar ruta activa — route_invoices guarda compound key (docId_invoice) o plain
+          const docIdFromUpdate = updatedItems.rows[0]?.document_id || '';
+          const routeRes = await client.query(
+            `SELECT ri.route_id FROM route_invoices ri
+             WHERE ri.invoice_id = $1
+                OR ri.invoice_id = CONCAT($2::text, '_', $1::text)
+             ORDER BY ri.created_at DESC LIMIT 1`,
+            [invoiceId, docIdFromUpdate]
           );
           const routeId = routeRes.rows[0]?.route_id || null;
 
-          // Obtener client_id del documento
-          const clientRes = await pool.query(
-            `SELECT client_id FROM documents_l WHERE id = (SELECT document_id FROM document_items WHERE (CONCAT(document_id,'_',COALESCE(NULLIF(invoice,''),order_number))=$1 OR TRIM(COALESCE(NULLIF(invoice,''),order_number))=$1) LIMIT 1)`,
-            [invoiceId]
+          const clientRes = await client.query(
+            `SELECT client_id FROM documents_l WHERE id = $1 LIMIT 1`,
+            [docIdFromUpdate]
           );
           const clientId = clientRes.rows[0]?.client_id || 'CLI-01';
 
-          // Agrupar por article_id para vehicle_inventory y route_assignment_items
           const artMap: Record<string, { qty: number; batch: string; unit: string; customerName: string; city: string; address: string; docId: string }> = {};
           for (const it of updatedItems.rows) {
             const key = it.article_id;
@@ -112,12 +114,10 @@ export const initDispatch = async (req: Request, res: Response) => {
           }
 
           for (const [articleId, d] of Object.entries(artMap)) {
-            // Nombre del artículo
-            const artRes = await pool.query('SELECT name FROM articles WHERE id = $1 LIMIT 1', [articleId]);
+            const artRes = await client.query('SELECT name FROM articles WHERE id = $1 LIMIT 1', [articleId]);
             const articleName = artRes.rows[0]?.name || articleId;
 
-            // vehicle_inventory: suma al stock del vehículo
-            await pool.query(`
+            await client.query(`
               INSERT INTO vehicle_inventory (vehicle_plate, driver_id, driver_name, article_id, article_name, batch, client_id, quantity, route_id, last_updated, last_user)
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10)
               ON CONFLICT (vehicle_plate, article_id, batch) DO UPDATE SET
@@ -129,14 +129,12 @@ export const initDispatch = async (req: Request, res: Response) => {
                 last_user   = EXCLUDED.last_user
             `, [vehiclePlate, driverId, driverName, articleId, articleName, d.batch, clientId, d.qty, routeId, createdBy]);
 
-            // route_assignment_items: registro histórico inmutable
-            await pool.query(`
+            await client.query(`
               INSERT INTO route_assignment_items
                 (route_id, document_id, invoice, article_id, article_name, batch, client_id, vehicle_plate, driver_id, driver_name, assigned_qty, unit, customer_name, city, address, assigned_by, assigned_at)
               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,CURRENT_TIMESTAMP)
             `, [routeId, d.docId, invoiceId, articleId, articleName, d.batch, clientId, vehiclePlate, driverId, driverName, d.qty, d.unit, d.customerName, d.city, d.address, createdBy]);
 
-            // Kardex: DESPACHO de bodega al vehículo
             logMovement({
               clientId,
               articleId,
@@ -157,45 +155,52 @@ export const initDispatch = async (req: Request, res: Response) => {
         }
 
         // 4. Verificar si ya se completaron todas las firmas
-        const pendingCount = await pool.query(
+        const pendingCount = await client.query(
             'SELECT COUNT(*) FROM dispatch_signatures_pending WHERE dispatch_id = $1 AND signed = false',
             [dispatchId]
         );
 
         if (parseInt(pendingCount.rows[0].count) === 0) {
-            await pool.query(
+            await client.query(
                 "UPDATE dispatch_assignments SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
                 [dispatchId]
             );
         }
 
-        await pool.query('COMMIT');
+        await client.query('COMMIT');
         clearInvoicesCache();
         res.json({ success: true, dispatchId, status: parseInt(pendingCount.rows[0].count) === 0 ? 'COMPLETED' : 'PENDING_SIGNATURES' });
     } catch (error: any) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error("Init Dispatch Error:", error);
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
 
 export const signDispatchPending = async (req: Request, res: Response) => {
     const { dispatchId, userId, password } = req.body;
 
+    const client = await pool.connect();
     try {
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
         // 1. Validar contraseña
-        const userRes = await pool.query('SELECT password FROM users WHERE id = $1', [userId]);
+        const userRes = await client.query('SELECT password FROM users WHERE id = $1', [userId]);
         if (userRes.rows.length === 0) throw new Error('Usuario no encontrado');
 
         const valid = await bcrypt.compare(password, userRes.rows[0].password);
-        if (!valid) return res.status(401).json({ error: 'Contraseña incorrecta' });
+        if (!valid) {
+            await client.query('ROLLBACK');
+            client.release();
+            return res.status(401).json({ error: 'Contraseña incorrecta' });
+        }
 
         // 2. Actualizar firma
-        const updateRes = await pool.query(`
-            UPDATE dispatch_signatures_pending 
-            SET signed = true, signed_at = CURRENT_TIMESTAMP 
+        const updateRes = await client.query(`
+            UPDATE dispatch_signatures_pending
+            SET signed = true, signed_at = CURRENT_TIMESTAMP
             WHERE dispatch_id = $1 AND user_id = $2 AND signed = false
             RETURNING id
         `, [dispatchId, userId]);
@@ -205,23 +210,25 @@ export const signDispatchPending = async (req: Request, res: Response) => {
         }
 
         // 3. Verificar si ya terminó todo el proceso
-        const pendingCount = await pool.query(
+        const pendingCount = await client.query(
             'SELECT COUNT(*) FROM dispatch_signatures_pending WHERE dispatch_id = $1 AND signed = false',
             [dispatchId]
         );
 
         if (parseInt(pendingCount.rows[0].count) === 0) {
-            await pool.query(
+            await client.query(
                 "UPDATE dispatch_assignments SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
                 [dispatchId]
             );
         }
 
-        await pool.query('COMMIT');
+        await client.query('COMMIT');
         res.json({ success: true, completed: parseInt(pendingCount.rows[0].count) === 0 });
     } catch (error: any) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
 

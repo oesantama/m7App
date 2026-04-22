@@ -77,7 +77,12 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
         res.json({ success: true, data: result.rows });
     } catch (err: any) {
         console.error('[CONCILIATION] getPendingConciliations error:', err.message);
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ 
+            success: false, 
+            error: 'Error interno del servidor', 
+            details: err.message,
+            hint: 'Verifique si la tabla route_surcharges existe'
+        });
     }
 };
 

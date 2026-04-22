@@ -150,7 +150,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     // PAGINACIÓN
     const [collapseDocs, setCollapseDocs]       = useState(false);
     const [docPage, setDocPage] = useState(1);
-    const [docPageSize, setDocPageSize] = useState<number | 'all'>(10);
+    const [docPageSize, setDocPageSize] = useState<number | 'all'>('all');
     const [routePage, setRoutePage] = useState(1);
     const [routePageSize, setRoutePageSize] = useState<number | 'all'>(10);
     const [invoicePage, setInvoicePage] = useState(1);
@@ -483,12 +483,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             <div className="flex items-center justify-between gap-3 flex-wrap">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <button onClick={() => setCollapseDocs(!collapseDocs)}
-                                        className={`p-2 rounded-xl transition-all shadow-sm flex items-center justify-center
+                                        className={`p-2 rounded-xl transition-all shadow-md flex items-center justify-center border-2
                                             ${collapseDocs 
-                                                ? 'bg-slate-900 text-white hover:bg-slate-700 w-10 h-10' 
-                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                                        title={collapseDocs ? "Mostrar lista" : "Ocultar lista"}>
-                                        {collapseDocs ? <Icons.ChevronRight className="w-5 h-5" /> : <Icons.ChevronLeft className="w-4 h-4" />}
+                                                ? 'bg-slate-900 text-white hover:bg-slate-800 border-slate-900 w-12 h-12' 
+                                                : 'bg-white text-emerald-600 border-emerald-500 hover:bg-emerald-50 w-10 h-10'}`}
+                                        title={collapseDocs ? "Mostrar lista de documentos" : "Ocultar lista de documentos"}>
+                                        {collapseDocs ? <Icons.ChevronRight className="w-6 h-6" /> : <Icons.ChevronLeft className="w-5 h-5" />}
                                     </button>
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
                                         {selectedDoc.external_doc_id}
