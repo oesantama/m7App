@@ -734,8 +734,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                             {unassigned} factura{unassigned !== 1 ? 's' : ''} no asignada{unassigned !== 1 ? 's' : ''} al planificador
                                                         </p>
                                                     </div>
-                                        </div>
-                                    )}
+                                                )}
+                                            </div>
 
                                     {/* ── Facturas sin asignar ─────────────── */}
                                     {unassigned > 0 && (
