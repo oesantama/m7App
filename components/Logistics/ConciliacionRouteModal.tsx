@@ -100,6 +100,8 @@ interface Props {
     documentId: string;
     currentUserId: string;
     onSaved: () => void;
+    initialSurcharges?: SobrecostoRow[];
+    initialGroupPayments?: ConsignacionRow[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -446,11 +448,24 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         const m = new Map<string, InvoiceFormState>();
         invoices.forEach(inv => m.set(inv.invoice_number, initForm(inv)));
         setForms(m);
-        setConsignaciones([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }]);
-        setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
+
+        // Cargar consignaciones grupales previas si existen
+        if (initialGroupPayments && initialGroupPayments.length > 0) {
+            setConsignaciones(initialGroupPayments);
+        } else {
+            setConsignaciones([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }]);
+        }
+
+        // Cargar sobrecostos previos si existen
+        if (initialSurcharges && initialSurcharges.length > 0) {
+            setSobrecostos(initialSurcharges);
+        } else {
+            setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
+        }
+
         setTab('individual');
         setActiveDialog(null);
-    }, [isOpen, invoices]);
+    }, [isOpen, invoices, initialGroupPayments, initialSurcharges]);
 
     const updateForm = useCallback((invoiceNum: string, patch: Partial<InvoiceFormState>) => {
         setForms(prev => {

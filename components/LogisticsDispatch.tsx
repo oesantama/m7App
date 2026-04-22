@@ -64,6 +64,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [invoiceAllPending, setInvoiceAllPending] = useState<Record<string, any[]>>({});
     // IDs of invoices dispatched this session — bulletproof guard against any stale-data overwrite
     const [dispatchedIds, setDispatchedIds] = useState<Set<string>>(new Set());
+    const routeInvoicesCache = useRef<Map<string, { data: any[]; ts: number }>>(new Map());
+    const CACHE_TTL = 60_000; // 60 segundos
     const [signatureKeys, setSignatureKeys] = useState<Record<string, string>>({});
     const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
     const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Control colapsable
@@ -718,6 +720,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             return cleanId(val);
         }).join(',');
 
+        // Caché local por ruta — evita refetch innecesario en 60 segundos
+        const cached = routeInvoicesCache.current.get(route.id);
+        if (cached && Date.now() - cached.ts < CACHE_TTL) {
+            setFn(cached.data);
+            if (drawMap) drawRouteOnMap(cached.data);
+            fetchInvoiceAllPending(cached.data);
+            return;
+        }
+
         setFetchStatus('FETCHING');
         try {
             const paramsData = await api.getInvoices(undefined, idsParam);
@@ -730,6 +741,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     return true;
                 });
                 setFetchStatus(`OK (${deduplicated.length})`);
+                routeInvoicesCache.current.set(route.id, { data: deduplicated, ts: Date.now() });
                 setFn(deduplicated);
                 if (drawMap) drawRouteOnMap(deduplicated);
                 fetchInvoiceAllPending(deduplicated);
@@ -1283,7 +1295,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             }
 
             const res = await api.initDispatch({
-                invoiceId: assigningInvoice.id || assigningInvoice.invoiceNumber,
+                invoiceId: assigningInvoice.invoiceNumber || assigningInvoice.id,
                 driverId: actualDriver?.id || user.id,
                 helperIds: isAccompanied ? selectedHelpers.slice(0, helperCount).filter(Boolean) : [],
                 scannedItems,
@@ -1314,10 +1326,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         setInvoiceAllPending(prev => ({ ...prev, [invIdForSigs]: Array.isArray(data) ? data : [] }));
                     }).catch(() => {});
                 }
-                // Refrescar datos del servidor en segundo plano (NO bloquea la UI)
+                // Invalidar caché y refrescar datos del servidor
                 if (selectedActiveRoute) {
+                    routeInvoicesCache.current.delete(selectedActiveRoute.id);
                     loadRouteInvoicesData(selectedActiveRoute, setRouteInvoices, false);
                 }
+                // Refrescar contadores de ruta en el panel lateral
+                onRefresh();
             }
         } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
     };
@@ -1621,7 +1636,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">{activeRoutes.length === 0 ? 'Esperando despacho...' : 'Sin rutas para este criterio'}</p>
                             </div>
                         ) : (
-                            filteredRoutes
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {filteredRoutes
                             .filter(route => {
                                 if (!routeSearch) return true;
                                 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -1747,6 +1763,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     </div>
                                 );
                             })
+                            }
+                            </div>
                         )}
                         </>}
                     </div>

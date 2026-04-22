@@ -8,6 +8,7 @@ import {
     downloadPlanilla,
     searchRoutesForPlanilla,
     saveConciliation,
+    saveSobrecostos,
     generateAndSendReport,
     importMasterSuite,
     getInvoiceStatusHistory,
@@ -27,6 +28,7 @@ router.get('/planilla',                   downloadPlanilla);
 router.get('/:documentId/history',        getInvoiceStatusHistory);
 router.get('/:documentId',                getConciliationByDocument);
 router.post('/save',                      saveConciliation);
+router.post('/sobrecostos',               saveSobrecostos);
 router.post('/report',                    generateAndSendReport);
 router.post('/import-mastersuite',        upload.single('file'), importMasterSuite);
 

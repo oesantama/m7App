@@ -125,6 +125,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [routes, setRoutes]               = useState<RouteGroup[]>([]);
     const [unassigned, setUnassigned]       = useState(0);
     const [loadingInv, setLoadingInv]       = useState(false);
+    const [routeSurcharges, setRouteSurcharges] = useState<any[]>([]);
+    const [groupPayments, setGroupPayments]     = useState<any[]>([]);
+    const [activeDetailCard, setActiveDetailCard] = useState<string | null>(null);
     const [modalInvoice, setModalInvoice]   = useState<InvoiceRow | null>(null);
     const [showReportInput, setShowReportInput] = useState(false);
     const [reportEmail, setReportEmail]     = useState('');
@@ -170,12 +173,17 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         setRoutes([]);
         setUnassigned(0);
         setShowReportInput(false);
+        setRouteSurcharges([]);
+        setGroupPayments([]);
+        setActiveDetailCard(null);
         setLoadingInv(true);
         try {
             const res = await api.getConciliationByDocument(doc.id);
             setInvoices(res.invoices || []);
             setRoutes(res.routes   || []);
             setUnassigned(res.unassigned_invoices || 0);
+            setRouteSurcharges(res.routeSurcharges || []);
+            setGroupPayments(res.groupPayments || []);
         } catch { toast.error('Error cargando detalle del documento'); }
         finally { setLoadingInv(false); }
     }, []);
@@ -1034,45 +1042,118 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     <span className="text-[9px] font-black text-emerald-700 shrink-0">{legalPct}% leg.</span>
                                 </div>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    <div className="bg-white border border-slate-100 rounded-xl px-3 py-2 text-center">
+                                    <div className="bg-white border border-slate-100 rounded-xl px-3 py-2 text-center cursor-default">
                                         <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Total placa</p>
                                         <p className="text-sm font-black text-slate-900">{fmtCOP(totalVal)}</p>
                                     </div>
-                                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 text-center">
-                                        <p className="text-[8px] font-black text-emerald-600 uppercase mb-0.5">💵 Legalizado</p>
-                                        <p className="text-sm font-black text-emerald-800">{fmtCOP(fin.valor_legalizado)}</p>
+                                    <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'leg' ? 'bg-emerald-600 text-white border-emerald-700 shadow-lg' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100'}`}
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'leg' ? null : 'leg')}>
+                                        <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'leg' ? 'text-emerald-100' : 'text-emerald-600'}`}>💵 Legalizado</p>
+                                        <p className="text-sm font-black">{fmtCOP(fin.valor_legalizado)}</p>
                                     </div>
-                                    {fin.valor_devuelto > 0 && (
-                                        <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-center">
-                                            <p className="text-[8px] font-black text-amber-600 uppercase mb-0.5">🔄 Devuelto</p>
-                                            <p className="text-sm font-black text-amber-800">{fmtCOP(fin.valor_devuelto)}</p>
-                                        </div>
-                                    )}
-                                    {fin.valor_parcial > 0 && (
-                                        <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2 text-center">
-                                            <p className="text-[8px] font-black text-orange-600 uppercase mb-0.5">📦 Parcial</p>
-                                            <p className="text-sm font-black text-orange-800">{fmtCOP(fin.valor_parcial)}</p>
-                                        </div>
-                                    )}
-                                    {fin.total_sobrecosto > 0 && (
-                                        <div className="bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 text-center">
-                                            <p className="text-[8px] font-black text-rose-600 uppercase mb-0.5">⚠️ Sobrecosto</p>
-                                            <p className="text-sm font-black text-rose-800">{fmtCOP(fin.total_sobrecosto)}</p>
-                                        </div>
-                                    )}
-                                    {fin.efectivo > 0 && (
-                                        <div className="bg-white border border-emerald-100 rounded-xl px-3 py-2 text-center">
-                                            <p className="text-[8px] font-black text-emerald-600 uppercase mb-0.5">EFE</p>
-                                            <p className="text-sm font-black text-emerald-700">{fmtCOP(fin.efectivo)}</p>
-                                        </div>
-                                    )}
-                                    {fin.credito > 0 && (
-                                        <div className="bg-white border border-blue-100 rounded-xl px-3 py-2 text-center">
-                                            <p className="text-[8px] font-black text-blue-600 uppercase mb-0.5">CRE</p>
-                                            <p className="text-sm font-black text-blue-700">{fmtCOP(fin.credito)}</p>
-                                        </div>
-                                    )}
+                                    <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'dev' ? 'bg-amber-500 text-white border-amber-600 shadow-lg' : 'bg-amber-50 border-amber-100 hover:bg-amber-100'}`}
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'dev' ? null : 'dev')}>
+                                        <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'dev' ? 'text-amber-100' : 'text-amber-600'}`}>🔄 Devuelto</p>
+                                        <p className="text-sm font-black">{fmtCOP(fin.valor_devuelto)}</p>
+                                    </div>
+                                    <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'par' ? 'bg-orange-500 text-white border-orange-600 shadow-lg' : 'bg-orange-50 border-orange-100 hover:bg-orange-100'}`}
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'par' ? null : 'par')}>
+                                        <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'par' ? 'text-orange-100' : 'text-orange-600'}`}>📦 Parcial</p>
+                                        <p className="text-sm font-black">{fmtCOP(fin.valor_parcial)}</p>
+                                    </div>
+                                    <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'sc' ? 'bg-rose-600 text-white border-rose-700 shadow-lg' : 'bg-rose-50 border-rose-100 hover:bg-rose-100'}`}
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'sc' ? null : 'sc')}>
+                                        <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'sc' ? 'text-rose-100' : 'text-rose-600'}`}>⚠️ Sobrecosto</p>
+                                        <p className="text-sm font-black">{fmtCOP(fin.total_sobrecosto)}</p>
+                                    </div>
                                 </div>
+
+                                {/* Vista detallada al dar clic en Card */}
+                                {activeDetailCard && (
+                                    <div className="mt-4 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
+                                                    Detalle: {activeDetailCard === 'leg' ? 'Legalizaciones' : activeDetailCard === 'dev' ? 'Devoluciones' : activeDetailCard === 'par' ? 'Parciales' : 'Sobrecostos'}
+                                                </h4>
+                                                <button onClick={() => setActiveDetailCard(null)} className="text-slate-400 hover:text-slate-600">
+                                                    <Icons.X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
+                                                {activeDetailCard === 'leg' && (
+                                                    <>
+                                                        {/* Facturas legalizadas */}
+                                                        {routeInvs.filter(i => i.forma_pago).map((inv, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                                                <div>
+                                                                    <p className="text-[10px] font-black text-slate-900">{inv.invoice_number}</p>
+                                                                    <p className="text-[8px] text-slate-500 font-bold uppercase">{inv.forma_pago} · {inv.comprobante || 'S/R'}</p>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-[11px] font-black text-emerald-600">{fmtCOP(inv.valor)}</p>
+                                                                    <p className="text-[8px] text-slate-400">{inv.fecha_pago ? String(inv.fecha_pago).slice(0, 10) : '—'}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {/* Consignaciones grupales */}
+                                                        {groupPayments.map((p, idx) => (
+                                                            <div key={`gp-${idx}`} className="flex items-center justify-between bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
+                                                                <div>
+                                                                    <p className="text-[10px] font-black text-emerald-900">Consignación Grupal</p>
+                                                                    <p className="text-[8px] text-emerald-600 font-bold uppercase">{p.metodo_pago} · {p.referencia || 'S/R'}</p>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-[11px] font-black text-emerald-700">{fmtCOP(p.vmetodo)}</p>
+                                                                    <p className="text-[8px] text-emerald-400">{p.processed_at ? String(p.processed_at).slice(0, 10) : '—'}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </>
+                                                )}
+                                                {activeDetailCard === 'dev' && routeInvs.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase())).map((inv, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between bg-amber-50 p-2.5 rounded-xl border border-amber-100">
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-amber-900">{inv.invoice_number}</p>
+                                                            <p className="text-[8px] text-amber-600 font-bold uppercase">Devolución Total</p>
+                                                        </div>
+                                                        <p className="text-[11px] font-black text-amber-700">{fmtCOP(inv.invoice_value)}</p>
+                                                    </div>
+                                                ))}
+                                                {activeDetailCard === 'par' && routeInvs.filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase())).map((inv, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between bg-orange-50 p-2.5 rounded-xl border border-orange-100">
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-orange-900">{inv.invoice_number}</p>
+                                                            <p className="text-[8px] text-orange-600 font-bold uppercase">Entrega Parcial</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-[11px] font-black text-orange-700">{fmtCOP(inv.valor)}</p>
+                                                            <p className="text-[8px] text-orange-400">Orig: {fmtCOP(inv.invoice_value)}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {activeDetailCard === 'sc' && routeSurcharges.filter(s => s.plate === detailRoute.plate).map((s, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between bg-rose-50 p-2.5 rounded-xl border border-rose-100">
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-rose-900">Surcharge / Gasto</p>
+                                                            <p className="text-[8px] text-rose-600 font-bold uppercase">{s.referencia || 'S/R'} · {s.status_id || 'PENDIENTE'}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-[11px] font-black text-rose-700">{fmtCOP(s.valor)}</p>
+                                                            <p className="text-[8px] text-rose-400">{s.fecha ? String(s.fecha).slice(0, 10) : '—'}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {((activeDetailCard === 'leg' && routeInvs.filter(i => i.forma_pago).length === 0 && groupPayments.length === 0) ||
+                                                  (activeDetailCard === 'dev' && routeInvs.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase())).length === 0) ||
+                                                  (activeDetailCard === 'par' && routeInvs.filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase())).length === 0) ||
+                                                  (activeDetailCard === 'sc' && routeSurcharges.filter(s => s.plate === detailRoute.plate).length === 0)) && (
+                                                    <p className="text-center py-4 text-[9px] text-slate-400 font-bold uppercase tracking-widest">Sin movimientos registrados</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Tabla de facturas — solo lectura */}
@@ -1088,7 +1169,6 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Original</th>
                                             <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Legalizado</th>
                                             <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Devol.</th>
-                                            <th className="text-right px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Sobrecosto</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -1126,7 +1206,6 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                     <td className="px-2 py-2.5 text-right text-slate-500">{vOriginal > 0 ? fmtCOP(vOriginal) : '—'}</td>
                                                     <td className="px-2 py-2.5 text-right font-black text-emerald-700">{vLegal > 0 ? fmtCOP(vLegal) : '—'}</td>
                                                     <td className="px-2 py-2.5 text-right font-black text-amber-700">{vDevol > 0 ? fmtCOP(vDevol) : '—'}</td>
-                                                    <td className="px-3 py-2.5 text-right font-black text-rose-600">{fmtCOP(sc) !== '—' ? fmtCOP(sc) : '$0'}</td>
                                                 </tr>
                                             );
                                         })}
@@ -1167,6 +1246,20 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         if (selectedDoc) loadDocDetail(selectedDoc);
                         onRefresh();
                     }}
+                    initialSurcharges={routeSurcharges.filter(s => s.plate === modalRoute.plate).map(s => ({
+                        id: s.id,
+                        valor: String(s.valor),
+                        nroAprobacion: s.referencia,
+                        fecha: s.fecha ? s.fecha.slice(0, 10) : '',
+                        statusId: s.status_id
+                    }))}
+                    initialGroupPayments={groupPayments.map(p => ({
+                        id: p.id,
+                        valor: String(p.vmetodo),
+                        nroAprobacion: p.referencia || '',
+                        fecha: p.processed_at ? p.processed_at.slice(0, 10) : '',
+                        observacion: ''
+                    }))}
                 />
             )}
 

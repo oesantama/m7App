@@ -57,7 +57,10 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                  WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_id,
                 (SELECT u.name FROM dispatch_assignments da
                  LEFT JOIN users u ON u.id = da.driver_id
-                 WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name
+                 WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name,
+
+                -- Sobrecostos de ruta acumulados
+                (SELECT COALESCE(SUM(valor), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id) AS total_sobrecosto_ruta
 
             FROM documents_l dl
             LEFT JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
@@ -340,12 +343,24 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
               )
         `, [documentId]);
 
+        // ── Extras: Sobrecostos y Consignaciones Grupales ────────────────────
+        const surchargesRes = await pool.query(
+            `SELECT * FROM route_surcharges WHERE document_id = $1 ORDER BY created_at ASC`,
+            [documentId]
+        );
+        const paymentsRes = await pool.query(
+            `SELECT * FROM document_l_payments WHERE document_id = $1 ORDER BY processed_at ASC`,
+            [documentId]
+        );
+
         res.json({
             success: true,
             doc,
             invoices: invoicesRes.rows,
             routes:   routesRes.rows,
             unassigned_invoices: Number(unassignedRes.rows[0]?.unassigned || 0),
+            routeSurcharges: surchargesRes.rows,
+            groupPayments: paymentsRes.rows
         });
     } catch (err: any) {
         console.error('[CONCILIATION] getConciliationByDocument error:', err.message);
@@ -782,6 +797,46 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error('[CONCILIATION] downloadPlanilla error:', err.message);
         res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+export const saveSobrecostos = async (req: Request, res: Response) => {
+    const { documentId, plate, items, userId } = req.body;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // Asegurar que la tabla existe para evitar errores de esquema inicial
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS route_surcharges (
+                id SERIAL PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                plate TEXT NOT NULL,
+                valor NUMERIC NOT NULL,
+                referencia TEXT,
+                fecha DATE,
+                status_id TEXT DEFAULT 'EST-01',
+                user_id TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+
+        // Insertar cada item de sobrecosto
+        for (const item of items) {
+            await client.query(`
+                INSERT INTO route_surcharges (document_id, plate, valor, referencia, fecha, status_id, user_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `, [documentId, plate, item.valor, item.referencia, item.fecha, item.statusId || 'EST-01', userId]);
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err: any) {
+        if (client) await client.query('ROLLBACK');
+        console.error('[CONCILIATION] saveSobrecostos error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
     }
 };
 
