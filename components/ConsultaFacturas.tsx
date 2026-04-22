@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { api } from '../services/api';
 import { Icons } from '../constants';
+import { hasPermission } from '../utils/permissions';
 
 // ── Tipos trazabilidad factura ────────────────────────────────────────────────
 
@@ -247,16 +248,36 @@ function movBadge(type: string) {
 
 // ── Tab Consulta Ítem ─────────────────────────────────────────────────────────
 
-const ConsultaItem: React.FC = () => {
+interface Client { id: string; name: string; }
+
+const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
   const [articleSearch, setArticleSearch] = useState('');
   const [dateFrom, setDateFrom]           = useState('');
   const [dateTo, setDateTo]               = useState('');
   const [loading, setLoading]             = useState(false);
-  const [stock, setStock]                 = useState<StockRow[]>([]);
+  const [stockBodega, setStockBodega]     = useState<StockRow[]>([]);
+  const [stockVehicle, setStockVehicle]   = useState<StockRow[]>([]);
   const [movements, setMovements]         = useState<Movement[]>([]);
   const [searched, setSearched]           = useState(false);
   const [error, setError]                 = useState<string | null>(null);
   const [articleLabel, setArticleLabel]   = useState('');
+
+  // Client selector
+  const [clients, setClients]             = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+
+  useEffect(() => {
+    const allowedIds: string[] = user?.clientIds?.length
+      ? user.clientIds
+      : user?.clientId ? [user.clientId] : [];
+    api.getClients().then((all: any[]) => {
+      const filtered = allowedIds.length
+        ? all.filter((c: any) => allowedIds.includes(c.id))
+        : all;
+      setClients(filtered);
+      if (filtered.length === 1) setSelectedClientId(filtered[0].id);
+    }).catch(() => {});
+  }, [user]);
 
   const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -266,16 +287,25 @@ const ConsultaItem: React.FC = () => {
     setError(null);
     try {
       const [stockRes, movRes] = await Promise.all([
-        api.getInventoryStock({ articleId: term }),
-        api.getInventoryMovements({ articleId: term, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, limit: 500 }),
+        api.getInventoryStock({ articleId: term, clientId: selectedClientId || undefined }),
+        api.getInventoryMovements({
+          articleId: term,
+          clientId: selectedClientId || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          limit: 500,
+        }),
       ]);
 
-      const stockData: StockRow[] = Array.isArray(stockRes) ? stockRes : (stockRes?.data || []);
-      const movData: Movement[]   = Array.isArray(movRes?.data) ? movRes.data : [];
+      // Stock API returns { success, bodega: [], vehiculos: [] }
+      const bodega:   StockRow[] = Array.isArray(stockRes?.bodega)    ? stockRes.bodega    : [];
+      const vehiculos:StockRow[] = Array.isArray(stockRes?.vehiculos)  ? stockRes.vehiculos : [];
+      const movData:  Movement[] = Array.isArray(movRes?.data)         ? movRes.data        : [];
 
-      setStock(stockData);
+      setStockBodega(bodega);
+      setStockVehicle(vehiculos);
       setMovements(movData);
-      setArticleLabel(stockData[0]?.article_name || movData[0]?.article_name || term);
+      setArticleLabel(bodega[0]?.article_name || vehiculos[0]?.article_name || movData[0]?.article_name || term);
       setSearched(true);
     } catch (err: any) {
       setError(err.message || 'Error de conexión');
@@ -284,10 +314,10 @@ const ConsultaItem: React.FC = () => {
     }
   };
 
-  // Totales de stock
-  const totalBodega  = stock.filter(s => !s.vehicle_plate && s.location !== 'VEHICULO').reduce((a, s) => a + Number(s.quantity || 0), 0);
-  const totalVehicle = stock.filter(s => !!s.vehicle_plate || s.location === 'VEHICULO').reduce((a, s) => a + Number(s.quantity || 0), 0);
+  const totalBodega  = stockBodega.reduce((a, s)  => a + Number(s.quantity || 0), 0);
+  const totalVehicle = stockVehicle.reduce((a, s) => a + Number(s.quantity || 0), 0);
   const totalStock   = totalBodega + totalVehicle;
+  const stock        = [...stockBodega, ...stockVehicle];
 
   // Totales de movimientos
   const totalIngresado  = movements.filter(m => ['INGRESO','RECIBO'].includes(m.movement_type)).reduce((a, m) => a + Number(m.quantity), 0);
@@ -302,6 +332,21 @@ const ConsultaItem: React.FC = () => {
       {/* Buscador */}
       <form onSubmit={handleSearch} className="flex flex-col gap-3">
         <div className="flex gap-3 flex-wrap">
+          {clients.length > 1 && (
+            <div className="flex flex-col">
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5 px-1">Cliente</label>
+              <select
+                value={selectedClientId}
+                onChange={e => setSelectedClientId(e.target.value)}
+                className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 shadow-sm min-w-[160px]"
+              >
+                <option value="">Todos los clientes</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex-1 min-w-[220px] relative">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4"><Icons.Search /></div>
             <input
@@ -516,12 +561,35 @@ const ConsultaItem: React.FC = () => {
 
 // ── Tab Consulta Factura ──────────────────────────────────────────────────────
 
-const ConsultaFacturaTab: React.FC = () => {
-  const [query, setQuery]     = useState('');
-  const [loading, setLoading] = useState(false);
-  const [data, setData]       = useState<TraceabilityData | null>(null);
-  const [error, setError]     = useState<string | null>(null);
-  const inputRef              = useRef<HTMLInputElement>(null);
+const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
+  const [query, setQuery]         = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [data, setData]           = useState<TraceabilityData | null>(null);
+  const [error, setError]         = useState<string | null>(null);
+  const [liberando, setLiberando] = useState(false);
+  const [liberadoMsg, setLiberadoMsg] = useState<string | null>(null);
+  const inputRef                  = useRef<HTMLInputElement>(null);
+
+  const canEdit = hasPermission(user, 'consulta-facturas', 'edit');
+
+  const handleLiberar = async () => {
+    if (!data?.route?.route_id || !data?.invoice?.invoice_number) return;
+    setLiberando(true);
+    setLiberadoMsg(null);
+    try {
+      await api.unassignRouteInvoice({
+        routeId: data.route.route_id,
+        invoiceId: data.invoice.invoice_number,
+        userId: user?.id,
+      });
+      setLiberadoMsg('Factura liberada de la ruta correctamente.');
+      setData(prev => prev ? { ...prev, route: null } : prev);
+    } catch (err: any) {
+      setLiberadoMsg(`Error: ${err.message || 'No se pudo liberar la factura'}`);
+    } finally {
+      setLiberando(false);
+    }
+  };
 
   const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -598,6 +666,12 @@ const ConsultaFacturaTab: React.FC = () => {
         </div>
       )}
 
+      {liberadoMsg && (
+        <div className={`max-w-xl rounded-2xl p-4 flex items-center gap-3 border ${liberadoMsg.startsWith('Error') ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+          <p className="text-sm font-semibold">{liberadoMsg}</p>
+        </div>
+      )}
+
       {data && stepStatuses && (
         <div className="flex flex-col gap-8 animate-in fade-in duration-500">
 
@@ -619,6 +693,15 @@ const ConsultaFacturaTab: React.FC = () => {
                     <span className="text-[10px] font-bold bg-white/10 px-2.5 py-1 rounded-full uppercase tracking-wide">
                       {data.invoice.plan_type}
                     </span>
+                  )}
+                  {canEdit && data.route?.route_id && (
+                    <button
+                      onClick={handleLiberar}
+                      disabled={liberando}
+                      className="mt-1 px-4 py-1.5 bg-rose-500 hover:bg-rose-400 disabled:bg-rose-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95 whitespace-nowrap"
+                    >
+                      {liberando ? 'Liberando...' : 'Liberar Factura'}
+                    </button>
                   )}
                 </div>
               </div>
@@ -839,7 +922,7 @@ const ConsultaFacturaTab: React.FC = () => {
 
 type Tab = 'factura' | 'item';
 
-const ConsultaFacturas: React.FC = () => {
+const ConsultaFacturas: React.FC<{ user: any }> = ({ user }) => {
   const [tab, setTab] = useState<Tab>('factura');
 
   return (
@@ -876,7 +959,7 @@ const ConsultaFacturas: React.FC = () => {
       </div>
 
       {/* Contenido del tab */}
-      {tab === 'factura' ? <ConsultaFacturaTab /> : <ConsultaItem />}
+      {tab === 'factura' ? <ConsultaFacturaTab user={user} /> : <ConsultaItem user={user} />}
     </div>
   );
 };

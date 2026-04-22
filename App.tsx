@@ -928,7 +928,7 @@ const App: React.FC = () => {
       case 'conciliacion':
         return <ConciliacionFacturas user={user!} />;
       case 'consulta-facturas':
-        return <ConsultaFacturas />;
+        return <ConsultaFacturas user={user!} />;
       case 'devoluciones-bodega':
         return <DevolucionesBodega user={user!} />;
       case 'consulta-inventario':
