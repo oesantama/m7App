@@ -7,6 +7,7 @@ import ConciliacionModal from '../Logistics/ConciliacionModal';
 import ConciliacionRouteModal from '../Logistics/ConciliacionRouteModal';
 import { exportToExcel } from '../../utils/exportUtils';
 import TableControls from '../shared/TableControls';
+import Pagination from '../shared/Pagination';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
