@@ -23,6 +23,20 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
 
         const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
+        // [M7-SELF-HEALING] Asegurar que la tabla de sobrecostos existe antes de consultar
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS route_surcharges (
+                id SERIAL PRIMARY KEY,
+                document_id TEXT,
+                plate TEXT,
+                valor NUMERIC(15,2),
+                referencia TEXT,
+                fecha DATE,
+                status_id TEXT DEFAULT 'PENDIENTE',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         const result = await pool.query(`
             SELECT
                 dl.id,
