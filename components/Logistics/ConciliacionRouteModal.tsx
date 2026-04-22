@@ -81,6 +81,7 @@ interface ConsignacionRow {
     valor: string;
     nroAprobacion: string;
     fecha: string;
+    observacion?: string;
 }
 
 interface Props {
@@ -460,6 +461,49 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         });
     }, []);
 
+    const handleSaveGrupal = async () => {
+        const pending = invoices.filter(i => !i.forma_pago);
+        if (pending.length === 0) {
+            toast.error('No hay facturas pendientes para legalizar.');
+            return;
+        }
+
+        const totalConsignadoVal = consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
+        if (totalConsignadoVal <= 0) {
+            toast.error('Ingrese un valor de consignación válido.');
+            return;
+        }
+
+        setSavingGrupal(true);
+        try {
+            // Concatenamos referencias y observaciones si hay varias
+            const refs = consignaciones.map(c => c.nroAprobacion).filter(Boolean).join(' / ');
+            const obs  = consignaciones.map(c => c.observacion).filter(Boolean).join(' | ');
+            const mainFecha = consignaciones[0].fecha;
+
+            for (const inv of pending) {
+                await api.saveConciliation({
+                    documentId,
+                    invoiceNumber:  inv.invoice_number,
+                    valor:          Number(inv.invoice_value) || 0,
+                    comprobante:    obs ? `${refs} (${obs})` : refs,
+                    fechaPago:      mainFecha,
+                    formaPago:      grupalMetodo,
+                    conciliadoPor:  currentUserId,
+                    vehiclePlate:   inv.vehicle_plate || route.plate,
+                    estadoEntrega:  'entregado',
+                    valorFactura:   Number(inv.invoice_value) || undefined,
+                });
+            }
+            toast.success(`✅ ${pending.length} facturas legalizadas correctamente`);
+            onSaved();
+        } catch (err: any) {
+            toast.error(err.message || 'Error al guardar consignación grupal');
+        } finally {
+            setSavingGrupal(false);
+        }
+    };
+
     const plateTotals = useMemo(() => {
         const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const legalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
@@ -470,14 +514,8 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
 
     const totalConsignado = useMemo(() =>
-        consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '.')) || 0), 0),
+        consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
     [consignaciones]);
-
-    const totalSeleccionado = useMemo(() =>
-        invoices.filter(inv => selectedInvoices.has(inv.invoice_number)).reduce((s, inv) => s + (Number(inv.invoice_value) || 0), 0),
-    [invoices, selectedInvoices]);
-
-    const grupalMatch = totalConsignado > 0 && Math.abs(totalConsignado - totalSeleccionado) <= 1500;
 
     const handleSave = async (inv: InvoiceRow) => {
         const form = forms.get(inv.invoice_number);
@@ -628,7 +666,107 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         </div>
                     )}
 
-                    {tab === 'grupal' && <div className="text-center py-10 text-slate-400 font-bold uppercase text-[10px]">Gestión de consignación grupal activa</div>}
+                    {tab === 'grupal' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Detalle de Consignaciones</h4>
+                                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Registre los comprobantes de pago de la placa</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setGrupalMetodo('CONSIGNACION')}
+                                            className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border-2
+                                                ${grupalMetodo === 'CONSIGNACION' ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-200' : 'bg-white border-slate-200 text-slate-500'}`}>
+                                            🏦 Consignación
+                                        </button>
+                                        <button onClick={() => setGrupalMetodo('TRANSFERENCIA')}
+                                            className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border-2
+                                                ${grupalMetodo === 'TRANSFERENCIA' ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200' : 'bg-white border-slate-200 text-slate-500'}`}>
+                                            📱 Transferencia
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {consignaciones.map((c, idx) => (
+                                        <div key={c.id} className="grid grid-cols-12 gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm relative group">
+                                            <div className="col-span-3">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
+                                                <input type="text" value={c.valor}
+                                                    onChange={e => {
+                                                        const val = e.target.value.replace(/\D/g, '');
+                                                        const fmt = val ? new Intl.NumberFormat('es-CO').format(Number(val)) : '';
+                                                        const next = [...consignaciones];
+                                                        next[idx].valor = fmt;
+                                                        setConsignaciones(next);
+                                                    }}
+                                                    placeholder="$ 0.00" className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia</p>
+                                                <input type="text" value={c.nroAprobacion}
+                                                    onChange={e => {
+                                                        const next = [...consignaciones];
+                                                        next[idx].nroAprobacion = e.target.value;
+                                                        setConsignaciones(next);
+                                                    }}
+                                                    placeholder="N° Comprobante" className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
+                                                <input type="date" value={c.fecha}
+                                                    onChange={e => {
+                                                        const next = [...consignaciones];
+                                                        next[idx].fecha = e.target.value;
+                                                        setConsignaciones(next);
+                                                    }}
+                                                    className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p>
+                                                <input type="text" value={c.observacion || ''}
+                                                    onChange={e => {
+                                                        const next = [...consignaciones];
+                                                        next[idx].observacion = e.target.value;
+                                                        setConsignaciones(next);
+                                                    }}
+                                                    placeholder="Notas..." className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                            </div>
+                                            {consignaciones.length > 1 && (
+                                                <button onClick={() => setConsignaciones(consignaciones.filter(x => x.id !== c.id))}
+                                                    className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100">
+                                                    <Icons.X className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button onClick={() => setConsignaciones([...consignaciones, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }])}
+                                    className="mt-4 w-full py-2.5 border-2 border-dashed border-slate-300 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest hover:border-violet-400 hover:text-violet-600 transition-all">
+                                    + Agregar otra consignación
+                                </button>
+                            </div>
+
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Total Consignado</p>
+                                    <p className="text-xl font-black text-emerald-900">{fmtCOP(totalConsignado)}</p>
+                                </div>
+                                <button onClick={handleSaveGrupal} disabled={savingGrupal}
+                                    className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all
+                                        ${savingGrupal ? 'bg-slate-200 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'}`}>
+                                    {savingGrupal ? 'Procesando...' : 'Legalizar Todas las Facturas'}
+                                </button>
+                            </div>
+                            
+                            <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 text-center">
+                                <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest">⚠ Atención</p>
+                                <p className="text-[8px] text-amber-600 mt-0.5 font-bold uppercase tracking-tight">Esta acción legalizará el 100% de las facturas pendientes de la placa {route.plate} como "Entregadas".</p>
+                            </div>
+                        </div>
+                    )}
                     
                     {tab === 'sobrecosto' && (
                         <div className="flex flex-col items-center justify-center p-12 text-center bg-orange-50 rounded-3xl border border-orange-100">
