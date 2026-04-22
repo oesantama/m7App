@@ -35,22 +35,41 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                 dl.delivery_date,
                 dl.client_id,
 
-                -- Conteo de facturas en el documento
-                COUNT(DISTINCT di.invoice)                                   AS total_invoices,
-                COUNT(DISTINCT ic.invoice_number)                            AS conciliadas,
-                COUNT(DISTINCT di.invoice) - COUNT(DISTINCT ic.invoice_number) AS pendientes,
+                -- Conteo de facturas en el documento (Subquery para evitar fan-out de joins)
+                (SELECT COUNT(DISTINCT di.invoice) 
+                 FROM document_items di 
+                 WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
+                ) AS total_invoices,
 
-                -- Efectivo y crédito desde document_l_payments
-                COALESCE(SUM(
-                    CASE WHEN UPPER(TRIM(p.metodo_pago)) LIKE '%EFECTIVO%' OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
-                    THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
-                ), 0)                                                        AS total_efectivo,
-                COALESCE(SUM(
-                    CASE WHEN p.metodo_pago IS NOT NULL
+                (SELECT COUNT(DISTINCT ic.invoice_number)
+                 FROM invoice_conciliations ic
+                 WHERE ic.document_id = dl.id
+                ) AS conciliadas,
+
+                -- Efectivo y crédito desde document_l_payments (Subquery para evitar fan-out)
+                (SELECT COALESCE(SUM(CASE 
+                    WHEN UPPER(TRIM(p.metodo_pago)) LIKE '%EFECTIVO%' OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
+                    THEN COALESCE(NULLIF(TRIM(p.vmetodo), '')::numeric, 0) ELSE 0 END), 0)
+                 FROM document_l_payments p
+                 WHERE p.invoice IS NOT NULL AND TRIM(UPPER(p.invoice)) IN (
+                    SELECT DISTINCT TRIM(UPPER(di2.invoice)) 
+                    FROM document_items di2 
+                    WHERE di2.document_id = dl.id AND di2.invoice IS NOT NULL AND di2.invoice <> ''
+                 )
+                ) AS total_efectivo,
+
+                (SELECT COALESCE(SUM(CASE 
+                    WHEN p.metodo_pago IS NOT NULL
                          AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFECTIVO%'
                          AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFE%'
-                    THEN COALESCE(p.vmetodo::numeric, 0) ELSE 0 END
-                ), 0)                                                        AS total_credito,
+                    THEN COALESCE(NULLIF(TRIM(p.vmetodo), '')::numeric, 0) ELSE 0 END), 0)
+                 FROM document_l_payments p
+                 WHERE p.invoice IS NOT NULL AND TRIM(UPPER(p.invoice)) IN (
+                    SELECT DISTINCT TRIM(UPPER(di2.invoice)) 
+                    FROM document_items di2 
+                    WHERE di2.document_id = dl.id AND di2.invoice IS NOT NULL AND di2.invoice <> ''
+                 )
+                ) AS total_credito,
 
                 -- Conductor y placa desde dispatch (última asignación del doc)
                 (SELECT da.driver_id FROM dispatch_assignments da
@@ -63,14 +82,15 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                 (SELECT COALESCE(SUM(valor), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id) AS total_sobrecosto_ruta
 
             FROM documents_l dl
-            LEFT JOIN document_items di ON di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
-            LEFT JOIN invoice_conciliations ic ON ic.document_id = dl.id AND ic.invoice_number = di.invoice
-            LEFT JOIN document_l_payments p ON p.invoice IS NOT NULL AND TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
-
             ${where}
-            GROUP BY dl.id
-            HAVING COUNT(DISTINCT di.invoice) > 0
-              AND COUNT(DISTINCT di.invoice) - COUNT(DISTINCT ic.invoice_number) > 0
+            -- El filtro de "al menos una pendiente" se aplica en el HAVING del resultado final o simplemente se filtra aquí
+            GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.codplan, dl.plan_type, dl.status, dl.created_at, dl.delivery_date, dl.client_id
+            HAVING (
+                (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
+                - 
+                (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
+            ) > 0
+              AND (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '') > 0
             ORDER BY dl.created_at DESC
         `, params);
 
