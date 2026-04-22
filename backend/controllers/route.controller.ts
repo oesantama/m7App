@@ -55,6 +55,7 @@ export const getRoutes = async (req: Request, res: Response) => {
         da.created_at,
         v.plate,
         d.name as driver_name,
+        d.document_number as driver_document,
         json_build_array(da.invoice_id) as invoice_ids,
         1 as total_invoices,
         CASE WHEN da.status IN ('COMPLETED', 'PENDING_SIGNATURES', 'EN_RUTA', 'EST-11', 'EST-12', 'ENTREGADO') THEN 1 ELSE 0 END as delivered_invoices

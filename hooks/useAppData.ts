@@ -43,12 +43,11 @@ export const useAppData = () => {
         hasPerm('ARTICULOS') ? api.getArticles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         (hasPerm('VEHICULOS') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getVehicles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         (hasPerm('CONDUCTORES') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getDrivers().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        hasPerm('USUARIOS') ? api.getUsers().then(normalizeData).catch(() => []) : Promise.resolve([]),
-
+        (isSuper || hasPerm('USUARIOS')) ? api.getUsers().then(normalizeData).catch(() => []) : Promise.resolve([]),
 
         isSuper ? api.getRoles().then(normalizeData).catch(() => []) : Promise.resolve([]),
         isSuper ? api.getPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
-        isSuper || hasPerm('MATRIZ_PERMISOS') ? api.getAllUserPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
+        (isSuper || hasPerm('MATRIZ_PERMISOS')) ? api.getAllUserPermissions().then(normalizeData).catch(() => []) : Promise.resolve([]),
         (hasPerm('CLIENTES') || hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getClients().then(normalizeData).catch(() => []) : Promise.resolve([]),
         (hasPerm('ASIGNACIONES') || hasPerm('RUTAS') || hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getAssignments().then(normalizeData).catch(() => []) : Promise.resolve([]),
         (hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) ? api.getInvoices(targetClientId).catch(() => []) : Promise.resolve([]),
