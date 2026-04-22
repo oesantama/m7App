@@ -1570,7 +1570,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     return sv + Number(inv?.volumeM3 || 0);
                                 }, 0);
                             }, 0);
-                            const delivered = invoices.filter(i => ['EST-11','EST-12','EST-13','EST-14'].includes(((i as any).itemStatus || i.status) as string)).length;
+                            const delivered = invoices.filter(i => {
+                                const key = cleanId((i as any).invoiceNumber || i.id);
+                                return dispatchedIds.has(key) || ['EST-11','EST-12','EST-13','EST-14'].includes(((i as any).itemStatus || i.status) as string);
+                            }).length;
                             const pct = totalInvoices > 0 ? Math.round((delivered / totalInvoices) * 100) : 0;
                             return (
                                 <div className="bg-slate-900 rounded-2xl p-3 mb-1 space-y-2">
@@ -1645,8 +1648,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     });
                                     return targetIds.includes(invId) || targetIds.includes(invNum);
                                 });
-                                const totalRouteInvoices = route.total_invoices ?? routeInvList.length;
-                                const deliveredRouteCount = route.delivered_invoices ?? routeInvList.filter(i => ['EST-11','EST-12','EST-13','EST-14','ENTREGADO'].includes(((i as any).itemStatus || i.status) as string)).length;
+                                const isSelectedRoute = selectedActiveRoute?.id === route.id;
+                                const totalRouteInvoices = isSelectedRoute
+                                    ? (routeInvoices.length || (route.total_invoices ?? routeInvList.length))
+                                    : (route.total_invoices ?? routeInvList.length);
+                                const deliveredRouteCount = isSelectedRoute
+                                    ? routeInvoices.filter(i => {
+                                        const key = cleanId((i as any).invoiceNumber || i.id);
+                                        return dispatchedIds.has(key) || ['EST-11','EST-12','EST-13','EST-14','ENTREGADO'].includes(((i as any).itemStatus || i.status) as string);
+                                    }).length
+                                    : (route.delivered_invoices ?? routeInvList.filter(i => ['EST-11','EST-12','EST-13','EST-14','ENTREGADO'].includes(((i as any).itemStatus || i.status) as string)).length);
                                 const percent = totalRouteInvoices > 0 ? (deliveredRouteCount / totalRouteInvoices) * 100 : 0;
 
                                  return (
