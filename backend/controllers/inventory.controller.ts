@@ -122,8 +122,8 @@ export const createSupplierReturn = async (req: Request, res: Response) => {
       // Descontar de inventario_clientes
       await client.query(`
         UPDATE inventario_clientes
-        SET quantity = GREATEST(0, quantity - $1), last_user = $2, last_updated = CURRENT_TIMESTAMP
-        WHERE client_id = $3 AND article_id = $4 AND batch = $5
+        SET quantity = GREATEST(0, quantity::numeric - $1::numeric), last_user = $2, last_updated = CURRENT_TIMESTAMP
+        WHERE client_id = $3::text AND article_id = $4::text AND batch = $5::text
       `, [Number(item.quantity), createdBy, clientId, item.article_id, item.batch || 'S/L']);
 
       // Kardex: SALIDA_PROVEEDOR
