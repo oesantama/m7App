@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import ConciliacionModal from '../Logistics/ConciliacionModal';
 import ConciliacionRouteModal from '../Logistics/ConciliacionRouteModal';
 import { exportToExcel } from '../../utils/exportUtils';
+import TableControls from '../shared/TableControls';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 

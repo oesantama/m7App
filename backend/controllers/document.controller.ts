@@ -887,6 +887,7 @@ export const getInvoices = async (req: Request, res: Response) => {
       res.setHeader('X-Cache', 'MISS');
     }
 
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-CRITICAL-ERR] getInvoices:', err.message);
