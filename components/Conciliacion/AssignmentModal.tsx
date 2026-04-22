@@ -11,10 +11,14 @@ interface Vehicle {
 }
 
 interface Assignment {
-    vehicleId: string;
-    driverId: string;
-    clientId: string;
-    isActive: boolean;
+    vehicle_id?: string;
+    vehicleId?: string;
+    driver_id?: string;
+    driverId?: string;
+    client_id?: string;
+    clientId?: string;
+    is_active?: boolean;
+    isActive?: boolean;
 }
 
 interface Props {
@@ -42,14 +46,14 @@ const AssignmentModal: React.FC<Props> = ({
     const [isSaving, setIsSaving] = useState(false);
 
     const availableVehicles = useMemo(() => {
-        // Filtrar vehículos que tengan un vínculo activo con este cliente
+        // Filtrar vínculos activos para este cliente, soportando snake_case (DB) y camelCase
         const activeLinks = assignments.filter(a => {
-            const isClientMatch = a.clientId === clientId;
-            const isActive = a.isActive;
-            return isClientMatch && isActive;
+            const aClientId = a.client_id || a.clientId;
+            const aIsActive = a.is_active !== undefined ? a.is_active : a.isActive;
+            return String(aClientId) === String(clientId) && aIsActive;
         });
 
-        const activeVehicleIds = new Set(activeLinks.map(a => String(a.vehicleId)));
+        const activeVehicleIds = new Set(activeLinks.map(a => String(a.vehicle_id || a.vehicleId)));
         
         return vehicles
             .filter(v => activeVehicleIds.has(String(v.id)))
@@ -62,12 +66,17 @@ const AssignmentModal: React.FC<Props> = ({
     const handleAssign = async (vehicle: Vehicle) => {
         setIsSaving(true);
         try {
-            const link = assignments.find(a => String(a.vehicleId) === String(vehicle.id) && a.isActive);
+            // Buscar el vínculo para obtener el conductor
+            const link = assignments.find(a => {
+                const vId = a.vehicle_id || a.vehicleId;
+                const aIsActive = a.is_active !== undefined ? a.is_active : a.isActive;
+                return String(vId) === String(vehicle.id) && aIsActive;
+            });
             
             const res = await api.saveRoute({
                 id: `rt-manual-${Date.now()}`,
                 vehicleId: vehicle.id,
-                driverId: link?.driverId || 'S/A',
+                driverId: link?.driver_id || link?.driverId || 'S/A',
                 clientId: clientId,
                 invoiceIds: [invoice.invoice_number],
                 createdBy: userName,

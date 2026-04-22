@@ -79,6 +79,18 @@ interface TraceabilityData {
     banco: string | null;
     referencia: string | null;
   } | null;
+  modifications: RouteModificationLog[];
+}
+
+interface RouteModificationLog {
+  id: number;
+  route_id: string;
+  action: string;
+  previous_plate: string | null;
+  new_plate: string | null;
+  details: any;
+  created_at: string;
+  user_name: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -954,6 +966,78 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Historial de modificaciones de ruta */}
+          {data.modifications?.length > 0 && (
+            <div>
+              <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
+                Historial de Modificaciones de Ruta
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold normal-case tracking-normal">{data.modifications.length}</span>
+              </h2>
+              <div className="flex flex-col gap-2">
+                {data.modifications.map((log, i) => {
+                  const isUnassign   = log.action === 'UNASSIGN_INVOICE';
+                  const isReassign   = log.action === 'REASSIGN' || log.action === 'REASSIGN_VEHICLE';
+                  const isAdd        = log.action === 'ADD';
+                  const obs          = typeof log.details === 'object' ? log.details?.observations : null;
+                  const accentBg    = isUnassign ? 'bg-rose-50 border-rose-200'
+                                    : isReassign ? 'bg-amber-50 border-amber-200'
+                                    : isAdd      ? 'bg-emerald-50 border-emerald-200'
+                                    : 'bg-slate-50 border-slate-200';
+                  const accentText  = isUnassign ? 'text-rose-700'
+                                    : isReassign ? 'text-amber-700'
+                                    : isAdd      ? 'text-emerald-700'
+                                    : 'text-slate-600';
+                  const icon        = isUnassign ? '🔓' : isReassign ? '🔄' : isAdd ? '➕' : '📝';
+                  const actionLabel = isUnassign ? 'Liberación de Ruta'
+                                    : isReassign ? 'Cambio de Placa / Reasignación'
+                                    : isAdd      ? 'Asignada a Ruta'
+                                    : log.action;
+                  return (
+                    <div key={log.id || i} className={`rounded-2xl border ${accentBg} px-5 py-4 flex flex-col md:flex-row md:items-start gap-3`}>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-lg">{icon}</span>
+                        <div>
+                          <div className={`text-[10px] font-black uppercase tracking-widest ${accentText}`}>{actionLabel}</div>
+                          <div className="text-[10px] text-slate-400">{fmtDateTime(log.created_at)}</div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-4 flex-1 text-xs">
+                        {log.user_name && (
+                          <div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Usuario</div>
+                            <div className="font-semibold text-slate-700">{log.user_name}</div>
+                          </div>
+                        )}
+                        {(log.previous_plate || log.new_plate) && (
+                          <div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Placa</div>
+                            <div className="font-mono font-black text-slate-800 flex items-center gap-1">
+                              {log.previous_plate && <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded">{log.previous_plate}</span>}
+                              {log.previous_plate && log.new_plate && <span className="text-slate-300">→</span>}
+                              {log.new_plate && <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">{log.new_plate}</span>}
+                            </div>
+                          </div>
+                        )}
+                        {log.route_id && (
+                          <div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Ruta ID</div>
+                            <div className="font-mono text-slate-500">{log.route_id}</div>
+                          </div>
+                        )}
+                        {obs && (
+                          <div className="w-full md:w-auto">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Observación</div>
+                            <div className="text-slate-700 font-semibold">{obs}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

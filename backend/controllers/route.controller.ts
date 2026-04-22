@@ -413,11 +413,16 @@ export const unassignRouteInvoice = async (req: Request, res: Response) => {
             [invoiceId]
         );
 
-        // 4. Registrar en log
+        // 4. Registrar en log (con invoice_id y placa anterior)
+        const plateRes = await client.query(
+            `SELECT v.plate FROM routes r LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text WHERE r.id::text = $1::text LIMIT 1`,
+            [routeId]
+        );
+        const prevPlate = plateRes.rows[0]?.plate || null;
         await client.query(
-            `INSERT INTO route_modifications_log (route_id, action, user_id, details)
-             VALUES ($1, 'UNASSIGN_INVOICE', $2, $3)`,
-            [routeId, userId || null, JSON.stringify({ invoice_id: invoiceId, observations, timestamp: new Date().toISOString() })]
+            `INSERT INTO route_modifications_log (route_id, invoice_id, action, user_id, previous_plate, details)
+             VALUES ($1, $2, 'UNASSIGN_INVOICE', $3, $4, $5)`,
+            [routeId, invoiceId, userId || null, prevPlate, JSON.stringify({ observations, timestamp: new Date().toISOString() })]
         );
 
         await client.query('COMMIT');

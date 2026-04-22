@@ -1034,6 +1034,25 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
       LIMIT 1
     `, [inv]);
 
+    // 7. Historial de modificaciones de ruta para esta factura
+    const logsRes = await pool.query(`
+      SELECT
+        rml.id,
+        rml.route_id::text,
+        rml.action,
+        rml.previous_plate,
+        rml.new_plate,
+        rml.details,
+        rml.created_at,
+        u.name AS user_name
+      FROM route_modifications_log rml
+      LEFT JOIN users u ON u.id::text = rml.user_id::text
+      WHERE rml.invoice_id = $1
+         OR rml.invoice_id = $2
+         OR rml.invoice_id = CONCAT($3::text, '_', $1::text)
+      ORDER BY rml.created_at DESC
+    `, [inv, `${invoiceData.document_id}_${inv}`, invoiceData.document_id]);
+
     res.json({
       success: true,
       data: {
@@ -1043,6 +1062,7 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
         dispatch:     dispatchRes.rows[0] || null,
         conciliation: concRes.rows[0]     || null,
         payment:      paymentRes.rows[0]  || null,
+        modifications: logsRes.rows,
       }
     });
   } catch (err: any) {
