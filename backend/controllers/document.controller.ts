@@ -975,6 +975,7 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
     const routeRes = await pool.query(`
       SELECT
         r.id::text                            AS route_id,
+        ri.invoice_id                         AS ri_invoice_id,
         r.created_at                          AS assigned_at,
         v.plate,
         d.name                                AS driver_name,

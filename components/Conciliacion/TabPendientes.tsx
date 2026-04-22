@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import ConciliacionModal from '../Logistics/ConciliacionModal';
 import ConciliacionRouteModal from '../Logistics/ConciliacionRouteModal';
+import AssignmentModal from './AssignmentModal';
 import { exportToExcel } from '../../utils/exportUtils';
 import TableControls from '../shared/TableControls';
 import Pagination from '../shared/Pagination';
@@ -26,6 +27,7 @@ export interface DocSummary {
     conductor_name?: string;
     total_efectivo?: number;
     total_credito?: number;
+    client_id?: string;
 }
 
 interface RouteGroup {
@@ -137,13 +139,29 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [msPreviewData, setMsPreviewData]     = useState<any[]>([]);
     const [showMsPreview, setShowMsPreview]     = useState(false);
 
+    // ASIGNACIÓN
+    const [vehicles, setVehicles]           = useState<any[]>([]);
+    const [assignments, setAssignments]     = useState<any[]>([]);
+    const [assigningInvoice, setAssigningInvoice] = useState<InvoiceRow | null>(null);
+
     // PAGINACIÓN
+    const [collapseDocs, setCollapseDocs]       = useState(false);
     const [docPage, setDocPage] = useState(1);
     const [docPageSize, setDocPageSize] = useState<number | 'all'>(10);
     const [routePage, setRoutePage] = useState(1);
     const [routePageSize, setRoutePageSize] = useState<number | 'all'>(10);
     const [invoicePage, setInvoicePage] = useState(1);
     const [invoicePageSize, setInvoicePageSize] = useState<number | 'all'>(10);
+
+    // ── Carga de vehículos y vínculos ──────────────────────────────────────────
+    useEffect(() => {
+        Promise.all([api.getVehicles(), api.getAssignments()])
+            .then(([v, a]) => {
+                setVehicles(v || []);
+                setAssignments(a || []);
+            })
+            .catch(() => {}); // Fallo silencioso, no crítico hasta intentar asignar
+    }, []);
 
     // ── Carga detalle del documento ───────────────────────────────────────────
     const loadDocDetail = useCallback(async (doc: DocSummary) => {
@@ -334,7 +352,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         <div className="flex flex-1 overflow-hidden">
 
             {/* ══ Panel izquierdo — lista de documentos ═══════════════════════ */}
-            <div className="w-full sm:w-72 lg:w-80 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col">
+            <div className={`${collapseDocs ? 'hidden' : 'w-full sm:w-72 lg:w-80'} flex-shrink-0 bg-white border-r border-slate-100 flex flex-col transition-all duration-300`}>
                 {/* Buscador */}
                 <div className="px-3 py-3 border-b border-slate-100 flex flex-col gap-2">
                     <TableControls 
@@ -455,6 +473,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         <div className="bg-white border-b border-slate-200 px-5 py-3 flex-shrink-0">
                             <div className="flex items-center justify-between gap-3 flex-wrap">
                                 <div className="flex items-center gap-2 flex-wrap">
+                                    <button onClick={() => setCollapseDocs(!collapseDocs)}
+                                        className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all"
+                                        title={collapseDocs ? "Mostrar lista" : "Ocultar lista"}>
+                                        {collapseDocs ? <Icons.ChevronRight className="w-4 h-4" /> : <Icons.ChevronLeft className="w-4 h-4" />}
+                                    </button>
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
                                         {selectedDoc.external_doc_id}
                                     </h3>
@@ -719,7 +742,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                 </button>
                                                                 <button
                                                                     onClick={() => setModalRoute(route)}
-                                                                    className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-emerald-600 transition-all">
+                                                                    className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
+                                                                        ${pct === 100 ? 'hidden' : 'bg-slate-900 text-white hover:bg-emerald-600'}`}>
                                                                     Conciliar →
                                                                 </button>
                                                             </div>
@@ -846,14 +870,22 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                     )}
                                                                 </div>
 
-                                                                {/* Botón conciliar/editar */}
-                                                                <button onClick={() => setModalInvoice(inv)}
-                                                                    className={`shrink-0 px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all
-                                                                        ${legalizada
-                                                                            ? 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                                                            : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                                                                    {legalizada ? 'Detalle' : 'Legalizar'}
-                                                                </button>
+                                                                {/* Botón conciliar/editar/asignar */}
+                                                                {!inv.route_vehicle_plate && !legalizada ? (
+                                                                    <button onClick={() => setAssigningInvoice(inv)}
+                                                                        className="shrink-0 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[8px] font-black uppercase tracking-wide transition-all flex items-center gap-1.5">
+                                                                        <Icons.Truck className="w-3 h-3" />
+                                                                        Asignar
+                                                                    </button>
+                                                                ) : (
+                                                                    <button onClick={() => setModalInvoice(inv)}
+                                                                        className={`shrink-0 px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all
+                                                                            ${legalizada
+                                                                                ? 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                                                                : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
+                                                                        {legalizada ? 'Detalle' : 'Legalizar'}
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );
@@ -1128,6 +1160,23 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     documentId={selectedDoc.id}
                     currentUserId={user?.id || ''}
                     onSaved={() => {
+                        if (selectedDoc) loadDocDetail(selectedDoc);
+                        onRefresh();
+                    }}
+                />
+            )}
+
+            {/* Modal de asignación de factura a placa */}
+            {assigningInvoice && selectedDoc && (
+                <AssignmentModal
+                    isOpen={!!assigningInvoice}
+                    onClose={() => setAssigningInvoice(null)}
+                    invoice={assigningInvoice}
+                    clientId={selectedDoc.client_id || ''}
+                    vehicles={vehicles}
+                    assignments={assignments}
+                    userName={user?.name || 'Sistema'}
+                    onAssigned={() => {
                         if (selectedDoc) loadDocDetail(selectedDoc);
                         onRefresh();
                     }}

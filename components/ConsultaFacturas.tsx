@@ -45,6 +45,7 @@ interface TraceabilityData {
   items: TraceabilityItem[];
   route: {
     route_id: string;
+    ri_invoice_id: string;
     assigned_at: string;
     plate: string | null;
     driver_name: string | null;
@@ -566,26 +567,34 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
   const [loading, setLoading]     = useState(false);
   const [data, setData]           = useState<TraceabilityData | null>(null);
   const [error, setError]         = useState<string | null>(null);
-  const [liberando, setLiberando] = useState(false);
-  const [liberadoMsg, setLiberadoMsg] = useState<string | null>(null);
-  const inputRef                  = useRef<HTMLInputElement>(null);
+  const [liberando, setLiberando]         = useState(false);
+  const [liberadoMsg, setLiberadoMsg]     = useState<{ ok: boolean; text: string } | null>(null);
+  const [showLiberarModal, setShowLiberarModal] = useState(false);
+  const [liberarObs, setLiberarObs]       = useState('');
+  const inputRef                          = useRef<HTMLInputElement>(null);
 
   const canEdit = hasPermission(user, 'consulta-facturas', 'edit');
 
   const handleLiberar = async () => {
-    if (!data?.route?.route_id || !data?.invoice?.invoice_number) return;
+    if (!liberarObs.trim()) return;
+    if (!data?.route?.route_id) return;
     setLiberando(true);
     setLiberadoMsg(null);
     try {
+      const invoiceId = data.route.ri_invoice_id || data.invoice.invoice_number;
       await api.unassignRouteInvoice({
         routeId: data.route.route_id,
-        invoiceId: data.invoice.invoice_number,
+        invoiceId,
+        observations: liberarObs.trim(),
         userId: user?.id,
       });
-      setLiberadoMsg('Factura liberada de la ruta correctamente.');
+      setLiberadoMsg({ ok: true, text: 'Factura liberada de la ruta correctamente.' });
       setData(prev => prev ? { ...prev, route: null } : prev);
+      setShowLiberarModal(false);
+      setLiberarObs('');
     } catch (err: any) {
-      setLiberadoMsg(`Error: ${err.message || 'No se pudo liberar la factura'}`);
+      setLiberadoMsg({ ok: false, text: err.message || 'No se pudo liberar la factura' });
+      setShowLiberarModal(false);
     } finally {
       setLiberando(false);
     }
@@ -667,8 +676,45 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
       )}
 
       {liberadoMsg && (
-        <div className={`max-w-xl rounded-2xl p-4 flex items-center gap-3 border ${liberadoMsg.startsWith('Error') ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
-          <p className="text-sm font-semibold">{liberadoMsg}</p>
+        <div className={`max-w-xl rounded-2xl p-4 flex items-center gap-3 border ${!liberadoMsg.ok ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+          <p className="text-sm font-semibold">{liberadoMsg.text}</p>
+        </div>
+      )}
+
+      {/* Modal Liberar Factura */}
+      {showLiberarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <h3 className="text-lg font-black text-slate-900 mb-1">Liberar Factura de Ruta</h3>
+            <p className="text-sm text-slate-500 mb-5">
+              La factura <span className="font-black text-slate-800">{data?.invoice.invoice_number}</span> será desvinculada de la ruta{data?.route?.plate ? ` (${data.route.plate})` : ''}. Esta acción queda registrada en el historial.
+            </p>
+            <div className="flex flex-col gap-2 mb-6">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Observación <span className="text-rose-500">*</span></label>
+              <textarea
+                value={liberarObs}
+                onChange={e => setLiberarObs(e.target.value)}
+                placeholder="Motivo por el cual se libera la factura..."
+                rows={3}
+                className="px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-800 text-sm font-semibold placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400/30 focus:border-rose-400 resize-none"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setShowLiberarModal(false); setLiberarObs(''); }}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleLiberar}
+                disabled={liberando || !liberarObs.trim()}
+                className="px-6 py-2.5 bg-rose-500 hover:bg-rose-400 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95"
+              >
+                {liberando ? 'Liberando...' : 'Confirmar Liberación'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -696,11 +742,10 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                   )}
                   {canEdit && data.route?.route_id && (
                     <button
-                      onClick={handleLiberar}
-                      disabled={liberando}
-                      className="mt-1 px-4 py-1.5 bg-rose-500 hover:bg-rose-400 disabled:bg-rose-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95 whitespace-nowrap"
+                      onClick={() => setShowLiberarModal(true)}
+                      className="mt-1 px-4 py-1.5 bg-rose-500 hover:bg-rose-400 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95 whitespace-nowrap"
                     >
-                      {liberando ? 'Liberando...' : 'Liberar Factura'}
+                      Liberar Factura
                     </button>
                   )}
                 </div>
