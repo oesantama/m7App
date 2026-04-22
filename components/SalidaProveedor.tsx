@@ -173,8 +173,8 @@ const SalidaProveedor: React.FC<{ user: any }> = ({ user }) => {
                 notes: formNotes || undefined,
                 createdBy: user?.name ?? user?.email ?? 'Bodega',
                 items: formItems.map(i => ({
-                    articleId: i.articleId,
-                    articleName: i.articleName,
+                    article_id: i.articleId,
+                    article_name: i.articleName,
                     batch: i.batch,
                     quantity: i.quantity,
                     unit: i.unit,

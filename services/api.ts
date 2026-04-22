@@ -248,7 +248,7 @@ export const api = {
   createSupplierReturn: (data: {
     clientId: string; reference?: string; returnReason?: string;
     notes?: string; createdBy?: string;
-    items: { articleId: string; articleName: string; batch?: string; quantity: number; unit?: string; notes?: string }[];
+    items: { article_id: string; article_name: string; batch?: string; quantity: number; unit?: string; notes?: string }[];
   }) => fetchJson(`${API_URL}/inventory/supplier-returns`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
