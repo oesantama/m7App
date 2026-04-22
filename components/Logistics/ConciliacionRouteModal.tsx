@@ -84,6 +84,14 @@ interface ConsignacionRow {
     observacion?: string;
 }
 
+interface SobrecostoRow {
+    id: string;
+    valor: string;
+    nroAprobacion: string;
+    fecha: string;
+    status: 'PENDIENTE' | 'APROBADO';
+}
+
 interface Props {
     isOpen: boolean;
     onClose: () => void;
@@ -425,17 +433,21 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [activeDialog, setActiveDialog] = useState<string | null>(null);
 
     // Estado consignación grupal
-    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10) }]);
-    const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
-    const [grupalMetodo, setGrupalMetodo]     = useState<MetodoPago>('CONSIGNACION');
+    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }]);
     const [savingGrupal, setSavingGrupal]     = useState(false);
+    const [grupalMetodo, setGrupalMetodo]     = useState<MetodoPago>('CONSIGNACION');
+
+    // Estado sobrecostos
+    const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), status: 'PENDIENTE' }]);
+    const [savingSobrecosto, setSavingSobrecosto] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
         const m = new Map<string, InvoiceFormState>();
         invoices.forEach(inv => m.set(inv.invoice_number, initForm(inv)));
         setForms(m);
-        setSelectedInvoices(new Set());
+        setConsignaciones([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }]);
+        setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), status: 'PENDIENTE' }]);
         setTab('individual');
         setActiveDialog(null);
     }, [isOpen, invoices]);
@@ -462,12 +474,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     }, []);
 
     const handleSaveGrupal = async () => {
-        const pending = invoices.filter(i => !i.forma_pago);
-        if (pending.length === 0) {
-            toast.error('No hay facturas pendientes para legalizar.');
-            return;
-        }
-
         const totalConsignadoVal = consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
         if (totalConsignadoVal <= 0) {
             toast.error('Ingrese un valor de consignación válido.');
@@ -476,26 +482,18 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
         setSavingGrupal(true);
         try {
-            // Concatenamos referencias y observaciones si hay varias
-            const refs = consignaciones.map(c => c.nroAprobacion).filter(Boolean).join(' / ');
-            const obs  = consignaciones.map(c => c.observacion).filter(Boolean).join(' | ');
-            const mainFecha = consignaciones[0].fecha;
-
-            for (const inv of pending) {
-                await api.saveConciliation({
-                    documentId,
-                    invoiceNumber:  inv.invoice_number,
-                    valor:          Number(inv.invoice_value) || 0,
-                    comprobante:    obs ? `${refs} (${obs})` : refs,
-                    fechaPago:      mainFecha,
-                    formaPago:      grupalMetodo,
-                    conciliadoPor:  currentUserId,
-                    vehiclePlate:   inv.vehicle_plate || route.plate,
-                    estadoEntrega:  'entregado',
-                    valorFactura:   Number(inv.invoice_value) || undefined,
-                });
-            }
-            toast.success(`✅ ${pending.length} facturas legalizadas correctamente`);
+            await api.processDocumentLPayment({
+                documentId,
+                payments: consignaciones.map(c => ({
+                    valor: Number(c.valor.replace(/\./g, '').replace(',', '')) || 0,
+                    referencia: c.nroAprobacion,
+                    fecha: c.fecha,
+                    metodo: grupalMetodo,
+                    observacion: c.observacion
+                })),
+                userId: currentUserId
+            });
+            toast.success('✅ Pagos de ruta registrados correctamente');
             onSaved();
         } catch (err: any) {
             toast.error(err.message || 'Error al guardar consignación grupal');
@@ -504,18 +502,53 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         }
     };
 
-    const plateTotals = useMemo(() => {
-        const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const legalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
-        const legalCount   = invoices.filter(i => !!i.forma_pago).length;
-        return { totalValue, legalizedVal, legalCount, pendingVal: totalValue - legalizedVal, total: invoices.length };
-    }, [invoices]);
+    const handleSaveSobrecosto = async () => {
+        const totalVal = sobrecostos.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
+        if (totalVal <= 0) {
+            toast.error('Ingrese valores de sobrecosto válidos.');
+            return;
+        }
 
-    const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
+        setSavingSobrecosto(true);
+        try {
+            await api.saveSobrecostos({
+                documentId,
+                plate: route.plate,
+                items: sobrecostos.map(s => ({
+                    valor: Number(s.valor.replace(/\./g, '').replace(',', '')) || 0,
+                    referencia: s.nroAprobacion,
+                    fecha: s.fecha,
+                    status: s.status
+                })),
+                userId: currentUserId
+            });
+            toast.success('✅ Sobrecostos guardados (Pendientes de aprobación)');
+            onSaved();
+        } catch (err: any) {
+            toast.error(err.message || 'Error al guardar sobrecostos');
+        } finally {
+            setSavingSobrecosto(false);
+        }
+    };
 
     const totalConsignado = useMemo(() =>
         consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
     [consignaciones]);
+
+    const totalSobrecostos = useMemo(() =>
+        sobrecostos.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
+    [sobrecostos]);
+
+    const plateTotals = useMemo(() => {
+        const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        const invLegalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
+        
+        // Sumamos individual + grupal + sobrecostos (como parte del flujo de la placa)
+        const totalLegalizado = invLegalizedVal + totalConsignado + totalSobrecostos;
+        
+        const legalCount   = invoices.filter(i => !!i.forma_pago).length;
+        return { totalValue, legalizedVal: totalLegalizado, legalCount, pendingVal: Math.max(0, totalValue - totalLegalizado), total: invoices.length };
+    }, [invoices, totalConsignado, totalSobrecostos]);
 
     const handleSave = async (inv: InvoiceRow) => {
         const form = forms.get(inv.invoice_number);
@@ -757,24 +790,90 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 <button onClick={handleSaveGrupal} disabled={savingGrupal}
                                     className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all
                                         ${savingGrupal ? 'bg-slate-200 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'}`}>
-                                    {savingGrupal ? 'Procesando...' : 'Legalizar Todas las Facturas'}
+                                    {savingGrupal ? 'Procesando...' : 'Guardar Pago de Ruta'}
                                 </button>
                             </div>
                             
                             <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 text-center">
-                                <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest">⚠ Atención</p>
-                                <p className="text-[8px] text-amber-600 mt-0.5 font-bold uppercase tracking-tight">Esta acción legalizará el 100% de las facturas pendientes de la placa {route.plate} como "Entregadas".</p>
+                                <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest">ℹ Manejo de Plata</p>
+                                <p className="text-[8px] text-amber-600 mt-0.5 font-bold uppercase tracking-tight">Este recaudo se asocia a la placa {route.plate} y suma al total legalizado de la ruta.</p>
                             </div>
                         </div>
                     )}
                     
                     {tab === 'sobrecosto' && (
-                        <div className="flex flex-col items-center justify-center p-12 text-center bg-orange-50 rounded-3xl border border-orange-100">
-                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
-                                <Icons.DollarSign className="w-8 h-8 text-orange-600" />
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Gestión de Sobrecostos</h4>
+                                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Registre gastos adicionales asociados a la placa {route.plate}</p>
+                                    </div>
+                                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[8px] font-black uppercase tracking-widest">Estado: Pendiente</span>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {sobrecostos.map((s, idx) => (
+                                        <div key={s.id} className="grid grid-cols-12 gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm relative group">
+                                            <div className="col-span-4">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
+                                                <input type="text" value={s.valor}
+                                                    onChange={e => {
+                                                        const val = e.target.value.replace(/\D/g, '');
+                                                        const fmt = val ? new Intl.NumberFormat('es-CO').format(Number(val)) : '';
+                                                        const next = [...sobrecostos];
+                                                        next[idx].valor = fmt;
+                                                        setSobrecostos(next);
+                                                    }}
+                                                    placeholder="$ 0.00" className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none border border-transparent focus:border-orange-300" />
+                                            </div>
+                                            <div className="col-span-4">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia (NIT si aplica)</p>
+                                                <input type="text" value={s.nroAprobacion}
+                                                    onChange={e => {
+                                                        const next = [...sobrecostos];
+                                                        next[idx].nroAprobacion = e.target.value;
+                                                        setSobrecostos(next);
+                                                    }}
+                                                    placeholder="Referencia / NIT" className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none border border-transparent focus:border-orange-300" />
+                                            </div>
+                                            <div className="col-span-4">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
+                                                <input type="date" value={s.fecha}
+                                                    onChange={e => {
+                                                        const next = [...sobrecostos];
+                                                        next[idx].fecha = e.target.value;
+                                                        setSobrecostos(next);
+                                                    }}
+                                                    className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none border border-transparent focus:border-orange-300" />
+                                            </div>
+                                            {sobrecostos.length > 1 && (
+                                                <button onClick={() => setSobrecostos(sobrecostos.filter(x => x.id !== s.id))}
+                                                    className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100">
+                                                    <Icons.X className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button onClick={() => setSobrecostos([...sobrecostos, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), status: 'PENDIENTE' }])}
+                                    className="mt-4 w-full py-2.5 border-2 border-dashed border-slate-300 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest hover:border-orange-400 hover:text-orange-600 transition-all">
+                                    + Agregar otro sobrecosto
+                                </button>
                             </div>
-                            <h3 className="text-sm font-black text-orange-900 uppercase">Módulo de Sobrecostos</h3>
-                            <p className="text-[10px] text-orange-600 mt-2 max-w-xs font-bold uppercase tracking-widest">En desarrollo. Aquí se gestionarán los gastos y sobrecostos operativos de la ruta.</p>
+
+                            <div className="bg-orange-50 border border-orange-100 rounded-3xl p-6 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest">Total Sobrecostos</p>
+                                    <p className="text-xl font-black text-orange-900">{fmtCOP(totalSobrecostos)}</p>
+                                </div>
+                                <button onClick={handleSaveSobrecosto} disabled={savingSobrecosto}
+                                    className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all
+                                        ${savingSobrecosto ? 'bg-slate-200 text-slate-400' : 'bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-900/20'}`}>
+                                    {savingSobrecosto ? 'Enviando...' : 'Solicitar Aprobación de Sobrecostos'}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

@@ -980,9 +980,13 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
               <div className="flex flex-col gap-2">
                 {data.modifications.map((log, i) => {
                   const isUnassign   = log.action === 'UNASSIGN_INVOICE';
-                  const isReassign   = log.action === 'REASSIGN' || log.action === 'REASSIGN_VEHICLE';
+                  const isReassign   = log.action === 'REASSIGN_PLATE' || log.action === 'REASSIGN_VEHICLE' || log.action === 'REASSIGN';
                   const isAdd        = log.action === 'ADD';
-                  const obs          = typeof log.details === 'object' ? log.details?.observations : null;
+                  let parsedDetails: any = null;
+                  try {
+                    parsedDetails = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+                  } catch { parsedDetails = null; }
+                  const obs = parsedDetails?.observations || null;
                   const accentBg    = isUnassign ? 'bg-rose-50 border-rose-200'
                                     : isReassign ? 'bg-amber-50 border-amber-200'
                                     : isAdd      ? 'bg-emerald-50 border-emerald-200'

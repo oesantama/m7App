@@ -685,6 +685,12 @@ export const api = {
     body: JSON.stringify(data)
   }),
 
+  saveSobrecostos: (data: { documentId: string, plate: string, items: any[], userId: string }) => fetchJson(`${API_URL}/conciliation/sobrecostos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+
   // --- CAPACITACIONES (Centro de Capacitaciones) ---
   getTrainingCategories: () => fetchJson(`${API_URL}/training/categories?_t=${Date.now()}`),
   getTrainingCourses: (categoryId?: string, level?: number) => {
