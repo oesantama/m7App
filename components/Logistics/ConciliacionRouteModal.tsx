@@ -89,7 +89,7 @@ interface SobrecostoRow {
     valor: string;
     nroAprobacion: string;
     fecha: string;
-    status: 'PENDIENTE' | 'APROBADO';
+    statusId: string;
 }
 
 interface Props {
@@ -438,7 +438,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [grupalMetodo, setGrupalMetodo]     = useState<MetodoPago>('CONSIGNACION');
 
     // Estado sobrecostos
-    const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), status: 'PENDIENTE' }]);
+    const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
     const [savingSobrecosto, setSavingSobrecosto] = useState(false);
 
     useEffect(() => {
@@ -447,7 +447,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         invoices.forEach(inv => m.set(inv.invoice_number, initForm(inv)));
         setForms(m);
         setConsignaciones([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }]);
-        setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), status: 'PENDIENTE' }]);
+        setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
         setTab('individual');
         setActiveDialog(null);
     }, [isOpen, invoices]);
@@ -518,7 +518,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     valor: Number(s.valor.replace(/\./g, '').replace(',', '')) || 0,
                     referencia: s.nroAprobacion,
                     fecha: s.fecha,
-                    status: s.status
+                    statusId: s.statusId
                 })),
                 userId: currentUserId
             });
@@ -549,6 +549,8 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         const legalCount   = invoices.filter(i => !!i.forma_pago).length;
         return { totalValue, legalizedVal: totalLegalizado, legalCount, pendingVal: Math.max(0, totalValue - totalLegalizado), total: invoices.length };
     }, [invoices, totalConsignado, totalSobrecostos]);
+
+    const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
 
     const handleSave = async (inv: InvoiceRow) => {
         const form = forms.get(inv.invoice_number);
@@ -809,7 +811,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Gestión de Sobrecostos</h4>
                                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Registre gastos adicionales asociados a la placa {route.plate}</p>
                                     </div>
-                                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[8px] font-black uppercase tracking-widest">Estado: Pendiente</span>
+                                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[8px] font-black uppercase tracking-widest">Estado ID: EST-01 (Pendiente)</span>
                                 </div>
 
                                 <div className="space-y-3">
@@ -857,7 +859,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     ))}
                                 </div>
 
-                                <button onClick={() => setSobrecostos([...sobrecostos, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), status: 'PENDIENTE' }])}
+                                <button onClick={() => setSobrecostos([...sobrecostos, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }])}
                                     className="mt-4 w-full py-2.5 border-2 border-dashed border-slate-300 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest hover:border-orange-400 hover:text-orange-600 transition-all">
                                     + Agregar otro sobrecosto
                                 </button>
