@@ -1737,9 +1737,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 );
                             })
                         )}
-
-                        </div>
-                        </> }
+                        </>}
                     </div>
 
                     {/* MAPA EXPANDIDO TOTAL */}
@@ -1958,7 +1956,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 )}
 
                                                 {/* SUBIR SOPORTE — cuando ya fue entregado */}
-                                                {(['EST-12','EST-13','EST-14'].includes(inv.itemStatus || inv.status || '')) && (
+                                                {(['EST-12','EST-13','EST-14'].includes(effectiveStatus)) && (
                                                     <button
                                                         onClick={() => setVoucherModal({ isOpen: true, invoice: inv })}
                                                         className="px-4 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all flex items-center gap-2"
