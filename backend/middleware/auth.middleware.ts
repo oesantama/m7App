@@ -34,16 +34,20 @@ const ID_MAP: Record<string, string> = {
     'ASIGNACIONES': 'PAG-12',
     'DOCUMENTOS_L': 'PAG-16',
     'RUTAS': 'PAG-15',
+    'UBICACIONES': 'PAG-15', // GPS locations ligadas al módulo de rutas
     'DASHBOARD': 'PAG-25',
     'NOTIFICACIONES': 'PAG-07',
     'GRUPO_INTER': 'PAG-31',
     'WHATSAPP': 'PAG-07',
-    'CAPACITACIONES': 'PAG-32', // PAG-32 = GESTIÓN ASISTENCIAS (training-ops)
-    'PAG-33': 'PAG-33',         // PAG-33 = CURSOS Y TALLERES (capacitaciones)
-    'PAG-35': 'PAG-35',         // PAG-35 = DASHBOARD AJOVER
-    'CONCILIACION': 'PAG-36',   // PAG-36 = CONCILIACIÓN FACTURAS
+    'CAPACITACIONES': 'PAG-32',
+    'PAG-33': 'PAG-33',
+    'PAG-35': 'PAG-35',
+    'CONCILIACION': 'PAG-36',
     'PAG-36': 'PAG-36',
 };
+
+// Módulos que usuarios con permiso RUTAS (PAG-15) pueden leer (solo view)
+const RUTAS_READ_ALLOWED = new Set(['VEHICULOS', 'ASIGNACIONES', 'UBICACIONES', 'CONDUCTORES']);
 
 export const requirePermission = (moduleName: string, action: string) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -65,20 +69,28 @@ export const requirePermission = (moduleName: string, action: string) => {
 
         const pageId = ID_MAP[moduleName];
 
-        const hasPermission = user.permissions?.some((p: any) => 
-            (p.module === moduleName || (pageId && p.module === pageId)) && 
+        const hasPermission = user.permissions?.some((p: any) =>
+            (p.module === moduleName || (pageId && p.module === pageId)) &&
             p.actions.includes(action)
         );
 
-        if (!hasPermission) {
-            console.warn(`[AUTH-403] Usuario ${user.email} intentó acceder a ${moduleName}:${action} sin permiso. ID esperado: ${pageId}`);
-            return res.status(403).json({ 
-                success: false, 
-                error: `Permiso insuficiente para ${moduleName}` 
-            });
+        if (hasPermission) return next();
+
+        // Usuarios con permiso RUTAS pueden leer datos de vehículos, asignaciones y ubicaciones
+        if (action === 'view' && RUTAS_READ_ALLOWED.has(moduleName)) {
+            const rutasPageId = ID_MAP['RUTAS'];
+            const hasRutas = user.permissions?.some((p: any) =>
+                (p.module === 'RUTAS' || (rutasPageId && p.module === rutasPageId)) &&
+                p.actions.includes('view')
+            );
+            if (hasRutas) return next();
         }
 
-        next();
+        console.warn(`[AUTH-403] Usuario ${user.email} intentó acceder a ${moduleName}:${action} sin permiso.`);
+        return res.status(403).json({
+            success: false,
+            error: `Permiso insuficiente para ${moduleName}`
+        });
     };
 };
 

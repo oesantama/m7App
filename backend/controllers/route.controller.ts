@@ -12,7 +12,7 @@ export const getRoutes = async (req: Request, res: Response) => {
     const result = await pool.query(`
       SELECT
         r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text, r.created_by::text, r.status_id::text, r.created_at,
-        v.plate, d.name as driver_name,
+        v.plate, d.name as driver_name, d.document_number as driver_document,
         COALESCE(
           (
             SELECT json_agg(invoice_id)

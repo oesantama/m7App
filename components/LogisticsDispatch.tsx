@@ -1163,26 +1163,35 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             });
         }
 
-        // Si es CONDUCTOR (ROL-03), solo mostrar sus rutas por documento
+        // Si es CONDUCTOR (ROL-03), solo mostrar sus rutas
         const userRoleId = user.role_id || user.roleId || '';
         if (userRoleId === 'ROL-03' || userRoleId === 'CONDUCTOR') {
             const userDoc = String(user.document_number || user.documentNumber || '').trim();
-            if (!userDoc) return [];
+            const userId  = String(user.id || user.userId || '').trim();
+            if (!userDoc && !userId) return [];
 
             return routes.filter(route => {
-                // 1. Verificar si la ruta tiene el documento pegado
-                if (String(route.driver_document || '').trim() === userDoc) return true;
+                // 1. driver_document viene directo del JOIN en getRoutes
+                const routeDoc = String((route as any).driver_document || '').trim();
+                if (userDoc && routeDoc && routeDoc === userDoc) return true;
 
-                // 2. Verificar vía asignación activa (manejar tanto camelCase como snake_case)
+                // 2. Verificar vía assignments (si hay datos)
                 const link = assignments.find(a => {
                     const aDriverId = a.driverId || (a as any).driver_id;
                     const aActive = a.isActive !== undefined ? a.isActive : (a as any).is_active;
                     return String(aDriverId) === String(route.driver_id) && aActive;
                 });
-                const linkDriverId = link?.driverId || (link as any)?.driver_id;
-                const drv = drivers.find(d => String(d.id) === String(linkDriverId));
-                const drvDoc = String((drv as any)?.document_number || (drv as any)?.documentNumber || '').trim();
-                return drvDoc === userDoc;
+                if (link) {
+                    const linkDriverId = link?.driverId || (link as any)?.driver_id;
+                    const drv = drivers.find(d => String(d.id) === String(linkDriverId));
+                    const drvDoc = String((drv as any)?.document_number || (drv as any)?.documentNumber || '').trim();
+                    if (userDoc && drvDoc && drvDoc === userDoc) return true;
+                }
+
+                // 3. Fallback: driver_id coincide con user.id (cuando el usuario ES el conductor)
+                if (userId && String(route.driver_id || '').trim() === userId) return true;
+
+                return false;
             });
         }
         // Admin u otros roles ven todo (filtrado por cliente)
@@ -1919,7 +1928,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
                                     // All unsigned signatures for this invoice (any user) — used to block ENTREGAR
                                     const allPendingForInv = invoiceAllPending[invKey] || [];
-                                    const hasAnyPendingSignature = allPendingForInv.length > 0;
                                     const pendingBodega = allPendingForInv.some(p => p.role === 'BODEGA');
                                     const pendingConductor = allPendingForInv.some(p => p.role === 'CONDUCTOR');
                                     return (
@@ -1961,8 +1969,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     </button>
                                                 )}
 
-                                                {/* ENTREGAR — EN RUTA + usuario sin firma pendiente + nadie más con firma pendiente */}
-                                                {effectiveStatus === 'EST-11' && !hasPendingSignature && !hasAnyPendingSignature && (
+                                                {/* ENTREGAR — EN RUTA + el usuario actual no tiene firma propia pendiente */}
+                                                {effectiveStatus === 'EST-11' && !hasPendingSignature && (
                                                     <button
                                                         onClick={() => {
                                                             const items = (inv.items || []).map((it: any) => ({
