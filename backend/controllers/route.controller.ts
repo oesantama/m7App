@@ -497,13 +497,11 @@ export const reassignRouteVehicle = async (req: Request, res: Response) => {
 
     // 7. Loguear movimiento
     await client.query(`
-      INSERT INTO route_modifications_log (route_id, action, user_id, details)
-      VALUES ($1, 'REASSIGN_PLATE', $2, $3)
-    `, [routeId, userId, JSON.stringify({
+      INSERT INTO route_modifications_log (route_id, action, user_id, previous_plate, new_plate, details)
+      VALUES ($1, 'REASSIGN_PLATE', $2, $3, $4, $5)
+    `, [routeId, userId, oldRoute.vehicle_id || null, newVehicleId || null, JSON.stringify({
       old_route_id: routeId,
       new_route_id: newRouteId,
-      old_plate: oldRoute.vehicle_id,
-      new_plate: newVehicleId,
       observations
     })]);
 

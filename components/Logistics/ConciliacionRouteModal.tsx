@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 type EstadoEntrega = 'entregado' | 'devolucion' | 'parcial';
 type MetodoPago   = 'TRANSFERENCIA' | 'CONSIGNACION';
-type ModalTab     = 'individual' | 'grupal';
+type ModalTab     = 'individual' | 'grupal' | 'repice';
 
 interface InvoiceRow {
     invoice_number: string;
@@ -391,17 +391,17 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[960] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-[90vw] rounded-3xl shadow-2xl shadow-slate-900/20 animate-in zoom-in-95 duration-250 flex flex-col max-h-[92vh] overflow-hidden border border-slate-100">
+        <div className="fixed inset-0 z-[960] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center sm:p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full h-full sm:h-auto sm:max-w-[98vw] sm:rounded-3xl shadow-2xl shadow-slate-900/20 animate-in zoom-in-95 duration-250 flex flex-col sm:max-h-[95vh] overflow-hidden border border-slate-100">
 
                 {/* ── Header ──────────────────────────────────────────────── */}
-                <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border-b border-emerald-100 px-6 pt-5 pb-4 rounded-t-3xl flex-shrink-0">
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex items-center gap-3">
+                <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border-b border-emerald-100 px-6 pt-5 pb-4 sm:rounded-t-3xl flex-shrink-0">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-md shadow-emerald-200">
                                 <span className="text-xl">🚛</span>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-0.5">Conciliar Facturas</p>
                                 <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none">{route.plate || 'Sin placa'}</h3>
                                 {route.driver_name && (
@@ -409,38 +409,30 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 )}
                             </div>
                         </div>
+
+                        {/* Metrics Cards moved here */}
+                        <div className="grid grid-cols-3 gap-2 flex-1 max-w-2xl">
+                            <div className="bg-emerald-100 border border-emerald-200 rounded-2xl px-3 py-2 text-center">
+                                <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">Legalizado</p>
+                                <p className="text-xs font-black text-emerald-800">{fmtCOP(plateTotals.legalizedVal)}</p>
+                            </div>
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2 text-center">
+                                <p className="text-[7px] font-black text-amber-600 uppercase tracking-widest mb-0.5">Pendiente</p>
+                                <p className="text-xs font-black text-amber-800">{fmtCOP(plateTotals.pendingVal)}</p>
+                            </div>
+                            <div className="bg-slate-100 border border-slate-200 rounded-2xl px-3 py-2 text-center">
+                                <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Total Placa</p>
+                                <p className="text-xs font-black text-slate-800">{fmtCOP(plateTotals.totalValue)}</p>
+                            </div>
+                        </div>
+
                         <button onClick={onClose}
-                            className="w-9 h-9 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-full flex items-center justify-center transition-all flex-shrink-0 mt-1 shadow-sm">
+                            className="w-9 h-9 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-full flex items-center justify-center transition-all flex-shrink-0 shadow-sm self-end lg:self-center">
                             <Icons.X className="w-4 h-4 text-slate-500 hover:text-rose-500" />
                         </button>
                     </div>
 
-                    {/* Progreso */}
-                    <div className="mt-4 grid grid-cols-3 gap-3">
-                        <div className="col-span-3">
-                            <div className="flex items-center justify-between mb-1">
-                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Avance de Legalización</span>
-                                <span className="text-[9px] font-black text-emerald-600">{plateTotals.legalCount}/{plateTotals.total} · {pct}%</span>
-                            </div>
-                            <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
-                            </div>
-                        </div>
-                        <div className="bg-emerald-100 border border-emerald-200 rounded-2xl px-4 py-2.5 text-center">
-                            <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">Legalizado</p>
-                            <p className="text-sm font-black text-emerald-800">{fmtCOP(plateTotals.legalizedVal)}</p>
-                        </div>
-                        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 text-center">
-                            <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest mb-0.5">Pendiente</p>
-                            <p className="text-sm font-black text-amber-800">{fmtCOP(plateTotals.pendingVal)}</p>
-                        </div>
-                        <div className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-2.5 text-center">
-                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Total Placa</p>
-                            <p className="text-sm font-black text-slate-800">{fmtCOP(plateTotals.totalValue)}</p>
-                        </div>
-                    </div>
-
-                    {/* Tabs */}
+                    {/* Tabs row below cards */}
                     <div className="flex gap-2 mt-4">
                         <button onClick={() => setTab('individual')}
                             className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2
@@ -456,6 +448,24 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     : 'bg-white border-slate-200 text-slate-500 hover:border-violet-300 hover:text-violet-600'}`}>
                             🏦 Consignación Grupal
                         </button>
+                        <button onClick={() => setTab('repice')}
+                            className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border-2
+                                ${tab === 'repice'
+                                    ? 'bg-blue-500 border-blue-500 text-white shadow-md shadow-blue-200'
+                                    : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600'}`}>
+                            📋 REPICE
+                        </button>
+                    </div>
+
+                    {/* Progress bar at the bottom of header */}
+                    <div className="mt-4">
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Avance de Legalización</span>
+                            <span className="text-[9px] font-black text-emerald-600">{plateTotals.legalCount}/{plateTotals.total} · {pct}%</span>
+                        </div>
+                        <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                        </div>
                     </div>
                 </div>
 
@@ -950,11 +960,26 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     </div>
                 )}
 
+                {/* ══ TAB REPICE ══════════════════════════════════════════════ */}
+                {tab === 'repice' && (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
+                        <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mb-4">
+                            <Icons.FileText className="w-8 h-8 text-blue-600" />
+                        </div>
+                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Módulo REPICE</h3>
+                        <p className="text-[10px] text-slate-500 mt-2 max-w-xs font-bold uppercase tracking-widest leading-relaxed">
+                            Contenido en desarrollo. Aquí se mostrará la gestión de documentos REPICE para esta placa.
+                        </p>
+                    </div>
+                )}
+
                 {/* ── Footer ──────────────────────────────────────────────── */}
                 <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 flex-shrink-0 bg-slate-50 rounded-b-3xl">
-                    {tab === 'individual' ? (
+                    {tab !== 'grupal' ? (
                         <>
-                            <p className="text-[9px] font-bold text-slate-400">{plateTotals.legalCount} de {plateTotals.total} facturas legalizadas</p>
+                            <p className="text-[9px] font-bold text-slate-400">
+                                {tab === 'individual' ? `${plateTotals.legalCount} de ${plateTotals.total} facturas legalizadas` : 'Vista de gestión de documentos'}
+                            </p>
                             <button onClick={onClose}
                                 className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 text-white font-black text-[9px] uppercase tracking-widest transition-all">
                                 Cerrar
