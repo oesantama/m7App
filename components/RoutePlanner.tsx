@@ -3125,42 +3125,42 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       )}
       {/* Modal Facturas Pendientes */}
       {isPendingInvoicesModalOpen && (
-        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-rose-50 rounded-t-[2.5rem] shrink-0">
+        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[98vw] h-[95vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-rose-50 rounded-t-[2rem] shrink-0">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white text-rose-600 rounded-2xl flex items-center justify-center shadow-md">
-                  <Icons.FileText className="w-6 h-6" />
+                <div className="w-10 h-10 bg-white text-rose-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Icons.FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Facturas Pendientes de Ruta</h3>
-                  <p className="text-xs font-bold text-slate-500 uppercase">Listado total de facturas aptas para despacho</p>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter leading-none">Facturas Pendientes de Ruta</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Listado total de facturas aptas para despacho</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={exportPendingInvoices}
-                  className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
                 >
                   <Icons.Download className="w-4 h-4" />
                   Exportar Excel
                 </button>
-                <button onClick={() => setIsPendingInvoicesModalOpen(false)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
-                  <Icons.X className="w-5 h-5 text-slate-400" />
+                <button onClick={() => setIsPendingInvoicesModalOpen(false)} className="w-9 h-9 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                  <Icons.X className="w-4 h-4 text-slate-400" />
                 </button>
               </div>
             </div>
 
-            <div className="px-8 py-6 bg-slate-50 border-b border-slate-200 shrink-0">
+            <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 shrink-0">
               <div className="relative">
-                <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5" />
+                <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
                 <input
                   autoFocus
                   type="text"
                   value={pendingInvoicesSearch}
                   onChange={(e) => setPendingInvoicesSearch(e.target.value.toUpperCase())}
                   placeholder="Buscar por factura, placa o documento..."
-                  className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-3xl text-sm font-black uppercase outline-none focus:border-rose-400 transition-all shadow-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-rose-400 transition-all shadow-sm"
                 />
               </div>
             </div>
@@ -3169,13 +3169,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 bg-white z-10 shadow-sm">
                   <tr className="bg-slate-50">
-                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Documento L</th>
-                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Fecha</th>
-                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Placa</th>
-                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Factura</th>
-                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Cliente</th>
-                    <th className="px-6 py-4 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Artículos</th>
-                    <th className="px-6 py-4 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Volumen</th>
+                    <th className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Doc. L</th>
+                    <th className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Fecha Entrega</th>
+                    <th className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Placa</th>
+                    <th className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Factura</th>
+                    <th className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Cliente</th>
+                    <th className="px-4 py-3 text-center text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Art.</th>
+                    <th className="px-4 py-3 text-right text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Volumen</th>
+                    <th className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">F. Carga</th>
+                    <th className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Usuario</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-50">
@@ -3193,27 +3195,33 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                           const doc = documents.find(d => d.id === inv.docLId);
                           return (
                             <tr key={inv.id} className="hover:bg-slate-50 transition-colors group">
-                              <td className="px-6 py-4">
-                                <span className="text-[10px] font-black text-slate-900 bg-slate-100 px-2 py-1 rounded-lg uppercase">{doc?.externalDocId || inv.docLId}</span>
+                              <td className="px-4 py-2">
+                                <span className="text-[9px] font-black text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded-lg uppercase">{doc?.externalDocId || inv.docLId}</span>
                               </td>
-                              <td className="px-6 py-4 text-[10px] font-bold text-slate-600 uppercase tracking-tighter">
+                              <td className="px-4 py-2 text-[9px] font-bold text-slate-600 uppercase tracking-tighter">
                                 {doc?.deliveryDate ? new Date(doc.deliveryDate).toLocaleDateString() : 'N/A'}
                               </td>
-                              <td className="px-6 py-4">
-                                <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase">{doc?.vehicleData || 'N/A'}</span>
+                              <td className="px-4 py-2">
+                                <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-lg uppercase">{doc?.vehicleData || 'N/A'}</span>
                               </td>
-                              <td className="px-6 py-4 text-[10px] font-black text-slate-900">{inv.invoiceNumber}</td>
-                              <td className="px-6 py-4 min-w-[200px]">
-                                <p className="text-[10px] font-black text-slate-700 truncate max-w-[250px] uppercase">{inv.customerName}</p>
-                                <p className="text-[8px] text-slate-400 font-bold uppercase">{inv.city}</p>
+                              <td className="px-4 py-2 text-[9px] font-black text-slate-900">{inv.invoiceNumber}</td>
+                              <td className="px-4 py-2 min-w-[150px]">
+                                <p className="text-[9px] font-black text-slate-700 truncate max-w-[200px] uppercase">{inv.customerName}</p>
+                                <p className="text-[7px] text-slate-400 font-bold uppercase">{inv.city}</p>
                               </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className="text-[10px] font-black text-slate-600 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center mx-auto border border-slate-100">
+                              <td className="px-4 py-2 text-center">
+                                <span className="text-[9px] font-black text-slate-600 bg-slate-50 w-6 h-6 rounded-full flex items-center justify-center mx-auto border border-slate-100">
                                   {inv.items?.length || 0}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 text-right">
-                                <span className="text-[10px] font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(3)}m³</span>
+                              <td className="px-4 py-2 text-right">
+                                <span className="text-[9px] font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(3)}m³</span>
+                              </td>
+                              <td className="px-4 py-2 text-[8px] font-bold text-slate-400 uppercase whitespace-nowrap">
+                                {doc?.createdAt ? new Date(doc.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                              </td>
+                              <td className="px-4 py-2 text-[8px] font-black text-slate-500 uppercase truncate max-w-[80px]">
+                                {doc?.createdBy || doc?.inventoryUser || '—'}
                               </td>
                             </tr>
                           );
@@ -3233,8 +3241,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 if (filtered.length === 0) {
                   return (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-300">
-                      <Icons.Audit className="w-16 h-16 opacity-20 mb-4" />
-                      <p className="text-xs font-black uppercase tracking-widest">
+                      <Icons.Audit className="w-12 h-12 opacity-20 mb-4" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">
                         {unassignedInvoices.length === 0 ? "No hay facturas pendientes" : "No se encontraron coincidencias"}
                       </p>
                     </div>

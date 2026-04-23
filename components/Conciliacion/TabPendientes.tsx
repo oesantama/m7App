@@ -292,14 +292,16 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             efectivo: number; credito: number;
             completadas: number; devueltas: number; parciales: number; legalizadas: number;
             repice_count: number; valor_repice: number;
+            valor_grupal: number;
         }>();
+
         invoices.forEach(inv => {
             const plate = inv.route_vehicle_plate || inv.vehicle_plate || '';
             if (!plate) return;
             const cur = map.get(plate) ?? {
                 valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
-                repice_count: 0, valor_repice: 0
+                repice_count: 0, valor_repice: 0, valor_grupal: 0
             };
             const val    = Number(inv.valor) || 0;
             const invVal = Number(inv.invoice_value) || 0;
@@ -326,8 +328,22 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             cur.total_sobrecosto += sc;
             map.set(plate, cur);
         });
+
+        // Sumar consignaciones grupales por placa
+        groupPayments.forEach(p => {
+            const plate = p.plate || '';
+            if (!plate) return;
+            const cur = map.get(plate) ?? {
+                valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
+                efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
+                repice_count: 0, valor_repice: 0, valor_grupal: 0
+            };
+            cur.valor_grupal += (Number(p.valor) || 0);
+            map.set(plate, cur);
+        });
+
         return map;
-    }, [invoices]);
+    }, [invoices, groupPayments]);
 
     // ── Métricas globales del documento ───────────────────────────────────────
     const stats = useMemo(() => {
@@ -346,7 +362,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
         // Recaudos adicionales: Solo contamos los que NO tienen factura asociada (los que son realmente grupales)
         const grupalRows      = groupPayments.filter(p => !p.invoice || p.invoice.trim() === '');
-        const totalGrupal     = grupalRows.reduce((s, p) => s + (Number(p.vmetodo) || 0), 0);
+        const totalGrupal     = grupalRows.reduce((s, p) => s + (Number(p.valor) || 0), 0);
         
         const approvedRows    = routeSurcharges.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02');
         const approvedSurch   = approvedRows.reduce((s, r) => s + (Number(r.valor) || 0), 0);
@@ -1085,7 +1101,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     : 0;
                 return (
                     <div className="fixed inset-0 z-[700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                             {/* Header */}
                             <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-emerald-50 flex items-center justify-between shrink-0">
                                 <div className="flex items-center gap-3">
@@ -1112,31 +1128,38 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     </div>
                                     <span className="text-[9px] font-black text-emerald-700 shrink-0">{legalPct}% leg.</span>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                                    <div className="bg-white border border-slate-100 rounded-xl px-3 py-2 text-center cursor-default">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Total placa</p>
-                                        <p className="text-sm font-black text-slate-900">{fmtCOP(totalVal)}</p>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                                    <div className="bg-white border border-slate-100 rounded-xl px-2 py-2 text-center cursor-default">
+                                        <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5 leading-none">Total placa</p>
+                                        <p className="text-[11px] font-black text-slate-900 leading-none mt-1">{fmtCOP(totalVal)}</p>
                                     </div>
-                                    <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'leg' ? 'bg-emerald-600 text-white border-emerald-700 shadow-lg' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100'}`}
-                                        onClick={() => setActiveDetailCard(activeDetailCard === 'leg' ? null : 'leg')}>
-                                        <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'leg' ? 'text-emerald-100' : 'text-emerald-600'}`}>💵 Legalizado</p>
-                                        <p className="text-sm font-black">{fmtCOP(fin.valor_legalizado)}</p>
+                                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-2 py-2 text-center cursor-default">
+                                        <p className="text-[7px] font-black text-emerald-600 uppercase mb-0.5 leading-none">Individual</p>
+                                        <p className="text-[11px] font-black text-emerald-800 leading-none mt-1">{fmtCOP(fin.valor_legalizado)}</p>
                                     </div>
-                                    <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-3 py-2 text-center cursor-default">
-                                        <p className="text-[8px] font-black text-amber-100 uppercase mb-0.5">⏳ Pendiente</p>
-                                        <p className="text-sm font-black">{fmtCOP(Math.max(0, totalVal - fin.valor_legalizado))}</p>
+                                    <div className="bg-violet-50 border border-violet-100 rounded-xl px-2 py-2 text-center cursor-default">
+                                        <p className="text-[7px] font-black text-violet-600 uppercase mb-0.5 leading-none">Grupal</p>
+                                        <p className="text-[11px] font-black text-violet-800 leading-none mt-1">{fmtCOP(fin.valor_grupal)}</p>
                                     </div>
-                                    <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'dev' ? 'bg-amber-500 text-white border-amber-600 shadow-lg' : 'bg-amber-50 border-amber-100 hover:bg-amber-100'}`}
+                                    <div className="bg-orange-50 border border-orange-100 rounded-xl px-2 py-2 text-center cursor-default">
+                                        <p className="text-[7px] font-black text-orange-600 uppercase mb-0.5 leading-none">Parcial</p>
+                                        <p className="text-[11px] font-black text-orange-800 leading-none mt-1">{fmtCOP(fin.valor_parcial)}</p>
+                                    </div>
+                                    <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-2 py-2 text-center cursor-default">
+                                        <p className="text-[7px] font-black text-amber-100 uppercase mb-0.5 leading-none">Pendiente</p>
+                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, totalVal - (fin.valor_legalizado + fin.valor_grupal)))}</p>
+                                    </div>
+                                    <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'dev' ? 'bg-amber-600 text-white border-amber-700 shadow-lg' : 'bg-amber-50 border-amber-100 hover:bg-amber-100'}`}
                                         onClick={() => setActiveDetailCard(activeDetailCard === 'dev' ? null : 'dev')}>
-                                        <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'dev' ? 'text-amber-100' : 'text-amber-600'}`}>🔄 Devuelto</p>
-                                        <p className="text-sm font-black">{fmtCOP(fin.valor_devuelto)}</p>
+                                        <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'dev' ? 'text-amber-100' : 'text-amber-600'}`}>🔄 Devuelto</p>
+                                        <p className="text-[11px] font-black mt-1 leading-none">{fmtCOP(fin.valor_devuelto)}</p>
                                     </div>
-                                    <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'sc' ? 'bg-rose-600 text-white border-rose-700 shadow-lg' : 'bg-rose-50 border-rose-100 hover:bg-rose-100'}`}
+                                    <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'sc' ? 'bg-rose-600 text-white border-rose-700 shadow-lg' : 'bg-rose-50 border-rose-100 hover:bg-rose-100'}`}
                                         onClick={() => {
                                             setActiveDetailCard(activeDetailCard === 'sc' ? null : 'sc');
                                         }}>
-                                        <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'sc' ? 'text-rose-100' : 'text-rose-600'}`}>⚠️ Sobrecosto</p>
-                                        <p className="text-sm font-black">{fmtCOP(routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))}</p>
+                                        <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'sc' ? 'text-rose-100' : 'text-rose-600'}`}>⚠️ Sobrecosto</p>
+                                        <p className="text-[11px] font-black mt-1 leading-none">{fmtCOP(routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))}</p>
                                     </div>
                                 </div>
 
@@ -1169,15 +1192,15 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                             </div>
                                                         ))}
                                                         {/* Consignaciones grupales */}
-                                                        {groupPayments.map((p, idx) => (
+                                                        {groupPayments.filter(p => p.plate === detailRoute.plate).map((p, idx) => (
                                                             <div key={`gp-${idx}`} className="flex items-center justify-between bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
                                                                 <div>
                                                                     <p className="text-[10px] font-black text-emerald-900">Consignación Grupal</p>
                                                                     <p className="text-[8px] text-emerald-600 font-bold uppercase">{p.metodo_pago} · {p.referencia || 'S/R'}</p>
                                                                 </div>
                                                                 <div className="text-right">
-                                                                    <p className="text-[11px] font-black text-emerald-700">{fmtCOP(p.vmetodo)}</p>
-                                                                    <p className="text-[8px] text-emerald-400">{p.processed_at ? String(p.processed_at).slice(0, 10) : '—'}</p>
+                                                                    <p className="text-[11px] font-black text-emerald-700">{fmtCOP(p.valor)}</p>
+                                                                    <p className="text-[8px] text-emerald-400">{p.created_at ? String(p.created_at).slice(0, 10) : '—'}</p>
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -1219,7 +1242,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                           </div>
                                                       );
                                                   })}
-                                                {((activeDetailCard === 'leg' && routeInvs.filter(i => i.forma_pago).length === 0 && groupPayments.length === 0) ||
+                                                {((activeDetailCard === 'leg' && routeInvs.filter(i => i.forma_pago).length === 0 && groupPayments.filter(p => p.plate === detailRoute.plate).length === 0) ||
                                                   (activeDetailCard === 'dev' && routeInvs.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase())).length === 0) ||
                                                   (activeDetailCard === 'par' && routeInvs.filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase())).length === 0) ||
                                                   (activeDetailCard === 'sc' && routeSurcharges.filter(s => s.plate === detailRoute.plate).length === 0)) && (
