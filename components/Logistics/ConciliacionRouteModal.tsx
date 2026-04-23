@@ -291,41 +291,65 @@ const LegalizationDialog: React.FC<{
                                             disabled={!canEdit}
                                             onClick={() => onUpdate({ numConsignacion: 'MISMO_CONDUCTOR' })}
                                             className={`flex-1 py-2 rounded-xl text-[8px] font-black uppercase transition-all border-2 
-                                                ${form.numConsignacion === 'MISMO_CONDUCTOR' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'}`}>
+                                                ${form.numConsignacion === 'MISMO_CONDUCTOR' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'}`}>
                                             Mismo Conductor
                                         </button>
                                         <button 
                                             disabled={!canEdit}
                                             onClick={() => onUpdate({ numConsignacion: 'OTRO_CONDUCTOR' })}
                                             className={`flex-1 py-2 rounded-xl text-[8px] font-black uppercase transition-all border-2 
-                                                ${form.numConsignacion !== 'MISMO_CONDUCTOR' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'}`}>
+                                                ${form.numConsignacion === 'OTRO_CONDUCTOR' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'}`}>
                                             Otro Conductor
                                         </button>
                                     </div>
                                     <p className="text-[7px] text-blue-400 font-bold mt-2 uppercase text-center italic">
                                         {form.numConsignacion === 'MISMO_CONDUCTOR' 
                                             ? 'ℹ️ Quedará pendiente hasta entrega por el mismo conductor.' 
-                                            : 'ℹ️ Seleccione la nueva placa de destino para la reasignación.'}
+                                            : form.numConsignacion === 'OTRO_CONDUCTOR' 
+                                                ? 'ℹ️ Seleccione la nueva placa de destino para la reasignación.'
+                                                : 'ℹ️ Seleccione el tipo de disposición para el Repice.'}
                                     </p>
 
-                                    {form.numConsignacion === 'OTRO_CONDUCTOR' && (
-                                        <div className="mt-3 animate-in slide-in-from-top-1 duration-200">
-                                            <label className="block text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">Placa de Destino</label>
-                                            <select
-                                                value={form.targetRouteId || ''}
-                                                onChange={(e) => onUpdate({ targetRouteId: e.target.value })}
-                                                disabled={!canEdit}
-                                                className="w-full px-3 py-2 bg-blue-50 border-2 border-blue-100 rounded-xl text-[10px] font-black text-blue-900 outline-none focus:border-blue-400 transition-all appearance-none cursor-pointer"
-                                            >
-                                                <option value="">Seleccione placa...</option>
-                                                {allRoutes?.filter(r => r.plate !== inv.vehicle_plate).map(r => (
-                                                    <option key={r.route_id} value={r.route_id}>
-                                                        🚗 {r.plate} — {r.driver_name || 'Sin conductor'}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
+                                    {form.numConsignacion === 'OTRO_CONDUCTOR' && (() => {
+                                        const [search, setSearch] = useState('');
+                                        const filteredRoutes = (allRoutes || []).filter(r => {
+                                            if (r.plate === inv.vehicle_plate) return false;
+                                            if (!search) return true;
+                                            const s = search.toLowerCase();
+                                            return r.plate.toLowerCase().includes(s) || (r.driver_name || '').toLowerCase().includes(s);
+                                        });
+
+                                        return (
+                                            <div className="mt-3 animate-in slide-in-from-top-1 duration-200 space-y-2">
+                                                <div>
+                                                    <label className="block text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">Buscar Placa / Conductor</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={search}
+                                                        onChange={(e) => setSearch(e.target.value)}
+                                                        placeholder="Filtrar por placa..."
+                                                        className="w-full px-3 py-1.5 bg-white border border-blue-200 rounded-lg text-[10px] outline-none focus:border-blue-400"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">Placa de Destino</label>
+                                                    <select
+                                                        value={form.targetRouteId || ''}
+                                                        onChange={(e) => onUpdate({ targetRouteId: e.target.value })}
+                                                        disabled={!canEdit}
+                                                        className="w-full px-3 py-2 bg-blue-50 border-2 border-blue-100 rounded-xl text-[10px] font-black text-blue-900 outline-none focus:border-blue-400 transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        <option value="">{filteredRoutes.length > 0 ? 'Seleccione placa...' : 'No se encontraron coincidencias'}</option>
+                                                        {filteredRoutes.map(r => (
+                                                            <option key={r.route_id} value={r.route_id}>
+                                                                🚗 {r.plate} — {r.driver_name || 'Sin conductor'}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
 
