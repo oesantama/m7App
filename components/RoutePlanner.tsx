@@ -3209,7 +3209,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                             </span>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <span className="text-[10px] font-black text-emerald-600">{inv.volumeM3?.toFixed(3)}m³</span>
+                            <span className="text-[10px] font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(3)}m³</span>
                           </td>
                         </tr>
                       );
