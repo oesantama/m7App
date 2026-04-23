@@ -260,13 +260,22 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     'article_name', a.name,
                     'qty', di2.expected_qty,
                     'unit', di2.unit,
-                    'returned_qty', (
-                        SELECT SUM(dri.quantity_returned)
-                        FROM delivery_return_items dri
-                        JOIN delivery_returns dr ON dr.id = dri.return_id
-                        WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(di2.invoice))
-                          AND dri.sku = di2.article_id
-                          AND dr.status <> 'CANCELLED'
+                    'returned_qty', COALESCE(
+                        (
+                            SELECT (elem->>'returned_qty')::numeric
+                            FROM jsonb_array_elements(COALESCE(ic.items_returned, '[]')::jsonb) AS elem
+                            WHERE elem->>'id' = di2.id::text
+                            LIMIT 1
+                        ),
+                        (
+                            SELECT SUM(dri.quantity_returned)
+                            FROM delivery_return_items dri
+                            JOIN delivery_returns dr ON dr.id = dri.return_id
+                            WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(di2.invoice))
+                              AND dri.sku = di2.article_id
+                              AND dr.status <> 'CANCELLED'
+                        ),
+                        0
                     )
                  )) FROM document_items di2 
                     LEFT JOIN articles a ON a.id = di2.article_id

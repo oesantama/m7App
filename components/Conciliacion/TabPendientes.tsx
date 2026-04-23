@@ -106,6 +106,7 @@ const FORMA_COLOR: Record<string, { bg: string; text: string; label: string }> =
 const ENTREGADO_STATUS = ['EST-12', 'ENTREGADO', 'COMPLETED', 'FINALIZADO'];
 const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO'];
 const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL'];
+const REPICE_STATUS    = ['EST-15', 'REPICE'];
 
 // ── Sub-componente: Metric pill ───────────────────────────────────────────────
 
@@ -1172,7 +1173,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                                             <div className="flex items-center justify-between mb-3">
                                                 <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
-                                                    Detalle: {activeDetailCard === 'leg' ? 'Legalizaciones' : activeDetailCard === 'dev' ? 'Devoluciones' : activeDetailCard === 'par' ? 'Parciales' : 'Sobrecostos'}
+                                                    Detalle: {activeDetailCard === 'leg' ? 'Legalizaciones' : activeDetailCard === 'dev' ? 'Devoluciones' : activeDetailCard === 'par' ? 'Parciales / Repice' : 'Sobrecostos'}
                                                 </h4>
                                                 <button onClick={() => setActiveDetailCard(null)} className="text-slate-400 hover:text-slate-600">
                                                     <Icons.X className="w-3 h-3" />
