@@ -395,7 +395,11 @@ const AdminDBManager: React.FC = () => {
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Gestor de Base de Datos <span className="text-xs bg-red-600 text-white px-2 py-1 rounded ml-2">ADMIN</span></h1>
+        <div className="flex items-center gap-4">
+            <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Gestor de Base de Datos</h2>
+            <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black animate-pulse">V2.0 - ACTIVE</span>
+            <span className="px-3 py-1 bg-red-500 text-white rounded-full text-[10px] font-black">ADMIN</span>
+        </div>
         
         <div className="flex gap-2">
             <button 

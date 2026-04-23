@@ -873,21 +873,33 @@ export const saveSobrecostos = async (req: Request, res: Response) => {
 
         // Procesar cada item de sobrecosto (Insertar o Actualizar si tiene ID)
         for (const item of items) {
-            // Un ID de base de datos es un número secuencial pequeño. 
-            // Un ID temporal del frontend (Date.now()) es un número de 13 dígitos (> 10^12).
-            const isUpdate = item.id && !isNaN(Number(item.id)) && Number(item.id) < 1000000000;
+            // Un ID de base de datos es un número secuencial. 
+            // Un ID temporal del frontend (Date.now()) es un número largo (> 10^10).
+            const isDbId = item.id && !isNaN(Number(item.id)) && String(item.id).length < 10;
 
-            if (isUpdate) {
+            if (isDbId) {
+                // SOLO actualizar si el estado NO es aprobado (EST-02)
+                // Esto cumple con "el que este aprobado no se permita editar"
                 await client.query(`
                     UPDATE route_surcharges 
                     SET valor = $1, referencia = $2, fecha = $3, status_id = $4, user_id = $5
-                    WHERE id = $6
+                    WHERE id = $6 AND status_id != 'EST-02' AND status_id != 'APROBADO'
                 `, [item.valor, item.referencia, item.fecha, item.statusId, userId, item.id]);
             } else {
-                await client.query(`
-                    INSERT INTO route_surcharges (document_id, plate, valor, referencia, fecha, status_id, user_id)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                `, [documentId, plate, item.valor, item.referencia, item.fecha, item.statusId || 'EST-01', userId]);
+                // Para evitar duplicidad al dar clic varias veces en "Solicitar"
+                // verificamos si ya existe un registro idéntico pendiente para esta placa/documento
+                const existing = await client.query(`
+                    SELECT id FROM route_surcharges 
+                    WHERE document_id = $1 AND plate = $2 AND valor = $3 AND referencia = $4 AND status_id = $5
+                    LIMIT 1
+                `, [documentId, plate, item.valor, item.referencia, item.statusId || 'EST-01']);
+
+                if (existing.rows.length === 0) {
+                    await client.query(`
+                        INSERT INTO route_surcharges (document_id, plate, valor, referencia, fecha, status_id, user_id)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    `, [documentId, plate, item.valor, item.referencia, item.fecha, item.statusId || 'EST-01', userId]);
+                }
             }
         }
 
