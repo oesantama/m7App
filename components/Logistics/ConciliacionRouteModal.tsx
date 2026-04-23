@@ -737,11 +737,18 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 <p className="text-[7px] text-slate-400 font-bold mt-1.5 text-center">{plateTotals.total} Facts</p>
                             </div>
                             <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-rose-500/10 border border-rose-100/50">
-                                <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center">Sobrecostos</p>
-                                <p className="text-sm font-black text-rose-800 leading-none text-center">{fmtCOP(surchargeStats.approved + surchargeStats.pending)}</p>
-                                <p className="text-[7px] text-rose-600/60 font-bold mt-1.5 text-center">
-                                    {surchargeStats.approvedCount} Apr | {surchargeStats.pendingCount} Pend
-                                </p>
+                                <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center">Sobrecostos (Aprobados)</p>
+                                <p className="text-sm font-black text-rose-800 leading-none text-center">{fmtCOP(surchargeStats.approved)}</p>
+                                <div className="grid grid-cols-2 gap-1 mt-1.5 pt-1.5 border-t border-rose-50/50">
+                                    <div className="text-center">
+                                        <p className="text-[6px] font-black text-emerald-500 uppercase leading-none">Aprobados</p>
+                                        <p className="text-[8px] font-black text-slate-700 leading-none mt-0.5">{surchargeStats.approvedCount}</p>
+                                    </div>
+                                    <div className="text-center border-l border-rose-50/50">
+                                        <p className="text-[6px] font-black text-amber-500 uppercase leading-none">Pendientes</p>
+                                        <p className="text-[8px] font-black text-slate-700 leading-none mt-0.5">{surchargeStats.pendingCount} <span className="text-[6px] text-slate-400">({fmtCOP(surchargeStats.pending)})</span></p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -872,7 +879,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     placeholder="N°" className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
                                             </div>
                                             <div className="col-span-2">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Metodo</p>
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Método</p>
                                                 <select value={c.metodo || 'CONSIGNACION'}
                                                     onChange={e => {
                                                         const next = [...consignaciones];
@@ -880,8 +887,8 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         setConsignaciones(next);
                                                     }}
                                                     className="w-full bg-slate-50 px-1 py-2 rounded-xl text-[9px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent appearance-none text-center">
-                                                    <option value="CONSIGNACION">🏦 CONS</option>
-                                                    <option value="TRANSFERENCIA">📱 TRANS</option>
+                                                    <option value="CONSIGNACION">🏦 CONSIGNACIÓN</option>
+                                                    <option value="TRANSFERENCIA">📱 TRANSFERENCIA</option>
                                                 </select>
                                             </div>
                                             <div className="col-span-2">
