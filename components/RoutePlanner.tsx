@@ -31,28 +31,28 @@ import * as XLSX from 'xlsx';
 // Cada zona define un corredor de reparto. Las zonas adyacentes pueden mezclarse
 // solo si la carga está muy vacía; zonas no adyacentes se excluyen completamente.
 const GEO_ZONES_ADJACENT: Record<string, string[]> = {
-  'NORTE_LEJANO':    ['NORTE'],
-  'NORTE':           ['NORTE_LEJANO', 'CENTRO_NORTE'],
-  'CENTRO_NORTE':    ['NORTE', 'CENTRO', 'CENTRO_OCC'],
-  'CENTRO':          ['CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO_SUR'],
-  'CENTRO_OCC':      ['CENTRO_NORTE', 'CENTRO', 'CENTRO_SUR'],
-  'CENTRO_SUR':      ['CENTRO', 'CENTRO_OCC', 'SUR'],
-  'SUR':             ['CENTRO_SUR', 'SUR_LEJANO'],
-  'SUR_LEJANO':      ['SUR'],
+  'NORTE_LEJANO': ['NORTE'],
+  'NORTE': ['NORTE_LEJANO', 'CENTRO_NORTE'],
+  'CENTRO_NORTE': ['NORTE', 'CENTRO', 'CENTRO_OCC'],
+  'CENTRO': ['CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO_SUR'],
+  'CENTRO_OCC': ['CENTRO_NORTE', 'CENTRO', 'CENTRO_SUR'],
+  'CENTRO_SUR': ['CENTRO', 'CENTRO_OCC', 'SUR'],
+  'SUR': ['CENTRO_SUR', 'SUR_LEJANO'],
+  'SUR_LEJANO': ['SUR'],
 };
 
 function classifyGeoZone(lat: number, lng: number, cityUpper: string): string {
   // Norte lejano: Girardota, Barbosa, Don Matías, Santo Domingo (+)
-  const nFar = ['GIRARDOTA','BARBOSA','DON MATÍAS','DONMATÍAS','SANTO DOMINGO'];
+  const nFar = ['GIRARDOTA', 'BARBOSA', 'DON MATÍAS', 'DONMATÍAS', 'SANTO DOMINGO'];
   if (nFar.some(c => cityUpper.includes(c)) || lat > 6.42) return 'NORTE_LEJANO';
   // Norte: Bello, Copacabana
-  if (['BELLO','COPACABANA'].some(c => cityUpper.includes(c)) || lat > 6.31) return 'NORTE';
+  if (['BELLO', 'COPACABANA'].some(c => cityUpper.includes(c)) || lat > 6.31) return 'NORTE';
   // Centro-norte Medellín (Castilla, Aranjuez, Robledo norte)
   if (lat > 6.265) return 'CENTRO_NORTE';
   // Centro Medellín: split por corredor occidente (San Javier, Laureles, Belén)
   if (lat > 6.205) return lng < -75.595 ? 'CENTRO_OCC' : 'CENTRO';
   // Sur: Envigado, Itagüí, Sabaneta
-  const sCities = ['ITAGÜÍ','ITAGUI','SABANETA','ENVIGADO'];
+  const sCities = ['ITAGÜÍ', 'ITAGUI', 'SABANETA', 'ENVIGADO'];
   if (sCities.some(c => cityUpper.includes(c)) || lat > 6.135) return 'SUR';
   // Sur lejano: Caldas, La Estrella, El Retiro
   return 'SUR_LEJANO';
@@ -63,7 +63,7 @@ function classifyGeoZone(lat: number, lng: number, cityUpper: string): string {
 const MAX_ROUTE_RADIUS_KM = 18;
 
 // ── Helpers de visualización ──────────────────────────────────────────────────
-const CITY_PALETTE = ['#6366f1','#8b5cf6','#06b6d4','#14b8a6','#f43f5e','#f97316','#22c55e','#3b82f6','#ec4899','#84cc16'];
+const CITY_PALETTE = ['#6366f1', '#8b5cf6', '#06b6d4', '#14b8a6', '#f43f5e', '#f97316', '#22c55e', '#3b82f6', '#ec4899', '#84cc16'];
 const getCityDotColor = (city: string): string => {
   let h = 0;
   for (let i = 0; i < city.length; i++) h = city.charCodeAt(i) + ((h << 5) - h);
@@ -145,7 +145,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const mapRef = useRef<L.Map | null>(null);
   const isSuperAdmin = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
   const allowedClientIds = user.clientIds || [];
-  
+
   // Filtrar clientes permitidos
   const allowedClients = useMemo(() => {
     if (isSuperAdmin) return clients;
@@ -166,7 +166,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       .then((data: any[]) => {
         if (Array.isArray(data)) setInvoices(data);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [selectedClient]);
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -290,7 +290,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             try {
               const geo = await api.geocodeAddress({ address: inv.address, city: inv.city });
               if (geo?.lat && geo?.lng && !geo.fallback) return { ...inv, lat: geo.lat, lng: geo.lng };
-            } catch {}
+            } catch { }
           }
           return inv;
         })
@@ -380,7 +380,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       if (points.length > 1) {
         setTimeout(() => {
           if (!cancelled && routePreviewMapRef.current) {
-            try { routePreviewMapRef.current.fitBounds(L.latLngBounds(points), { padding: [40, 40] }); } catch {}
+            try { routePreviewMapRef.current.fitBounds(L.latLngBounds(points), { padding: [40, 40] }); } catch { }
           }
         }, 1300);
       }
@@ -402,7 +402,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // FILTRO 2: Estados aptos para despacho Orbit
       const s = String(inv.status || '').toUpperCase();
       // IDs EST-XX + texto legado (compatibilidad retroactiva mientras migra la BD)
-      const validStatuses = ['EST-03','EST-04','EST-05','EST-08','PENDIENTE','AUDITADO','INVENTARIADO','EN CONTEO'];
+      const validStatuses = ['EST-03', 'EST-04', 'EST-05', 'EST-08', 'PENDIENTE', 'AUDITADO', 'INVENTARIADO', 'EN CONTEO'];
       return validStatuses.includes(s);
     });
 
@@ -677,7 +677,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       // 3. Ordenamiento Global — prioridad → ventana horaria → ZONA GEOGRÁFICA → ciudad → barrio
-      const ZONE_ORDER = ['NORTE_LEJANO','NORTE','CENTRO_NORTE','CENTRO_OCC','CENTRO','CENTRO_SUR','SUR','SUR_LEJANO'];
+      const ZONE_ORDER = ['NORTE_LEJANO', 'NORTE', 'CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO', 'CENTRO_SUR', 'SUR', 'SUR_LEJANO'];
       availableInvoices.sort((a, b) => {
         // @ts-ignore
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
@@ -753,7 +753,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       // Ordenar celdas: primero por zona (ZONE_ORDER), luego por densidad desc
-      const ZONE_ORDER_CLUSTER = ['NORTE_LEJANO','NORTE','CENTRO_NORTE','CENTRO_OCC','CENTRO','CENTRO_SUR','SUR','SUR_LEJANO'];
+      const ZONE_ORDER_CLUSTER = ['NORTE_LEJANO', 'NORTE', 'CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO', 'CENTRO_SUR', 'SUR', 'SUR_LEJANO'];
       let remainingCells = Array.from(cellMap.values()).sort((a, b) => {
         const zA = ZONE_ORDER_CLUSTER.indexOf(a.zone);
         const zB = ZONE_ORDER_CLUSTER.indexOf(b.zone);
@@ -1331,7 +1331,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const link = assignments.find(a => a.vehicleId === route.vehicle.id && a.isActive);
         // Generar ID más robusto
         const uniqueId = `rt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        
+
         const res = await api.saveRoute({
           id: uniqueId,
           vehicleId: route.vehicle.id,
@@ -1376,7 +1376,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     } else if (failCount > 0) {
       toast.error("Error al procesar el despacho masivo. No se confirmó ninguna ruta.");
     }
-    
+
     setDispatchConfirmation({ isOpen: false, route: null, isMass: false });
   };
 
@@ -1430,9 +1430,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     autoTable(pdf, {
       startY: y, margin: { left: ML }, tableWidth: bankW,
       head: [['BANCO', 'VALOR', 'COMPROBANTE', 'FECHA']],
-      body: [['','','',''],['','','',''],['','','','']],
+      body: [['', '', '', ''], ['', '', '', ''], ['', '', '', '']],
       styles: { fontSize: 6, cellPadding: 1.5, minCellHeight: 5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
-      headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
+      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
       theme: 'grid',
       margin: { bottom: 28 }
     });
@@ -1499,9 +1499,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           ];
         }),
       styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
-      headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
       columnStyles: {
-        0: { cellWidth: 8,  halign: 'center' },
+        0: { cellWidth: 8, halign: 'center' },
         1: { cellWidth: 12, halign: 'center' },
         2: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
         3: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
@@ -1557,21 +1557,21 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       autoTable(pdf, {
         startY: y, margin: { left: ML, right: MR },
         tableWidth: CW, // Forzar el ancho al margen de la tabla superior
-        head: [['ID','CANT','NOTAS','ID','CANT','NOTAS','ID','CANT','NOTAS','ID','CANT','NOTAS']],
+        head: [['ID', 'CANT', 'NOTAS', 'ID', 'CANT', 'NOTAS', 'ID', 'CANT', 'NOTAS', 'ID', 'CANT', 'NOTAS']],
         body: cargoRows,
         styles: { fontSize: 5.5, cellPadding: 1, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
-        headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 5.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+        headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 5.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
         columnStyles: {
-          0:  { cellWidth: 29, halign: 'center' },
-          1:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
-          2:  { cellWidth: 12 },
-          3:  { cellWidth: 29, halign: 'center' },
-          4:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
-          5:  { cellWidth: 12 },
-          6:  { cellWidth: 29, halign: 'center' },
-          7:  { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
-          8:  { cellWidth: 12 },
-          9:  { cellWidth: 29, halign: 'center' },
+          0: { cellWidth: 29, halign: 'center' },
+          1: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
+          2: { cellWidth: 12 },
+          3: { cellWidth: 29, halign: 'center' },
+          4: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
+          5: { cellWidth: 12 },
+          6: { cellWidth: 29, halign: 'center' },
+          7: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
+          8: { cellWidth: 12 },
+          9: { cellWidth: 29, halign: 'center' },
           10: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
           11: { cellWidth: 12 },
         },
@@ -1586,26 +1586,26 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const footerY = PH - 26;
 
     for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-        
-        // ── FOOTER SIGNATURES (ON EVERY PAGE) ─────────────────────────────
-        pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.3);
-        pdf.line(ML + 5, footerY + 12, ML + 5 + sigW, footerY + 12);
-        pdf.line(ML + 5 + sigW + 20, footerY + 12, ML + 5 + sigW * 2 + 20, footerY + 12);
-        
-        pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
-        pdf.text('FIRMA CONDUCTOR', ML + 5 + sigW / 2, footerY + 16, { align: 'center' });
-        pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(80, 80, 80);
-        pdf.text(driverName.toUpperCase(), ML + 5 + sigW / 2, footerY + 20, { align: 'center' });
-        
-        pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
-        pdf.text('DESPACHO / AUDITORIA', ML + 5 + sigW + 20 + sigW / 2, footerY + 16, { align: 'center' });
-        pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(80, 80, 80);
-        pdf.text(despachador.toUpperCase(), ML + 5 + sigW + 20 + sigW / 2, footerY + 20, { align: 'center' });
+      pdf.setPage(i);
 
-        // Page numbers
-        pdf.setFontSize(5); pdf.setTextColor(100, 116, 139);
-        pdf.text(`Página ${i} de ${totalPages} | ORBITM7 Intelligence - ${dateStr} - ${route.vehicle.plate} - ${route.assignedInvoices.length} facturas`, PW / 2, PH - 5, { align: 'center' });
+      // ── FOOTER SIGNATURES (ON EVERY PAGE) ─────────────────────────────
+      pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.3);
+      pdf.line(ML + 5, footerY + 12, ML + 5 + sigW, footerY + 12);
+      pdf.line(ML + 5 + sigW + 20, footerY + 12, ML + 5 + sigW * 2 + 20, footerY + 12);
+
+      pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+      pdf.text('FIRMA CONDUCTOR', ML + 5 + sigW / 2, footerY + 16, { align: 'center' });
+      pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(80, 80, 80);
+      pdf.text(driverName.toUpperCase(), ML + 5 + sigW / 2, footerY + 20, { align: 'center' });
+
+      pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+      pdf.text('DESPACHO / AUDITORIA', ML + 5 + sigW + 20 + sigW / 2, footerY + 16, { align: 'center' });
+      pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(80, 80, 80);
+      pdf.text(despachador.toUpperCase(), ML + 5 + sigW + 20 + sigW / 2, footerY + 20, { align: 'center' });
+
+      // Page numbers
+      pdf.setFontSize(5); pdf.setTextColor(100, 116, 139);
+      pdf.text(`Página ${i} de ${totalPages} | ORBITM7 Intelligence - ${dateStr} - ${route.vehicle.plate} - ${route.assignedInvoices.length} facturas`, PW / 2, PH - 5, { align: 'center' });
     }
 
     pdf.save(fileName);
@@ -1621,13 +1621,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     let clientLogo = currentClient?.logo_url || currentClient?.logoUrl || currentClient?.logo || currentClient?.avatar || '';
 
     if (clientLogo && !clientLogo.startsWith('http') && !clientLogo.startsWith('data:')) {
-        clientLogo = `data:image/png;base64,${clientLogo}`;
+      clientLogo = `data:image/png;base64,${clientLogo}`;
     }
     if (!clientLogo) clientLogo = 'https://placehold.co/150x50?text=CLIENTE+LOGO';
 
     // 1. Cálculos de Cabecera y Resumen
     const totalItemsCount = route.assignedInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.totalItems) || 0), 0);
-    
+
     // 2. Consolidación de Carga
     const cargoMap = new Map<string, { id: string, name: string, total: number, unit?: string }>();
     route.assignedInvoices.forEach(inv => {
@@ -1734,9 +1734,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             </thead>
             <tbody>
               ${route.assignedInvoices.map(inv => {
-                const firstItem = inv.items?.[0] || {} as any;
-                const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
-                return `
+      const firstItem = inv.items?.[0] || {} as any;
+      const method = String(inv.paymentMethod || firstItem.paymentMethod || '-').toUpperCase();
+      return `
                   <tr>
                     <td class="text-center">${inv.unCode || firstItem.unCode || firstItem.un_code || '-'}</td>
                     <td class="text-center" style="font-weight:900;">${inv.invoiceNumber}</td>
@@ -1748,7 +1748,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     <td><div style="font-weight:900">${inv.customerName}</div><div style="font-size:7px; color:#64748b">${inv.address} - ${inv.city}</div></td>
                   </tr>
                 `;
-              }).join('')}
+    }).join('')}
             </tbody>
           </table>
 
@@ -1763,12 +1763,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               </thead>
               <tbody>
                 ${(() => {
-                  const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
-                  const rows = [];
-                  for (let i = 0; i < items.length; i += 2) {
-                    const it1 = items[i];
-                    const it2 = items[i + 1];
-                    rows.push(`
+        const items = Array.from(cargoMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+        const rows = [];
+        for (let i = 0; i < items.length; i += 2) {
+          const it1 = items[i];
+          const it2 = items[i + 1];
+          rows.push(`
                       <tr>
                         <td class="text-center">${it1.id}</td>
                         <td style="font-size:6.5px; overflow:hidden; white-space:nowrap;">${it1.name}</td>
@@ -1779,9 +1779,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         <td class="text-center" style="font-weight:900; background:#fefce8;">${it2 ? it2.total : ''}</td>
                       </tr>
                     `);
-                  }
-                  return rows.join('');
-                })()}
+        }
+        return rows.join('');
+      })()}
               </tbody>
             </table>
           </div>
@@ -1821,7 +1821,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 onChange={(e) => { setSelectedClient(e.target.value); setSuggestedRoutes([]); }}
                 className="bg-slate-50 border border-slate-200 px-3 py-0.5 rounded-md text-[9px] font-black uppercase outline-none focus:border-emerald-500 shadow-sm max-w-[160px]"
               >
-                {isSuperAdmin && <option value="GLOBAL">FLOTA GLOBAL ORBIT</option>}
+
                 {allowedClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -1919,10 +1919,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest">Requeridos</p>
               <p className="text-xs font-black text-rose-900 leading-none">~{unassignedMetrics.additionalVehicles}</p>
             </div>
-            <button 
+            <button
               onClick={() => setIsPendingInvoicesModalOpen(true)}
-              className="ml-1 px-2 py-1 bg-rose-600 text-white rounded-lg text-[7px] font-black uppercase tracking-tighter hover:bg-rose-700 transition-all shadow-sm active:scale-95 whitespace-nowrap">
-              Ver Pendientes
+              className="flex items-center gap-1.5 ml-2 px-3 py-1.5 bg-rose-500 text-white rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-md shadow-rose-200 active:scale-95 whitespace-nowrap group">
+              <Icons.Truck className="w-3.5 h-3.5 group-hover:animate-bounce" />
+              VER PENDIENTES
             </button>
           </div>
         </div>
@@ -2243,160 +2244,160 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       {/* Modal para Agregar Facturas Pendientes */}
       {addInvoiceModal.isOpen && (() => {
         const activeRoute = addInvoiceModal.routeIndex !== null ? suggestedRoutes[addInvoiceModal.routeIndex] : null;
-        const routeInvCount  = activeRoute?.assignedInvoices?.length ?? 0;
-        const routeVolUsed   = activeRoute?.assignedInvoices?.reduce((s, i) => s + (Number(i.volumeM3) || 0), 0) ?? 0;
+        const routeInvCount = activeRoute?.assignedInvoices?.length ?? 0;
+        const routeVolUsed = activeRoute?.assignedInvoices?.reduce((s, i) => s + (Number(i.volumeM3) || 0), 0) ?? 0;
         const vehicleCapacity = Number((activeRoute?.vehicle as any)?.capacityM3 || (activeRoute?.vehicle as any)?.capacity_m3 || 0);
-        const plate      = (activeRoute?.vehicle as any)?.plate || '—';
+        const plate = (activeRoute?.vehicle as any)?.plate || '—';
         const driverName = (activeRoute?.vehicle as any)?.driverName || (activeRoute?.vehicle as any)?.driver_name || 'Sin conductor';
         return (
-        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-slate-100 flex flex-col gap-4 bg-emerald-50 rounded-t-[2.5rem] shrink-0">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white text-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
-                    <Icons.Plus className="w-6 h-6" />
+          <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-300">
+              <div className="p-8 border-b border-slate-100 flex flex-col gap-4 bg-emerald-50 rounded-t-[2.5rem] shrink-0">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white text-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
+                      <Icons.Plus className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Agregar Factura</h3>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">{addInvoiceModal.tab === 'plan' ? 'Seleccione una factura pendiente' : 'Factura de repice (no está en el plan)'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Agregar Factura</h3>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase">{addInvoiceModal.tab === 'plan' ? 'Seleccione una factura pendiente' : 'Factura de repice (no está en el plan)'}</p>
-                  </div>
+                  <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null }); setModalSearchTerm(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                    <Icons.X className="w-5 h-5 text-slate-400" />
+                  </button>
                 </div>
-                <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null }); setModalSearchTerm(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
-                  <Icons.X className="w-5 h-5 text-slate-400" />
-                </button>
-              </div>
 
-              {/* Datos del vehículo destino */}
-              {activeRoute && (
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 bg-slate-900 text-white rounded-xl px-3 py-1.5">
-                    <Icons.Truck className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-[11px] font-black uppercase tracking-wider">{plate}</span>
+                {/* Datos del vehículo destino */}
+                {activeRoute && (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 bg-slate-900 text-white rounded-xl px-3 py-1.5">
+                      <Icons.Truck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-[11px] font-black uppercase tracking-wider">{plate}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 border border-slate-200">
+                      <Icons.User className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-[11px] font-bold text-slate-600 uppercase truncate max-w-[160px]">{driverName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 border border-slate-200">
+                      <Icons.Package className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="text-[11px] font-black text-slate-700">{routeInvCount} fact.</span>
+                    </div>
+                    <div className={`flex items-center gap-2 rounded-xl px-3 py-1.5 border ${vehicleCapacity > 0 && routeVolUsed / vehicleCapacity > 0.9 ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
+                      <Icons.Package className="w-3.5 h-3.5 text-amber-400" />
+                      <span className={`text-[11px] font-black ${vehicleCapacity > 0 && routeVolUsed / vehicleCapacity > 0.9 ? 'text-rose-600' : 'text-slate-700'}`}>
+                        {routeVolUsed.toFixed(2)} / {vehicleCapacity > 0 ? vehicleCapacity.toFixed(2) : '—'} m³
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 border border-slate-200">
-                    <Icons.User className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-[11px] font-bold text-slate-600 uppercase truncate max-w-[160px]">{driverName}</span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 border border-slate-200">
-                    <Icons.Package className="w-3.5 h-3.5 text-indigo-400" />
-                    <span className="text-[11px] font-black text-slate-700">{routeInvCount} fact.</span>
-                  </div>
-                  <div className={`flex items-center gap-2 rounded-xl px-3 py-1.5 border ${vehicleCapacity > 0 && routeVolUsed / vehicleCapacity > 0.9 ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
-                    <Icons.Package className="w-3.5 h-3.5 text-amber-400" />
-                    <span className={`text-[11px] font-black ${vehicleCapacity > 0 && routeVolUsed / vehicleCapacity > 0.9 ? 'text-rose-600' : 'text-slate-700'}`}>
-                      {routeVolUsed.toFixed(2)} / {vehicleCapacity > 0 ? vehicleCapacity.toFixed(2) : '—'} m³
-                    </span>
-                  </div>
+                )}
+
+                {/* Tabs: Plan / Repice */}
+                <div className="flex gap-2 bg-slate-100 p-1 rounded-2xl">
+                  <button
+                    onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'plan' }))}
+                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'plan' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    📋 Del Plan
+                  </button>
+                  <button
+                    onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'repice' }))}
+                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'repice' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    ⚡ Repice
+                  </button>
                 </div>
-              )}
 
-              {/* Tabs: Plan / Repice */}
-              <div className="flex gap-2 bg-slate-100 p-1 rounded-2xl">
-                <button
-                  onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'plan' }))}
-                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'plan' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  📋 Del Plan
-                </button>
-                <button
-                  onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'repice' }))}
-                  className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'repice' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  ⚡ Repice
-                </button>
-              </div>
+                <div className="relative">
+                  <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                  <input
+                    ref={addInvoiceInputRef}
+                    autoFocus
+                    type="text"
+                    placeholder={addInvoiceModal.tab === 'plan' ? 'Buscar por factura, cliente o pedido...' : 'Buscar factura de repice por número...'}
+                    value={modalSearchTerm}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const clearAll = () => {
+                        setModalSearchTerm('');
+                        if (addInvoiceInputRef.current) {
+                          addInvoiceInputRef.current.value = '';
+                          addInvoiceInputRef.current.focus();
+                        }
+                      };
 
-              <div className="relative">
-                <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                <input
-                  ref={addInvoiceInputRef}
-                  autoFocus
-                  type="text"
-                  placeholder={addInvoiceModal.tab === 'plan' ? 'Buscar por factura, cliente o pedido...' : 'Buscar factura de repice por número...'}
-                  value={modalSearchTerm}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const clearAll = () => {
-                      setModalSearchTerm('');
-                      if (addInvoiceInputRef.current) {
-                        addInvoiceInputRef.current.value = '';
-                        addInvoiceInputRef.current.focus();
+                      // ── SUPRIMIR chars residuales post-scan ──
+                      // Usamos React state (no DOM) para que el input controlado quede realmente vacío
+                      if (scanSuppressRef.current) {
+                        clearTimeout(scanSuppressRef.current);
+                        scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
+                        setModalSearchTerm('');
+                        return;
                       }
-                    };
 
-                    // ── SUPRIMIR chars residuales post-scan ──
-                    // Usamos React state (no DOM) para que el input controlado quede realmente vacío
-                    if (scanSuppressRef.current) {
-                      clearTimeout(scanSuppressRef.current);
-                      scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-                      setModalSearchTerm('');
-                      return;
-                    }
+                      // ── DETECCIÓN DE SCAN (pistola/QR) ──
+                      // Solo dispara si contiene prefijo DIAN "NumFac" O si el texto llega muy largo
+                      // de golpe (> 50 chars). Evita falsos positivos al escribir manualmente.
+                      const isScan = raw.length > 50 || /NumFac/i.test(raw);
 
-                    // ── DETECCIÓN DE SCAN (pistola/QR) ──
-                    // Solo dispara si contiene prefijo DIAN "NumFac" O si el texto llega muy largo
-                    // de golpe (> 50 chars). Evita falsos positivos al escribir manualmente.
-                    const isScan = raw.length > 50 || /NumFac/i.test(raw);
+                      if (isScan) {
+                        // Estrategia 1: formato DIAN PDF417/QR → NumFac:XXXXXXX
+                        let invoiceNum: string | null = null;
+                        const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
+                        if (numFacMatch) invoiceNum = numFacMatch[1].toUpperCase();
 
-                    if (isScan) {
-                      // Estrategia 1: formato DIAN PDF417/QR → NumFac:XXXXXXX
-                      let invoiceNum: string | null = null;
-                      const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
-                      if (numFacMatch) invoiceNum = numFacMatch[1].toUpperCase();
+                        // Estrategia 2: buscar patrón alfanumérico en lista de facturas
+                        if (!invoiceNum) {
+                          const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                          for (const c of candidates) {
+                            if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
+                              invoiceNum = c; break;
+                            }
+                          }
+                          // Estrategia 3: primer candidato como filtro
+                          if (!invoiceNum && candidates.length > 0) invoiceNum = candidates[0];
+                        }
 
-                      // Estrategia 2: buscar patrón alfanumérico en lista de facturas
-                      if (!invoiceNum) {
-                        const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
-                        for (const c of candidates) {
-                          if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
-                            invoiceNum = c; break;
+                        // Limpiar estado React y activar supresión
+                        setModalSearchTerm('');
+                        if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
+                        scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
+
+                        if (invoiceNum) {
+                          const match = unassignedInvoices.find(
+                            inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+                              || (inv.id || '').toUpperCase().includes(invoiceNum)
+                          );
+                          if (match) {
+                            handleAddInvoiceToRoute(match);
+                          } else {
+                            setModalSearchTerm(invoiceNum); // mostrar número en buscador si no está en lista
                           }
                         }
-                        // Estrategia 3: primer candidato como filtro
-                        if (!invoiceNum && candidates.length > 0) invoiceNum = candidates[0];
+                        return;
                       }
 
-                      // Limpiar estado React y activar supresión
-                      setModalSearchTerm('');
-                      if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
-                      scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-
-                      if (invoiceNum) {
-                        const match = unassignedInvoices.find(
-                          inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
-                               || (inv.id || '').toUpperCase().includes(invoiceNum)
+                      // ── ESCRITURA MANUAL ──
+                      setModalSearchTerm(raw.toUpperCase());
+                      if (raw.length >= 4) {
+                        const term = raw.toLowerCase();
+                        const matches = unassignedInvoices.filter(inv =>
+                          (inv.invoiceNumber || '').toLowerCase().includes(term) ||
+                          (inv.orderNumber || '').toLowerCase().includes(term)
                         );
-                        if (match) {
-                          handleAddInvoiceToRoute(match);
-                        } else {
-                          setModalSearchTerm(invoiceNum); // mostrar número en buscador si no está en lista
-                        }
+                        if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); setModalSearchTerm(''); }
                       }
-                      return;
-                    }
-
-                    // ── ESCRITURA MANUAL ──
-                    setModalSearchTerm(raw.toUpperCase());
-                    if (raw.length >= 4) {
-                      const term = raw.toLowerCase();
-                      const matches = unassignedInvoices.filter(inv =>
-                        (inv.invoiceNumber || '').toLowerCase().includes(term) ||
-                        (inv.orderNumber  || '').toLowerCase().includes(term)
-                      );
-                      if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); setModalSearchTerm(''); }
-                    }
-                  }}
-                  className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
-                />
+                    }}
+                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-3">
-              {(() => {
-                // Para repice: solo facturas en estado EST-15
-                const pool = addInvoiceModal.tab === 'repice'
-                  ? invoices.filter(inv => {
+              <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-3">
+                {(() => {
+                  // Para repice: solo facturas en estado EST-15
+                  const pool = addInvoiceModal.tab === 'repice'
+                    ? invoices.filter(inv => {
                       if ((inv as any).status !== 'EST-15' && (inv as any).item_status !== 'EST-15') return false;
                       const term = modalSearchTerm.toLowerCase().trim();
                       if (!term || term.length < 2) return true; // muestra todos EST-15 si no hay búsqueda
@@ -2404,103 +2405,103 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         (inv.customerName || '').toLowerCase().includes(term) ||
                         (inv.orderNumber || '').toLowerCase().includes(term);
                     })
-                  : unassignedInvoices;
+                    : unassignedInvoices;
 
-                const filtered = addInvoiceModal.tab === 'repice' ? pool : pool.filter(inv => {
-                  const term = modalSearchTerm.toLowerCase();
-                  return (inv.invoiceNumber || '').toLowerCase().includes(term) ||
-                    (inv.customerName || '').toLowerCase().includes(term) ||
-                    (inv.orderNumber || '').toLowerCase().includes(term);
-                });
+                  const filtered = addInvoiceModal.tab === 'repice' ? pool : pool.filter(inv => {
+                    const term = modalSearchTerm.toLowerCase();
+                    return (inv.invoiceNumber || '').toLowerCase().includes(term) ||
+                      (inv.customerName || '').toLowerCase().includes(term) ||
+                      (inv.orderNumber || '').toLowerCase().includes(term);
+                  });
 
-                if (filtered.length === 0) {
-                  return (
-                    <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
-                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 scale-150 opacity-20">
-                        <Icons.Plus className="w-8 h-8" />
-                      </div>
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                        {addInvoiceModal.tab === 'repice'
-                          ? 'No hay facturas en estado Repice (EST-15)'
-                          : 'Sin resultados para tu búsqueda'}
-                      </p>
-                    </div>
-                  );
-                }
-
-                return filtered.map((inv, index) => (
-                  <div key={`${inv.id}-${index}`} className="bg-slate-50 p-4 rounded-2xl hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-emerald-100 group">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-black text-xs text-slate-900 uppercase flex flex-wrap items-center gap-1 gap-x-2">
-                          <span className="whitespace-nowrap">{inv.invoiceNumber}</span>
-                          <span className="text-slate-300">|</span>
-                          <span className="truncate text-slate-600 font-bold">{inv.customerName}</span>
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase truncate">
-                            {inv.address} • {inv.city}
-                          </p>
-                          {inv.orderNumber && (
-                            <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-bold uppercase border border-indigo-100">
-                              PED: {inv.orderNumber}
-                            </span>
-                          )}
-                          {inv.externalDocId && (
-                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase border border-slate-200">
-                              DOC: {inv.externalDocId}
-                            </span>
-                          )}
-                          {addInvoiceModal.tab === 'repice' && (
-                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-black uppercase border border-amber-300 animate-pulse">
-                              ⚡ REPICE
-                            </span>
-                          )}
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Orbit (R)' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                            {documents.find(d => d.id === inv.docLId)?.planType || 'Plan Normal'}
-                          </span>
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
+                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 scale-150 opacity-20">
+                          <Icons.Plus className="w-8 h-8" />
                         </div>
-                        {(inv as any).isPriority && (
-                          <div className="flex items-center gap-1.5 mt-2">
-                            <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200 shadow-sm animate-pulse">
-                              <Icons.Alert className="w-2.5 h-2.5" />
-                              <span className="text-[8px] font-black uppercase">Horario Crítico</span>
-                            </div>
-                            {(inv as any).detectedTime && (
-                              <span className="bg-slate-900 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase shadow-md flex items-center gap-1">
-                                <Icons.Clock className="w-2 h-2" />
-                                {(inv as any).detectedTime}
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                          {addInvoiceModal.tab === 'repice'
+                            ? 'No hay facturas en estado Repice (EST-15)'
+                            : 'Sin resultados para tu búsqueda'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((inv, index) => (
+                    <div key={`${inv.id}-${index}`} className="bg-slate-50 p-4 rounded-2xl hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-emerald-100 group">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-xs text-slate-900 uppercase flex flex-wrap items-center gap-1 gap-x-2">
+                            <span className="whitespace-nowrap">{inv.invoiceNumber}</span>
+                            <span className="text-slate-300">|</span>
+                            <span className="truncate text-slate-600 font-bold">{inv.customerName}</span>
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase truncate">
+                              {inv.address} • {inv.city}
+                            </p>
+                            {inv.orderNumber && (
+                              <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-bold uppercase border border-indigo-100">
+                                PED: {inv.orderNumber}
                               </span>
                             )}
+                            {inv.externalDocId && (
+                              <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase border border-slate-200">
+                                DOC: {inv.externalDocId}
+                              </span>
+                            )}
+                            {addInvoiceModal.tab === 'repice' && (
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-black uppercase border border-amber-300 animate-pulse">
+                                ⚡ REPICE
+                              </span>
+                            )}
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Orbit (R)' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                              {documents.find(d => d.id === inv.docLId)?.planType || 'Plan Normal'}
+                            </span>
                           </div>
-                        )}
+                          {(inv as any).isPriority && (
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200 shadow-sm animate-pulse">
+                                <Icons.Alert className="w-2.5 h-2.5" />
+                                <span className="text-[8px] font-black uppercase">Horario Crítico</span>
+                              </div>
+                              {(inv as any).detectedTime && (
+                                <span className="bg-slate-900 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase shadow-md flex items-center gap-1">
+                                  <Icons.Clock className="w-2 h-2" />
+                                  {(inv as any).detectedTime}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-black text-emerald-600">
+                            {(() => { try { return (Number(inv.volumeM3) || 0).toFixed(3); } catch (e) { return "0.000"; } })()}m³
+                          </p>
+                          <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tight">
+                            {(() => { try { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(inv.invoiceValue || 0); } catch (e) { return "$0"; } })()}
+                          </p>
+                          <button
+                            onClick={() => handleAddInvoiceToRoute(inv)}
+                            className="mt-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-sm"
+                          >
+                            Agregar
+                          </button>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-black text-emerald-600">
-                          {(() => { try { return (Number(inv.volumeM3) || 0).toFixed(3); } catch (e) { return "0.000"; } })()}m³
+                      {(inv.notes || (inv as any).detectedTime) && (
+                        <p className="text-[9px] text-amber-600 italic mt-2 line-clamp-2 font-bold bg-amber-50/50 px-2 py-1 rounded-lg border border-amber-100 w-full">
+                          "{inv.notes || `ENTREGA PRIORITARIA: ${(inv as any).detectedTime}`}"
                         </p>
-                        <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tight">
-                          {(() => { try { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(inv.invoiceValue || 0); } catch (e) { return "$0"; } })()}
-                        </p>
-                        <button
-                          onClick={() => handleAddInvoiceToRoute(inv)}
-                          className="mt-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-sm"
-                        >
-                          Agregar
-                        </button>
-                      </div>
+                      )}
                     </div>
-                    {(inv.notes || (inv as any).detectedTime) && (
-                      <p className="text-[9px] text-amber-600 italic mt-2 line-clamp-2 font-bold bg-amber-50/50 px-2 py-1 rounded-lg border border-amber-100 w-full">
-                        "{inv.notes || `ENTREGA PRIORITARIA: ${(inv as any).detectedTime}`}"
-                      </p>
-                    )}
-                  </div>
-                ))
-              })()}
+                  ))
+                })()}
+              </div>
             </div>
           </div>
-        </div>
         );
       })()}
 
@@ -2639,12 +2640,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     const desc = doc?.inventory_observation || "Carga Masiva Orbit";
 
                     if (!docMap.has(groupKey)) {
-                      docMap.set(groupKey, { 
-                        label, 
-                        desc, 
+                      docMap.set(groupKey, {
+                        label,
+                        desc,
                         planType: doc?.planType || 'Normal',
-                        invoices: [], 
-                        volume: 0 
+                        invoices: [],
+                        volume: 0
                       });
                     }
                     const entry = docMap.get(groupKey)!;
@@ -2946,7 +2947,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             <div className="w-24 h-24 bg-red-500/10 text-red-500 rounded-[2rem] flex items-center justify-center mx-auto animate-bounce shadow-[0_0_50px_rgba(239,68,68,0.2)]">
               <div className="w-12 h-12 rotate-12"><Icons.Alert /></div>
             </div>
-            
+
             <div className="space-y-2">
               <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Acción Crítica</h3>
               <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed">
@@ -2969,7 +2970,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 Cancelar
               </button>
             </div>
-            
+
             <p className="text-[7px] text-slate-600 font-bold uppercase tracking-widest pt-2">OrbitM7 Data Integrity Protocol</p>
           </div>
         </div>
@@ -3086,10 +3087,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 v.plate.toUpperCase().includes(manualVehicleSearch) ||
                 ((v as any).driverName || '').toUpperCase().includes(manualVehicleSearch)
               ).length === 0 && (
-                <div className="py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sin resultados para "{manualVehicleSearch}"</p>
-                </div>
-              )}
+                  <div className="py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sin resultados para "{manualVehicleSearch}"</p>
+                  </div>
+                )}
               {remainingVehicles.filter(v =>
                 v.plate.toUpperCase().includes(manualVehicleSearch) ||
                 ((v as any).driverName || '').toUpperCase().includes(manualVehicleSearch)
@@ -3137,7 +3138,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <button 
+                <button
                   onClick={exportPendingInvoices}
                   className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
                 >
@@ -3222,7 +3223,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 </div>
               )}
             </div>
-            
+
             <div className="p-6 bg-slate-900 border-t border-slate-800 shrink-0 flex justify-between items-center">
               <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
                 Mostrando {unassignedInvoices.filter(inv => {
