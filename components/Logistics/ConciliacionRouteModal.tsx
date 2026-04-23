@@ -249,18 +249,20 @@ const LegalizationDialog: React.FC<{
                                 {msHint && !form.statusUnlocked && (
                                     <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">🏢 {msHint}</span>
                                 )}
-                                <button onClick={() => onUpdate({ statusUnlocked: !form.statusUnlocked })}
-                                    className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all
-                                        ${form.statusUnlocked ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'}`}>
-                                    {form.statusUnlocked ? '🔒 Bloquear MS' : '🔓 Habilitar Edición'}
-                                </button>
+                                {!isLegalized && (
+                                    <button onClick={() => onUpdate({ statusUnlocked: !form.statusUnlocked })}
+                                        className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all
+                                            ${form.statusUnlocked ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'}`}>
+                                        {form.statusUnlocked ? '🔒 Bloquear MS' : '🔓 Habilitar Edición'}
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
-                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)) })} />
-                            <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!currentAllowed.has('parcial')}    onClick={() => onUpdate({ estadoEntrega: 'parcial' })} />
-                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={!currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: String(Math.round(invoiceVal)) })} />
-                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0' })} />
+                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={isLegalized || !currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)) })} />
+                            <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={isLegalized || !currentAllowed.has('parcial')}    onClick={() => onUpdate({ estadoEntrega: 'parcial' })} />
+                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={isLegalized || !currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: String(Math.round(invoiceVal)) })} />
+                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={isLegalized || !currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0' })} />
                         </div>
                     </div>
 
@@ -290,6 +292,7 @@ const LegalizationDialog: React.FC<{
                                                     {form.estadoEntrega === 'parcial' && (
                                                         <td className="px-3 py-2.5">
                                                             <input type="number" min={0} max={it.qty} value={it.returned_qty}
+                                                                disabled={isLegalized}
                                                                 onChange={e => {
                                                                     const rq = Math.min(Number(it.qty), Math.max(0, Number(e.target.value) || 0));
                                                                     onUpdateItem(it.id, rq);
@@ -297,7 +300,7 @@ const LegalizationDialog: React.FC<{
                                                                     const finalVal = Math.max(0, invoiceVal - (otherDev + (rq * unitPrice)));
                                                                     onUpdate({ valor: String(Math.round(finalVal)) });
                                                                 }}
-                                                                className="w-full text-center bg-amber-50 border border-amber-200 rounded-lg py-1.5 font-black text-amber-800 outline-none" />
+                                                                className="w-full text-center bg-amber-50 border border-amber-200 rounded-lg py-1.5 font-black text-amber-800 outline-none disabled:opacity-70" />
                                                         </td>
                                                     )}
                                                     <td className="px-4 py-2.5 text-right font-black text-slate-500">
@@ -337,8 +340,9 @@ const LegalizationDialog: React.FC<{
                                     <div className="relative">
                                         <span className="absolute left-0 top-1/2 -translate-y-1/2 text-emerald-400 font-black">$</span>
                                         <input type="number" min={0} value={form.valor}
+                                            disabled={isLegalized}
                                             onChange={e => onUpdate({ valor: e.target.value })}
-                                            className="w-full bg-transparent pl-4 text-lg font-black text-emerald-900 outline-none" />
+                                            className="w-full bg-transparent pl-4 text-lg font-black text-emerald-900 outline-none disabled:opacity-70" />
                                     </div>
                                 </div>
                             </div>
@@ -365,10 +369,11 @@ const LegalizationDialog: React.FC<{
                                     <div className="flex gap-2">
                                         {(['TRANSFERENCIA', 'CONSIGNACION'] as MetodoPago[]).map(m => (
                                             <button key={m} onClick={() => onUpdate({ metodo: m })}
+                                                disabled={isLegalized}
                                                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-[9px] font-black uppercase transition-all
                                                     ${form.metodo === m 
                                                         ? (m === 'TRANSFERENCIA' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-violet-600 border-violet-600 text-white') 
-                                                        : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                                                        : 'border-slate-200 text-slate-500 hover:border-slate-300'} disabled:opacity-70`}>
                                                 {m === 'TRANSFERENCIA' ? '📱' : '🏦'} {m === 'TRANSFERENCIA' ? 'Transfer' : 'Consig'}
                                             </button>
                                         ))}
@@ -378,12 +383,14 @@ const LegalizationDialog: React.FC<{
                                     <div>
                                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">N° Comprobante / Ref.</p>
                                         <input type="text" value={form.numConsignacion} onChange={e => onUpdate({ numConsignacion: e.target.value })}
-                                            placeholder="Ref. del pago" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-slate-400" />
+                                            disabled={isLegalized}
+                                            placeholder="Ref. del pago" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-slate-400 disabled:opacity-70" />
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Fecha Pago</p>
                                         <input type="date" value={form.fecha} onChange={e => onUpdate({ fecha: e.target.value })}
-                                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-slate-400" />
+                                            disabled={isLegalized}
+                                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-slate-400 disabled:opacity-70" />
                                     </div>
                                 </div>
                             </div>
@@ -411,9 +418,9 @@ const LegalizationDialog: React.FC<{
                 {/* Footer */}
                 <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
                     <button onClick={onClose} className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-white transition-all">
-                        Cancelar
+                        {isLegalized ? 'Cerrar' : 'Cancelar'}
                     </button>
-                    {!isWarehouseReceived && (
+                    {!isWarehouseReceived && !isLegalized && (
                         <button onClick={onSave} disabled={form.saving}
                             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all
                                 ${form.saving ? 'bg-slate-200 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'}`}>
