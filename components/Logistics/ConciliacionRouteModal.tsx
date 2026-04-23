@@ -462,7 +462,12 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
         // Cargar sobrecostos previos si existen
         if (initialSurcharges && initialSurcharges.length > 0) {
-            setSobrecostos(initialSurcharges);
+            setSobrecostos(initialSurcharges.map(s => ({
+                ...s,
+                // Asegurar que el valor sea un string formateado sin decimales
+                // Aquí usamos Number() directo porque el valor viene del API (formato standard)
+                valor: s.valor ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Math.floor(Number(s.valor) || 0)) : ''
+            })));
         } else {
             setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
         }
@@ -540,7 +545,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 documentId,
                 plate: route.plate,
                 items: sobrecostos.map(s => ({
-                    valor: Number(s.valor.replace(/\./g, '').replace(',', '')) || 0,
+                    valor: Math.floor(Number(String(s.valor).replace(/\D/g, '')) || 0),
                     referencia: s.nroAprobacion,
                     fecha: s.fecha,
                     statusId: s.statusId || 'PENDIENTE'
@@ -573,7 +578,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 plate: route.plate,
                 items: [{
                     id: s.id,
-                    valor: Number(s.valor.replace(/\./g, '').replace(',', '')) || 0,
+                    valor: Math.floor(Number(String(s.valor).replace(/\D/g, '')) || 0),
                     referencia: s.nroAprobacion,
                     fecha: s.fecha,
                     statusId: 'APROBADO'
@@ -604,10 +609,10 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const surchargeStats = useMemo(() => {
         const approved = sobrecostos
             .filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02')
-            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
+            .reduce((s, c) => s + (Math.floor(Number(String(c.valor).replace(/\D/g, '')) || 0)), 0);
         const pending = sobrecostos
             .filter(c => c.statusId === 'PENDIENTE' || c.statusId === 'EST-01' || !c.statusId)
-            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
+            .reduce((s, c) => s + (Math.floor(Number(String(c.valor).replace(/\D/g, '')) || 0)), 0);
         
         const approvedCount = sobrecostos.filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02').length;
         const pendingCount = sobrecostos.filter(c => c.statusId === 'PENDIENTE' || c.statusId === 'EST-01' || !c.statusId).length;
@@ -924,7 +929,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     <input type="text" value={s.valor} disabled={isApproved}
                                                         onChange={e => {
                                                             const val = e.target.value.replace(/\D/g, '');
-                                                            const fmt = val ? new Intl.NumberFormat('es-CO').format(Number(val)) : '';
+                                                            const fmt = val ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Number(val)) : '';
                                                             const next = [...sobrecostos];
                                                             next[idx].valor = fmt;
                                                             setSobrecostos(next);
