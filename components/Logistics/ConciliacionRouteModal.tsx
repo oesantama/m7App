@@ -505,9 +505,15 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     }, []);
 
     const handleSaveGrupal = async () => {
-        const hasValid = consignaciones.some(s => Number(String(s.valor).replace(/\D/g, '')) > 0);
-        if (!hasValid) {
+        const activePayments = consignaciones.filter(c => Number(String(c.valor).replace(/\D/g, '')) > 0);
+        if (activePayments.length === 0) {
             toast.error('Ingrese al menos un valor de consignación válido.');
+            return;
+        }
+
+        const hasMissingRef = activePayments.some(c => !c.nroAprobacion || c.nroAprobacion.trim() === '');
+        if (hasMissingRef) {
+            toast.error('La Referencia es obligatoria para cada pago registrado.');
             return;
         }
 
@@ -860,69 +866,70 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
                                 <div className="space-y-3">
                                     {consignaciones.map((c, idx) => (
-                                        <div key={c.id} className="grid grid-cols-12 gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm relative group">
-                                            <div className="col-span-2">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
-                                                <input type="text" value={c.valor}
-                                                    onChange={e => {
-                                                        const val = e.target.value.replace(/\D/g, '');
-                                                        const fmt = val ? new Intl.NumberFormat('es-CO').format(Number(val)) : '';
-                                                        const next = [...consignaciones];
-                                                        next[idx].valor = fmt;
-                                                        setConsignaciones(next);
-                                                    }}
-                                                    placeholder="$ 0" className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                             <div key={c.id} className={`grid grid-cols-12 gap-3 p-3 rounded-2xl border shadow-sm relative group transition-all
+                                                ${String(c.id).startsWith('temp-') ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-80'}`}>
+                                                <div className="col-span-2">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
+                                                    <input type="text" value={c.valor} disabled={!String(c.id).startsWith('temp-')}
+                                                        onChange={e => {
+                                                            const val = e.target.value.replace(/\D/g, '');
+                                                            const fmt = val ? new Intl.NumberFormat('es-CO').format(Number(val)) : '';
+                                                            const next = [...consignaciones];
+                                                            next[idx].valor = fmt;
+                                                            setConsignaciones(next);
+                                                        }}
+                                                        placeholder="$ 0" className="w-full bg-white px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent disabled:bg-transparent" />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia</p>
+                                                    <input type="text" value={c.nroAprobacion} disabled={!String(c.id).startsWith('temp-')}
+                                                        onChange={e => {
+                                                            const next = [...consignaciones];
+                                                            next[idx].nroAprobacion = e.target.value;
+                                                            setConsignaciones(next);
+                                                        }}
+                                                        placeholder="N°" className="w-full bg-white px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent disabled:bg-transparent" />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Método</p>
+                                                    <select value={c.metodo || 'CONSIGNACION'} disabled={!String(c.id).startsWith('temp-')}
+                                                        onChange={e => {
+                                                            const next = [...consignaciones];
+                                                            next[idx].metodo = e.target.value as MetodoPago;
+                                                            setConsignaciones(next);
+                                                        }}
+                                                        className="w-full bg-white px-1 py-2 rounded-xl text-[9px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent appearance-none text-center disabled:bg-transparent">
+                                                        <option value="CONSIGNACION">🏦 CONSIGNACIÓN</option>
+                                                        <option value="TRANSFERENCIA">📱 TRANSFERENCIA</option>
+                                                    </select>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
+                                                    <input type="date" value={c.fecha} disabled={!String(c.id).startsWith('temp-')}
+                                                        onChange={e => {
+                                                            const next = [...consignaciones];
+                                                            next[idx].fecha = e.target.value;
+                                                            setConsignaciones(next);
+                                                        }}
+                                                        className="w-full bg-white px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent disabled:bg-transparent" />
+                                                </div>
+                                                <div className="col-span-4">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p>
+                                                    <input type="text" value={c.observacion || ''} disabled={!String(c.id).startsWith('temp-')}
+                                                        onChange={e => {
+                                                            const next = [...consignaciones];
+                                                            next[idx].observacion = e.target.value;
+                                                            setConsignaciones(next);
+                                                        }}
+                                                        placeholder="Notas..." className="w-full bg-white px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent disabled:bg-transparent" />
+                                                </div>
+                                                {consignaciones.length > 1 && String(c.id).startsWith('temp-') && (
+                                                    <button onClick={() => setConsignaciones(consignaciones.filter(x => x.id !== c.id))}
+                                                        className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100">
+                                                        <Icons.X className="w-3 h-3" />
+                                                    </button>
+                                                )}
                                             </div>
-                                            <div className="col-span-2">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia</p>
-                                                <input type="text" value={c.nroAprobacion}
-                                                    onChange={e => {
-                                                        const next = [...consignaciones];
-                                                        next[idx].nroAprobacion = e.target.value;
-                                                        setConsignaciones(next);
-                                                    }}
-                                                    placeholder="N°" className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Método</p>
-                                                <select value={c.metodo || 'CONSIGNACION'}
-                                                    onChange={e => {
-                                                        const next = [...consignaciones];
-                                                        next[idx].metodo = e.target.value as MetodoPago;
-                                                        setConsignaciones(next);
-                                                    }}
-                                                    className="w-full bg-slate-50 px-1 py-2 rounded-xl text-[9px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent appearance-none text-center">
-                                                    <option value="CONSIGNACION">🏦 CONSIGNACIÓN</option>
-                                                    <option value="TRANSFERENCIA">📱 TRANSFERENCIA</option>
-                                                </select>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
-                                                <input type="date" value={c.fecha}
-                                                    onChange={e => {
-                                                        const next = [...consignaciones];
-                                                        next[idx].fecha = e.target.value;
-                                                        setConsignaciones(next);
-                                                    }}
-                                                    className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
-                                            </div>
-                                            <div className="col-span-4">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p>
-                                                <input type="text" value={c.observacion || ''}
-                                                    onChange={e => {
-                                                        const next = [...consignaciones];
-                                                        next[idx].observacion = e.target.value;
-                                                        setConsignaciones(next);
-                                                    }}
-                                                    placeholder="Notas..." className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
-                                            </div>
-                                            {consignaciones.length > 1 && (
-                                                <button onClick={() => setConsignaciones(consignaciones.filter(x => x.id !== c.id))}
-                                                    className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100">
-                                                    <Icons.X className="w-3 h-3" />
-                                                </button>
-                                            )}
-                                        </div>
                                     ))}
                                 </div>
 
