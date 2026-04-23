@@ -291,6 +291,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             valor_parcial: number; total_sobrecosto: number;
             efectivo: number; credito: number;
             completadas: number; devueltas: number; parciales: number; legalizadas: number;
+            repice_count: number; valor_repice: number;
         }>();
         invoices.forEach(inv => {
             const plate = inv.route_vehicle_plate || inv.vehicle_plate || '';
@@ -298,18 +299,26 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const cur = map.get(plate) ?? {
                 valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
+                repice_count: 0, valor_repice: 0
             };
             const val    = Number(inv.valor) || 0;
             const invVal = Number(inv.invoice_value) || 0;
             const sc     = Number(inv.sobrecosto) || 0;
             const metodo = (inv.forma_pago || '').toUpperCase();
             const status = (inv.item_status || '').toUpperCase();
+
             if (inv.forma_pago) {
                 cur.valor_legalizado += val;
                 cur.legalizadas += 1;
                 if (metodo === 'EFECTIVO' || metodo.includes('EFE')) cur.efectivo += val;
                 else cur.credito += val;
             }
+
+            if (status === 'REPICE') {
+                cur.repice_count += 1;
+                cur.valor_repice += invVal;
+            }
+
             if (inv.es_devolucion) cur.valor_devuelto += invVal;
             if (PARCIAL_STATUS.includes(status)) { cur.valor_parcial += val; cur.parciales += 1; }
             if (inv.es_devolucion || DEVUELTO_STATUS.includes(status)) cur.devueltas += 1;
@@ -622,13 +631,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                 <span className="text-[8px] text-violet-100/70 font-bold mt-1">{stats.grupalCount} Movimientos</span>
                                             </div>
                                         )}
-                                        {stats.repiceCount > 0 && (
-                                            <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-900/10 min-w-[120px]">
-                                                <span className="text-[8px] font-black text-blue-100 uppercase tracking-widest leading-none mb-1">📦 Repice</span>
-                                                <span className="text-base font-black leading-none">{fmtCOP(stats.valorRepice)}</span>
-                                                <span className="text-[8px] text-blue-100/70 font-bold mt-1">{stats.repiceCount} Facturas</span>
-                                            </div>
-                                        )}
+                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-900/10 min-w-[120px]">
+                                            <span className="text-[8px] font-black text-blue-100 uppercase tracking-widest leading-none mb-1">📦 Repice</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorRepice)}</span>
+                                            <span className="text-[8px] text-blue-100/70 font-bold mt-1">{stats.repiceCount} Facturas</span>
+                                        </div>
                                     </div>
 
                                     {/* Fila 2: Barra de Progreso Principal (AVANCE DE LEGALIZACIÓN) */}
@@ -767,6 +774,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                         <div className="bg-orange-50/50 border border-orange-100 rounded-xl px-2.5 py-2">
                                                                             <p className="text-[7px] font-black text-orange-600 uppercase tracking-wider mb-0.5">📦 Parcial</p>
                                                                             <p className="text-xs font-black text-orange-800">{fmtCOP(fin.valor_parcial)}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {fin.valor_repice > 0 && (
+                                                                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl px-2.5 py-2">
+                                                                            <p className="text-[7px] font-black text-blue-600 uppercase tracking-wider mb-0.5">🔄 Repice</p>
+                                                                            <p className="text-xs font-black text-blue-800">{fmtCOP(fin.valor_repice)} <span className="text-[8px] text-blue-500">({fin.repice_count})</span></p>
                                                                         </div>
                                                                     )}
                                                                     {fin.total_sobrecosto > 0 && (

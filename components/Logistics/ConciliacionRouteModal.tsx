@@ -914,7 +914,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     {sobrecostos.map((s, idx) => {
                                         const isApproved = s.statusId === 'APROBADO' || s.statusId === 'EST-02';
                                         const isPending  = !isApproved;
-                                        const isAdmin    = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01';
 
                                         return (
                                             <div key={s.id} className={`grid grid-cols-12 gap-3 p-3 rounded-2xl border-2 shadow-sm relative group transition-all
@@ -959,14 +958,10 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     {isApproved ? (
                                                         <span className="bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Aprobado</span>
                                                     ) : (
-                                                        isAdmin ? (
-                                                            <button onClick={() => handleApproveSurcharge(s.id)}
-                                                                className="bg-emerald-500 hover:bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest shadow-sm shadow-emerald-200">
-                                                                ✅ Aprobar
-                                                            </button>
-                                                        ) : (
-                                                            <span className="bg-amber-100 text-amber-700 text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Pendiente</span>
-                                                        )
+                                                        <button onClick={() => handleApproveSurcharge(s.id)}
+                                                            className="bg-emerald-500 hover:bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest shadow-sm shadow-emerald-200">
+                                                            ✅ Aprobar
+                                                        </button>
                                                     )}
                                                 </div>
 
