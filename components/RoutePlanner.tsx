@@ -3180,46 +3180,47 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-50">
                   {(() => {
+                    const query = (pendingInvoicesSearch || '').toUpperCase();
                     const filtered = unassignedInvoices.filter(inv => {
                       const doc = documents.find(d => d.id === inv.docLId);
                       const searchStr = `${inv.invoiceNumber} ${doc?.externalDocId} ${doc?.vehicleData} ${inv.customerName}`.toUpperCase();
-                      const query = (pendingInvoicesSearch || '').toUpperCase();
                       return searchStr.includes(query);
                     });
 
                     return (
                       <>
-                        {filtered.map((inv, idx) => {
+                        {filtered.map((inv) => {
                           const doc = documents.find(d => d.id === inv.docLId);
                           return (
-                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <span className="text-[10px] font-black text-slate-900 bg-slate-100 px-2 py-1 rounded-lg uppercase">{doc?.externalDocId || inv.docLId}</span>
-                          </td>
-                          <td className="px-6 py-4 text-[10px] font-bold text-slate-600 uppercase tracking-tighter">
-                            {doc?.deliveryDate ? new Date(doc.deliveryDate).toLocaleDateString() : 'N/A'}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase">{doc?.vehicleData || 'N/A'}</span>
-                          </td>
-                          <td className="px-6 py-4 text-[10px] font-black text-slate-900">{inv.invoiceNumber}</td>
-                          <td className="px-6 py-4 min-w-[200px]">
-                            <p className="text-[10px] font-black text-slate-700 truncate max-w-[250px] uppercase">{inv.customerName}</p>
-                            <p className="text-[8px] text-slate-400 font-bold uppercase">{inv.city}</p>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="text-[10px] font-black text-slate-600 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center mx-auto border border-slate-100">
-                              {inv.items?.length || 0}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <span className="text-[10px] font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(3)}m³</span>
-                          </td>
-                        </tr>
-                      );
-                        </>
-                      );
-                    })()}
+                            <tr key={inv.id} className="hover:bg-slate-50 transition-colors group">
+                              <td className="px-6 py-4">
+                                <span className="text-[10px] font-black text-slate-900 bg-slate-100 px-2 py-1 rounded-lg uppercase">{doc?.externalDocId || inv.docLId}</span>
+                              </td>
+                              <td className="px-6 py-4 text-[10px] font-bold text-slate-600 uppercase tracking-tighter">
+                                {doc?.deliveryDate ? new Date(doc.deliveryDate).toLocaleDateString() : 'N/A'}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase">{doc?.vehicleData || 'N/A'}</span>
+                              </td>
+                              <td className="px-6 py-4 text-[10px] font-black text-slate-900">{inv.invoiceNumber}</td>
+                              <td className="px-6 py-4 min-w-[200px]">
+                                <p className="text-[10px] font-black text-slate-700 truncate max-w-[250px] uppercase">{inv.customerName}</p>
+                                <p className="text-[8px] text-slate-400 font-bold uppercase">{inv.city}</p>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <span className="text-[10px] font-black text-slate-600 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center mx-auto border border-slate-100">
+                                  {inv.items?.length || 0}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <span className="text-[10px] font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(3)}m³</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
                 </tbody>
               </table>
               {(() => {
