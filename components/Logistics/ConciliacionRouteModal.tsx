@@ -519,10 +519,20 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     };
 
     const handleSaveSobrecosto = async () => {
-        const totalVal = sobrecostos.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
-        if (totalVal <= 0) {
-            toast.error('Ingrese valores de sobrecosto válidos.');
-            return;
+        // Validación de campos obligatorios
+        for (const s of sobrecostos) {
+            if (!s.valor || Number(s.valor.replace(/\./g, '').replace(',', '')) <= 0) {
+                toast.error('Cada sobrecosto debe tener un valor válido.');
+                return;
+            }
+            if (!s.nroAprobacion || s.nroAprobacion.trim().length < 3) {
+                toast.error('La Referencia/NIT es obligatoria para cada sobrecosto.');
+                return;
+            }
+            if (!s.fecha) {
+                toast.error('La Fecha es obligatoria para cada sobrecosto.');
+                return;
+            }
         }
 
         setSavingSobrecosto(true);
@@ -534,7 +544,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     valor: Number(s.valor.replace(/\./g, '').replace(',', '')) || 0,
                     referencia: s.nroAprobacion,
                     fecha: s.fecha,
-                    statusId: s.statusId
+                    statusId: s.statusId || 'PENDIENTE'
                 })),
                 userId: currentUserId
             });
@@ -547,12 +557,40 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         }
     };
 
+    const handleApproveSurcharge = async (sId: string) => {
+        try {
+            // Reutilizamos saveSobrecostos o una API específica si existe, 
+            // por ahora simulamos aprobación vía api.saveSobrecostos pasando el nuevo estado
+            const s = sobrecostos.find(x => x.id === sId);
+            if (!s) return;
+            
+            await api.saveSobrecostos({
+                documentId,
+                plate: route.plate,
+                items: [{
+                    id: s.id,
+                    valor: Number(s.valor.replace(/\./g, '').replace(',', '')) || 0,
+                    referencia: s.nroAprobacion,
+                    fecha: s.fecha,
+                    statusId: 'APROBADO'
+                }],
+                userId: currentUserId
+            });
+            toast.success('✅ Sobrecosto aprobado');
+            onSaved();
+        } catch (err: any) {
+            toast.error(err.message || 'Error al aprobar sobrecosto');
+        }
+    };
+
     const totalConsignado = useMemo(() =>
         consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
     [consignaciones]);
 
     const totalSobrecostos = useMemo(() =>
-        sobrecostos.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
+        sobrecostos
+            .filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02') // EST-02 = Aprobado
+            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
     [sobrecostos]);
 
     const plateTotals = useMemo(() => {
@@ -834,48 +872,74 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 </div>
 
                                 <div className="space-y-3">
-                                    {sobrecostos.map((s, idx) => (
-                                        <div key={s.id} className="grid grid-cols-12 gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm relative group">
-                                            <div className="col-span-4">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
-                                                <input type="text" value={s.valor}
-                                                    onChange={e => {
-                                                        const val = e.target.value.replace(/\D/g, '');
-                                                        const fmt = val ? new Intl.NumberFormat('es-CO').format(Number(val)) : '';
-                                                        const next = [...sobrecostos];
-                                                        next[idx].valor = fmt;
-                                                        setSobrecostos(next);
-                                                    }}
-                                                    placeholder="$ 0.00" className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none border border-transparent focus:border-orange-300" />
+                                    {sobrecostos.map((s, idx) => {
+                                        const isApproved = s.statusId === 'APROBADO' || s.statusId === 'EST-02';
+                                        const isPending  = !isApproved;
+                                        const isAdmin    = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01';
+
+                                        return (
+                                            <div key={s.id} className={`grid grid-cols-12 gap-3 p-3 rounded-2xl border-2 shadow-sm relative group transition-all
+                                                ${isApproved ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+                                                
+                                                <div className="col-span-3">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
+                                                    <input type="text" value={s.valor} disabled={isApproved}
+                                                        onChange={e => {
+                                                            const val = e.target.value.replace(/\D/g, '');
+                                                            const fmt = val ? new Intl.NumberFormat('es-CO').format(Number(val)) : '';
+                                                            const next = [...sobrecostos];
+                                                            next[idx].valor = fmt;
+                                                            setSobrecostos(next);
+                                                        }}
+                                                        placeholder="$ 0.00" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
+                                                            ${isApproved ? 'bg-transparent text-emerald-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                </div>
+                                                <div className="col-span-3">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia / NIT</p>
+                                                    <input type="text" value={s.nroAprobacion} disabled={isApproved}
+                                                        onChange={e => {
+                                                            const next = [...sobrecostos];
+                                                            next[idx].nroAprobacion = e.target.value;
+                                                            setSobrecostos(next);
+                                                        }}
+                                                        placeholder="Obligatorio" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
+                                                            ${isApproved ? 'bg-transparent text-emerald-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                </div>
+                                                <div className="col-span-3">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
+                                                    <input type="date" value={s.fecha} disabled={isApproved}
+                                                        onChange={e => {
+                                                            const next = [...sobrecostos];
+                                                            next[idx].fecha = e.target.value;
+                                                            setSobrecostos(next);
+                                                        }}
+                                                        className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
+                                                            ${isApproved ? 'bg-transparent text-emerald-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                </div>
+                                                <div className="col-span-3 flex flex-col justify-end">
+                                                    {isApproved ? (
+                                                        <span className="bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Aprobado</span>
+                                                    ) : (
+                                                        isAdmin ? (
+                                                            <button onClick={() => handleApproveSurcharge(s.id)}
+                                                                className="bg-emerald-500 hover:bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest shadow-sm shadow-emerald-200">
+                                                                ✅ Aprobar
+                                                            </button>
+                                                        ) : (
+                                                            <span className="bg-amber-100 text-amber-700 text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Pendiente</span>
+                                                        )
+                                                    )}
+                                                </div>
+
+                                                {isPending && (
+                                                    <button onClick={() => setSobrecostos(sobrecostos.filter(x => x.id !== s.id))}
+                                                        className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100">
+                                                        <Icons.X className="w-3 h-3" />
+                                                    </button>
+                                                )}
                                             </div>
-                                            <div className="col-span-4">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia (NIT si aplica)</p>
-                                                <input type="text" value={s.nroAprobacion}
-                                                    onChange={e => {
-                                                        const next = [...sobrecostos];
-                                                        next[idx].nroAprobacion = e.target.value;
-                                                        setSobrecostos(next);
-                                                    }}
-                                                    placeholder="Referencia / NIT" className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none border border-transparent focus:border-orange-300" />
-                                            </div>
-                                            <div className="col-span-4">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
-                                                <input type="date" value={s.fecha}
-                                                    onChange={e => {
-                                                        const next = [...sobrecostos];
-                                                        next[idx].fecha = e.target.value;
-                                                        setSobrecostos(next);
-                                                    }}
-                                                    className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none border border-transparent focus:border-orange-300" />
-                                            </div>
-                                            {sobrecostos.length > 1 && (
-                                                <button onClick={() => setSobrecostos(sobrecostos.filter(x => x.id !== s.id))}
-                                                    className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100">
-                                                    <Icons.X className="w-3 h-3" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 <button onClick={() => setSobrecostos([...sobrecostos, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }])}

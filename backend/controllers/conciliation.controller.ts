@@ -871,12 +871,20 @@ export const saveSobrecostos = async (req: Request, res: Response) => {
             )
         `);
 
-        // Insertar cada item de sobrecosto
+        // Procesar cada item de sobrecosto (Insertar o Actualizar si tiene ID)
         for (const item of items) {
-            await client.query(`
-                INSERT INTO route_surcharges (document_id, plate, valor, referencia, fecha, status_id, user_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-            `, [documentId, plate, item.valor, item.referencia, item.fecha, item.statusId || 'EST-01', userId]);
+            if (item.id && !String(item.id).startsWith('17')) { // Los IDs de Date.now() suelen empezar por 17... (son nuevos)
+                await client.query(`
+                    UPDATE route_surcharges 
+                    SET valor = $1, referencia = $2, fecha = $3, status_id = $4, user_id = $5
+                    WHERE id = $6
+                `, [item.valor, item.referencia, item.fecha, item.statusId, userId, item.id]);
+            } else {
+                await client.query(`
+                    INSERT INTO route_surcharges (document_id, plate, valor, referencia, fecha, status_id, user_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                `, [documentId, plate, item.valor, item.referencia, item.fecha, item.statusId || 'EST-01', userId]);
+            }
         }
 
         await client.query('COMMIT');
