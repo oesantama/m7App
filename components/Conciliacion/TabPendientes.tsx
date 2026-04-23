@@ -335,10 +335,15 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         const individualLeg   = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
         const valorLegalizado = individualLeg;
 
-        // Recaudos adicionales
-        const totalGrupal     = groupPayments.reduce((s, p) => s + (Number(p.vmetodo) || 0), 0);
-        const approvedSurch   = routeSurcharges.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
-        const pendingSurch    = routeSurcharges.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id).reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        // Recaudos adicionales: Solo contamos los que NO tienen factura asociada (los que son realmente grupales)
+        const grupalRows      = groupPayments.filter(p => !p.invoice || p.invoice.trim() === '');
+        const totalGrupal     = grupalRows.reduce((s, p) => s + (Number(p.vmetodo) || 0), 0);
+        
+        const approvedRows    = routeSurcharges.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02');
+        const approvedSurch   = approvedRows.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        
+        const pendingRows     = routeSurcharges.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id);
+        const pendingSurch    = pendingRows.reduce((s, r) => s + (Number(r.valor) || 0), 0);
         
         const totalExtra      = totalGrupal + approvedSurch;
 
@@ -347,11 +352,19 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         
         const assigned        = total - unassigned;
         
+        const repiceRows      = invoices.filter(i => (i.item_status || '').toLowerCase() === 'repice');
+        const repiceCount     = repiceRows.length;
+        const valorRepice     = repiceRows.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+
         return { 
             total, legalizadas, entregadas, devueltas, parciales, 
             valorTotal, valorLegalizado, valorDevuelto, valorParcial, 
             approvedSurch, pendingSurch, totalGrupal, totalExtra,
-            assigned 
+            assigned,
+            grupalCount: grupalRows.length,
+            approvedSurchCount: approvedRows.length,
+            pendingSurchCount: pendingRows.length,
+            repiceCount, valorRepice
         };
     }, [invoices, unassigned, groupPayments, routeSurcharges]);
 
@@ -575,25 +588,28 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Placa</span>
                                             <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotal)}</span>
+                                            <span className="text-[8px] text-slate-500 font-bold mt-1">{stats.total} Facturas</span>
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-emerald-100 uppercase tracking-widest leading-none mb-1">Legalizado</span>
                                             <span className="text-base font-black leading-none">{fmtCOP(stats.valorLegalizado)}</span>
+                                            <span className="text-[8px] text-emerald-100/70 font-bold mt-1">{stats.legalizadas} Facturas</span>
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-amber-100 uppercase tracking-widest leading-none mb-1">Pendiente</span>
                                             <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotal - stats.valorLegalizado))}</span>
+                                            <span className="text-[8px] text-amber-100/70 font-bold mt-1">{stats.total - stats.legalizadas} Por Legalizar</span>
                                         </div>
                                         {(stats.approvedSurch > 0 || stats.pendingSurch > 0) && (
                                             <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-900/10 min-w-[140px]">
                                                 <span className="text-[8px] font-black text-rose-100 uppercase tracking-widest leading-none mb-1">Sobre Costos</span>
                                                 <div className="flex flex-col gap-0.5">
                                                     <div className="flex justify-between items-center gap-4">
-                                                        <span className="text-[7px] font-bold text-rose-200 uppercase">Aprobados:</span>
+                                                        <span className="text-[7px] font-bold text-rose-200 uppercase">Ok ({stats.approvedSurchCount}):</span>
                                                         <span className="text-xs font-black">{fmtCOP(stats.approvedSurch)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center gap-4 border-t border-rose-500/30 pt-0.5">
-                                                        <span className="text-[7px] font-bold text-rose-200 uppercase">Pendientes:</span>
+                                                        <span className="text-[7px] font-bold text-rose-200 uppercase">Pend ({stats.pendingSurchCount}):</span>
                                                         <span className="text-xs font-black">{fmtCOP(stats.pendingSurch)}</span>
                                                     </div>
                                                 </div>
@@ -603,6 +619,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-900/10 min-w-[120px]">
                                                 <span className="text-[8px] font-black text-violet-100 uppercase tracking-widest leading-none mb-1">Consig. Grupal</span>
                                                 <span className="text-base font-black leading-none">{fmtCOP(stats.totalGrupal)}</span>
+                                                <span className="text-[8px] text-violet-100/70 font-bold mt-1">{stats.grupalCount} Movimientos</span>
+                                            </div>
+                                        )}
+                                        {stats.repiceCount > 0 && (
+                                            <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-900/10 min-w-[120px]">
+                                                <span className="text-[8px] font-black text-blue-100 uppercase tracking-widest leading-none mb-1">📦 Repice</span>
+                                                <span className="text-base font-black leading-none">{fmtCOP(stats.valorRepice)}</span>
+                                                <span className="text-[8px] text-blue-100/70 font-bold mt-1">{stats.repiceCount} Facturas</span>
                                             </div>
                                         )}
                                     </div>

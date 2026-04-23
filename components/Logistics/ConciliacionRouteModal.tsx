@@ -441,6 +441,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }]);
     const [savingGrupal, setSavingGrupal]     = useState(false);
     const [grupalMetodo, setGrupalMetodo]     = useState<MetodoPago>('CONSIGNACION');
+    const [searchTerm, setSearchTerm]         = useState('');
 
     // Estado sobrecostos
     const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
@@ -599,11 +600,32 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         return { approved, pending };
     }, [sobrecostos]);
 
+    const filteredInvoices = useMemo(() => {
+        if (!searchTerm) return invoices;
+        const lower = searchTerm.toLowerCase();
+        return invoices.filter(inv => 
+            inv.invoice_number.toLowerCase().includes(lower) || 
+            inv.customer_name?.toLowerCase().includes(lower)
+        );
+    }, [invoices, searchTerm]);
+
+    const surchargeStats = useMemo(() => {
+        const approved = sobrecostos
+            .filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02')
+            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
+        const pending = sobrecostos
+            .filter(c => c.statusId === 'PENDIENTE' || c.statusId === 'EST-01' || !c.statusId)
+            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
+        
+        const approvedCount = sobrecostos.filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02').length;
+        const pendingCount = sobrecostos.filter(c => c.statusId === 'PENDIENTE' || c.statusId === 'EST-01' || !c.statusId).length;
+
+        return { approved, pending, approvedCount, pendingCount };
+    }, [sobrecostos]);
+
     const plateTotals = useMemo(() => {
         const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const invLegalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
-
-        // MODIFICACIÓN: Solo sumamos sobrecostos APROBADOS
         const totalLegalizado = invLegalizedVal + surchargeStats.approved;
         
         const legalCount   = invoices.filter(i => !!i.forma_pago).length;
@@ -668,19 +690,29 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 flex-1 max-w-2xl">
-                            <div className="bg-emerald-100 border border-emerald-200 rounded-2xl px-3 py-2 text-center">
-                                <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">Legalizado</p>
-                                <p className="text-xs font-black text-emerald-800">{fmtCOP(plateTotals.legalizedVal)}</p>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1 max-w-3xl">
+                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-emerald-500/10 border border-emerald-100/50">
+                                <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest mb-1">Legalizado</p>
+                                <p className="text-base font-black text-emerald-800 leading-none">{fmtCOP(plateTotals.legalizedVal)}</p>
+                                <p className="text-[8px] text-emerald-600/60 font-bold mt-1.5">{plateTotals.legalCount} Facturas</p>
                             </div>
-                            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2 text-center">
-                                <p className="text-[7px] font-black text-amber-600 uppercase tracking-widest mb-0.5">Pendiente</p>
-                                <p className="text-xs font-black text-amber-800">{fmtCOP(plateTotals.pendingVal)}</p>
+                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-amber-500/10 border border-amber-100/50">
+                                <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest mb-1">Pendiente</p>
+                                <p className="text-base font-black text-amber-800 leading-none">{fmtCOP(plateTotals.pendingVal)}</p>
+                                <p className="text-[8px] text-amber-600/60 font-bold mt-1.5">{plateTotals.total - plateTotals.legalCount} Por Legalizar</p>
                             </div>
-                            <div className="bg-slate-100 border border-slate-200 rounded-2xl px-3 py-2 text-center">
-                                <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Total Placa</p>
-                                <p className="text-xs font-black text-slate-800">{fmtCOP(plateTotals.totalValue)}</p>
+                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-slate-500/10 border border-slate-100">
+                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Placa</p>
+                                <p className="text-base font-black text-slate-800 leading-none">{fmtCOP(plateTotals.totalValue)}</p>
+                                <p className="text-[8px] text-slate-400 font-bold mt-1.5">{plateTotals.total} Facturas</p>
                             </div>
+                            {surchargeStats.approvedCount > 0 && (
+                                <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-rose-500/10 border border-rose-100/50">
+                                    <p className="text-[8px] font-black text-rose-600 uppercase tracking-widest mb-1">Sobrecostos</p>
+                                    <p className="text-base font-black text-rose-800 leading-none">{fmtCOP(surchargeStats.approved)}</p>
+                                    <p className="text-[8px] text-rose-600/60 font-bold mt-1.5">{surchargeStats.approvedCount} Aprobados</p>
+                                </div>
+                            )}
                         </div>
 
                         <button onClick={onClose} className="w-9 h-9 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-full flex items-center justify-center transition-all flex-shrink-0 shadow-sm self-end lg:self-center">
@@ -719,8 +751,20 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4">
                     {tab === 'individual' && (
-                        <div className="space-y-2.5">
-                            {invoices.map(inv => {
+                        <div className="space-y-4">
+                            {/* Buscador de facturas */}
+                            <div className="relative mb-4">
+                                <Icons.Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input 
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Buscar factura por número o cliente..."
+                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-bold outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 transition-all shadow-sm"
+                                />
+                            </div>
+
+                            {filteredInvoices.map(inv => {
                                 const isLegalized = !!inv.forma_pago;
                                 const invoiceVal = Number(inv.invoice_value) || 0;
                                 const ms = inv.mastersuite_estado?.toLowerCase();
@@ -952,10 +996,10 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 </button>
                             </div>
 
-                            <div className="bg-orange-50 border border-orange-100 rounded-3xl p-6 flex items-center justify-between">
+                            <div className="bg-white rounded-[2rem] p-6 flex items-center justify-between shadow-xl shadow-slate-200/30 border border-slate-100">
                                 <div>
-                                    <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest">Total Sobrecostos</p>
-                                    <p className="text-xl font-black text-orange-900">{fmtCOP(totalSobrecostos)}</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Sobrecostos</p>
+                                    <p className="text-xl font-black text-slate-900">{fmtCOP(surchargeStats.approved + surchargeStats.pending)}</p>
                                 </div>
                                 <button onClick={handleSaveSobrecosto} disabled={savingSobrecosto}
                                     className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all
