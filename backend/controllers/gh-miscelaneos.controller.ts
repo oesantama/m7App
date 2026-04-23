@@ -17,7 +17,7 @@ const ALLOWED_TABLES: Record<string, string> = {
 const resolveTable = (tabla: string): string | null => ALLOWED_TABLES[tabla] ?? null;
 
 export const getGhMiscelaneos = async (req: Request, res: Response) => {
-  const table = resolveTable(req.params.tabla);
+  const table = resolveTable(req.params.tabla as string);
   if (!table) return res.status(400).json({ error: 'Tabla no permitida' });
 
   try {
@@ -32,7 +32,7 @@ export const getGhMiscelaneos = async (req: Request, res: Response) => {
 };
 
 export const saveGhMiscelaneo = async (req: Request, res: Response) => {
-  const table = resolveTable(req.params.tabla);
+  const table = resolveTable(req.params.tabla as string);
   if (!table) return res.status(400).json({ error: 'Tabla no permitida' });
 
   const { id, nombre, estado, usuarioControl } = req.body;
@@ -57,7 +57,7 @@ export const saveGhMiscelaneo = async (req: Request, res: Response) => {
 };
 
 export const deleteGhMiscelaneo = async (req: Request, res: Response) => {
-  const table = resolveTable(req.params.tabla);
+  const table = resolveTable(req.params.tabla as string);
   if (!table) return res.status(400).json({ error: 'Tabla no permitida' });
 
   const { id } = req.params;
