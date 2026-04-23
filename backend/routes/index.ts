@@ -43,6 +43,8 @@ import inventoryNewsRoutes from './inventory-news.routes.js';
 import grupoInterRoutes from './grupoInter.routes.js';
 import conciliationRoutes from './conciliation.routes.js';
 import inventoryRoutes from './inventory.routes.js';
+import ghMiscelaneosRoutes from './gh-miscelaneos.routes.js';
+import cfgCiudadesRoutes from './cfg-ciudades.routes.js';
 
 
 
@@ -91,6 +93,8 @@ router.use('/admin/backup', backupRoutes); // DB Backup endpoint
 router.use('/grupo-inter', grupoInterRoutes);
 router.use('/conciliation', conciliationRoutes);
 router.use('/inventory', inventoryRoutes);
+router.use('/gh-miscelaneos', ghMiscelaneosRoutes);
+router.use('/cfg-ciudades', cfgCiudadesRoutes);
 
 export default router;
 

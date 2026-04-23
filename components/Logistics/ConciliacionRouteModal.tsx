@@ -528,10 +528,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 toast.error('Cada sobrecosto debe tener un valor válido.');
                 return;
             }
-            if (!s.nroAprobacion || s.nroAprobacion.trim().length < 3) {
-                toast.error('La Referencia/NIT es obligatoria para cada sobrecosto.');
-                return;
-            }
             if (!s.fecha) {
                 toast.error('La Fecha es obligatoria para cada sobrecosto.');
                 return;
@@ -566,6 +562,11 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             // por ahora simulamos aprobación vía api.saveSobrecostos pasando el nuevo estado
             const s = sobrecostos.find(x => x.id === sId);
             if (!s) return;
+
+            if (!s.nroAprobacion || s.nroAprobacion.trim().length < 3) {
+                toast.error('La Referencia/NIT es obligatoria para aprobar un sobrecosto.');
+                return;
+            }
             
             await api.saveSobrecostos({
                 documentId,
@@ -909,7 +910,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     </div>
                                     <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[8px] font-black uppercase tracking-widest">Estado: Pendiente de Aprobación</span>
                                 </div>
-
                                 <div className="space-y-3">
                                     {sobrecostos.map((s, idx) => {
                                         const isApproved = s.statusId === 'APROBADO' || s.statusId === 'EST-02';
@@ -917,7 +917,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
                                         return (
                                             <div key={s.id} className={`grid grid-cols-12 gap-3 p-3 rounded-2xl border-2 shadow-sm relative group transition-all
-                                                ${isApproved ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+                                                ${isApproved ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}>
                                                 
                                                 <div className="col-span-3">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
@@ -930,7 +930,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                             setSobrecostos(next);
                                                         }}
                                                         placeholder="$ 0.00" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-emerald-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                            ${isApproved ? 'bg-transparent text-blue-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
                                                 <div className="col-span-3">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia / NIT</p>
@@ -941,7 +941,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                             setSobrecostos(next);
                                                         }}
                                                         placeholder="Obligatorio" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-emerald-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                            ${isApproved ? 'bg-transparent text-blue-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
                                                 <div className="col-span-3">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
@@ -952,11 +952,11 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                             setSobrecostos(next);
                                                         }}
                                                         className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-emerald-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                            ${isApproved ? 'bg-transparent text-blue-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
                                                 <div className="col-span-3 flex flex-col justify-end">
                                                     {isApproved ? (
-                                                        <span className="bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Aprobado</span>
+                                                        <span className="bg-blue-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Aprobado</span>
                                                     ) : (
                                                         <button onClick={() => handleApproveSurcharge(s.id)}
                                                             className="bg-emerald-500 hover:bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest shadow-sm shadow-emerald-200">

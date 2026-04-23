@@ -149,6 +149,22 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'approved_at'
   ],
 
+  // ─── GESTIÓN HUMANA: MISCELÁNEOS ─────────────────────────────────────────
+  'gh_horarios_laborales': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_eps':                ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_afp':                ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_tipos_vivienda':     ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_tipos_contrato':     ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_ingresos_mensuales': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_cargos':             ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_tipos_sangre':       ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_estados_civiles':    ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_niveles_educativos': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+
+  // ─── CONFIGURACIÓN: CIUDADES ──────────────────────────────────────────────
+  'cfg_departamentos': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'cfg_ciudades':      ['nombre', 'id_departamento', 'estado', 'usuario_control', 'fecha_control'],
+
   // ─── TRANSACCIONES DE CONCILIACIÓN ────────────────────────────────────────
   // Detalle por factura dentro de una conciliación: qué pasó con cada una.
   'conciliation_transactions': [
@@ -176,7 +192,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
@@ -208,9 +224,9 @@ const healSchema = async (client: any) => {
       for (const col of columns) {
         if (!existingCols.has(col)) {
           let type = 'TEXT';
-          if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at' || col === 'f_ultimo_corte' || col === 'fecha_carge' || col === 'fecha_entregado' || col === 'create_at' || col === 'update_at') {
+          if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at' || col === 'f_ultimo_corte' || col === 'fecha_carge' || col === 'fecha_entregado' || col === 'create_at' || col === 'update_at' || col === 'fecha_control') {
             type = 'TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP';
-          } else if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repice' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repice_qty' || col === 'invoice_value' || col === 'collected_value' || col === 'total_volume_m3' || col === 'vehicle_capacity_m3' || col === 'utilization_pct') {
+          } else if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repice' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repice_qty' || col === 'invoice_value' || col === 'collected_value' || col === 'total_volume_m3' || col === 'vehicle_capacity_m3' || col === 'utilization_pct' || col === 'id_departamento') {
             type = 'NUMERIC DEFAULT 0';
           } else if (col === 'client_ids') {
              type = 'TEXT[]';
@@ -635,11 +651,12 @@ export const restoreSystem = async () => {
         'PAG-01','PAG-03','PAG-04','PAG-05','PAG-06','PAG-07','PAG-08','PAG-09','PAG-10','PAG-11',
         'PAG-12','PAG-13','PAG-14','PAG-15','PAG-16','PAG-17',
         'PAG-18','PAG-19','PAG-20','PAG-21','PAG-22','PAG-23','PAG-24',
-        'PAG-25','PAG-26','PAG-27','PAG-28','PAG-29','PAG-30','PAG-SQL', 'PAG-31', 'PAG-32', 'PAG-33', 'PAG-34', 'PAG-35', 'PAG-36', 'PAG-37', 'PAG-38', 'PAG-39', 'PAG-40'
+        'PAG-25','PAG-26','PAG-27','PAG-28','PAG-29','PAG-30','PAG-SQL', 'PAG-31', 'PAG-32', 'PAG-33', 'PAG-34', 'PAG-35', 'PAG-36', 'PAG-37', 'PAG-38', 'PAG-39', 'PAG-40',
+        'PAG-41', 'PAG-42'
       )
     `);
     await client.query(`
-      DELETE FROM modules WHERE id NOT IN ('MOD-01','MOD-02','MOD-03','MOD-04','MOD-05','MOD-06', 'MOD-07', 'MOD-08')
+      DELETE FROM modules WHERE id NOT IN ('MOD-01','MOD-02','MOD-03','MOD-04','MOD-05','MOD-06', 'MOD-07', 'MOD-08', 'MOD-09')
     `);
 
     await client.query(`
@@ -651,7 +668,8 @@ export const restoreSystem = async () => {
       ('MOD-05', 'M7 INTELLIGENCE', 'Sparkles', 'EST-01'),
       ('MOD-06', 'ADMINISTRACIÓN', 'Database', 'EST-01'),
       ('MOD-07', 'GESTIÓN GRUPO INTER', 'Truck', 'EST-01'),
-      ('MOD-08', 'CENTRO DE FORMACIÓN', 'Award', 'EST-01')
+      ('MOD-08', 'CENTRO DE FORMACIÓN', 'Award', 'EST-01'),
+      ('MOD-09', 'GESTIÓN HUMANA', 'Users', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class, status_id = EXCLUDED.status_id;
     `);
 
@@ -711,7 +729,13 @@ export const restoreSystem = async () => {
 
       -- Centro de Formación (MOD-08)
       ('PAG-32', 'GESTIÓN ASISTENCIAS', 'training-ops', 'MOD-08', 'MOD-08', 'EST-01'),
-      ('PAG-33', 'CURSOS Y TALLERES', 'capacitaciones', 'MOD-08', 'MOD-08', 'EST-01')
+      ('PAG-33', 'CURSOS Y TALLERES', 'capacitaciones', 'MOD-08', 'MOD-08', 'EST-01'),
+
+      -- Gestión Humana (MOD-09)
+      ('PAG-41', 'MISCELÁNEOS', 'gestion-humana-miscelaneos', 'MOD-09', 'MOD-09', 'EST-01'),
+
+      -- Configuración Maestros extra (MOD-01)
+      ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01')
 
       ON CONFLICT (id) DO UPDATE SET 
         name = EXCLUDED.name, 

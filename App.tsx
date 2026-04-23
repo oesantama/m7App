@@ -63,6 +63,8 @@ const ConsultaFacturas = lazyWithRetry(() => import('./components/ConsultaFactur
 const DevolucionesBodega = lazyWithRetry(() => import('./components/Devoluciones/DevolucionesBodega'));
 const ConsultaInventario = lazyWithRetry(() => import('./components/ConsultaInventario'));
 const SalidaProveedor   = lazyWithRetry(() => import('./components/SalidaProveedor'));
+const GestionHumanaMiscelaneos = lazyWithRetry(() => import('./components/GestionHumana/Miscelaneos'));
+const CfgCiudades       = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 
 
 // Import Admin Module
@@ -939,6 +941,10 @@ const App: React.FC = () => {
         return <CentroCapacitaciones user={user!} />;
       case 'chatbot':
         return <AIChat context={{ user: user!.name, activeTab: 'chatbot-fullscreen' }} />;
+      case 'gestion-humana-miscelaneos':
+        return <GestionHumanaMiscelaneos user={user!} />;
+      case 'cfg-ciudades':
+        return <CfgCiudades user={user!} />;
       default:
         return (
           <div className="p-10 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">

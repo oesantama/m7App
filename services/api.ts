@@ -322,6 +322,28 @@ export const api = {
   }),
   deleteEstado: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/estados/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
+  // Gestión Humana — Misceláneos (CRUD genérico por tabla)
+  getGhMiscelaneos: (tabla: string) => fetchJson(`${API_URL}/gh-miscelaneos/${tabla}`),
+  saveGhMiscelaneo: (tabla: string, data: any) => fetchJson(`${API_URL}/gh-miscelaneos/${tabla}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  deleteGhMiscelaneo: (tabla: string, id: number) => fetchJson(`${API_URL}/gh-miscelaneos/${tabla}/${id}`, { method: 'DELETE' }),
+
+  // Configuración — Ciudades
+  getDepartamentos: () => fetchJson(`${API_URL}/cfg-ciudades/departamentos`),
+  saveDepartamento: (data: any) => fetchJson(`${API_URL}/cfg-ciudades/departamentos`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  deleteDepartamento: (id: number) => fetchJson(`${API_URL}/cfg-ciudades/departamentos/${id}`, { method: 'DELETE' }),
+  getCiudades: (departamentoId?: number) => fetchJson(`${API_URL}/cfg-ciudades/ciudades${departamentoId ? `?departamentoId=${departamentoId}` : ''}`),
+  saveCiudad: (data: any) => fetchJson(`${API_URL}/cfg-ciudades/ciudades`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  deleteCiudad: (id: number) => fetchJson(`${API_URL}/cfg-ciudades/ciudades/${id}`, { method: 'DELETE' }),
+
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
   saveMarca: (data: any) => fetchJson(`${API_URL}/marcas`, {
