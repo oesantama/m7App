@@ -43,8 +43,8 @@ export const getTableData = async (req: any, res: Response) => {
     }
 
     const offset = (page - 1) * limit;
-    let query = `SELECT * FROM ${tableName}`;
-    let countQuery = `SELECT COUNT(*) as total FROM ${tableName}`;
+    let query = `SELECT * FROM ${tableName} t`;
+    let countQuery = `SELECT COUNT(*) as total FROM ${tableName} t`;
     const params: any[] = [];
 
     // Simple textual search across all text columns? 
@@ -59,10 +59,11 @@ export const getTableData = async (req: any, res: Response) => {
     // Alternative: Filter by ID if search looks like ID.
     
     if (search) {
-       // Only safer way without schema introspection is strict equality on ID or partial match if we knew columns.
-       // Let's rely on the Frontend "SQL Mode" for complex queries and keep this for basic listing.
-       // OR, implemented basic TEXT column search if possible. 
-       // For this iteration, let's stick to Pagination and let the user use SQL Mode for filtering.
+       // Implementación de búsqueda genérica: busca la coincidencia en cualquier columna casteada a texto
+       // Esto permite buscar en IDs, nombres, fechas, etc. sin conocer el esquema de antemano.
+       query += ` WHERE (SELECT string_agg(val::text, ' ') FROM (SELECT (t.*)) AS val) ILIKE $1`;
+       countQuery += ` WHERE (SELECT string_agg(val::text, ' ') FROM (SELECT (t.*)) AS val) ILIKE $1`;
+       params.push(`%${search}%`);
     }
 
     // Add Sorting
@@ -76,7 +77,7 @@ export const getTableData = async (req: any, res: Response) => {
     // Add Pagination
     // Handle "Show All" by passing -1 or very large limit? 
     // If limit is very large, just use it. If frontend sends 1000000 it works.
-    query += ` LIMIT $1 OFFSET $2`;
+    query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
     const result = await pool.query(query, params);
