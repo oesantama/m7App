@@ -589,25 +589,27 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
     [consignaciones]);
 
-    const totalSobrecostos = useMemo(() =>
-        sobrecostos
-            .filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02') // EST-02 = Aprobado
-            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
-    [sobrecostos]);
+    const surchargeStats = useMemo(() => {
+        const approved = sobrecostos
+            .filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02')
+            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
+        const pending = sobrecostos
+            .filter(c => c.statusId === 'PENDIENTE' || c.statusId === 'EST-01' || !c.statusId)
+            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
+        return { approved, pending };
+    }, [sobrecostos]);
 
     const plateTotals = useMemo(() => {
         const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const invLegalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
 
-        // MODIFICACIÓN: No sumamos totalConsignado (grupal) al legalizado de la PLACA
-        // porque totalConsignado es del documento entero y desvirtúa el pendiente de la placa.
-        // Los sobrecostos SÍ son de la placa.
-        const totalLegalizado = invLegalizedVal + totalSobrecostos;
+        // MODIFICACIÓN: Solo sumamos sobrecostos APROBADOS
+        const totalLegalizado = invLegalizedVal + surchargeStats.approved;
         
         const legalCount   = invoices.filter(i => !!i.forma_pago).length;
         const pendingVal   = Math.max(0, totalValue - totalLegalizado);
         return { totalValue, legalizedVal: totalLegalizado, legalCount, pendingVal, total: invoices.length };
-    }, [invoices, totalSobrecostos]);
+    }, [invoices, surchargeStats]);
 
     const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
 
@@ -870,7 +872,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Gestión de Sobrecostos</h4>
                                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Registre gastos adicionales asociados a la placa {route.plate}</p>
                                     </div>
-                                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[8px] font-black uppercase tracking-widest">Estado ID: EST-01 (Pendiente)</span>
+                                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[8px] font-black uppercase tracking-widest">Estado: Pendiente de Aprobación</span>
                                 </div>
 
                                 <div className="space-y-3">
