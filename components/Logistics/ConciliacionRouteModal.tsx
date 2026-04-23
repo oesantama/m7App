@@ -737,16 +737,21 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 <p className="text-[7px] text-slate-400 font-bold mt-1.5 text-center">{plateTotals.total} Facts</p>
                             </div>
                             <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-rose-500/10 border border-rose-100/50">
-                                <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center">Sobrecostos (Aprobados)</p>
-                                <p className="text-sm font-black text-rose-800 leading-none text-center">{fmtCOP(surchargeStats.approved)}</p>
-                                <div className="grid grid-cols-2 gap-1 mt-1.5 pt-1.5 border-t border-rose-50/50">
-                                    <div className="text-center">
-                                        <p className="text-[6px] font-black text-emerald-500 uppercase leading-none">Aprobados</p>
-                                        <p className="text-[8px] font-black text-slate-700 leading-none mt-0.5">{surchargeStats.approvedCount}</p>
+                                <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center font-bold">Resumen Sobrecostos</p>
+                                <div className="space-y-1.5 mt-2">
+                                    <div className="flex justify-between items-center bg-amber-50/50 px-2 py-1 rounded-lg">
+                                        <p className="text-[7px] font-black text-amber-600 uppercase tracking-tight">Pendiente:</p>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-700 leading-none">{fmtCOP(surchargeStats.pending)}</p>
+                                            <p className="text-[6px] font-bold text-slate-400 uppercase mt-0.5">Cant: {surchargeStats.pendingCount}</p>
+                                        </div>
                                     </div>
-                                    <div className="text-center border-l border-rose-50/50">
-                                        <p className="text-[6px] font-black text-amber-500 uppercase leading-none">Pendientes</p>
-                                        <p className="text-[8px] font-black text-slate-700 leading-none mt-0.5">{surchargeStats.pendingCount} <span className="text-[6px] text-slate-400">({fmtCOP(surchargeStats.pending)})</span></p>
+                                    <div className="flex justify-between items-center bg-emerald-50/50 px-2 py-1 rounded-lg">
+                                        <p className="text-[7px] font-black text-emerald-600 uppercase tracking-tight">Aprobados:</p>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-700 leading-none">{fmtCOP(surchargeStats.approved)}</p>
+                                            <p className="text-[6px] font-bold text-slate-400 uppercase mt-0.5">Cant: {surchargeStats.approvedCount}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
