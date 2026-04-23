@@ -286,6 +286,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
 
         const baseInvoiceFrom = `
             FROM document_items di
+            INNER JOIN documents_l dl ON dl.id = di.document_id
             LEFT JOIN invoice_conciliations ic
                 ON ic.document_id = $1 AND ic.invoice_number = di.invoice
             LEFT JOIN users u ON u.id = ic.conciliado_por
