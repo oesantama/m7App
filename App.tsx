@@ -64,6 +64,7 @@ const DevolucionesBodega = lazyWithRetry(() => import('./components/Devoluciones
 const ConsultaInventario = lazyWithRetry(() => import('./components/ConsultaInventario'));
 const SalidaProveedor   = lazyWithRetry(() => import('./components/SalidaProveedor'));
 const GestionHumanaMiscelaneos = lazyWithRetry(() => import('./components/GestionHumana/Miscelaneos'));
+const GestionHumanaPersonal    = lazyWithRetry(() => import('./components/GestionHumana/Personal'));
 const CfgCiudades       = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 
 
@@ -943,6 +944,8 @@ const App: React.FC = () => {
         return <AIChat context={{ user: user!.name, activeTab: 'chatbot-fullscreen' }} />;
       case 'gestion-humana-miscelaneos':
         return <GestionHumanaMiscelaneos user={user!} />;
+      case 'gestion-humana-personal':
+        return <GestionHumanaPersonal user={user!} />;
       case 'cfg-ciudades':
         return <CfgCiudades user={user!} />;
       default:

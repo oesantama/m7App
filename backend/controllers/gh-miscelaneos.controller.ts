@@ -12,6 +12,8 @@ const ALLOWED_TABLES: Record<string, string> = {
   'tipos-sangre':       'gh_tipos_sangre',
   'estados-civiles':    'gh_estados_civiles',
   'niveles-educativos': 'gh_niveles_educativos',
+  'areas':              'gh_areas',
+  'jefes-inmediatos':   'gh_jefes_inmediatos',
 };
 
 const resolveTable = (tabla: string): string | null => ALLOWED_TABLES[tabla] ?? null;

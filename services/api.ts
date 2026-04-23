@@ -345,6 +345,19 @@ export const api = {
   }),
   deleteCiudad: (id: number) => fetchJson(`${API_URL}/cfg-ciudades/ciudades/${id}`, { method: 'DELETE' }),
 
+  // Gestión Humana — Personal
+  getPersonal: () => fetchJson(`${API_URL}/gh-personal`),
+  savePersonal: (data: any) => fetchJson(`${API_URL}/gh-personal`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  deletePersonal: (id: number | string) => fetchJson(`${API_URL}/gh-personal/${id}`, { method: 'DELETE' }),
+  getPersonalEncuestas: () => fetchJson(`${API_URL}/gh-personal/encuestas`),
+  activatePersonalEncuesta: (data: { cedula: string, usuarioControl: string }) => fetchJson(`${API_URL}/gh-personal/encuestas/activate`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
   saveMarca: (data: any) => fetchJson(`${API_URL}/marcas`, {

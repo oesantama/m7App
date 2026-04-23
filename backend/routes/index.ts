@@ -44,6 +44,7 @@ import grupoInterRoutes from './grupoInter.routes.js';
 import conciliationRoutes from './conciliation.routes.js';
 import inventoryRoutes from './inventory.routes.js';
 import ghMiscelaneosRoutes from './gh-miscelaneos.routes.js';
+import ghPersonalRoutes from './gh-personal.routes.js';
 import cfgCiudadesRoutes from './cfg-ciudades.routes.js';
 
 
@@ -94,6 +95,7 @@ router.use('/grupo-inter', grupoInterRoutes);
 router.use('/conciliation', conciliationRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/gh-miscelaneos', ghMiscelaneosRoutes);
+router.use('/gh-personal', ghPersonalRoutes);
 router.use('/cfg-ciudades', cfgCiudadesRoutes);
 
 export default router;

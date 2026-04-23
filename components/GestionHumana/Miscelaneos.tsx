@@ -35,7 +35,9 @@ type TabKey =
   | 'cargos'
   | 'tipos-sangre'
   | 'estados-civiles'
-  | 'niveles-educativos';
+  | 'niveles-educativos'
+  | 'areas'
+  | 'jefes-inmediatos';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'horarios-laborales', label: 'Horario Laboral' },
@@ -48,6 +50,8 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'tipos-sangre',       label: 'Tipo Sangre' },
   { key: 'estados-civiles',    label: 'Estados Civiles' },
   { key: 'niveles-educativos', label: 'Niveles Educativos' },
+  { key: 'areas',              label: 'Áreas' },
+  { key: 'jefes-inmediatos',   label: 'Jefes Inmediatos' },
 ];
 
 // ─── Sub-componente CRUD reutilizable ─────────────────────────────────────────
