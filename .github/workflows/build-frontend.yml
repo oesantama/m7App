@@ -63,8 +63,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       # Hace el paquete público automáticamente para que Coolify pueda
       # hacer docker pull sin necesidad de credenciales.
