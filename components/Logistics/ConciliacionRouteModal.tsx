@@ -525,7 +525,7 @@ const LegalizationDialog: React.FC<{
 
 const ConciliacionRouteModal: React.FC<Props> = ({
     isOpen, onClose, route, invoices, documentId, currentUserId, onSaved,
-    initialSurcharges, initialGroupPayments
+    initialSurcharges, initialGroupPayments, allRoutes
 }) => {
     const { user } = useAppData();
     const [tab, setTab]         = useState<ModalTab>('individual');
