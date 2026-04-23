@@ -27,14 +27,25 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS route_surcharges (
                 id SERIAL PRIMARY KEY,
-                document_id TEXT,
-                plate TEXT,
-                valor NUMERIC(15,2),
+                document_id TEXT NOT NULL,
+                plate TEXT NOT NULL,
+                valor NUMERIC(15,2) NOT NULL,
                 referencia TEXT,
                 fecha DATE,
                 status_id TEXT DEFAULT 'PENDIENTE',
+                user_id TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
+        `);
+
+        // Garantizar que la columna user_id existe (si la tabla se creó antes sin ella)
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='route_surcharges' AND column_name='user_id') THEN
+                    ALTER TABLE route_surcharges ADD COLUMN user_id TEXT;
+                END IF;
+            END $$;
         `);
 
         const result = await pool.query(`

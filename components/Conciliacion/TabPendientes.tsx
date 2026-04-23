@@ -329,10 +329,17 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         const parciales       = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).length;
         
         const valorTotal      = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const valorLegalizado = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
+        
+        // El valor legalizado global incluye: facturas individuales + consignaciones grupales + sobrecostos
+        const totalGrupal     = groupPayments.reduce((s, p) => s + (Number(p.vmetodo) || 0), 0);
+        const totalSurch      = routeSurcharges.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        const individualLeg   = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
+
+        const valorLegalizado = individualLeg + totalGrupal + totalSurch;
+
         const valorDevuelto   = invoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const valorParcial    = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).reduce((s, i) => s + (Number(i.valor) || 0), 0);
-        const totalSobrecosto = invoices.reduce((s, i) => s + (Number(i.sobrecosto) || 0), 0);
+        const totalSobrecosto = totalSurch;
 
         const assigned        = total - unassigned;
         
@@ -341,7 +348,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             valorTotal, valorLegalizado, valorDevuelto, valorParcial, totalSobrecosto,
             assigned 
         };
-    }, [invoices, unassigned]);
+    }, [invoices, unassigned, groupPayments, routeSurcharges]);
 
     const isAllLegalized = stats.total > 0 && stats.legalizadas === stats.total;
 

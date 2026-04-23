@@ -107,7 +107,7 @@ interface Props {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const fmtCOP = (v: number | undefined | null) =>
-    v != null && v > 0
+    v != null && v >= 0
         ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
         : '—';
 
@@ -558,13 +558,16 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const plateTotals = useMemo(() => {
         const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const invLegalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
-        
-        // Sumamos individual + grupal + sobrecostos (como parte del flujo de la placa)
-        const totalLegalizado = invLegalizedVal + totalConsignado + totalSobrecostos;
+
+        // MODIFICACIÓN: No sumamos totalConsignado (grupal) al legalizado de la PLACA
+        // porque totalConsignado es del documento entero y desvirtúa el pendiente de la placa.
+        // Los sobrecostos SÍ son de la placa.
+        const totalLegalizado = invLegalizedVal + totalSobrecostos;
         
         const legalCount   = invoices.filter(i => !!i.forma_pago).length;
-        return { totalValue, legalizedVal: totalLegalizado, legalCount, pendingVal: Math.max(0, totalValue - totalLegalizado), total: invoices.length };
-    }, [invoices, totalConsignado, totalSobrecostos]);
+        const pendingVal   = Math.max(0, totalValue - totalLegalizado);
+        return { totalValue, legalizedVal: totalLegalizado, legalCount, pendingVal, total: invoices.length };
+    }, [invoices, totalSobrecostos]);
 
     const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
 
