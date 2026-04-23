@@ -330,22 +330,27 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         
         const valorTotal      = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         
-        // El valor legalizado global incluye: facturas individuales + consignaciones grupales + sobrecostos
-        const totalGrupal     = groupPayments.reduce((s, p) => s + (Number(p.vmetodo) || 0), 0);
-        const totalSurch      = routeSurcharges.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        // RE-DEFINICIÓN: El 'Legalizado' en las cards principales se refiere a las FACTURAS.
+        // Las consignaciones grupales y sobrecostos son 'Recaudos Extra' que no matan facturas directamente.
         const individualLeg   = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
+        const valorLegalizado = individualLeg;
 
-        const valorLegalizado = individualLeg + totalGrupal + totalSurch;
+        // Recaudos adicionales
+        const totalGrupal     = groupPayments.reduce((s, p) => s + (Number(p.vmetodo) || 0), 0);
+        const approvedSurch   = routeSurcharges.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        const pendingSurch    = routeSurcharges.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id).reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        
+        const totalExtra      = totalGrupal + approvedSurch;
 
         const valorDevuelto   = invoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const valorParcial    = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).reduce((s, i) => s + (Number(i.valor) || 0), 0);
-        const totalSobrecosto = totalSurch;
-
+        
         const assigned        = total - unassigned;
         
         return { 
             total, legalizadas, entregadas, devueltas, parciales, 
-            valorTotal, valorLegalizado, valorDevuelto, valorParcial, totalSobrecosto,
+            valorTotal, valorLegalizado, valorDevuelto, valorParcial, 
+            approvedSurch, pendingSurch, totalGrupal, totalExtra,
             assigned 
         };
     }, [invoices, unassigned, groupPayments, routeSurcharges]);
@@ -577,12 +582,27 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-amber-100 uppercase tracking-widest leading-none mb-1">Pendiente</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotal - stats.valorLegalizado)}</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotal - stats.valorLegalizado))}</span>
                                         </div>
-                                        {stats.totalSobrecosto > 0 && (
-                                            <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-900/10 min-w-[100px]">
-                                                <span className="text-[8px] font-black text-rose-100 uppercase tracking-widest leading-none mb-1">Sobre Costo</span>
-                                                <span className="text-base font-black leading-none">{fmtCOP(stats.totalSobrecosto)}</span>
+                                        {(stats.approvedSurch > 0 || stats.pendingSurch > 0) && (
+                                            <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-900/10 min-w-[140px]">
+                                                <span className="text-[8px] font-black text-rose-100 uppercase tracking-widest leading-none mb-1">Sobre Costos</span>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex justify-between items-center gap-4">
+                                                        <span className="text-[7px] font-bold text-rose-200 uppercase">Aprobados:</span>
+                                                        <span className="text-xs font-black">{fmtCOP(stats.approvedSurch)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center gap-4 border-t border-rose-500/30 pt-0.5">
+                                                        <span className="text-[7px] font-bold text-rose-200 uppercase">Pendientes:</span>
+                                                        <span className="text-xs font-black">{fmtCOP(stats.pendingSurch)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {stats.totalGrupal > 0 && (
+                                            <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-900/10 min-w-[120px]">
+                                                <span className="text-[8px] font-black text-violet-100 uppercase tracking-widest leading-none mb-1">Consig. Grupal</span>
+                                                <span className="text-base font-black leading-none">{fmtCOP(stats.totalGrupal)}</span>
                                             </div>
                                         )}
                                     </div>
@@ -1048,7 +1068,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     </div>
                                     <span className="text-[9px] font-black text-emerald-700 shrink-0">{legalPct}% leg.</span>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                                     <div className="bg-white border border-slate-100 rounded-xl px-3 py-2 text-center cursor-default">
                                         <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Total placa</p>
                                         <p className="text-sm font-black text-slate-900">{fmtCOP(totalVal)}</p>
@@ -1058,20 +1078,21 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'leg' ? 'text-emerald-100' : 'text-emerald-600'}`}>💵 Legalizado</p>
                                         <p className="text-sm font-black">{fmtCOP(fin.valor_legalizado)}</p>
                                     </div>
+                                    <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-3 py-2 text-center cursor-default">
+                                        <p className="text-[8px] font-black text-amber-100 uppercase mb-0.5">⏳ Pendiente</p>
+                                        <p className="text-sm font-black">{fmtCOP(Math.max(0, totalVal - fin.valor_legalizado))}</p>
+                                    </div>
                                     <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'dev' ? 'bg-amber-500 text-white border-amber-600 shadow-lg' : 'bg-amber-50 border-amber-100 hover:bg-amber-100'}`}
                                         onClick={() => setActiveDetailCard(activeDetailCard === 'dev' ? null : 'dev')}>
                                         <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'dev' ? 'text-amber-100' : 'text-amber-600'}`}>🔄 Devuelto</p>
                                         <p className="text-sm font-black">{fmtCOP(fin.valor_devuelto)}</p>
                                     </div>
-                                    <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'par' ? 'bg-orange-500 text-white border-orange-600 shadow-lg' : 'bg-orange-50 border-orange-100 hover:bg-orange-100'}`}
-                                        onClick={() => setActiveDetailCard(activeDetailCard === 'par' ? null : 'par')}>
-                                        <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'par' ? 'text-orange-100' : 'text-orange-600'}`}>📦 Parcial</p>
-                                        <p className="text-sm font-black">{fmtCOP(fin.valor_parcial)}</p>
-                                    </div>
                                     <div className={`border rounded-xl px-3 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'sc' ? 'bg-rose-600 text-white border-rose-700 shadow-lg' : 'bg-rose-50 border-rose-100 hover:bg-rose-100'}`}
-                                        onClick={() => setActiveDetailCard(activeDetailCard === 'sc' ? null : 'sc')}>
+                                        onClick={() => {
+                                            setActiveDetailCard(activeDetailCard === 'sc' ? null : 'sc');
+                                        }}>
                                         <p className={`text-[8px] font-black uppercase mb-0.5 ${activeDetailCard === 'sc' ? 'text-rose-100' : 'text-rose-600'}`}>⚠️ Sobrecosto</p>
-                                        <p className="text-sm font-black">{fmtCOP(fin.total_sobrecosto)}</p>
+                                        <p className="text-sm font-black">{fmtCOP(routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))}</p>
                                     </div>
                                 </div>
 
@@ -1139,18 +1160,21 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                         </div>
                                                     </div>
                                                 ))}
-                                                {activeDetailCard === 'sc' && routeSurcharges.filter(s => s.plate === detailRoute.plate).map((s, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between bg-rose-50 p-2.5 rounded-xl border border-rose-100">
-                                                        <div>
-                                                            <p className="text-[10px] font-black text-rose-900">Surcharge / Gasto</p>
-                                                            <p className="text-[8px] text-rose-600 font-bold uppercase">{s.referencia || 'S/R'} · {s.status_id || 'PENDIENTE'}</p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="text-[11px] font-black text-rose-700">{fmtCOP(s.valor)}</p>
-                                                            <p className="text-[8px] text-rose-400">{s.fecha ? String(s.fecha).slice(0, 10) : '—'}</p>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                  {activeDetailCard === 'sc' && routeSurcharges.filter(s => s.plate === detailRoute.plate).map((s, idx) => {
+                                                      const statusName = (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente';
+                                                      return (
+                                                          <div key={idx} className={`flex items-center justify-between p-2.5 rounded-xl border ${statusName === 'Aprobado' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+                                                              <div>
+                                                                  <p className={`text-[10px] font-black ${statusName === 'Aprobado' ? 'text-emerald-900' : 'text-rose-900'}`}>Surcharge / Gasto</p>
+                                                                  <p className={`text-[8px] font-bold uppercase ${statusName === 'Aprobado' ? 'text-emerald-600' : 'text-rose-600'}`}>{s.referencia || 'S/R'} · {statusName}</p>
+                                                              </div>
+                                                              <div className="text-right">
+                                                                  <p className={`text-[11px] font-black ${statusName === 'Aprobado' ? 'text-emerald-700' : 'text-rose-700'}`}>{fmtCOP(s.valor)}</p>
+                                                                  <p className="text-[8px] text-slate-400">{s.fecha ? String(s.fecha).slice(0, 10) : '—'}</p>
+                                                              </div>
+                                                          </div>
+                                                      );
+                                                  })}
                                                 {((activeDetailCard === 'leg' && routeInvs.filter(i => i.forma_pago).length === 0 && groupPayments.length === 0) ||
                                                   (activeDetailCard === 'dev' && routeInvs.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase())).length === 0) ||
                                                   (activeDetailCard === 'par' && routeInvs.filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase())).length === 0) ||

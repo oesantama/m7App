@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icons } from '../../constants';
 import { api } from '../../services/api';
+import { useAppData } from '../../hooks/useAppData';
 import { toast } from 'sonner';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -431,6 +432,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     isOpen, onClose, route, invoices, documentId, currentUserId, onSaved,
     initialSurcharges, initialGroupPayments
 }) => {
+    const { user } = useAppData();
     const [tab, setTab]         = useState<ModalTab>('individual');
     const [forms, setForms]     = useState<Map<string, InvoiceFormState>>(new Map());
     const [activeDialog, setActiveDialog] = useState<string | null>(null);
