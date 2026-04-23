@@ -439,15 +439,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const totW = CW - bankW - 3;
             const totX = ML + bankW + 3;
 
-            autoTable(pdf, {
-                startY: y, margin: { left: ML }, tableWidth: bankW,
-                head: [['BANCO', 'VALOR', 'COMPROBANTE', 'FECHA']],
-                body: [['','','',''],['','','',''],['','','','']],
-                styles: { fontSize: 6, cellPadding: 1.5, minCellHeight: 5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
-                headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
-                theme: 'grid',
-                margin: { bottom: 28 }
-            });
+                autoTable(pdf, {
+                    startY: y, margin: { left: ML, bottom: 28 }, tableWidth: bankW,
+                    head: [['BANCO', 'VALOR', 'COMPROBANTE', 'FECHA']],
+                    body: [['','','',''],['','','',''],['','','','']],
+                    styles: { fontSize: 6, cellPadding: 1.5, minCellHeight: 5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+                    headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
+                    theme: 'grid'
+                });
             const bankEndY = (pdf as any).lastAutoTable.finalY;
 
             const fmtCOP = (v: number) => `$ ${v.toLocaleString('es-CO')}`;
@@ -488,7 +487,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
             // ── INVOICES TABLE ──────────────────────────────────────────────────────
             autoTable(pdf, {
-                startY: y, margin: { left: ML, right: MR },
+                startY: y, margin: { left: ML, right: MR, bottom: 28 },
                 head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
                 body: [...routeInvList]
                     .sort((a, b) => String(a.invoiceNumber || '').localeCompare(String(b.invoiceNumber || ''), undefined, { numeric: true, sensitivity: 'base' }))
@@ -522,8 +521,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     8: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
                     9: { halign: 'left' },
                 },
-                theme: 'grid',
-                margin: { bottom: 28 }
+                theme: 'grid'
             });
             y = (pdf as any).lastAutoTable.finalY + 5;
 
@@ -556,7 +554,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     cargoRows.push(row);
                 }
                 autoTable(pdf, {
-                    startY: y, margin: { left: ML, right: MR },
+                    startY: y, margin: { left: ML, right: MR, bottom: 28 },
                     tableWidth: CW, // Forzar el ancho al margen de la tabla superior
                     head: [['ID','CANT','NOTAS','ID','CANT','NOTAS','ID','CANT','NOTAS','ID','CANT','NOTAS']],
                     body: cargoRows,
@@ -576,8 +574,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         10: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
                         11: { cellWidth: 12 },
                     },
-                    theme: 'grid',
-                    margin: { bottom: 28 }
+                    theme: 'grid'
                 });
                 y = (pdf as any).lastAutoTable.finalY + 8;
             }

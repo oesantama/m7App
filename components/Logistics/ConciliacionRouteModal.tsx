@@ -844,7 +844,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Detalle de Consignaciones</h4>
                                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Registre los comprobantes de pago de la placa</p>
                                     </div>
-                                    </div>
                                 </div>
 
                                 <div className="space-y-3">
