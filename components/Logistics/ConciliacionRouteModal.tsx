@@ -390,10 +390,6 @@ const LegalizationDialog: React.FC<{
                                             <p className="text-sm font-black text-slate-700">{form.numConsignacion || '—'}</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Banco</p>
-                                            <p className="text-sm font-black text-slate-700">{form.banco || '—'}</p>
-                                        </div>
-                                        <div className="space-y-1">
                                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Fecha Registro</p>
                                             <p className="text-sm font-black text-slate-700">{form.fecha || '—'}</p>
                                         </div>
@@ -443,17 +439,11 @@ const LegalizationDialog: React.FC<{
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 gap-4">
                                                 <div className="space-y-1.5">
                                                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">No. Comprobante / Ref.</label>
                                                     <input type="text" value={form.numConsignacion}
                                                         onChange={e => onUpdate({ numConsignacion: e.target.value })} placeholder="Ref. del pago"
-                                                        className="w-full px-4 py-3 bg-white border border-slate-200 focus:border-emerald-500 rounded-2xl text-sm font-black outline-none transition-all placeholder:text-slate-300" />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Banco</label>
-                                                    <input type="text" value={form.banco}
-                                                        onChange={e => onUpdate({ banco: e.target.value })} placeholder="Ej: Bancolombia"
                                                         className="w-full px-4 py-3 bg-white border border-slate-200 focus:border-emerald-500 rounded-2xl text-sm font-black outline-none transition-all placeholder:text-slate-300" />
                                                 </div>
                                             </div>
@@ -541,7 +531,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     'VALOR DEVUELTO': Math.round(devVal),
                     'SOBRECOSTO': i.sobrecosto || 0,
                     'METODO': i.forma_pago || '—',
-                    'BANCO': i.banco || '—',
                     'COMPROBANTE': i.comprobante || '—',
                     'FECHA PAGO': i.fecha_pago ? i.fecha_pago.slice(0, 10) : '—',
                 };
