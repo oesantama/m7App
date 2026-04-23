@@ -59,10 +59,9 @@ export const getTableData = async (req: any, res: Response) => {
     // Alternative: Filter by ID if search looks like ID.
     
     if (search) {
-       // Implementación de búsqueda genérica: busca la coincidencia en cualquier columna casteada a texto
-       // Esto permite buscar en IDs, nombres, fechas, etc. sin conocer el esquema de antemano.
-       query += ` WHERE (SELECT string_agg(val::text, ' ') FROM (SELECT (t.*)) AS val) ILIKE $1`;
-       countQuery += ` WHERE (SELECT string_agg(val::text, ' ') FROM (SELECT (t.*)) AS val) ILIKE $1`;
+       // Búsqueda robusta: convierte la fila a JSONB y busca el término en cualquier valor de campo
+       query += ` WHERE EXISTS (SELECT 1 FROM jsonb_each_text(to_jsonb(t)) WHERE value ILIKE $1)`;
+       countQuery += ` WHERE EXISTS (SELECT 1 FROM jsonb_each_text(to_jsonb(t)) WHERE value ILIKE $1)`;
        params.push(`%${search}%`);
     }
 

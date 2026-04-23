@@ -873,7 +873,11 @@ export const saveSobrecostos = async (req: Request, res: Response) => {
 
         // Procesar cada item de sobrecosto (Insertar o Actualizar si tiene ID)
         for (const item of items) {
-            if (item.id && !String(item.id).startsWith('17')) { // Los IDs de Date.now() suelen empezar por 17... (son nuevos)
+            // Un ID de base de datos es un número secuencial pequeño. 
+            // Un ID temporal del frontend (Date.now()) es un número de 13 dígitos (> 10^12).
+            const isUpdate = item.id && !isNaN(Number(item.id)) && Number(item.id) < 1000000000;
+
+            if (isUpdate) {
                 await client.query(`
                     UPDATE route_surcharges 
                     SET valor = $1, referencia = $2, fecha = $3, status_id = $4, user_id = $5
