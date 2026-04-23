@@ -429,6 +429,7 @@ const LegalizationDialog: React.FC<{
 
 const ConciliacionRouteModal: React.FC<Props> = ({
     isOpen, onClose, route, invoices, documentId, currentUserId, onSaved,
+    initialSurcharges, initialGroupPayments
 }) => {
     const [tab, setTab]         = useState<ModalTab>('individual');
     const [forms, setForms]     = useState<Map<string, InvoiceFormState>>(new Map());
