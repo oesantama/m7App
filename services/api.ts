@@ -701,7 +701,7 @@ export const api = {
     return fetchJson(`${API_URL}/picking/status/${encodeURIComponent(invoiceId)}`).catch(() => null);
   },
 
-  processDocumentLPayment: (data: { documentId: string, payments: any[], userId: string }) => fetchJson(`${API_URL}/documents/process-l-payment`, {
+  saveRouteGroupPayments: (data: { documentId: string, plate: string, payments: any[], userId: string }) => fetchJson(`${API_URL}/conciliation/group-payments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)

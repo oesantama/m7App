@@ -455,9 +455,16 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
         // Cargar consignaciones grupales previas si existen
         if (initialGroupPayments && initialGroupPayments.length > 0) {
-            setConsignaciones(initialGroupPayments);
+            setConsignaciones(initialGroupPayments.map(p => ({
+                id: String(p.id),
+                valor: p.valor ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Math.floor(Number(p.valor) || 0)) : '',
+                nroAprobacion: p.referencia || '',
+                fecha: p.fecha ? new Date(p.fecha).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                observacion: p.observacion || '',
+                metodo: p.metodo_pago as MetodoPago || 'CONSIGNACION'
+            })));
         } else {
-            setConsignaciones([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }]);
+            setConsignaciones([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }]);
         }
 
         // Cargar sobrecostos previos si existen
@@ -498,21 +505,23 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     }, []);
 
     const handleSaveGrupal = async () => {
-        const totalConsignadoVal = consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
-        if (totalConsignadoVal <= 0) {
-            toast.error('Ingrese un valor de consignación válido.');
+        const hasValid = consignaciones.some(s => Number(String(s.valor).replace(/\D/g, '')) > 0);
+        if (!hasValid) {
+            toast.error('Ingrese al menos un valor de consignación válido.');
             return;
         }
 
         setSavingGrupal(true);
         try {
-            await api.processDocumentLPayment({
+            await api.saveRouteGroupPayments({
                 documentId,
-                payments: consignaciones.map(c => ({
-                    valor: Number(c.valor.replace(/\./g, '').replace(',', '')) || 0,
+                plate: route.plate,
+                payments: consignaciones.filter(c => Number(String(c.valor).replace(/\D/g, '')) > 0).map(c => ({
+                    id: c.id,
+                    valor: Math.floor(Number(String(c.valor).replace(/\D/g, '')) || 0),
                     referencia: c.nroAprobacion,
                     fecha: c.fecha,
-                    metodo: grupalMetodo,
+                    metodo: c.metodo || grupalMetodo,
                     observacion: c.observacion
                 })),
                 userId: currentUserId
@@ -623,12 +632,16 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const plateTotals = useMemo(() => {
         const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const invLegalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
-        const totalLegalizado = invLegalizedVal + surchargeStats.approved;
+        
+        // Sumar consignaciones grupales guardadas
+        const totalConsignadoPrevio = (initialGroupPayments || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+        
+        const totalLegalizado = invLegalizedVal + surchargeStats.approved + totalConsignadoPrevio;
         
         const legalCount   = invoices.filter(i => !!i.forma_pago).length;
         const pendingVal   = Math.max(0, totalValue - totalLegalizado);
         return { totalValue, legalizedVal: totalLegalizado, legalCount, pendingVal, total: invoices.length };
-    }, [invoices, surchargeStats]);
+    }, [invoices, surchargeStats, initialGroupPayments]);
 
     const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
 
@@ -703,11 +716,14 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 <p className="text-base font-black text-slate-800 leading-none">{fmtCOP(plateTotals.totalValue)}</p>
                                 <p className="text-[8px] text-slate-400 font-bold mt-1.5">{plateTotals.total} Facturas</p>
                             </div>
-                            {surchargeStats.approvedCount > 0 && (
+                            {(surchargeStats.approvedCount > 0 || surchargeStats.pendingCount > 0) && (
                                 <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-rose-500/10 border border-rose-100/50">
                                     <p className="text-[8px] font-black text-rose-600 uppercase tracking-widest mb-1">Sobrecostos</p>
-                                    <p className="text-base font-black text-rose-800 leading-none">{fmtCOP(surchargeStats.approved)}</p>
-                                    <p className="text-[8px] text-rose-600/60 font-bold mt-1.5">{surchargeStats.approvedCount} Aprobados</p>
+                                    <p className="text-base font-black text-rose-800 leading-none">{fmtCOP(surchargeStats.approved + surchargeStats.pending)}</p>
+                                    <p className="text-[8px] text-rose-600/60 font-bold mt-1.5">
+                                        {surchargeStats.approvedCount} Aprobados 
+                                        {surchargeStats.pendingCount > 0 && ` | ${surchargeStats.pendingCount} Pendientes`}
+                                    </p>
                                 </div>
                             )}
                         </div>
@@ -828,7 +844,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 <div className="space-y-3">
                                     {consignaciones.map((c, idx) => (
                                         <div key={c.id} className="grid grid-cols-12 gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm relative group">
-                                            <div className="col-span-3">
+                                            <div className="col-span-2">
                                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
                                                 <input type="text" value={c.valor}
                                                     onChange={e => {
@@ -838,9 +854,9 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         next[idx].valor = fmt;
                                                         setConsignaciones(next);
                                                     }}
-                                                    placeholder="$ 0.00" className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                                    placeholder="$ 0" className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
                                             </div>
-                                            <div className="col-span-3">
+                                            <div className="col-span-2">
                                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia</p>
                                                 <input type="text" value={c.nroAprobacion}
                                                     onChange={e => {
@@ -848,9 +864,23 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         next[idx].nroAprobacion = e.target.value;
                                                         setConsignaciones(next);
                                                     }}
-                                                    placeholder="N° Comprobante" className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                                    placeholder="N°" className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
                                             </div>
-                                            <div className="col-span-3">
+                                            <div className="col-span-2">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Metodo</p>
+                                                <select value={c.metodo || 'CONSIGNACION'}
+                                                    onChange={e => {
+                                                        const next = [...consignaciones];
+                                                        next[idx].metodo = e.target.value as MetodoPago;
+                                                        setConsignaciones(next);
+                                                    }}
+                                                    className="w-full bg-slate-50 px-1 py-2 rounded-xl text-[9px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent appearance-none text-center">
+                                                    <option value="CONSIGNACION">🏦 CONS</option>
+                                                    <option value="TRANSFERENCIA">📱 TRANS</option>
+                                                    <option value="EFECTIVO">💵 EFEC</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-span-2">
                                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
                                                 <input type="date" value={c.fecha}
                                                     onChange={e => {
@@ -858,9 +888,9 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         next[idx].fecha = e.target.value;
                                                         setConsignaciones(next);
                                                     }}
-                                                    className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                                    className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
                                             </div>
-                                            <div className="col-span-3">
+                                            <div className="col-span-4">
                                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p>
                                                 <input type="text" value={c.observacion || ''}
                                                     onChange={e => {
@@ -868,7 +898,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         next[idx].observacion = e.target.value;
                                                         setConsignaciones(next);
                                                     }}
-                                                    placeholder="Notas..." className="w-full bg-slate-50 px-3 py-2 rounded-xl text-[11px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
+                                                    placeholder="Notas..." className="w-full bg-slate-50 px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent" />
                                             </div>
                                             {consignaciones.length > 1 && (
                                                 <button onClick={() => setConsignaciones(consignaciones.filter(x => x.id !== c.id))}
@@ -880,7 +910,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     ))}
                                 </div>
 
-                                <button onClick={() => setConsignaciones([...consignaciones, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }])}
+                                <button onClick={() => setConsignaciones([...consignaciones, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }])}
                                     className="mt-4 w-full py-2.5 border-2 border-dashed border-slate-300 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest hover:border-violet-400 hover:text-violet-600 transition-all">
                                     + Agregar otra consignación
                                 </button>

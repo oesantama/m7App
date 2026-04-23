@@ -38,7 +38,23 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
             )
         `);
 
-        // Garantizar que la columna user_id existe (si la tabla se creó antes sin ella)
+        // [M7-SELF-HEALING] Tabla para Consignaciones Grupales (por Ruta/Placa, sin factura)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS route_group_payments (
+                id SERIAL PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                plate TEXT NOT NULL,
+                valor NUMERIC(15,2) NOT NULL,
+                referencia TEXT,
+                fecha DATE,
+                metodo_pago TEXT,
+                observacion TEXT,
+                user_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Garantizar que la columna user_id existe
         await pool.query(`
             DO $$ 
             BEGIN 
@@ -104,7 +120,10 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                  WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name,
 
                 -- Sobrecostos de ruta acumulados
-                (SELECT COALESCE(SUM(valor), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id) AS total_sobrecosto_ruta
+                (SELECT COALESCE(SUM(valor), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id) AS total_sobrecosto_ruta,
+
+                -- Pagos grupales acumulados
+                (SELECT COALESCE(SUM(valor), 0) FROM route_group_payments rgp WHERE rgp.document_id = dl.id) AS total_pago_grupal
 
             FROM documents_l dl
             ${where}
@@ -399,7 +418,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
             [documentId]
         );
         const paymentsRes = await pool.query(
-            `SELECT * FROM document_l_payments WHERE document_id = $1 ORDER BY processed_at ASC`,
+            `SELECT * FROM route_group_payments WHERE document_id = $1 ORDER BY created_at ASC`,
             [documentId]
         );
 
@@ -908,6 +927,44 @@ export const saveSobrecostos = async (req: Request, res: Response) => {
     } catch (err: any) {
         if (client) await client.query('ROLLBACK');
         console.error('[CONCILIATION] saveSobrecostos error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
+
+// ─── POST /conciliation/group-payments ─────────────────────────────────────────
+export const saveRouteGroupPayments = async (req: Request, res: Response) => {
+    const { documentId, plate, payments, userId } = req.body;
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        for (const pay of payments) {
+            const valNum = Math.floor(Number(String(pay.valor).replace(/\D/g, '')) || 0);
+            
+            if (pay.id && !String(pay.id).includes('-')) {
+                // Es un registro existente (ID numérico de DB) -> UPDATE
+                await client.query(`
+                    UPDATE route_group_payments
+                    SET valor = $1, referencia = $2, fecha = $3, metodo_pago = $4, observacion = $5, user_id = $6
+                    WHERE id = $7 AND document_id = $8
+                `, [valNum, pay.referencia, pay.fecha, pay.metodo, pay.observacion, userId, pay.id, documentId]);
+            } else {
+                // Es un registro nuevo -> INSERT
+                await client.query(`
+                    INSERT INTO route_group_payments (document_id, plate, valor, referencia, fecha, metodo_pago, observacion, user_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `, [documentId, plate, valNum, pay.referencia, pay.fecha, pay.metodo, pay.observacion, userId]);
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err: any) {
+        if (client) await client.query('ROLLBACK');
+        console.error('[CONCILIATION] saveRouteGroupPayments error:', err.message);
         res.status(500).json({ success: false, error: err.message });
     } finally {
         client.release();

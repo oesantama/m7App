@@ -9,6 +9,7 @@ import {
     searchRoutesForPlanilla,
     saveConciliation,
     saveSobrecostos,
+    saveRouteGroupPayments,
     generateAndSendReport,
     importMasterSuite,
     getInvoiceStatusHistory,
@@ -29,6 +30,7 @@ router.get('/:documentId/history',        getInvoiceStatusHistory);
 router.get('/:documentId',                getConciliationByDocument);
 router.post('/save',                      saveConciliation);
 router.post('/sobrecostos',               saveSobrecostos);
+router.post('/group-payments',            saveRouteGroupPayments);
 router.post('/report',                    generateAndSendReport);
 router.post('/import-mastersuite',        upload.single('file'), importMasterSuite);
 
