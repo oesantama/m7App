@@ -1133,19 +1133,22 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5 leading-none">Total placa</p>
                                         <p className="text-[11px] font-black text-slate-900 leading-none mt-1">{fmtCOP(totalVal)}</p>
                                     </div>
-                                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-2 py-2 text-center cursor-default">
-                                        <p className="text-[7px] font-black text-emerald-600 uppercase mb-0.5 leading-none">Individual</p>
-                                        <p className="text-[11px] font-black text-emerald-800 leading-none mt-1">{fmtCOP(fin.valor_legalizado)}</p>
+                                    <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'leg' ? 'bg-emerald-600 text-white border-emerald-700 shadow-lg' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100'}`}
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'leg' ? null : 'leg')}>
+                                        <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'leg' ? 'text-emerald-100' : 'text-emerald-600'}`}>Individual</p>
+                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(fin.valor_legalizado)}</p>
                                     </div>
-                                    <div className="bg-violet-50 border border-violet-100 rounded-xl px-2 py-2 text-center cursor-default">
-                                        <p className="text-[7px] font-black text-violet-600 uppercase mb-0.5 leading-none">Grupal</p>
-                                        <p className="text-[11px] font-black text-violet-800 leading-none mt-1">{fmtCOP(fin.valor_grupal)}</p>
+                                    <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'leg' ? 'bg-violet-600 text-white border-violet-700 shadow-lg' : 'bg-violet-50 border-violet-100 hover:bg-violet-100'}`}
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'leg' ? null : 'leg')}>
+                                        <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'leg' ? 'text-violet-100' : 'text-violet-600'}`}>Grupal</p>
+                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(fin.valor_grupal)}</p>
                                     </div>
-                                    <div className="bg-orange-50 border border-orange-100 rounded-xl px-2 py-2 text-center cursor-default">
-                                        <p className="text-[7px] font-black text-orange-600 uppercase mb-0.5 leading-none">Parcial</p>
-                                        <p className="text-[11px] font-black text-orange-800 leading-none mt-1">{fmtCOP(fin.valor_parcial)}</p>
+                                    <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'par' ? 'bg-orange-600 text-white border-orange-700 shadow-lg' : 'bg-orange-50 border-orange-100 hover:bg-orange-100'}`}
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'par' ? null : 'par')}>
+                                        <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'par' ? 'text-orange-100' : 'text-orange-600'}`}>Parcial</p>
+                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(fin.valor_parcial)}</p>
                                     </div>
-                                    <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-2 py-2 text-center cursor-default">
+                                    <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-2 py-2 text-center cursor-default shadow-md">
                                         <p className="text-[7px] font-black text-amber-100 uppercase mb-0.5 leading-none">Pendiente</p>
                                         <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, totalVal - (fin.valor_legalizado + fin.valor_grupal)))}</p>
                                     </div>
