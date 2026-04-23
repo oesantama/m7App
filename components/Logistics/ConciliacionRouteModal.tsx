@@ -590,15 +590,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         consignaciones.reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0),
     [consignaciones]);
 
-    const surchargeStats = useMemo(() => {
-        const approved = sobrecostos
-            .filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02')
-            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
-        const pending = sobrecostos
-            .filter(c => c.statusId === 'PENDIENTE' || c.statusId === 'EST-01' || !c.statusId)
-            .reduce((s, c) => s + (Number(c.valor.replace(/\./g, '').replace(',', '')) || 0), 0);
-        return { approved, pending };
-    }, [sobrecostos]);
 
     const filteredInvoices = useMemo(() => {
         if (!searchTerm) return invoices;
