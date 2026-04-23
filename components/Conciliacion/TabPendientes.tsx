@@ -80,6 +80,7 @@ interface InvoiceRow {
     items?: any[];
     bodega_received_at?: string;
     assigned_at?: string;
+    document_created_at?: string;
 }
 
 interface Props {
@@ -265,17 +266,20 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const getStatusName = (id: string | undefined) => {
                 if (!id) return 'PENDIENTE';
                 const upper = id.toUpperCase();
-                if (ENTREGADO_STATUS.includes(upper)) return 'ENTREGADO';
-                if (DEVUELTO_STATUS.includes(upper)) return 'DEVUELTO';
-                if (PARCIAL_STATUS.includes(upper)) return 'PARCIAL';
-                if (REPICE_STATUS.includes(upper)) return 'REPICE';
+                if (upper === 'EST-10') return 'PENDIENTE';
+                if (upper === 'EST-11') return 'EN TRANSITO';
+                if (upper === 'EST-12' || ENTREGADO_STATUS.includes(upper)) return 'ENTREGADO';
+                if (upper === 'EST-13' || DEVUELTO_STATUS.includes(upper)) return 'DEVUELTO';
+                if (upper === 'EST-14' || PARCIAL_STATUS.includes(upper)) return 'PARCIAL';
+                if (upper === 'EST-15' || REPICE_STATUS.includes(upper)) return 'REPICE';
                 return id;
             };
 
             const getScStatusName = (id: string | undefined) => {
                 if (!id) return 'PENDIENTE';
-                if (id === 'EST-01' || id === 'PENDIENTE') return 'PENDIENTE';
-                if (id === 'EST-02' || id === 'APROBADO') return 'APROBADO';
+                const upper = id.toUpperCase();
+                if (upper === 'EST-01' || upper === 'PENDIENTE') return 'PENDIENTE';
+                if (upper === 'EST-02' || upper === 'APROBADO') return 'APROBADO';
                 return id;
             };
 
@@ -297,6 +301,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     'METODO': i.forma_pago || '—',
                     'COMPROBANTE': i.comprobante || '—',
                     'FECHA PAGO': i.fecha_pago ? i.fecha_pago.slice(0, 10) : '—',
+                    'FECHA CARGA SISTEMA': i.document_created_at ? i.document_created_at.slice(0, 10) : '—',
                     'FECHA RECIBIDO DOC': i.bodega_received_at ? i.bodega_received_at.slice(0, 10) : '—',
                     'FECHA ASIGNACION PLACA': i.assigned_at ? i.assigned_at.slice(0, 10) : '—',
                 };
@@ -312,10 +317,10 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 XLSX.utils.sheet_add_aoa(wsConsolidated, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
                 XLSX.utils.sheet_add_json(wsConsolidated, groupPayments.map(p => ({
                     'PLACA': p.plate || '—',
-                    'METODO': p.metodo || '—',
+                    'METODO': p.metodo_pago || p.metodo || '—',
                     'VALOR': Number(p.valor) || 0,
-                    'REFERENCIA': p.nro_aprobacion || p.nroAprobacion || '—',
-                    'FECHA CONSIGNACION': p.fecha ? p.fecha.slice(0, 10) : '—',
+                    'REFERENCIA': p.referencia || p.nro_aprobacion || p.nroAprobacion || '—',
+                    'FECHA CONSIGNACION': p.fecha ? String(p.fecha).slice(0, 10) : '—',
                     'OBSERVACION': p.observacion || '—'
                 })), { origin: -1 });
             }
@@ -327,8 +332,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 XLSX.utils.sheet_add_json(wsConsolidated, routeSurcharges.map(s => ({
                     'PLACA': s.plate || '—',
                     'VALOR': Number(s.valor) || 0,
-                    'REFERENCIA': s.nro_aprobacion || s.nroAprobacion || '—',
-                    'FECHA': s.fecha ? s.fecha.slice(0, 10) : '—',
+                    'REFERENCIA': s.referencia || s.nro_aprobacion || s.nroAprobacion || '—',
+                    'FECHA': s.fecha ? String(s.fecha).slice(0, 10) : '—',
                     'ESTADO': getScStatusName(s.status_id || s.statusId)
                 })), { origin: -1 });
             }
@@ -349,10 +354,10 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
                     XLSX.utils.sheet_add_aoa(wsPlate, [['PAGOS GRUPALES - ' + p]], { origin: -1 });
                     XLSX.utils.sheet_add_json(wsPlate, plateGroup.map(g => ({
-                        'METODO': g.metodo || '—',
+                        'METODO': g.metodo_pago || g.metodo || '—',
                         'VALOR': Number(g.valor) || 0,
-                        'REFERENCIA': g.nro_aprobacion || g.nroAprobacion || '—',
-                        'FECHA CONSIGNACION': g.fecha ? g.fecha.slice(0, 10) : '—',
+                        'REFERENCIA': g.referencia || g.nro_aprobacion || g.nroAprobacion || '—',
+                        'FECHA CONSIGNACION': g.fecha ? String(g.fecha).slice(0, 10) : '—',
                         'OBSERVACION': g.observacion || '—'
                     })), { origin: -1 });
                 }
@@ -364,8 +369,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     XLSX.utils.sheet_add_aoa(wsPlate, [['SOBRECOSTOS - ' + p]], { origin: -1 });
                     XLSX.utils.sheet_add_json(wsPlate, plateSur.map(s => ({
                         'VALOR': Number(s.valor) || 0,
-                        'REFERENCIA': s.nro_aprobacion || s.nroAprobacion || '—',
-                        'FECHA': s.fecha ? s.fecha.slice(0, 10) : '—',
+                        'REFERENCIA': s.referencia || s.nro_aprobacion || s.nroAprobacion || '—',
+                        'FECHA': s.fecha ? String(s.fecha).slice(0, 10) : '—',
                         'ESTADO': getScStatusName(s.status_id || s.statusId)
                     })), { origin: -1 });
                 }
@@ -444,7 +449,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 else cur.credito += val;
             }
 
-            if (status === 'REPICE') {
+            if (REPICE_STATUS.includes(status)) {
                 cur.repice_count += 1;
                 cur.valor_repice += invVal;
             }
@@ -505,7 +510,10 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         
         const assigned        = total - unassigned;
         
-        const repiceRows      = invoices.filter(i => (i.item_status || '').toLowerCase() === 'repice');
+        const repiceRows      = invoices.filter(i => {
+            const st = (i.item_status || '').toUpperCase();
+            return REPICE_STATUS.includes(st);
+        });
         const repiceCount     = repiceRows.length;
         const valorRepice     = repiceRows.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
 
@@ -1146,7 +1154,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     conductorId={selectedDoc.conductor_id}
                     conductorName={selectedDoc.conductor_name}
                     onSaved={handleInvoiceSaved}
-                    isReadOnly={!!modalInvoice.forma_pago}
+                    isReadOnly={!!modalInvoice.forma_pago && !REPICE_STATUS.includes((modalInvoice.item_status || '').toUpperCase())}
                 />
             )}
 
@@ -1412,10 +1420,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             const itemS       = (inv.item_status || '').toUpperCase();
                                             const isDevuelta  = inv.es_devolucion || DEVUELTO_STATUS.includes(itemS);
                                             const isParcial   = PARCIAL_STATUS.includes(itemS);
+                                            const isRepice    = REPICE_STATUS.includes(itemS);
                                             const statusLabel = ENTREGADO_STATUS.includes(itemS)
                                                 ? { label: 'Entregada', color: 'bg-teal-100 text-teal-700' }
                                                 : isDevuelta ? { label: 'Devuelta', color: 'bg-amber-100 text-amber-700' }
                                                 : isParcial  ? { label: 'Parcial',  color: 'bg-orange-100 text-orange-700' }
+                                                : isRepice   ? { label: 'Repice',   color: 'bg-blue-100 text-blue-700' }
                                                 : { label: 'Pendiente', color: 'bg-slate-100 text-slate-500' };
                                             const pagoLabel  = inv.forma_pago
                                                 ? (FORMA_COLOR[inv.forma_pago]?.label || inv.forma_pago) : '—';
@@ -1498,6 +1508,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             observacion: p.observacion || '',
                             metodo: p.metodo_pago || 'CONSIGNACION'
                         }))}
+                    allRoutes={routes}
                 />
             )}
 

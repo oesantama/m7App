@@ -74,6 +74,7 @@ interface InvoiceFormState {
     saving: boolean;
     items: InvoiceItem[];
     statusUnlocked: boolean;
+    targetRouteId?: string; // Para reasignación en REPICE
 }
 
 // Fila de consignación grupal
@@ -106,6 +107,7 @@ interface Props {
     onSaved: () => void;
     initialSurcharges?: SobrecostoRow[];
     initialGroupPayments?: ConsignacionRow[];
+    allRoutes?: RouteGroup[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -209,10 +211,15 @@ const LegalizationDialog: React.FC<{
     onUpdate: (patch: Partial<InvoiceFormState>) => void;
     onUpdateItem: (itemId: string | number, rq: number) => void;
     onSave: () => void;
-}> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave }) => {
+    allRoutes?: RouteGroup[];
+}> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes }) => {
     const isLegalized   = !!inv.forma_pago;
+    const isRepice      = (inv.item_status || '').toUpperCase() === 'EST-15' || (inv.item_status || '').toUpperCase() === 'REPICE';
     const invoiceVal    = Number(inv.invoice_value) || 0;
     const isWarehouseReceived = !!inv.bodega_received_at;
+    
+    // El REPICE es editable aunque esté legalizado, hasta que se reciba en bodega
+    const canEdit       = !isWarehouseReceived && (!isLegalized || isRepice);
 
     const { allowed: msAllowed, hint: msHint } = getMsConstraint(inv);
     
@@ -266,10 +273,10 @@ const LegalizationDialog: React.FC<{
                             </div>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
-                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={isLegalized || !currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)) })} />
-                            <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={isLegalized || !currentAllowed.has('parcial')}    onClick={() => onUpdate({ estadoEntrega: 'parcial' })} />
-                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={isLegalized || !currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: '0' })} />
-                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={isLegalized || !currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0' })} />
+                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!canEdit || !currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)) })} />
+                            <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!canEdit || !currentAllowed.has('parcial')}    onClick={() => onUpdate({ estadoEntrega: 'parcial' })} />
+                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={!canEdit || !currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: '0' })} />
+                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!canEdit || !currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0' })} />
                         </div>
                     </div>
 
@@ -281,14 +288,14 @@ const LegalizationDialog: React.FC<{
                                     <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-2">Información de Repice</p>
                                     <div className="flex gap-2">
                                         <button 
-                                            disabled={isLegalized}
+                                            disabled={!canEdit}
                                             onClick={() => onUpdate({ numConsignacion: 'MISMO_CONDUCTOR' })}
                                             className={`flex-1 py-2 rounded-xl text-[8px] font-black uppercase transition-all border-2 
                                                 ${form.numConsignacion === 'MISMO_CONDUCTOR' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'}`}>
                                             Mismo Conductor
                                         </button>
                                         <button 
-                                            disabled={isLegalized}
+                                            disabled={!canEdit}
                                             onClick={() => onUpdate({ numConsignacion: 'OTRO_CONDUCTOR' })}
                                             className={`flex-1 py-2 rounded-xl text-[8px] font-black uppercase transition-all border-2 
                                                 ${form.numConsignacion !== 'MISMO_CONDUCTOR' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'}`}>
@@ -298,8 +305,27 @@ const LegalizationDialog: React.FC<{
                                     <p className="text-[7px] text-blue-400 font-bold mt-2 uppercase text-center italic">
                                         {form.numConsignacion === 'MISMO_CONDUCTOR' 
                                             ? 'ℹ️ Quedará pendiente hasta entrega por el mismo conductor.' 
-                                            : 'ℹ️ Factura será liberada para re-asignación a otro vehículo.'}
+                                            : 'ℹ️ Seleccione la nueva placa de destino para la reasignación.'}
                                     </p>
+
+                                    {form.numConsignacion === 'OTRO_CONDUCTOR' && (
+                                        <div className="mt-3 animate-in slide-in-from-top-1 duration-200">
+                                            <label className="block text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">Placa de Destino</label>
+                                            <select
+                                                value={form.targetRouteId || ''}
+                                                onChange={(e) => onUpdate({ targetRouteId: e.target.value })}
+                                                disabled={!canEdit}
+                                                className="w-full px-3 py-2 bg-blue-50 border-2 border-blue-100 rounded-xl text-[10px] font-black text-blue-900 outline-none focus:border-blue-400 transition-all appearance-none cursor-pointer"
+                                            >
+                                                <option value="">Seleccione placa...</option>
+                                                {allRoutes?.filter(r => r.plate !== inv.vehicle_plate).map(r => (
+                                                    <option key={r.route_id} value={r.route_id}>
+                                                        🚗 {r.plate} — {r.driver_name || 'Sin conductor'}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -326,7 +352,7 @@ const LegalizationDialog: React.FC<{
                                                         <td className="px-3 py-2.5 text-center font-black text-slate-400">{it.qty}</td>
                                                         {form.estadoEntrega === 'parcial' && (
                                                             <td className="px-3 py-2.5 bg-amber-50/30 text-center">
-                                                                {isLegalized ? (
+                                                                {!canEdit ? (
                                                                     <span className="font-black text-amber-700 text-sm">{it.returned_qty}</span>
                                                                 ) : (
                                                                     <input type="number" min={0} max={it.qty} value={it.returned_qty}
@@ -369,7 +395,7 @@ const LegalizationDialog: React.FC<{
                     {/* Valores y Consignación */}
                     {(form.estadoEntrega !== 'devolucion' && form.estadoEntrega !== 'repice') && (
                         <div className="space-y-4">
-                            {isLegalized ? (
+                            {!canEdit ? (
                                 <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-6 space-y-4 shadow-sm">
                                     <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                                         <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">Resumen de Pago</h4>
@@ -479,9 +505,9 @@ const LegalizationDialog: React.FC<{
                 {/* Footer */}
                 <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
                     <button onClick={onClose} className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-white transition-all">
-                        {isLegalized ? 'Cerrar' : 'Cancelar'}
+                        {!canEdit ? 'Cerrar' : 'Cancelar'}
                     </button>
-                    {!isWarehouseReceived && !isLegalized && (
+                    {canEdit && (
                         <button onClick={onSave} disabled={form.saving}
                             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all
                                 ${form.saving ? 'bg-slate-200 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'}`}>
@@ -737,6 +763,12 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         const valorNum = Number(form.valor);
         const invoiceVal = Number(inv.invoice_value) || 0;
 
+        // Validación de reasignación REPICE
+        if (form.estadoEntrega === 'repice' && form.numConsignacion === 'OTRO_CONDUCTOR' && !form.targetRouteId) {
+            toast.error('Debe seleccionar la placa de destino para la reasignación.');
+            return;
+        }
+
         updateForm(inv.invoice_number, { saving: true });
         try {
             await api.saveConciliation({
@@ -755,6 +787,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 estadoEntrega:  form.estadoEntrega,
                 valorFactura:   invoiceVal || undefined,
                 itemsReturned:  form.estadoEntrega === 'parcial' ? form.items.filter(it => (Number(it.returned_qty) || 0) > 0) : [],
+                targetRouteId:  form.targetRouteId, // Enviamos el destino de reasignación
             });
             toast.success(`✅ ${inv.invoice_number} legalizada`);
             updateForm(inv.invoice_number, { saving: false });
@@ -1146,6 +1179,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         onUpdate={(patch) => updateForm(inv.invoice_number, patch)}
                         onUpdateItem={(itemId, rq) => updateItem(inv.invoice_number, itemId, rq)}
                         onSave={() => handleSave(inv)}
+                        allRoutes={allRoutes}
                     />
                 );
             })()}

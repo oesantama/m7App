@@ -229,6 +229,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
         // Base del SELECT para facturas — compartido entre query con/sin MasterSuite
         const baseInvoiceSelect = `
             SELECT
+                dl.created_at                               AS document_created_at,
                 di.invoice                                  AS invoice_number,
                 di.customer_name,
                 di.city,
@@ -301,7 +302,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
             GROUP BY di.invoice, di.customer_name, di.city, di.address,
                      ic.id, ic.banco, ic.valor, ic.comprobante, ic.fecha_pago,
                      ic.forma_pago, ic.numero_cheque, ic.es_devolucion, ic.conciliado_por,
-                     ic.conductor_id, ic.conductor_name, ic.vehicle_plate, ic.created_at, u.name
+                     ic.conductor_id, ic.conductor_name, ic.vehicle_plate, ic.created_at, u.name, dl.created_at
             ORDER BY di.invoice`;
 
         // Intentar con columnas MasterSuite; si no existen, reintentar sin ellas
@@ -451,92 +452,130 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
 // Guarda o actualiza la conciliación de UNA factura dentro de un documento.
 // También actualiza item_status en document_items y guarda historial.
 export const saveConciliation = async (req: Request, res: Response) => {
-    const {
-        documentId, invoiceNumber,
-        banco, valor, comprobante, fechaPago, formaPago, numeroCheque,
-        esDevolucion, conciliadoPor,
-        vehiclePlate, conductorId, conductorName,
-        estadoEntrega,   // 'entregado' | 'parcial' | 'devolucion'
-        valorFactura,    // valor original de la factura (para calcular devuelto en parcial)
-        usuarioNombre,
-        sobrecosto,
-        itemsReturned,
-    } = req.body;
-
-    if (!documentId || !invoiceNumber) {
-        return res.status(400).json({ success: false, error: 'documentId e invoiceNumber son requeridos' });
-    }
-
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-
-        // 1. Estado anterior de la factura
-        const prevRes = await client.query(
-            `SELECT ic.forma_pago, di.item_status
-             FROM document_items di
-             LEFT JOIN invoice_conciliations ic ON ic.document_id = $1 AND ic.invoice_number = $2
-             WHERE di.document_id = $1 AND di.invoice = $2 LIMIT 1`,
-            [documentId, invoiceNumber]
-        );
-        const prevFormaPago  = prevRes.rows[0]?.forma_pago  || null;
-        const prevItemStatus = prevRes.rows[0]?.item_status || null;
-
-        // 2. UPSERT en invoice_conciliations
-        const result = await client.query(`
-            INSERT INTO invoice_conciliations
-                (document_id, invoice_number, banco, valor, comprobante, fecha_pago,
-                 forma_pago, numero_cheque, es_devolucion, conciliado_por,
-                 vehicle_plate, conductor_id, conductor_name, sobrecosto, items_returned, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
-            ON CONFLICT (document_id, invoice_number) DO UPDATE SET
-                banco           = EXCLUDED.banco,
-                valor           = EXCLUDED.valor,
-                comprobante     = EXCLUDED.comprobante,
-                fecha_pago      = EXCLUDED.fecha_pago,
-                forma_pago      = EXCLUDED.forma_pago,
-                numero_cheque   = EXCLUDED.numero_cheque,
-                es_devolucion   = EXCLUDED.es_devolucion,
-                conciliado_por  = EXCLUDED.conciliado_por,
-                vehicle_plate   = EXCLUDED.vehicle_plate,
-                conductor_id    = EXCLUDED.conductor_id,
-                conductor_name  = EXCLUDED.conductor_name,
-                sobrecosto      = EXCLUDED.sobrecosto,
-                items_returned  = EXCLUDED.items_returned,
-                updated_at      = NOW()
-            RETURNING *
-        `, [
+        const {
             documentId, invoiceNumber,
-            banco || null, valor || null, comprobante || null, fechaPago || null,
-            formaPago || null, numeroCheque || null, esDevolucion ?? false, conciliadoPor || null,
-            vehiclePlate || null, conductorId || null, conductorName || null,
-            Number(sobrecosto) || 0,
-            itemsReturned ? JSON.stringify(itemsReturned) : '[]',
-        ]);
+            banco, valor, comprobante, fechaPago, formaPago, numeroCheque,
+            esDevolucion, conciliadoPor,
+            vehiclePlate, conductorId, conductorName,
+            estadoEntrega,
+            valorFactura,
+            usuarioNombre,
+            sobrecosto,
+            itemsReturned,
+            targetRouteId, // ID de la ruta destino para reasignación en REPICE
+        } = req.body;
 
-        // 3. Determinar nuevo item_status según estado de entrega
-        let nuevoItemStatus: string | null = null;
-        let eventoHistorial = 'LEGALIZADO';
-
-        if (esDevolucion || estadoEntrega === 'devolucion' || formaPago === 'DEVOLUCION') {
-            nuevoItemStatus = 'EST-13';
-            eventoHistorial = 'DEVOLUCION';
-        } else if (estadoEntrega === 'parcial') {
-            nuevoItemStatus = 'EST-14';
-            eventoHistorial = 'PARCIAL';
-        } else if (estadoEntrega === 'entregado' || formaPago) {
-            nuevoItemStatus = 'EST-12';
-            eventoHistorial = 'LEGALIZADO';
+        if (!documentId || !invoiceNumber) {
+            return res.status(400).json({ success: false, error: 'documentId e invoiceNumber son requeridos' });
         }
 
-        // 4. Actualizar item_status en document_items (si hay cambio)
-        if (nuevoItemStatus) {
-            await client.query(
-                `UPDATE document_items SET item_status = $1
-                 WHERE document_id = $2 AND invoice = $3`,
-                [nuevoItemStatus, documentId, invoiceNumber]
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // 1. Manejo de Reasignación en REPICE (Otro Conductor)
+            let finalPlate = vehiclePlate;
+            let finalConductorId = conductorId;
+            let finalConductorName = conductorName;
+
+            if (estadoEntrega === 'repice' && targetRouteId) {
+                // Obtener datos de la ruta destino
+                const targetRes = await client.query(`
+                    SELECT r.id, v.plate, d.id as driver_id, d.name as driver_name
+                    FROM routes r
+                    LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+                    LEFT JOIN drivers d ON d.id::text = r.driver_id::text
+                    WHERE r.id::text = $1
+                `, [targetRouteId]);
+
+                if (targetRes.rowCount > 0) {
+                    const tr = targetRes.rows[0];
+                    finalPlate = tr.plate;
+                    finalConductorId = tr.driver_id;
+                    finalConductorName = tr.driver_name;
+
+                    // Reasignar en route_invoices
+                    // Primero desvincular de cualquier ruta previa (mismo invoice_id)
+                    const invKey = invoiceNumber.includes('_') ? invoiceNumber : `${documentId}_${invoiceNumber}`;
+                    await client.query(`DELETE FROM route_invoices WHERE invoice_id = $1 OR invoice_id = $2`, [invoiceNumber, invKey]);
+                    
+                    // Vincular a la nueva ruta
+                    await client.query(`
+                        INSERT INTO route_invoices (route_id, invoice_id, created_at)
+                        VALUES ($1, $2, NOW())
+                    `, [targetRouteId, invKey]);
+                }
+            }
+
+            // 2. Estado anterior de la factura
+            const prevRes = await client.query(
+                `SELECT ic.forma_pago, di.item_status
+                 FROM document_items di
+                 LEFT JOIN invoice_conciliations ic ON ic.document_id = $1 AND ic.invoice_number = $2
+                 WHERE di.document_id = $1 AND di.invoice = $2 LIMIT 1`,
+                [documentId, invoiceNumber]
             );
-        }
+            const prevFormaPago  = prevRes.rows[0]?.forma_pago  || null;
+            const prevItemStatus = prevRes.rows[0]?.item_status || null;
+
+            // 3. UPSERT en invoice_conciliations
+            const result = await client.query(`
+                INSERT INTO invoice_conciliations
+                    (document_id, invoice_number, banco, valor, comprobante, fecha_pago,
+                     forma_pago, numero_cheque, es_devolucion, conciliado_por,
+                     vehicle_plate, conductor_id, conductor_name, sobrecosto, items_returned, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
+                ON CONFLICT (document_id, invoice_number) DO UPDATE SET
+                    banco           = EXCLUDED.banco,
+                    valor           = EXCLUDED.valor,
+                    comprobante     = EXCLUDED.comprobante,
+                    fecha_pago      = EXCLUDED.fecha_pago,
+                    forma_pago      = EXCLUDED.forma_pago,
+                    numero_cheque   = EXCLUDED.numero_cheque,
+                    es_devolucion   = EXCLUDED.es_devolucion,
+                    conciliado_por  = EXCLUDED.conciliado_por,
+                    vehicle_plate   = EXCLUDED.vehicle_plate,
+                    conductor_id    = EXCLUDED.conductor_id,
+                    conductor_name  = EXCLUDED.conductor_name,
+                    sobrecosto      = EXCLUDED.sobrecosto,
+                    items_returned  = EXCLUDED.items_returned,
+                    updated_at      = NOW()
+                RETURNING *
+            `, [
+                documentId, invoiceNumber,
+                banco || null, valor || null, comprobante || null, fechaPago || null,
+                formaPago || null, numeroCheque || null, esDevolucion ?? false, conciliadoPor || null,
+                finalPlate || null, finalConductorId || null, finalConductorName || null,
+                Number(sobrecosto) || 0,
+                itemsReturned ? JSON.stringify(itemsReturned) : '[]',
+            ]);
+
+            // 4. Determinar nuevo item_status según estado de entrega
+            let nuevoItemStatus: string | null = null;
+            let eventoHistorial = 'LEGALIZADO';
+
+            if (esDevolucion || estadoEntrega === 'devolucion' || formaPago === 'DEVOLUCION') {
+                nuevoItemStatus = 'EST-13';
+                eventoHistorial = 'DEVOLUCION';
+            } else if (estadoEntrega === 'parcial') {
+                nuevoItemStatus = 'EST-14';
+                eventoHistorial = 'PARCIAL';
+            } else if (estadoEntrega === 'repice') {
+                nuevoItemStatus = 'EST-15';
+                eventoHistorial = 'REPICE';
+            } else if (estadoEntrega === 'entregado' || formaPago) {
+                nuevoItemStatus = 'EST-12';
+                eventoHistorial = 'LEGALIZADO';
+            }
+
+            // 5. Actualizar item_status en document_items (si hay cambio)
+            if (nuevoItemStatus) {
+                await client.query(
+                    `UPDATE document_items SET item_status = $1
+                     WHERE document_id = $2 AND invoice = $3`,
+                    [nuevoItemStatus, documentId, invoiceNumber]
+                );
+            }
 
         // 5. COMMIT — la conciliación queda guardada independiente del historial
         await client.query('COMMIT');
