@@ -3179,15 +3179,19 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-50">
-                  {unassignedInvoices
-                    .filter(inv => {
+                  {(() => {
+                    const filtered = unassignedInvoices.filter(inv => {
                       const doc = documents.find(d => d.id === inv.docLId);
                       const searchStr = `${inv.invoiceNumber} ${doc?.externalDocId} ${doc?.vehicleData} ${inv.customerName}`.toUpperCase();
-                      return searchStr.includes(pendingInvoicesSearch);
-                    })
-                    .map((inv, idx) => {
-                      const doc = documents.find(d => d.id === inv.docLId);
-                      return (
+                      const query = (pendingInvoicesSearch || '').toUpperCase();
+                      return searchStr.includes(query);
+                    });
+
+                    return (
+                      <>
+                        {filtered.map((inv, idx) => {
+                          const doc = documents.find(d => d.id === inv.docLId);
+                          return (
                         <tr key={inv.id} className="hover:bg-slate-50 transition-colors group">
                           <td className="px-6 py-4">
                             <span className="text-[10px] font-black text-slate-900 bg-slate-100 px-2 py-1 rounded-lg uppercase">{doc?.externalDocId || inv.docLId}</span>
@@ -3213,24 +3217,43 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                           </td>
                         </tr>
                       );
-                    })}
+                        </>
+                      );
+                    })()}
                 </tbody>
               </table>
-              {unassignedInvoices.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-300">
-                  <Icons.Audit className="w-16 h-16 opacity-20 mb-4" />
-                  <p className="text-xs font-black uppercase tracking-widest">No hay facturas pendientes</p>
-                </div>
-              )}
+              {(() => {
+                const query = (pendingInvoicesSearch || '').toUpperCase();
+                const filtered = unassignedInvoices.filter(inv => {
+                  const doc = documents.find(d => d.id === inv.docLId);
+                  const searchStr = `${inv.invoiceNumber} ${doc?.externalDocId} ${doc?.vehicleData} ${inv.customerName}`.toUpperCase();
+                  return searchStr.includes(query);
+                });
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-300">
+                      <Icons.Audit className="w-16 h-16 opacity-20 mb-4" />
+                      <p className="text-xs font-black uppercase tracking-widest">
+                        {unassignedInvoices.length === 0 ? "No hay facturas pendientes" : "No se encontraron coincidencias"}
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
 
             <div className="p-6 bg-slate-900 border-t border-slate-800 shrink-0 flex justify-between items-center">
               <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
-                Mostrando {unassignedInvoices.filter(inv => {
-                  const doc = documents.find(d => d.id === inv.docLId);
-                  const searchStr = `${inv.invoiceNumber} ${doc?.externalDocId} ${doc?.vehicleData} ${inv.customerName}`.toUpperCase();
-                  return searchStr.includes(pendingInvoicesSearch);
-                }).length} de {unassignedInvoices.length} facturas
+                {(() => {
+                  const query = (pendingInvoicesSearch || '').toUpperCase();
+                  const filteredCount = unassignedInvoices.filter(inv => {
+                    const doc = documents.find(d => d.id === inv.docLId);
+                    const searchStr = `${inv.invoiceNumber} ${doc?.externalDocId} ${doc?.vehicleData} ${inv.customerName}`.toUpperCase();
+                    return searchStr.includes(query);
+                  }).length;
+                  return `Mostrando ${filteredCount} de ${unassignedInvoices.length} facturas`;
+                })()}
               </p>
               <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest animate-pulse">
                 Sincronización en tiempo real activa
