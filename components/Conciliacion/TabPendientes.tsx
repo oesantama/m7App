@@ -78,6 +78,8 @@ interface InvoiceRow {
     mastersuite_fecha_entrega?: string;
     mastersuite_motivo_dev?: string;
     items?: any[];
+    bodega_received_at?: string;
+    assigned_at?: string;
 }
 
 interface Props {
@@ -253,6 +255,131 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         } catch (err: any) { toast.error(err.message || 'Error enviando informe'); }
         finally { setSendingReport(false); }
     };
+
+    const handleExportExcel = useCallback(() => {
+        if (!selectedDoc) return;
+        try {
+            const wb = XLSX.utils.book_new();
+            const docName = selectedDoc.external_doc_id ? `DOC-L-${selectedDoc.external_doc_id}` : 'CONCILIACION';
+
+            const getStatusName = (id: string | undefined) => {
+                if (!id) return 'PENDIENTE';
+                const upper = id.toUpperCase();
+                if (ENTREGADO_STATUS.includes(upper)) return 'ENTREGADO';
+                if (DEVUELTO_STATUS.includes(upper)) return 'DEVUELTO';
+                if (PARCIAL_STATUS.includes(upper)) return 'PARCIAL';
+                if (REPICE_STATUS.includes(upper)) return 'REPICE';
+                return id;
+            };
+
+            const getScStatusName = (id: string | undefined) => {
+                if (!id) return 'PENDIENTE';
+                if (id === 'EST-01' || id === 'PENDIENTE') return 'PENDIENTE';
+                if (id === 'EST-02' || id === 'APROBADO') return 'APROBADO';
+                return id;
+            };
+
+            // --- FUNCIÓN PARA FORMATEAR DATOS DE FACTURAS ---
+            const mapInvoices = (invs: InvoiceRow[]) => invs.map(i => {
+                const totalQty = i.items?.reduce((s, it) => s + (it.qty || 0), 0) || 1;
+                const unitPrice = (i.invoice_value || 0) / (totalQty || 1);
+                const devVal = i.items?.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                
+                return {
+                    'FACTURA': i.invoice_number,
+                    'CLIENTE': i.customer_name || '—',
+                    'CIUDAD': i.city || '—',
+                    'PLACA': i.route_vehicle_plate || '—',
+                    'ESTADO': getStatusName(i.item_status),
+                    'VALOR FACTURA': i.invoice_value || 0,
+                    'VALOR RECAUDADO': i.valor || 0,
+                    'VALOR DEVUELTO': Math.round(devVal),
+                    'METODO': i.forma_pago || '—',
+                    'COMPROBANTE': i.comprobante || '—',
+                    'FECHA PAGO': i.fecha_pago ? i.fecha_pago.slice(0, 10) : '—',
+                    'FECHA RECIBIDO DOC': i.bodega_received_at ? i.bodega_received_at.slice(0, 10) : '—',
+                    'FECHA ASIGNACION PLACA': i.assigned_at ? i.assigned_at.slice(0, 10) : '—',
+                };
+            });
+
+            // --- HOJA 1: CONSOLIDADO GENERAL ---
+            const consolidatedData = mapInvoices(invoices);
+            const wsConsolidated = XLSX.utils.json_to_sheet(consolidatedData);
+            
+            // Agregar Pagos Grupales al final del consolidado
+            if (groupPayments && groupPayments.length > 0) {
+                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
+                XLSX.utils.sheet_add_aoa(wsConsolidated, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
+                XLSX.utils.sheet_add_json(wsConsolidated, groupPayments.map(p => ({
+                    'PLACA': p.plate || '—',
+                    'METODO': p.metodo || '—',
+                    'VALOR': Number(p.valor) || 0,
+                    'REFERENCIA': p.nro_aprobacion || p.nroAprobacion || '—',
+                    'FECHA CONSIGNACION': p.fecha ? p.fecha.slice(0, 10) : '—',
+                    'OBSERVACION': p.observacion || '—'
+                })), { origin: -1 });
+            }
+
+            // Agregar Sobrecostos al final del consolidado
+            if (routeSurcharges && routeSurcharges.length > 0) {
+                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
+                XLSX.utils.sheet_add_aoa(wsConsolidated, [['SOBRECOSTOS DE RUTA']], { origin: -1 });
+                XLSX.utils.sheet_add_json(wsConsolidated, routeSurcharges.map(s => ({
+                    'PLACA': s.plate || '—',
+                    'VALOR': Number(s.valor) || 0,
+                    'REFERENCIA': s.nro_aprobacion || s.nroAprobacion || '—',
+                    'FECHA': s.fecha ? s.fecha.slice(0, 10) : '—',
+                    'ESTADO': getScStatusName(s.status_id || s.statusId)
+                })), { origin: -1 });
+            }
+
+            XLSX.utils.book_append_sheet(wb, wsConsolidated, docName.slice(0, 30));
+
+            // --- HOJAS SIGUIENTES: POR PLACA ---
+            const plates = Array.from(new Set(invoices.map(i => i.route_vehicle_plate).filter(Boolean)));
+            plates.forEach(p => {
+                if (!p) return;
+                const plateInvs = invoices.filter(i => i.route_vehicle_plate === p);
+                const plateData = mapInvoices(plateInvs);
+                const wsPlate = XLSX.utils.json_to_sheet(plateData);
+
+                // Pagos grupales de esta placa
+                const plateGroup = groupPayments?.filter(g => g.plate === p) || [];
+                if (plateGroup.length > 0) {
+                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
+                    XLSX.utils.sheet_add_aoa(wsPlate, [['PAGOS GRUPALES - ' + p]], { origin: -1 });
+                    XLSX.utils.sheet_add_json(wsPlate, plateGroup.map(g => ({
+                        'METODO': g.metodo || '—',
+                        'VALOR': Number(g.valor) || 0,
+                        'REFERENCIA': g.nro_aprobacion || g.nroAprobacion || '—',
+                        'FECHA CONSIGNACION': g.fecha ? g.fecha.slice(0, 10) : '—',
+                        'OBSERVACION': g.observacion || '—'
+                    })), { origin: -1 });
+                }
+
+                // Sobrecostos de esta placa
+                const plateSur = routeSurcharges?.filter(s => s.plate === p) || [];
+                if (plateSur.length > 0) {
+                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
+                    XLSX.utils.sheet_add_aoa(wsPlate, [['SOBRECOSTOS - ' + p]], { origin: -1 });
+                    XLSX.utils.sheet_add_json(wsPlate, plateSur.map(s => ({
+                        'VALOR': Number(s.valor) || 0,
+                        'REFERENCIA': s.nro_aprobacion || s.nroAprobacion || '—',
+                        'FECHA': s.fecha ? s.fecha.slice(0, 10) : '—',
+                        'ESTADO': getScStatusName(s.status_id || s.statusId)
+                    })), { origin: -1 });
+                }
+
+                XLSX.utils.book_append_sheet(wb, wsPlate, p.slice(0, 30));
+            });
+
+            XLSX.writeFile(wb, `${docName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+            toast.success('Excel generado correctamente');
+        } catch (err: any) {
+            console.error('Export Error:', err);
+            toast.error('Error al generar Excel: ' + err.message);
+        }
+    }, [selectedDoc, invoices, groupPayments, routeSurcharges]);
 
     // ── Filtros ───────────────────────────────────────────────────────────────
     const filteredDocs = useMemo(() =>
@@ -570,6 +697,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         className="hidden"
                                         onChange={handleImportMasterSuite}
                                     />
+                                    <button
+                                        onClick={handleExportExcel}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm">
+                                        <Icons.Download className="w-3 h-3" />
+                                        Exportar Excel
+                                    </button>
                                     <button
                                         onClick={() => msFileRef.current?.click()}
                                         disabled={importingMS}

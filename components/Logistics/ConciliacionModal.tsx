@@ -58,7 +58,6 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
     isReadOnly = false
 }) => {
     const [formaPago, setFormaPago]     = useState<FormaPago | ''>('');
-    const [banco, setBanco]             = useState('');
     const [valor, setValor]             = useState('');
     const [comprobante, setComprobante] = useState('');
     const [fechaPago, setFechaPago]     = useState('');
@@ -72,7 +71,6 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
             const yaConciliado = !!invoice.conciliation_id;
             if (yaConciliado) {
                 setFormaPago((invoice.forma_pago as FormaPago) || '');
-                setBanco(invoice.banco || '');
                 setValor(invoice.valor != null ? String(invoice.valor) : '');
                 setComprobante(invoice.comprobante || '');
                 setFechaPago(invoice.fecha_pago ? invoice.fecha_pago.slice(0, 10) : new Date().toISOString().slice(0, 10));
@@ -80,7 +78,6 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
             } else {
                 // Nueva conciliación — pre-cargar desde datos de pago de la factura
                 setFormaPago('TRANSFERENCIA');
-                setBanco(invoice.invoice_banco || '');
                 setValor(invoice.invoice_value != null ? String(invoice.invoice_value) : '');
                 setComprobante('');
                 setFechaPago(new Date().toISOString().slice(0, 10));
@@ -101,7 +98,6 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
             await api.saveConciliation({
                 documentId,
                 invoiceNumber:  invoice.invoice_number,
-                banco:          banco || undefined,
                 valor:          Number(valor),
                 comprobante:    comprobante || undefined,
                 fechaPago:      fechaPago || undefined,
@@ -205,19 +201,6 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Banco */}
-                    <div>
-                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Banco / Entidad</label>
-                        <input
-                            type="text"
-                            value={banco}
-                            onChange={e => setBanco(e.target.value)}
-                            readOnly={isReadOnly}
-                            placeholder="Ej: Bancolombia, Davivienda..."
-                            className={`w-full px-4 py-3 border focus:border-blue-500 focus:bg-white rounded-2xl text-sm outline-none transition-all
-                                ${isReadOnly ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
-                        />
-                    </div>
 
                     {/* Comprobante */}
                     <div>

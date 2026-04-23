@@ -3,7 +3,6 @@ import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { useAppData } from '../../hooks/useAppData';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -71,7 +70,6 @@ interface InvoiceFormState {
     valor: string;
     numConsignacion: string;
     metodo: MetodoPago;
-    banco: string;
     fecha: string;
     saving: boolean;
     items: InvoiceItem[];
@@ -159,7 +157,6 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
                           : String(inv.invoice_value ?? ''),
         numConsignacion:  inv.comprobante || '',
         metodo:           (inv.forma_pago as MetodoPago) || 'TRANSFERENCIA',
-        banco:            inv.banco || '',
         fecha:            inv.fecha_pago
                             ? inv.fecha_pago.slice(0, 10)
                             : new Date().toISOString().slice(0, 10),
@@ -509,111 +506,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [forms, setForms]     = useState<Map<string, InvoiceFormState>>(new Map());
     const [activeDialog, setActiveDialog] = useState<string | null>(null);
 
-    const handleExportExcel = useCallback(() => {
-        try {
-            const wb = XLSX.utils.book_new();
-            const docName = route.route_id ? `DOC-L-${route.route_id}` : 'CONCILIACION';
-
-            // --- FUNCIÓN PARA FORMATEAR DATOS DE FACTURAS ---
-            const mapInvoices = (invs: InvoiceRow[]) => invs.map(i => {
-                const totalQty = i.items?.reduce((s, it) => s + (it.qty || 0), 0) || 1;
-                const unitPrice = (i.invoice_value || 0) / totalQty;
-                const devVal = i.items?.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
-                
-                return {
-                    'FACTURA': i.invoice_number,
-                    'CLIENTE': i.customer_name || '—',
-                    'CIUDAD': i.city || '—',
-                    'PLACA': i.route_vehicle_plate || '—',
-                    'ESTADO': i.item_status || 'PENDIENTE',
-                    'VALOR FACTURA': i.invoice_value || 0,
-                    'VALOR RECAUDADO': i.valor || 0,
-                    'VALOR DEVUELTO': Math.round(devVal),
-                    'SOBRECOSTO': i.sobrecosto || 0,
-                    'METODO': i.forma_pago || '—',
-                    'COMPROBANTE': i.comprobante || '—',
-                    'FECHA PAGO': i.fecha_pago ? i.fecha_pago.slice(0, 10) : '—',
-                };
-            });
-
-            // --- HOJA 1: CONSOLIDADO GENERAL ---
-            const consolidatedData = mapInvoices(invoices);
-            const wsConsolidated = XLSX.utils.json_to_sheet(consolidatedData);
-            
-            // Agregar Pagos Grupales al final del consolidado
-            if (initialGroupPayments && initialGroupPayments.length > 0) {
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
-                XLSX.utils.sheet_add_json(wsConsolidated, initialGroupPayments.map(p => ({
-                    'PLACA': p.plate || '—',
-                    'METODO': p.metodo || '—',
-                    'VALOR': Number(p.valor) || 0,
-                    'REFERENCIA': p.nroAprobacion || '—',
-                    'FECHA': p.fecha ? p.fecha.slice(0, 10) : '—',
-                    'OBSERVACION': p.observacion || '—'
-                })), { origin: -1 });
-            }
-
-            // Agregar Sobrecostos al final del consolidado
-            if (initialSurcharges && initialSurcharges.length > 0) {
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [['SOBRECOSTOS DE RUTA']], { origin: -1 });
-                XLSX.utils.sheet_add_json(wsConsolidated, initialSurcharges.map(s => ({
-                    'PLACA': s.plate || '—',
-                    'VALOR': Number(s.valor) || 0,
-                    'REFERENCIA': s.nroAprobacion || '—',
-                    'FECHA': s.fecha ? s.fecha.slice(0, 10) : '—',
-                    'ESTADO': s.statusId
-                })), { origin: -1 });
-            }
-
-            XLSX.utils.book_append_sheet(wb, wsConsolidated, 'CONSOLIDADO GENERAL');
-
-            // --- HOJAS SIGUIENTES: POR PLACA ---
-            const plates = Array.from(new Set(invoices.map(i => i.route_vehicle_plate).filter(Boolean)));
-            plates.forEach(p => {
-                if (!p) return;
-                const plateInvs = invoices.filter(i => i.route_vehicle_plate === p);
-                const plateData = mapInvoices(plateInvs);
-                const wsPlate = XLSX.utils.json_to_sheet(plateData);
-
-                // Pagos grupales de esta placa
-                const plateGroup = initialGroupPayments?.filter(g => g.plate === p) || [];
-                if (plateGroup.length > 0) {
-                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
-                    XLSX.utils.sheet_add_aoa(wsPlate, [['PAGOS GRUPALES - ' + p]], { origin: -1 });
-                    XLSX.utils.sheet_add_json(wsPlate, plateGroup.map(g => ({
-                        'METODO': g.metodo || '—',
-                        'VALOR': Number(g.valor) || 0,
-                        'REFERENCIA': g.nroAprobacion || '—',
-                        'FECHA': g.fecha ? g.fecha.slice(0, 10) : '—',
-                        'OBSERVACION': g.observacion || '—'
-                    })), { origin: -1 });
-                }
-
-                // Sobrecostos de esta placa
-                const plateSur = initialSurcharges?.filter(s => s.plate === p) || [];
-                if (plateSur.length > 0) {
-                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
-                    XLSX.utils.sheet_add_aoa(wsPlate, [['SOBRECOSTOS - ' + p]], { origin: -1 });
-                    XLSX.utils.sheet_add_json(wsPlate, plateSur.map(s => ({
-                        'VALOR': Number(s.valor) || 0,
-                        'REFERENCIA': s.nroAprobacion || '—',
-                        'FECHA': s.fecha ? s.fecha.slice(0, 10) : '—',
-                        'ESTADO': s.statusId
-                    })), { origin: -1 });
-                }
-
-                XLSX.utils.book_append_sheet(wb, wsPlate, p);
-            });
-
-            XLSX.writeFile(wb, `${docName}_${new Date().toISOString().slice(0,10)}.xlsx`);
-            toast.success('Excel generado correctamente');
-        } catch (err: any) {
-            console.error('Export Error:', err);
-            toast.error('Error al generar Excel: ' + err.message);
-        }
-    }, [invoices, initialGroupPayments, initialSurcharges, route.route_id]);
 
     // Estado consignación grupal
     const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }]);
@@ -941,15 +833,9 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 self-end lg:self-center">
-                            <button onClick={handleExportExcel} className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-2 shadow-md shadow-emerald-200 group border-none outline-none">
-                                <Icons.Download className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Exportar Excel</span>
-                            </button>
-                            <button onClick={onClose} className="w-9 h-9 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-full flex items-center justify-center transition-all flex-shrink-0 shadow-sm">
-                                <Icons.X className="w-4 h-4 text-slate-500 hover:text-rose-500" />
-                            </button>
-                        </div>
+                        <button onClick={onClose} className="w-9 h-9 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-full flex items-center justify-center transition-all flex-shrink-0 shadow-sm self-end lg:self-center">
+                            <Icons.X className="w-4 h-4 text-slate-500 hover:text-rose-500" />
+                        </button>
                     </div>
 
                     <div className="flex gap-2 mt-4">

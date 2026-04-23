@@ -254,6 +254,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 MAX(p.metodo_pago)                          AS invoice_metodo_pago,
                 MAX(di.item_status)                         AS item_status,
                 MAX(COALESCE(v2.plate, r2.vehicle_id::text)) AS route_vehicle_plate,
+                MAX(ri2.created_at)                          AS assigned_at,
                 (SELECT json_agg(json_build_object(
                     'id', di2.id,
                     'article_id', di2.article_id,
