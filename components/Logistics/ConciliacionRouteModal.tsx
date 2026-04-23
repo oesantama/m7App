@@ -83,6 +83,7 @@ interface ConsignacionRow {
     nroAprobacion: string;
     fecha: string;
     observacion?: string;
+    metodo?: MetodoPago;
 }
 
 interface SobrecostoRow {
@@ -438,9 +439,8 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [activeDialog, setActiveDialog] = useState<string | null>(null);
 
     // Estado consignación grupal
-    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '' }]);
+    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }]);
     const [savingGrupal, setSavingGrupal]     = useState(false);
-    const [grupalMetodo, setGrupalMetodo]     = useState<MetodoPago>('CONSIGNACION');
     const [searchTerm, setSearchTerm]         = useState('');
 
     // Estado sobrecostos
@@ -458,13 +458,13 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             setConsignaciones(initialGroupPayments.map(p => ({
                 id: String(p.id),
                 valor: p.valor ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Math.floor(Number(p.valor) || 0)) : '',
-                nroAprobacion: p.referencia || '',
+                nroAprobacion: p.nroAprobacion || '',
                 fecha: p.fecha ? new Date(p.fecha).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
                 observacion: p.observacion || '',
-                metodo: p.metodo_pago as MetodoPago || 'CONSIGNACION'
+                metodo: p.metodo as MetodoPago || 'CONSIGNACION'
             })));
         } else {
-            setConsignaciones([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }]);
+            setConsignaciones([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }]);
         }
 
         // Cargar sobrecostos previos si existen
@@ -521,7 +521,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     valor: Math.floor(Number(String(c.valor).replace(/\D/g, '')) || 0),
                     referencia: c.nroAprobacion,
                     fecha: c.fecha,
-                    metodo: c.metodo || grupalMetodo,
+                    metodo: c.metodo || 'CONSIGNACION',
                     observacion: c.observacion
                 })),
                 userId: currentUserId
@@ -631,16 +631,26 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
     const plateTotals = useMemo(() => {
         const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const invLegalizedVal = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
+        const legalizedIndividual = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
         
         // Sumar consignaciones grupales guardadas
-        const totalConsignadoPrevio = (initialGroupPayments || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+        const legalizedGrupal = (initialGroupPayments || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
         
-        const totalLegalizado = invLegalizedVal + surchargeStats.approved + totalConsignadoPrevio;
+        // Total Legalizado = Individual + Grupal + Sobrecostos Aprobados
+        const totalLegalizado = legalizedIndividual + legalizedGrupal + surchargeStats.approved;
         
         const legalCount   = invoices.filter(i => !!i.forma_pago).length;
         const pendingVal   = Math.max(0, totalValue - totalLegalizado);
-        return { totalValue, legalizedVal: totalLegalizado, legalCount, pendingVal, total: invoices.length };
+        
+        return { 
+            totalValue, 
+            legalizedVal: totalLegalizado, 
+            legalizedIndividual,
+            legalizedGrupal,
+            legalCount, 
+            pendingVal, 
+            total: invoices.length 
+        };
     }, [invoices, surchargeStats, initialGroupPayments]);
 
     const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
@@ -700,32 +710,39 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1 max-w-3xl">
+                        <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 flex-1 max-w-full">
                             <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-emerald-500/10 border border-emerald-100/50">
-                                <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest mb-1">Legalizado</p>
-                                <p className="text-base font-black text-emerald-800 leading-none">{fmtCOP(plateTotals.legalizedVal)}</p>
-                                <p className="text-[8px] text-emerald-600/60 font-bold mt-1.5">{plateTotals.legalCount} Facturas</p>
+                                <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest mb-1 text-center">Legalización Individual</p>
+                                <p className="text-sm font-black text-emerald-800 leading-none text-center">{fmtCOP(plateTotals.legalizedIndividual)}</p>
+                                <p className="text-[7px] text-emerald-600/60 font-bold mt-1.5 text-center">{plateTotals.legalCount} Facts</p>
+                            </div>
+                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-violet-500/10 border border-violet-100/50">
+                                <p className="text-[7px] font-black text-violet-600 uppercase tracking-widest mb-1 text-center">Legalización Grupal</p>
+                                <p className="text-sm font-black text-violet-800 leading-none text-center">{fmtCOP(plateTotals.legalizedGrupal)}</p>
+                                <p className="text-[7px] text-violet-600/60 font-bold mt-1.5 text-center">Consignado Ruta</p>
+                            </div>
+                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-blue-500/10 border border-blue-100/50">
+                                <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mb-1 text-center">Total Legalizado</p>
+                                <p className="text-sm font-black text-blue-800 leading-none text-center">{fmtCOP(plateTotals.legalizedVal)}</p>
+                                <p className="text-[7px] text-blue-600/60 font-bold mt-1.5 text-center">Acumulado Total</p>
                             </div>
                             <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-amber-500/10 border border-amber-100/50">
-                                <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest mb-1">Pendiente</p>
-                                <p className="text-base font-black text-amber-800 leading-none">{fmtCOP(plateTotals.pendingVal)}</p>
-                                <p className="text-[8px] text-amber-600/60 font-bold mt-1.5">{plateTotals.total - plateTotals.legalCount} Por Legalizar</p>
+                                <p className="text-[7px] font-black text-amber-600 uppercase tracking-widest mb-1 text-center">Pendiente</p>
+                                <p className="text-sm font-black text-amber-800 leading-none text-center">{fmtCOP(plateTotals.pendingVal)}</p>
+                                <p className="text-[7px] text-amber-600/60 font-bold mt-1.5 text-center">Falta Cobrar</p>
                             </div>
                             <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-slate-500/10 border border-slate-100">
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Placa</p>
-                                <p className="text-base font-black text-slate-800 leading-none">{fmtCOP(plateTotals.totalValue)}</p>
-                                <p className="text-[8px] text-slate-400 font-bold mt-1.5">{plateTotals.total} Facturas</p>
+                                <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Total Placa</p>
+                                <p className="text-sm font-black text-slate-800 leading-none text-center">{fmtCOP(plateTotals.totalValue)}</p>
+                                <p className="text-[7px] text-slate-400 font-bold mt-1.5 text-center">{plateTotals.total} Facts</p>
                             </div>
-                            {(surchargeStats.approvedCount > 0 || surchargeStats.pendingCount > 0) && (
-                                <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-rose-500/10 border border-rose-100/50">
-                                    <p className="text-[8px] font-black text-rose-600 uppercase tracking-widest mb-1">Sobrecostos</p>
-                                    <p className="text-base font-black text-rose-800 leading-none">{fmtCOP(surchargeStats.approved + surchargeStats.pending)}</p>
-                                    <p className="text-[8px] text-rose-600/60 font-bold mt-1.5">
-                                        {surchargeStats.approvedCount} Aprobados 
-                                        {surchargeStats.pendingCount > 0 && ` | ${surchargeStats.pendingCount} Pendientes`}
-                                    </p>
-                                </div>
-                            )}
+                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-rose-500/10 border border-rose-100/50">
+                                <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center">Sobrecostos</p>
+                                <p className="text-sm font-black text-rose-800 leading-none text-center">{fmtCOP(surchargeStats.approved + surchargeStats.pending)}</p>
+                                <p className="text-[7px] text-rose-600/60 font-bold mt-1.5 text-center">
+                                    {surchargeStats.approvedCount} Apr | {surchargeStats.pendingCount} Pend
+                                </p>
+                            </div>
                         </div>
 
                         <button onClick={onClose} className="w-9 h-9 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-full flex items-center justify-center transition-all flex-shrink-0 shadow-sm self-end lg:self-center">
@@ -827,17 +844,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Detalle de Consignaciones</h4>
                                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Registre los comprobantes de pago de la placa</p>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setGrupalMetodo('CONSIGNACION')}
-                                            className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border-2
-                                                ${grupalMetodo === 'CONSIGNACION' ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-200' : 'bg-white border-slate-200 text-slate-500'}`}>
-                                            🏦 Consignación
-                                        </button>
-                                        <button onClick={() => setGrupalMetodo('TRANSFERENCIA')}
-                                            className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border-2
-                                                ${grupalMetodo === 'TRANSFERENCIA' ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200' : 'bg-white border-slate-200 text-slate-500'}`}>
-                                            📱 Transferencia
-                                        </button>
                                     </div>
                                 </div>
 
@@ -877,7 +883,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     className="w-full bg-slate-50 px-1 py-2 rounded-xl text-[9px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent appearance-none text-center">
                                                     <option value="CONSIGNACION">🏦 CONS</option>
                                                     <option value="TRANSFERENCIA">📱 TRANS</option>
-                                                    <option value="EFECTIVO">💵 EFEC</option>
                                                 </select>
                                             </div>
                                             <div className="col-span-2">
@@ -910,7 +915,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     ))}
                                 </div>
 
-                                <button onClick={() => setConsignaciones([...consignaciones, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }])}
+                                <button onClick={() => setConsignaciones([...consignaciones, { id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }])}
                                     className="mt-4 w-full py-2.5 border-2 border-dashed border-slate-300 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest hover:border-violet-400 hover:text-violet-600 transition-all">
                                     + Agregar otra consignación
                                 </button>

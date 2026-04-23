@@ -944,7 +944,9 @@ export const saveRouteGroupPayments = async (req: Request, res: Response) => {
         for (const pay of payments) {
             const valNum = Math.floor(Number(String(pay.valor).replace(/\D/g, '')) || 0);
             
-            if (pay.id && !String(pay.id).includes('-')) {
+            const isExisting = pay.id && !String(pay.id).startsWith('temp-');
+            
+            if (isExisting) {
                 // Es un registro existente (ID numérico de DB) -> UPDATE
                 await client.query(`
                     UPDATE route_group_payments

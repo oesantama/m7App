@@ -25,6 +25,7 @@ import {
 } from '../config/routeConfig';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 // ── Zonas geográficas Valle de Aburrá (7 corredores) ─────────────────────────
 // Cada zona define un corredor de reparto. Las zonas adyacentes pueden mezclarse
@@ -201,6 +202,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const routePreviewMapRef = useRef<L.Map | null>(null);
   const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addInvoiceInputRef = useRef<HTMLInputElement>(null);
+  const [isPendingInvoicesModalOpen, setIsPendingInvoicesModalOpen] = useState(false);
+  const [pendingInvoicesSearch, setPendingInvoicesSearch] = useState('');
 
   const handleDeleteDocument = async (id: string) => {
     setShowDeleteConfirm({ isOpen: true, id });
@@ -221,6 +224,27 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     } catch (err) {
       toast.error('Error de conexión');
     }
+  };
+
+  const exportPendingInvoices = () => {
+    const data = unassignedInvoices.map(inv => {
+      const doc = documents.find(d => d.id === inv.docLId);
+      return {
+        'Documento L': doc?.externalDocId || inv.docLId,
+        'Fecha': doc?.deliveryDate || doc?.createdAt || 'N/A',
+        'Placa': doc?.vehicleData || 'N/A',
+        'Factura': inv.invoiceNumber || 'N/A',
+        'Cant Artículos': inv.items?.length || 0,
+        'Cliente': inv.customerName || 'N/A',
+        'Ciudad': inv.city || 'N/A',
+        'Volumen M3': inv.volumeM3 || 0
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Facturas Pendientes");
+    XLSX.writeFile(wb, `Facturas_Pendientes_Orbit_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   // Mapa de vista previa de ruta
@@ -1881,7 +1905,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       {/* INDICADORES DE DÉFICIT EN HEADER (RELOCALIZADOS) */}
       {(unassignedMetrics.count > 0) && (
-        <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 p-2 px-4 rounded-[1.5rem] animate-in slide-in-from-top duration-500 shadow-sm ml-auto">
+        <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 p-2 px-4 rounded-[1.5rem] animate-in slide-in-from-top duration-500 shadow-sm ml-auto relative group">
           <div className="flex flex-col border-r border-rose-200 pr-3">
             <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest">Sin Ruta</p>
             <p className="text-xs font-black text-rose-900 leading-none">{unassignedMetrics.count} <span className="text-[8px] font-bold text-slate-400">FACTS</span></p>
@@ -1895,9 +1919,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest">Requeridos</p>
               <p className="text-xs font-black text-rose-900 leading-none">~{unassignedMetrics.additionalVehicles}</p>
             </div>
-            <div className="w-6 h-6 bg-rose-500 text-white rounded-lg flex items-center justify-center shadow-lg">
-              <Icons.Truck className="w-3 h-3" />
-            </div>
+            <button 
+              onClick={() => setIsPendingInvoicesModalOpen(true)}
+              className="ml-1 px-2 py-1 bg-rose-600 text-white rounded-lg text-[7px] font-black uppercase tracking-tighter hover:bg-rose-700 transition-all shadow-sm active:scale-95 whitespace-nowrap">
+              Ver Pendientes
+            </button>
           </div>
         </div>
       )}
@@ -3092,6 +3118,122 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
             <div className="p-6 bg-slate-50 border-t border-slate-100 rounded-b-[2.5rem]">
               <p className="text-[8px] text-slate-400 font-bold uppercase text-center">Solo se muestran vehículos en estado "Disponible" con operadora activa</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Facturas Pendientes */}
+      {isPendingInvoicesModalOpen && (
+        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-rose-50 rounded-t-[2.5rem] shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white text-rose-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Icons.FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Facturas Pendientes de Ruta</h3>
+                  <p className="text-xs font-bold text-slate-500 uppercase">Listado total de facturas aptas para despacho</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={exportPendingInvoices}
+                  className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+                >
+                  <Icons.Download className="w-4 h-4" />
+                  Exportar Excel
+                </button>
+                <button onClick={() => setIsPendingInvoicesModalOpen(false)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                  <Icons.X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-8 py-6 bg-slate-50 border-b border-slate-200 shrink-0">
+              <div className="relative">
+                <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={pendingInvoicesSearch}
+                  onChange={(e) => setPendingInvoicesSearch(e.target.value.toUpperCase())}
+                  placeholder="Buscar por factura, placa o documento..."
+                  className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-3xl text-sm font-black uppercase outline-none focus:border-rose-400 transition-all shadow-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto custom-scrollbar p-0">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 bg-white z-10 shadow-sm">
+                  <tr className="bg-slate-50">
+                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Documento L</th>
+                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Fecha</th>
+                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Placa</th>
+                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Factura</th>
+                    <th className="px-6 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Cliente</th>
+                    <th className="px-6 py-4 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Artículos</th>
+                    <th className="px-6 py-4 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Volumen</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-50">
+                  {unassignedInvoices
+                    .filter(inv => {
+                      const doc = documents.find(d => d.id === inv.docLId);
+                      const searchStr = `${inv.invoiceNumber} ${doc?.externalDocId} ${doc?.vehicleData} ${inv.customerName}`.toUpperCase();
+                      return searchStr.includes(pendingInvoicesSearch);
+                    })
+                    .map((inv, idx) => {
+                      const doc = documents.find(d => d.id === inv.docLId);
+                      return (
+                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors group">
+                          <td className="px-6 py-4">
+                            <span className="text-[10px] font-black text-slate-900 bg-slate-100 px-2 py-1 rounded-lg uppercase">{doc?.externalDocId || inv.docLId}</span>
+                          </td>
+                          <td className="px-6 py-4 text-[10px] font-bold text-slate-600 uppercase tracking-tighter">
+                            {doc?.deliveryDate ? new Date(doc.deliveryDate).toLocaleDateString() : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase">{doc?.vehicleData || 'N/A'}</span>
+                          </td>
+                          <td className="px-6 py-4 text-[10px] font-black text-slate-900">{inv.invoiceNumber}</td>
+                          <td className="px-6 py-4 min-w-[200px]">
+                            <p className="text-[10px] font-black text-slate-700 truncate max-w-[250px] uppercase">{inv.customerName}</p>
+                            <p className="text-[8px] text-slate-400 font-bold uppercase">{inv.city}</p>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-[10px] font-black text-slate-600 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center mx-auto border border-slate-100">
+                              {inv.items?.length || 0}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <span className="text-[10px] font-black text-emerald-600">{inv.volumeM3?.toFixed(3)}m³</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+              {unassignedInvoices.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-300">
+                  <Icons.Audit className="w-16 h-16 opacity-20 mb-4" />
+                  <p className="text-xs font-black uppercase tracking-widest">No hay facturas pendientes</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 bg-slate-900 border-t border-slate-800 shrink-0 flex justify-between items-center">
+              <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                Mostrando {unassignedInvoices.filter(inv => {
+                  const doc = documents.find(d => d.id === inv.docLId);
+                  const searchStr = `${inv.invoiceNumber} ${doc?.externalDocId} ${doc?.vehicleData} ${inv.customerName}`.toUpperCase();
+                  return searchStr.includes(pendingInvoicesSearch);
+                }).length} de {unassignedInvoices.length} facturas
+              </p>
+              <p className="text-[9px] text-indigo-400 font-black uppercase tracking-widest animate-pulse">
+                Sincronización en tiempo real activa
+              </p>
             </div>
           </div>
         </div>
