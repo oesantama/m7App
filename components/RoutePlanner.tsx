@@ -409,11 +409,17 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return filtered;
   }, [invoices, learningExemptions, selectedClient]);
 
-  // Facturas que NO están en ninguna ruta sugerida
+  // Facturas que NO están en ninguna ruta sugerida NI en rutas activas ya confirmadas
   const unassignedInvoices = useMemo(() => {
-    const assignedIds = new Set(suggestedRoutes.flatMap(r => r.assignedInvoices.map(i => i.id)));
-    return validInvoices.filter(inv => !assignedIds.has(inv.id));
-  }, [validInvoices, suggestedRoutes]);
+    // 1. IDs asignados en la sesión actual (sugerencias)
+    const suggestedIds = new Set(suggestedRoutes.flatMap(r => r.assignedInvoices.map(i => i.id)));
+    
+    // 2. IDs ya confirmados en la base de datos (rutas activas)
+    // Buscamos en invoiceIds e invoice_ids por compatibilidad de aliasing
+    const activeConfirmedIds = new Set(activeRoutes.flatMap(r => r.invoiceIds || (r as any).invoice_ids || []));
+
+    return validInvoices.filter(inv => !suggestedIds.has(inv.id) && !activeConfirmedIds.has(inv.id));
+  }, [validInvoices, suggestedRoutes, activeRoutes]);
 
   // DESGLOSE DE PENDIENTES POR TIPO DE PLAN (Solicitud Usuario)
   const unassignedCounts = useMemo(() => {
@@ -1473,58 +1479,71 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     pdf.text('CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)', PW / 2, y + 3.5, { align: 'center' });
     y += 7;
 
-    // ── INVOICES TABLE ────────────────────────────────────────────────────────
-    // Columnas: # | U.NEG | DOC L | FACTURA | PEDIDO | CANT | REF | VALOR | PAG | CLIENTE / DIRECCION
-    // Anchos (landscape A4, CW≈285mm): 8+12+26+26+24+10+18+26+12 = 162 → CLIENTE ocupa resto ≈123mm
-    autoTable(pdf, {
-      startY: y, margin: { left: ML, right: MR },
-      head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
-      body: [...route.assignedInvoices]
-        .sort((a, b) => String(a.invoiceNumber || '').localeCompare(String(b.invoiceNumber || ''), undefined, { numeric: true, sensitivity: 'base' }))
-        .map((inv, idx) => {
-          const fi = (inv.items?.[0] || {}) as any;
-          const method = String((inv as any).paymentMethod || fi.paymentMethod || fi.payment_method || '-').toUpperCase();
-          const isRepice = !!(inv as any).isRepice;
-          return [
-            String(idx + 1),
-            String(inv.unCode || fi.unCode || fi.un_code || '-'),
-            String(inv.docLId || '-'),
-            isRepice ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
-            String(inv.orderNumber || '-'),
-            String(inv.totalItems || '-'),
-            String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
-            fmtCOP(inv.invoiceValue || 0),
-            method,
-            `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
-          ];
-        }),
-      styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
-      columnStyles: {
-        0: { cellWidth: 8, halign: 'center' },
-        1: { cellWidth: 12, halign: 'center' },
-        2: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
-        3: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
-        4: { cellWidth: 24, halign: 'center' },
-        5: { cellWidth: 10, halign: 'center' },
-        6: { cellWidth: 18, halign: 'center' },
-        7: { cellWidth: 26, halign: 'right' },
-        8: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
-        9: { halign: 'left' },
-      },
-      theme: 'grid',
-      margin: { bottom: 28 },
-      didParseCell: (data: any) => {
-        if (data.section === 'body') {
-          const inv = route.assignedInvoices[data.row.index] as any;
-          if (inv?.isRepice) {
+    // ── INVOICES TABLE (SPLIT NORMAL / REPICE) ────────────────────────────────
+    const normalInvoices = route.assignedInvoices.filter(inv => !(inv as any).isRepice);
+    const repiceInvoices = route.assignedInvoices.filter(inv => (inv as any).isRepice);
+
+    const renderInvoiceTable = (list: any[], title?: string) => {
+      if (list.length === 0) return;
+
+      if (title) {
+        if (y > PH - 40) { pdf.addPage(); y = ML; }
+        pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(185, 28, 28); // Rojo para destacar Repice
+        pdf.text(title, ML, y + 4);
+        y += 6;
+      }
+
+      autoTable(pdf, {
+        startY: y, margin: { left: ML, right: MR },
+        head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
+        body: list
+          .sort((a, b) => String(a.invoiceNumber || '').localeCompare(String(b.invoiceNumber || ''), undefined, { numeric: true, sensitivity: 'base' }))
+          .map((inv, idx) => {
+            const fi = (inv.items?.[0] || {}) as any;
+            const method = String((inv as any).paymentMethod || fi.paymentMethod || fi.payment_method || '-').toUpperCase();
+            const isRepice = !!(inv as any).isRepice;
+            return [
+              String(idx + 1),
+              String(inv.unCode || fi.unCode || fi.un_code || '-'),
+              String(inv.docLId || '-'),
+              isRepice ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
+              String(inv.orderNumber || '-'),
+              String(inv.totalItems || '-'),
+              String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),
+              fmtCOP(inv.invoiceValue || 0),
+              method,
+              `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
+            ];
+          }),
+        styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+        headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },
+          1: { cellWidth: 12, halign: 'center' },
+          2: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+          3: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+          4: { cellWidth: 24, halign: 'center' },
+          5: { cellWidth: 10, halign: 'center' },
+          6: { cellWidth: 18, halign: 'center' },
+          7: { cellWidth: 26, halign: 'right' },
+          8: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
+          9: { halign: 'left' },
+        },
+        theme: 'grid',
+        margin: { bottom: 28 },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && title) { // Si hay título es que estamos en tabla de repice
             data.cell.styles.fontStyle = 'bold';
-            data.cell.styles.textColor = [0, 0, 0];
+            data.cell.styles.textColor = [185, 28, 28];
           }
-        }
-      },
-    });
-    y = (pdf as any).lastAutoTable.finalY + 5;
+        },
+      });
+      y = (pdf as any).lastAutoTable.finalY + 5;
+    };
+
+    // Renderizar primero normales, luego repices
+    renderInvoiceTable(normalInvoices);
+    renderInvoiceTable(repiceInvoices, 'FACTURAS DE REPICE (RE-DESPACHO)');
 
     // ── CARGO CONSOLIDATION ───────────────────────────────────────────────────
     const cargoMap = new Map<string, { id: string; name: string; total: number }>();
@@ -2395,12 +2414,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
               <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-3">
                 {(() => {
-                  // Para repice: solo facturas en estado EST-15
+                  // Para repice: solo facturas en estado EST-15 que NO estén ya en otra ruta activa
                   const pool = addInvoiceModal.tab === 'repice'
                     ? invoices.filter(inv => {
-                      if ((inv as any).status !== 'EST-15' && (inv as any).item_status !== 'EST-15') return false;
+                      const status = String((inv as any).status || (inv as any).item_status || '').toUpperCase();
+                      if (status !== 'EST-15' && status !== 'REPICE') return false;
+                      
+                      // EXCLUSIÓN CRÍTICA: No mostrar si ya está en una ruta activa confirmada
+                      const activeConfirmedIds = new Set(activeRoutes.flatMap(r => r.invoiceIds || (r as any).invoice_ids || []));
+                      if (activeConfirmedIds.has(inv.id)) return false;
+
                       const term = modalSearchTerm.toLowerCase().trim();
-                      if (!term || term.length < 2) return true; // muestra todos EST-15 si no hay búsqueda
+                      if (!term || term.length < 2) return true;
                       return (inv.invoiceNumber || '').toLowerCase().includes(term) ||
                         (inv.customerName || '').toLowerCase().includes(term) ||
                         (inv.orderNumber || '').toLowerCase().includes(term);

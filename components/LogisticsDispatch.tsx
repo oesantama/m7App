@@ -485,45 +485,76 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             pdf.text('CUENTA CORRIENTE BANCOLOMBIA 217-392356-56 (RECAUDO OFICIAL)', PW / 2, y + 3.5, { align: 'center' });
             y += 7;
 
-            // ── INVOICES TABLE ──────────────────────────────────────────────────────
-            autoTable(pdf, {
-                startY: y, margin: { left: ML, right: MR, bottom: 28 },
-                head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
-                body: [...routeInvList]
-                    .sort((a, b) => String(a.invoiceNumber || '').localeCompare(String(b.invoiceNumber || ''), undefined, { numeric: true, sensitivity: 'base' }))
-                    .map((inv, idx) => {
-                        const firstItem = inv.items?.[0] || {} as any;
-                        const method = String(inv.paymentMethod || firstItem.paymentMethod || firstItem.payment_method || '-').toUpperCase();
-                        return [
-                            String(idx + 1),
-                            String(inv.unCode || firstItem.unCode || firstItem.un_code || '-'),
-                            String(inv.docLId || '-'),
-                            String(inv.invoiceNumber),
-                            String(inv.orderNumber || '-'),
-                            String(inv.totalItems || '-'),
-                            String(inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'),
-                            fmtCOP(inv.invoiceValue || 0),
-                            method,
-                            `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
-                        ];
-                    }),
-                styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
-                headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
-                columnStyles: {
-                    0: { cellWidth: 8,  halign: 'center' },
-                    1: { cellWidth: 12, halign: 'center' },
-                    2: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
-                    3: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
-                    4: { cellWidth: 24, halign: 'center' },
-                    5: { cellWidth: 10, halign: 'center' },
-                    6: { cellWidth: 18, halign: 'center' },
-                    7: { cellWidth: 26, halign: 'right' },
-                    8: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
-                    9: { halign: 'left' },
-                },
-                theme: 'grid'
+            // ── INVOICES TABLE (SPLIT NORMAL / REPICE) ────────────────────────────────
+            const normalInvoices = routeInvList.filter(inv => {
+                const s = String(inv.item_status || inv.status || '').toUpperCase();
+                return s !== 'EST-15' && s !== 'REPICE';
             });
-            y = (pdf as any).lastAutoTable.finalY + 5;
+            const repiceInvoices = routeInvList.filter(inv => {
+                const s = String(inv.item_status || inv.status || '').toUpperCase();
+                return s === 'EST-15' || s === 'REPICE';
+            });
+
+            const renderInvoiceTable = (list: any[], title?: string) => {
+                if (list.length === 0) return;
+
+                if (title) {
+                    if (y > PH - 40) { pdf.addPage(); y = ML; }
+                    pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(185, 28, 28); // Rojo para destacar Repice
+                    pdf.text(title, ML, y + 4);
+                    y += 6;
+                }
+
+                autoTable(pdf, {
+                    startY: y, margin: { left: ML, right: MR, bottom: 28 },
+                    head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
+                    body: list
+                        .sort((a, b) => String(a.invoiceNumber || '').localeCompare(String(b.invoiceNumber || ''), undefined, { numeric: true, sensitivity: 'base' }))
+                        .map((inv, idx) => {
+                            const firstItem = inv.items?.[0] || {} as any;
+                            const method = String(inv.paymentMethod || firstItem.paymentMethod || firstItem.payment_method || '-').toUpperCase();
+                            const isRepice = String(inv.item_status || inv.status || '').toUpperCase() === 'EST-15' || String(inv.item_status || inv.status || '').toUpperCase() === 'REPICE';
+                            return [
+                                String(idx + 1),
+                                String(inv.unCode || firstItem.unCode || firstItem.un_code || '-'),
+                                String(inv.docLId || '-'),
+                                isRepice ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
+                                String(inv.orderNumber || '-'),
+                                String(inv.totalItems || '-'),
+                                String(inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'),
+                                fmtCOP(inv.invoiceValue || 0),
+                                method,
+                                `${inv.customerName || ''} · ${inv.address} - ${inv.city}`,
+                            ];
+                        }),
+                    styles: { fontSize: 6.5, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
+                    headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', fontSize: 6.5, lineWidth: 0.1, lineColor: [0, 0, 0] },
+                    columnStyles: {
+                        0: { cellWidth: 8,  halign: 'center' },
+                        1: { cellWidth: 12, halign: 'center' },
+                        2: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+                        3: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+                        4: { cellWidth: 24, halign: 'center' },
+                        5: { cellWidth: 10, halign: 'center' },
+                        6: { cellWidth: 18, halign: 'center' },
+                        7: { cellWidth: 26, halign: 'right' },
+                        8: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
+                        9: { halign: 'left' },
+                    },
+                    theme: 'grid',
+                    didParseCell: (data: any) => {
+                        if (data.section === 'body' && title) { // Si hay título es que estamos en tabla de repice
+                            data.cell.styles.fontStyle = 'bold';
+                            data.cell.styles.textColor = [185, 28, 28];
+                        }
+                    },
+                });
+                y = (pdf as any).lastAutoTable.finalY + 5;
+            };
+
+            // Renderizar tablas
+            renderInvoiceTable(normalInvoices);
+            renderInvoiceTable(repiceInvoices, 'FACTURAS DE REPICE (RE-DESPACHO)');
 
             // ── CARGO CONSOLIDATION ──────────────────────────────────────────────────
             const cargoMap = new Map<string, { id: string; name: string; total: number }>();

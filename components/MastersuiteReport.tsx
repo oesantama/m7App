@@ -16,11 +16,11 @@ const COLS: Array<keyof ReportRow> = [
 ];
 
 const MastersuiteReport: React.FC = () => {
-  const [rows, setRows]         = useState<ReportRow[]>([]);
-  const [loading, setLoading]   = useState(false);
+  const [rows, setRows] = useState<ReportRow[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [error, setError]       = useState('');
-  const [filterDoc, setFilterDoc]     = useState('');
+  const [error, setError] = useState('');
+  const [filterDoc, setFilterDoc] = useState('');
   const [filterPlate, setFilterPlate] = useState('');
 
   const fetchReport = useCallback(async () => {
@@ -33,7 +33,7 @@ const MastersuiteReport: React.FC = () => {
     try {
       const data = await api.getMastersuiteReport({
         document: filterDoc.trim(),
-        plate:    filterPlate.trim(),
+        plate: filterPlate.trim(),
       });
       setRows(Array.isArray(data) ? data : []);
       setSearched(true);
@@ -57,7 +57,7 @@ const MastersuiteReport: React.FC = () => {
     ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Hoja 1');
+    XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
     const date = new Date().toISOString().split('T')[0];
     XLSX.writeFile(wb, `informe_mastersuite_${date}.xlsx`);
   };
@@ -216,9 +216,9 @@ const MastersuiteReport: React.FC = () => {
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       {row.TRUCK_ID_ORIGIN
                         ? <div className="flex flex-col">
-                            <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Bodega Origen</span>
-                            <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-200">{row.TRUCK_ID_ORIGIN}</span>
-                          </div>
+                          <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Bodega Origen</span>
+                          <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-200">{row.TRUCK_ID_ORIGIN}</span>
+                        </div>
                         : <span className="text-slate-300 font-bold">—</span>}
                     </td>
                     <td className="px-4 py-2.5 font-bold text-slate-500 uppercase whitespace-nowrap">
@@ -227,13 +227,13 @@ const MastersuiteReport: React.FC = () => {
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       {row.TRUCK_ID_DESTIN
                         ? <div className="flex flex-col">
-                            <span className="text-[7px] font-black text-emerald-500 uppercase mb-0.5">Reparto Destino</span>
-                            <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-sm">{row.TRUCK_ID_DESTIN}</span>
-                          </div>
+                          <span className="text-[7px] font-black text-emerald-500 uppercase mb-0.5">Reparto Destino</span>
+                          <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-sm">{row.TRUCK_ID_DESTIN}</span>
+                        </div>
                         : <div className="flex flex-col opacity-40">
-                            <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Sin Asignar</span>
-                            <span className="border border-dashed border-slate-300 text-slate-400 text-[9px] px-2 py-1 rounded-lg italic">Pendiente</span>
-                          </div>}
+                          <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Sin Asignar</span>
+                          <span className="border border-dashed border-slate-300 text-slate-400 text-[9px] px-2 py-1 rounded-lg italic">Pendiente</span>
+                        </div>}
                     </td>
                     <td className="px-4 py-2.5 font-bold text-slate-600 whitespace-nowrap">
                       <div className="flex flex-col">
