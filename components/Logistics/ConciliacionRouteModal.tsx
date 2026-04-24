@@ -113,7 +113,7 @@ interface Props {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const fmtCOP = (v: number | undefined | null) =>
-    v != null && v >= 0
+    v != null 
         ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
         : '—';
 
@@ -814,29 +814,52 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     }, [sobrecostos]);
 
     const plateTotals = useMemo(() => {
-        // FILTRO: Solo EFECTIVO
+        // FILTRO CRÍTICO: EF -> Total Placa (Efectivo), !EF -> Crédito
         const efectivoInvoices = invoices.filter(i => {
-            const m = (i.invoice_metodo_pago || '').toUpperCase();
-            return m.includes('EFE') || m === 'CASH' || m === '';
+            const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+            return m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '';
+        });
+
+        const creditoInvoices = invoices.filter(i => {
+            const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+            return !(m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '');
         });
 
         const totalValue   = efectivoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const valorDevuelto = efectivoInvoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        const valorCredito = creditoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        
+        // El valor devuelto (EF) incluye: 
+        // 1. Facturas con estado devolución (total)
+        // 2. La parte no cobrada de las facturas con entrega parcial
+        const valorDevuelto = efectivoInvoices.reduce((s, i) => {
+            const isDev = i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase());
+            const isPar = PARCIAL_STATUS.includes((i.item_status || '').toUpperCase());
+            
+            if (isDev) return s + (Number(i.invoice_value) || 0);
+            if (isPar && i.forma_pago) {
+                // Si es parcial y ya se legalizó, la diferencia es devolución
+                return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
+            }
+            return s;
+        }, 0);
+        
+        // Individual Legalizado (Solo lo que ya se guardó)
         const legalizedIndividual = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
         
         // Sumar consignaciones grupales guardadas
         const legalizedGrupal = (initialGroupPayments || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
         
-        // Total Legalizado = Individual + Grupal + Sobrecostos Aprobados
-        const totalLegalizado = legalizedIndividual + legalizedGrupal + surchargeStats.approved;
-        
         const legalCount   = invoices.filter(i => !!i.forma_pago).length;
-        // Pendiente = Total(Efe) - Legalizado - Devolución(Efe)
-        const pendingVal   = Math.max(0, totalValue - totalLegalizado - valorDevuelto);
+        
+        // PENDIENTE = TOTAL EF - (LEG INDIVIDUAL + LEG GRUPAL + DEVUELTO EF + SOBRECOSTO APROBADO)
+        // Nota: legalizedIndividual ya contiene la parte cobrada de los parciales.
+        // valorDevuelto contiene la parte NO cobrada de los parciales (si están legalizados) y el total de las devoluciones.
+        const pendingVal   = Math.max(0, totalValue - (legalizedIndividual + legalizedGrupal + surchargeStats.approved + valorDevuelto));
         
         return { 
             totalValue, 
-            legalizedVal: totalLegalizado, 
+            valorCredito,
+            legalizedVal: legalizedIndividual + legalizedGrupal + surchargeStats.approved, 
             legalizedIndividual,
             legalizedGrupal,
             legalCount, 
@@ -911,7 +934,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 flex-1 max-w-full">
+                        <div className="grid grid-cols-2 lg:grid-cols-8 gap-2 flex-1 max-w-full">
                             <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-emerald-500/10 border border-emerald-100/50">
                                 <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest mb-1 text-center">Individual</p>
                                 <p className="text-[11px] font-black text-emerald-800 leading-none text-center">{fmtCOP(plateTotals.legalizedIndividual)}</p>
@@ -940,7 +963,12 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-slate-500/10 border border-slate-100">
                                 <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Total Placa</p>
                                 <p className="text-[11px] font-black text-slate-800 leading-none text-center">{fmtCOP(plateTotals.totalValue)}</p>
-                                <p className="text-[6px] text-slate-400 font-bold mt-1 text-center">{plateTotals.total} Facts</p>
+                                <p className="text-[6px] text-slate-400 font-bold mt-1 text-center">{plateTotals.total} Facts (EF)</p>
+                            </div>
+                            <div className="bg-slate-800 rounded-2xl px-3 py-2 shadow-lg shadow-slate-900/10 border border-slate-900 text-white">
+                                <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center">Crédito</p>
+                                <p className="text-[11px] font-black leading-none text-center">{fmtCOP(plateTotals.valorCredito)}</p>
+                                <p className="text-[6px] text-slate-500 font-bold mt-1 text-center">Cartera</p>
                             </div>
                             <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-rose-500/10 border border-rose-100/50">
                                 <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center font-bold">Sobrecostos</p>
