@@ -560,8 +560,11 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
              utl.nombre as tiempo_libre_nombre,
              tc.nombre as contrato_nombre, im.nombre as ingresos_nombre,
              afp.nombre as afp_nombre, eps.nombre as eps_nombre,
+             tl.nombre as turno_nombre,
              pac.nombre as pcargo_nombre, cvv.nombre as conviviente_nombre,
-             cg.nombre as cargo_enc_nombre
+             cg.nombre as cargo_enc_nombre,
+             fd.nombre as frec_deporte_nombre,
+             td.nombre as tipo_deporte_nombre
       FROM gh_encuestas_sociodemograficas r
       JOIN gh_personal p ON p.cedula = r.cedula
       LEFT JOIN cfg_ciudades mn ON mn.id = r.municipio_nacimiento_id
@@ -577,9 +580,12 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
       LEFT JOIN gh_miscelaneos im ON im.id = r.ingresos_mensuales_id
       LEFT JOIN gh_miscelaneos afp ON afp.id = r.afp_id
       LEFT JOIN gh_miscelaneos eps ON eps.id = r.eps_id
+      LEFT JOIN gh_miscelaneos tl ON tl.id = r.turno_laboral_id
       LEFT JOIN gh_miscelaneos pac ON pac.id = r.personas_a_cargo_id
       LEFT JOIN gh_miscelaneos cvv ON cvv.id = r.con_quien_vive_id
       LEFT JOIN gh_miscelaneos cg ON cg.id = r.cargo_id
+      LEFT JOIN gh_miscelaneos fd ON fd.id = r.frecuencia_deporte_id
+      LEFT JOIN gh_miscelaneos td ON td.id = r.tipo_deporte_id
       WHERE r.id = $1
     `, [id]);
 
@@ -639,10 +645,12 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
         startY: y,
         body: data,
         theme: 'grid',
-        styles: { fontSize: 7, cellPadding: 2, font: 'helvetica' },
+        styles: { fontSize: 7, cellPadding: 2, font: 'helvetica', textColor: [60, 60, 60] },
         columnStyles: {
-            0: { fillColor: [245, 245, 245], fontStyle: 'bold', cellWidth: 35 },
-            2: { fillColor: [245, 245, 245], fontStyle: 'bold', cellWidth: 35 }
+            0: { fillColor: [245, 245, 245], fontStyle: 'bold', cellWidth: 35, textColor: [0, 0, 0] },
+            1: { cellWidth: (pageWidth - 28) / 2 - 35 },
+            2: { fillColor: [245, 245, 245], fontStyle: 'bold', cellWidth: 35, textColor: [0, 0, 0] },
+            3: { cellWidth: (pageWidth - 28) / 2 - 35 }
         },
         margin: { left: 14, right: 14 }
       });
@@ -650,40 +658,58 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     };
 
     addSection("1. PERFIL CORPORATIVO", [
-      ["Cargo", enc.cargo_enc_nombre || enc.cargo_original, "Fecha Ingreso", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : 'N/A'],
-      ["Tipo Contrato", enc.contrato_nombre, "Turno", enc.turno_laboral],
-      ["Ingresos", enc.ingresos_nombre, "AFP / EPS", `${enc.afp_nombre} / ${enc.eps_nombre}`]
+      ["Cargo", enc.cargo_enc_nombre || enc.cargo_original || '—', "Fecha Ingreso", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—'],
+      ["Tipo Contrato", enc.contrato_nombre || '—', "Turno", enc.turno_nombre || '—'],
+      ["Ingresos", enc.ingresos_nombre || '—', "AFP / EPS", `${enc.afp_nombre || '—'} / ${enc.eps_nombre || '—'}`]
     ]);
 
     addSection("2. DATOS PERSONALES Y RESIDENCIA", [
-      ["Cédula", enc.cedula, "Tipo Sangre", enc.sangre_nombre],
-      ["Lugar Nac.", `${enc.mun_nac_nombre}, ${enc.dep_nac_nombre}`, "Fecha Nac.", enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : 'N/A'],
-      ["Estado Civil", enc.civil_nombre, "Nivel Educativo", enc.edu_nombre],
-      ["Estrato", enc.estrato, "Tipo Vivienda", enc.vivienda_nombre],
-      ["Ciudad Res.", `${enc.mun_res_nombre}, ${enc.dep_res_nombre}`, "Barrio", enc.barrio],
-      ["Dirección", enc.direccion, "", ""]
+      ["Cédula", enc.cedula, "Tipo Sangre", enc.sangre_nombre || '—'],
+      ["Lugar Nac.", `${enc.mun_nac_nombre || '—'}, ${enc.dep_nac_nombre || '—'}`, "Fecha Nac.", enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—'],
+      ["Estado Civil", enc.civil_nombre || '—', "Nivel Educativo", enc.edu_nombre || '—'],
+      ["Estrato", enc.estrato || '—', "Tipo Vivienda", enc.vivienda_nombre || '—'],
+      ["Ciudad Res.", `${enc.mun_res_nombre || '—'}, ${enc.dep_res_nombre || '—'}`, "Barrio", enc.barrio || '—'],
+      ["Dirección", enc.direccion || '—', "", ""]
     ]);
 
     addSection("3. ENTORNO FAMILIAR Y SOCIAL", [
-      ["Personas Hogar", enc.viven_conmigo, "Sustentador Principal", enc.principal_sustentador],
-      ["Personas a Cargo", enc.pcargo_nombre, "Discapacidad Fam.", enc.discapacidad_familia],
-      ["Vive con", enc.conviviente_nombre, "Hijos", enc.cuantos_hijos]
+      ["Personas Hogar", enc.viven_conmigo || '—', "Sustentador", enc.principal_sustentador || '—'],
+      ["Pers. a Cargo", enc.pcargo_nombre || '—', "Discapacidad Fam.", enc.discapacidad_familia || '—'],
+      ["Con Quien Vive", enc.conviviente_nombre || '—', "Cuantos Hijos", enc.cuantos_hijos || '0']
     ]);
 
     addSection("4. SALUD Y ESTILO DE VIDA", [
-      ["Enfermedad Crónica", enc.sufre_enfermedad, "Frecuencia Alcohol", enc.bebe_alcohol],
-      ["Fuma", enc.fuma, "Práctica Deporte", enc.practica_deporte],
-      ["Frecuencia Deporte", enc.tipo_deporte, "Uso Tiempo Libre", enc.tiempo_libre_nombre || enc.uso_tiempo_libre_otros]
+      ["Sufre Enfermedad", enc.sufre_enfermedad || '—', "Bebe Alcohol", enc.bebe_alcohol || '—'],
+      ["Fuma", enc.fuma || '—', "Practica Deporte", enc.practica_deporte || '—'],
+      ["Tipo Deporte", enc.tipo_deporte_nombre || '—', "Frecuencia", enc.frec_deporte_nombre || '—'],
+      ["Uso Tiempo Libre", enc.tiempo_libre_nombre || enc.uso_tiempo_libre_otros || '—', "", ""]
     ]);
 
     addSection("5. CONTACTO DE EMERGENCIA", [
-      ["Nombre", enc.contacto_emergencia_nombre, "Teléfono", enc.contacto_emergencia_telefono]
+      ["Nombre", enc.contacto_emergencia_nombre || '—', "Teléfono", enc.contacto_emergencia_telefono || '—']
     ]);
 
     if (familia.length > 0) {
-      addSection("6. COMPOSICIÓN FAMILIAR", familia.map(f => [
-        f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'
-      ]));
+      if (y > 230) { doc.addPage(); y = 20; }
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setFillColor(15, 23, 42);
+      doc.rect(14, y, pageWidth - 28, 6, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.text("6. COMPOSICIÓN FAMILIAR (HIJOS / OTROS)", 16, y + 4.5);
+      y += 6;
+
+      const famData = familia.map(f => [f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—', f.ocupacion || '—']);
+      autoTable(doc, {
+        startY: y,
+        head: [['NOMBRE COMPLETO', 'FECHA NACIMIENTO', 'OCUPACIÓN']],
+        body: famData,
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2, textColor: [60, 60, 60] },
+        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+        margin: { left: 14, right: 14 }
+      });
+      y = (doc as any).lastAutoTable.finalY + 12;
     }
 
     if (y > 250) { doc.addPage(); y = 20; }
@@ -695,20 +721,25 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     y += 5;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
-    const disclaimer = "Declaro que la información suministrada es veraz y autorizo a la empresa para el tratamiento de mis datos personales según la Ley 1581 de 2012. Este reporte fue generado automáticamente el " + new Date(enc.fecha_realizacion).toLocaleString();
+    const disclaimer = "Declaro que la información suministrada en esta encuesta es veraz y autorizo a la empresa para el tratamiento de mis datos personales según la Ley 1581 de 2012 y demás normas concordantes. Este reporte fue generado automáticamente por el sistema OrbitM7 el " + new Date().toLocaleString();
     doc.text(doc.splitTextToSize(disclaimer, pageWidth - 28), 14, y);
     
-    y += 15;
+    y += 20;
     // Espacio para firma
+    doc.setDrawColor(180);
     doc.line(14, y, 80, y);
-    doc.text("Firma del Colaborador", 14, y + 4);
-    doc.text(`CC: ${enc.cedula}`, 14, y + 8);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Firma del Colaborador", 14, y + 5);
+    doc.setFont("helvetica", "normal");
+    doc.text(`CC: ${enc.cedula}`, 14, y + 9);
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=Perfil_${enc.cedula}.pdf`);
     res.send(pdfBuffer);
   } catch (err: any) {
+    console.error('[PDF-ERROR]', err);
     res.status(500).json({ error: err.message });
   }
 };
