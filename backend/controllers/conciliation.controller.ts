@@ -87,6 +87,13 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                  WHERE ic.document_id = dl.id
                 ) AS conciliadas,
 
+                -- Cálculo de pendientes
+                (
+                  (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
+                  - 
+                  (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
+                ) AS pendientes,
+
                 -- Efectivo y crédito desde document_l_payments (Subquery para evitar fan-out)
                 (SELECT COALESCE(SUM(CASE 
                     WHEN UPPER(TRIM(p.metodo_pago)) LIKE '%EFECTIVO%' OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'

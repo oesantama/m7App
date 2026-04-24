@@ -9,10 +9,11 @@ const router = Router();
 router.get('/', (req, res, next) => {
   const user = (req as any).user;
   const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
-  const hasDriversPerm = user?.permissions?.some((p: any) => p.module === 'PAG-14' && p.actions.includes('view')); // Conductores suele ser PAG-14 también
+  const hasDriversPerm = user?.permissions?.some((p: any) => p.module === 'PAG-14' && p.actions.includes('view'));
   const hasRutasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-15' && p.actions.includes('view'));
+  const hasConciliacionPerm = user?.permissions?.some((p: any) => (p.module === 'PAG-40' || p.module === 'CONCILIACION') && p.actions.includes('view'));
 
-  if (isSuper || hasDriversPerm || hasRutasPerm) return next();
+  if (isSuper || hasDriversPerm || hasRutasPerm || hasConciliacionPerm) return next();
   res.status(403).json({ success: false, error: 'Permiso insuficiente para ver conductores' });
 }, getDrivers);
 router.post('/', requirePermission('CONDUCTORES', 'create'), saveDriver);
