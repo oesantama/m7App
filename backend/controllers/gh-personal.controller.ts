@@ -49,7 +49,7 @@ const initTables = async () => {
         ingresos_mensuales_id INTEGER,
         afp_id INTEGER,
         eps_id INTEGER,
-        turno_laboral VARCHAR(100),
+        turno_laboral_id INTEGER,
         tipo_vivienda_id INTEGER,
         estrato INTEGER,
         municipio_residencia_id INTEGER,
@@ -64,8 +64,8 @@ const initTables = async () => {
         cuantos_hijos INTEGER,
         bebe_alcohol VARCHAR(50),
         fuma VARCHAR(10),
-        practica_deporte VARCHAR(50),
-        tipo_deporte VARCHAR(255),
+        frecuencia_deporte_id INTEGER,
+        tipo_deporte_id INTEGER,
         uso_tiempo_libre_id INTEGER,
         uso_tiempo_libre_otros TEXT,
         contacto_emergencia_nombre VARCHAR(255),
@@ -104,6 +104,12 @@ const initTables = async () => {
       CREATE TABLE IF NOT EXISTS gh_tipos_sangre (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
       CREATE TABLE IF NOT EXISTS gh_estados_civiles (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
       CREATE TABLE IF NOT EXISTS gh_niveles_educativos (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+      CREATE TABLE IF NOT EXISTS gh_turnos_laborales (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+      CREATE TABLE IF NOT EXISTS gh_personas_a_cargo (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+      CREATE TABLE IF NOT EXISTS gh_convivientes (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+      CREATE TABLE IF NOT EXISTS gh_frecuencia_deporte (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+      CREATE TABLE IF NOT EXISTS gh_tipos_deporte (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+      CREATE TABLE IF NOT EXISTS gh_usos_tiempo_libre (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
       -- Registrar Pagina Personal si no existe
       INSERT INTO pages (id, parent_id, name, route, status_id)

@@ -3,6 +3,35 @@ import { api } from '../../services/api';
 import { Toaster, toast } from 'sonner';
 import { Check, Search, User, FileText, Heart, Home, Users, Activity, ShieldCheck, ClipboardCheck, Plus, Trash2, Briefcase } from 'lucide-react';
 
+const Input = ({ label, name, value, onChange, type = 'text', placeholder = '' }: any) => (
+  <div className="space-y-1.5">
+    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">{label}</label>
+    <input
+      type={type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500 transition-all"
+    />
+  </div>
+);
+
+const Select = ({ label, name, value, onChange, options, labelField = 'nombre', valueField = 'id' }: any) => (
+  <div className="space-y-1.5">
+    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">{label}</label>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500 transition-all"
+    >
+      <option value="">Seleccione...</option>
+      {options.map((o: any) => (
+        <option key={o[valueField] || o} value={o[valueField] || o}>{o[labelField] || o}</option>
+      ))}
+    </select>
+  </div>
+);
+
 const PublicSurvey: React.FC = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -24,7 +53,7 @@ const PublicSurvey: React.FC = () => {
     ingresos_mensuales_id: '',
     afp_id: '',
     eps_id: '',
-    turno_laboral: '',
+    turno_laboral_id: '',
     tipo_vivienda_id: '',
     estrato: '',
     departamento_res_id: '', // Auxiliar para filtrar municipios
@@ -38,10 +67,8 @@ const PublicSurvey: React.FC = () => {
     discapacidad_familia: 'NO',
     con_quien_vive_id: '',
     cuantos_hijos: 0,
-    bebe_alcohol: 'No nunca',
-    fuma: 'NO',
-    practica_deporte: 'No practico deporte',
-    tipo_deporte: '',
+    frecuencia_deporte_id: '',
+    tipo_deporte_id: '',
     uso_tiempo_libre_id: '',
     uso_tiempo_libre_otros: '',
     contacto_emergencia_nombre: '',
@@ -67,13 +94,16 @@ const PublicSurvey: React.FC = () => {
     eps: [],
     personasCargo: [],
     convivientes: [],
-    tiemposLibres: []
+    tiemposLibres: [],
+    tiposDeporte: [],
+    frecuenciaDeporte: [],
+    turnos: []
   });
 
   useEffect(() => {
     const loadMaestros = async () => {
       try {
-        const [sangre, civil, edu, viv, deptos, cargos, contratos, ingresos, afp, eps, pc, conv, tl] = await Promise.all([
+        const [sangre, civil, edu, viv, deptos, cargos, contratos, ingresos, afp, eps, pc, conv, tl, turnos, td, fd] = await Promise.all([
           api.getGhMiscelaneos('tipos-sangre'),
           api.getGhMiscelaneos('estados-civiles'),
           api.getGhMiscelaneos('niveles-educativos'),
@@ -86,12 +116,15 @@ const PublicSurvey: React.FC = () => {
           api.getGhMiscelaneos('eps'),
           api.getGhMiscelaneos('personas-a-cargo'),
           api.getGhMiscelaneos('convivientes'),
-          api.getGhMiscelaneos('tiempos-libres')
+          api.getGhMiscelaneos('usos-tiempo-libre'),
+          api.getGhMiscelaneos('turnos-laborales'),
+          api.getGhMiscelaneos('tipos-deporte'),
+          api.getGhMiscelaneos('frecuencia-deporte')
         ]);
         setMaestros(prev => ({ 
           ...prev, sangre, civil, educativo: edu, vivienda: viv, departamentos: deptos,
           cargos, contratos, ingresos, afp, eps, personasCargo: pc, convivientes: conv,
-          tiemposLibres: tl
+          tiemposLibres: tl, turnos, tiposDeporte: td, frecuenciaDeporte: fd
         }));
       } catch (e) {}
     };
@@ -117,6 +150,24 @@ const PublicSurvey: React.FC = () => {
       api.getCiudades(depNacId).then(res => setMaestros(prev => ({ ...prev, municipiosNac: res })));
     }
   }, [depNacId]);
+
+  // Manejar cambio en número de hijos para agregar/quitar filas automáticamente
+  useEffect(() => {
+    const numHijos = parseInt(form.cuantos_hijos) || 0;
+    setFamilia(prev => {
+      const current = [...prev];
+      if (current.length < numHijos) {
+        // Agregar faltantes
+        for (let i = current.length; i < numHijos; i++) {
+          current.push({ nombre: '', fecha_nacimiento: '' });
+        }
+      } else if (current.length > numHijos) {
+        // Quitar excedentes
+        return current.slice(0, numHijos);
+      }
+      return current;
+    });
+  }, [form.cuantos_hijos]);
 
   const handleValidate = async () => {
     if (!cedula) return toast.error('Ingrese su número de cédula');
@@ -147,37 +198,6 @@ const PublicSurvey: React.FC = () => {
     }
   };
 
-  const Input = ({ label, name, type = 'text', placeholder = '' }: any) => (
-    <div className="space-y-1.5">
-      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">{label}</label>
-      <input
-        type={type}
-        value={form[name]}
-        onChange={e => setForm({ ...form, [name]: e.target.value })}
-        placeholder={placeholder}
-        className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500 transition-all"
-      />
-    </div>
-  );
-
-  const Select = ({ label, name, options, labelField = 'nombre', valueField = 'id', onChange }: any) => (
-    <div className="space-y-1.5">
-      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">{label}</label>
-      <select
-        value={form[name]}
-        onChange={e => {
-          if (onChange) onChange(e.target.value);
-          setForm({ ...form, [name]: e.target.value });
-        }}
-        className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500 transition-all"
-      >
-        <option value="">Seleccione...</option>
-        {options.map((o: any) => (
-          <option key={o[valueField] || o} value={o[valueField] || o}>{o[labelField] || o}</option>
-        ))}
-      </select>
-    </div>
-  );
 
   if (!isValidated) {
     return (
@@ -252,20 +272,25 @@ const PublicSurvey: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="Fecha Ingreso" name="fecha_ingreso" type="date" />
-                <Select label="Cargo" name="cargo_id" options={maestros.cargos} />
-                <Select label="Tipo Contrato" name="tipo_contrato_id" options={maestros.contratos} />
-                <Input label="Turno Laboral" name="turno_laboral" placeholder="Mañana, Tarde, Rotativo..." />
-                <Select label="Ingresos Mensuales" name="ingresos_mensuales_id" options={maestros.ingresos} />
-                <Select label="AFP" name="afp_id" options={maestros.afp} />
-                <Select label="EPS" name="eps_id" options={maestros.eps} />
+                <Input label="Fecha Ingreso" name="fecha_ingreso" type="date" value={form.fecha_ingreso} onChange={(v:any) => setForm((p:any) => ({...p, fecha_ingreso: v}))} />
+                <Select label="Cargo" name="cargo_id" options={maestros.cargos} value={form.cargo_id} onChange={(v:any) => setForm((p:any) => ({...p, cargo_id: v}))} />
+                <Select label="Tipo Contrato" name="tipo_contrato_id" options={maestros.contratos} value={form.tipo_contrato_id} onChange={(v:any) => setForm((p:any) => ({...p, tipo_contrato_id: v}))} />
+                <Select label="Turno Laboral" name="turno_laboral_id" options={maestros.turnos} value={form.turno_laboral_id} onChange={(v:any) => setForm((p:any) => ({...p, turno_laboral_id: v}))} />
+                <Select label="Ingresos Mensuales" name="ingresos_mensuales_id" options={maestros.ingresos} value={form.ingresos_mensuales_id} onChange={(v:any) => setForm((p:any) => ({...p, ingresos_mensuales_id: v}))} />
+                <Select label="AFP" name="afp_id" options={maestros.afp} value={form.afp_id} onChange={(v:any) => setForm((p:any) => ({...p, afp_id: v}))} />
+                <Select label="EPS" name="eps_id" options={maestros.eps} value={form.eps_id} onChange={(v:any) => setForm((p:any) => ({...p, eps_id: v}))} />
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
-                  <Select label="Depto Nacimiento" name="dep_nac" options={maestros.departamentos} onChange={(v:any) => setDepNacId(v)} />
-                  <Select label="Ciudad Nacimiento" name="municipio_nacimiento_id" options={maestros.municipiosNac} />
-                  <Input label="Fecha de Nacimiento" name="fecha_nacimiento" type="date" />
-                  <Select label="Tipo de Sangre" name="tipo_sangre_id" options={maestros.sangre} />
-                  <Select label="Estado Civil" name="estado_civil_id" options={maestros.civil} />
-                  <Select label="Nivel Educativo" name="nivel_educativo_id" options={maestros.educativo} />
+                  <Select label="Depto Nacimiento" name="dep_nac" options={maestros.departamentos} value={form.dep_nac} onChange={(v:any) => {
+                    setDepNacId(v);
+                    setForm((prev:any) => ({ ...prev, dep_nac: v, municipio_nacimiento_id: '' }));
+                  }} />
+                  <div className={!depNacId ? 'opacity-50 pointer-events-none' : ''}>
+                    <Select label="Ciudad Nacimiento" name="municipio_nacimiento_id" options={maestros.municipiosNac} value={form.municipio_nacimiento_id} onChange={(v:any) => setForm((p:any) => ({...p, municipio_nacimiento_id: v}))} />
+                  </div>
+                  <Input label="Fecha de Nacimiento" name="fecha_nacimiento" type="date" value={form.fecha_nacimiento} onChange={(v:any) => setForm((p:any) => ({...p, fecha_nacimiento: v}))} />
+                  <Select label="Tipo de Sangre" name="tipo_sangre_id" options={maestros.sangre} value={form.tipo_sangre_id} onChange={(v:any) => setForm((p:any) => ({...p, tipo_sangre_id: v}))} />
+                  <Select label="Estado Civil" name="estado_civil_id" options={maestros.civil} value={form.estado_civil_id} onChange={(v:any) => setForm((p:any) => ({...p, estado_civil_id: v}))} />
+                  <Select label="Nivel Educativo" name="nivel_educativo_id" options={maestros.educativo} value={form.nivel_educativo_id} onChange={(v:any) => setForm((p:any) => ({...p, nivel_educativo_id: v}))} />
                 </div>
               </div>
             </div>
@@ -283,12 +308,14 @@ const PublicSurvey: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Select label="Tipo de Vivienda" name="tipo_vivienda_id" options={maestros.vivienda} />
-                <Select label="Estrato" name="estrato" options={['1', '2', '3', '4', '5', '6']} />
-                <Select label="Departamento Residencia" name="departamento_res_id" options={maestros.departamentos} />
-                <Select label="Ciudad / Municipio" name="municipio_residencia_id" options={maestros.municipiosRes} />
-                <Input label="Barrio" name="barrio" />
-                <Input label="Dirección Exacta" name="direccion" />
+                <Select label="Tipo de Vivienda" name="tipo_vivienda_id" options={maestros.vivienda} value={form.tipo_vivienda_id} onChange={(v:any) => setForm((p:any) => ({...p, tipo_vivienda_id: v}))} />
+                <Select label="Estrato" name="estrato" options={['1', '2', '3', '4', '5', '6']} value={form.estrato} onChange={(v:any) => setForm((p:any) => ({...p, estrato: v}))} />
+                <Select label="Departamento Residencia" name="departamento_res_id" options={maestros.departamentos} value={form.departamento_res_id} onChange={(v:any) => setForm((prev:any) => ({ ...prev, departamento_res_id: v, municipio_residencia_id: '' }))} />
+                <div className={!form.departamento_res_id ? 'opacity-50 pointer-events-none' : ''}>
+                  <Select label="Ciudad / Municipio" name="municipio_residencia_id" options={maestros.municipiosRes} value={form.municipio_residencia_id} onChange={(v:any) => setForm((p:any) => ({...p, municipio_residencia_id: v}))} />
+                </div>
+                <Input label="Barrio" name="barrio" value={form.barrio} onChange={(v:any) => setForm((p:any) => ({...p, barrio: v}))} />
+                <Input label="Dirección Exacta" name="direccion" value={form.direccion} onChange={(v:any) => setForm((p:any) => ({...p, direccion: v}))} />
               </div>
             </div>
           )}
@@ -305,33 +332,27 @@ const PublicSurvey: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="Total personas en su hogar" name="viven_conmigo" type="number" />
-                <Select label="¿Es el principal sustentador?" name="principal_sustentador" options={['SI', 'NO']} />
-                <Select label="Personas a cargo" name="personas_a_cargo_id" options={maestros.personasCargo} />
-                <Select label="¿Hay personas con discapacidad en su familia?" name="discapacidad_familia" options={['SI', 'NO']} />
-                <Select label="¿Con quién vive actualmente?" name="con_quien_vive_id" options={maestros.convivientes} />
-                <Input label="¿Cuántos hijos tiene?" name="cuantos_hijos" type="number" />
+                <Input label="Total personas en su hogar" name="viven_conmigo" type="number" value={form.viven_conmigo} onChange={(v:any) => setForm((p:any) => ({...p, viven_conmigo: v}))} />
+                <Select label="¿Es el principal sustentador?" name="principal_sustentador" options={['SI', 'NO']} value={form.principal_sustentador} onChange={(v:any) => setForm((p:any) => ({...p, principal_sustentador: v}))} />
+                <Select label="Personas a cargo" name="personas_a_cargo_id" options={maestros.personasCargo} value={form.personas_a_cargo_id} onChange={(v:any) => setForm((p:any) => ({...p, personas_a_cargo_id: v}))} />
+                <Select label="¿Hay personas con discapacidad en su familia?" name="discapacidad_familia" options={['SI', 'NO']} value={form.discapacidad_familia} onChange={(v:any) => setForm((p:any) => ({...p, discapacidad_familia: v}))} />
+                <Select label="¿Con quién vive actualmente?" name="con_quien_vive_id" options={maestros.convivientes} value={form.con_quien_vive_id} onChange={(v:any) => setForm((p:any) => ({...p, con_quien_vive_id: v}))} />
+                <Input label="¿Cuántos hijos tiene?" name="cuantos_hijos" type="number" value={form.cuantos_hijos} onChange={(v:any) => setForm((p:any) => ({...p, cuantos_hijos: v}))} />
               </div>
               <div className="space-y-4 pt-4">
                 <div className="flex justify-between items-center">
-                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Hijos (Nombre y Fecha Nacimiento)</h4>
-                  <button onClick={() => setFamilia([...familia, { nombre: '', fecha_nacimiento: '' }])} className="h-9 px-4 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase flex items-center gap-2 hover:bg-indigo-100 transition-all">
-                    <Plus size={14} /> Agregar Hijo
-                  </button>
+                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Información de los Hijos</h4>
                 </div>
                 <div className="space-y-3">
                   {familia.map((fam, idx) => (
                     <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                      <div className="md:col-span-6 space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Nombre Completo</label>
+                      <div className="md:col-span-8 space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Nombre Completo del Hijo/a</label>
                         <input value={fam.nombre} onChange={e => { const n = [...familia]; n[idx].nombre = e.target.value; setFamilia(n); }} className="w-full h-10 px-4 rounded-xl bg-white border border-slate-200 text-[11px] font-bold outline-none" />
                       </div>
                       <div className="md:col-span-4 space-y-1">
                         <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Fecha Nacimiento</label>
                         <input type="date" value={fam.fecha_nacimiento} onChange={e => { const n = [...familia]; n[idx].fecha_nacimiento = e.target.value; setFamilia(n); }} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] font-bold outline-none" />
-                      </div>
-                      <div className="md:col-span-2 flex justify-end">
-                        <button onClick={() => setFamilia(familia.filter((_, i) => i !== idx))} className="h-10 w-10 flex items-center justify-center bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}
@@ -352,19 +373,19 @@ const PublicSurvey: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Select label="¿Sufre alguna enfermedad?" name="sufre_enfermedad" options={['SI', 'NO']} />
-                <Select label="Consume bebidas alcohólicas" name="bebe_alcohol" options={['Si con frecuencia', 'Si ocasionalmente', 'No nunca']} />
-                <Select label="Fuma actualmente" name="fuma" options={['SI', 'NO']} />
-                <Select label="Practica algún deporte" name="practica_deporte" options={['Si varias veces a la semana', 'Si una vez a la semana', 'Si ocasionalmente', 'No practico deporte']} />
-                <Input label="¿Qué tipo de deporte realiza?" name="tipo_deporte" />
-                <Select label="Uso del tiempo libre" name="uso_tiempo_libre_id" options={maestros.tiemposLibres} />
+                <Select label="¿Sufre alguna enfermedad?" name="sufre_enfermedad" options={['SI', 'NO']} value={form.sufre_enfermedad} onChange={(v:any) => setForm((p:any) => ({...p, sufre_enfermedad: v}))} />
+                <Select label="Consume bebidas alcohólicas" name="bebe_alcohol" options={['Si con frecuencia', 'Si ocasionalmente', 'No nunca']} value={form.bebe_alcohol} onChange={(v:any) => setForm((p:any) => ({...p, bebe_alcohol: v}))} />
+                <Select label="Fuma actualmente" name="fuma" options={['SI', 'NO']} value={form.fuma} onChange={(v:any) => setForm((p:any) => ({...p, fuma: v}))} />
+                <Select label="Practica algún deporte" name="frecuencia_deporte_id" options={maestros.frecuenciaDeporte} value={form.frecuencia_deporte_id} onChange={(v:any) => setForm((p:any) => ({...p, frecuencia_deporte_id: v}))} />
+                <Select label="Tipo de deporte que realiza" name="tipo_deporte_id" options={maestros.tiposDeporte} value={form.tipo_deporte_id} onChange={(v:any) => setForm((p:any) => ({...p, tipo_deporte_id: v}))} />
+                <Select label="Uso del tiempo libre" name="uso_tiempo_libre_id" options={maestros.tiemposLibres} value={form.uso_tiempo_libre_id} onChange={(v:any) => setForm((p:any) => ({...p, uso_tiempo_libre_id: v}))} />
                 {form.uso_tiempo_libre_id === maestros.tiemposLibres.find((t:any) => t.nombre.toLowerCase().includes('otro'))?.id?.toString() && (
-                  <Input label="Especifique otro uso" name="uso_tiempo_libre_otros" />
+                  <Input label="Especifique otro uso" name="uso_tiempo_libre_otros" value={form.uso_tiempo_libre_otros} onChange={(v:any) => setForm((p:any) => ({...p, uso_tiempo_libre_otros: v}))} />
                 )}
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-indigo-50/30 rounded-3xl border border-indigo-100">
                   <div className="md:col-span-2"><h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-2">Contacto de Emergencia</h4></div>
-                  <Input label="Nombre del contacto" name="contacto_emergencia_nombre" />
-                  <Input label="Teléfono / Celular" name="contacto_emergencia_telefono" />
+                  <Input label="Nombre del contacto" name="contacto_emergencia_nombre" value={form.contacto_emergencia_nombre} onChange={(v:any) => setForm((p:any) => ({...p, contacto_emergencia_nombre: v}))} />
+                  <Input label="Teléfono / Celular" name="contacto_emergencia_telefono" value={form.contacto_emergencia_telefono} onChange={(v:any) => setForm((p:any) => ({...p, contacto_emergencia_telefono: v}))} />
                 </div>
               </div>
             </div>

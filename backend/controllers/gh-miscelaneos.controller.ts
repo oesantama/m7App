@@ -14,11 +14,17 @@ const ALLOWED_TABLES: Record<string, string> = {
   'niveles-educativos': 'gh_niveles_educativos',
   'areas':              'gh_areas',
   'jefes-inmediatos':   'gh_jefes_inmediatos',
+  'turnos-laborales':   'gh_turnos_laborales',
+  'personas-a-cargo':   'gh_personas_a_cargo',
+  'convivientes':       'gh_convivientes',
+  'frecuencia-deporte': 'gh_frecuencia_deporte',
+  'tipos-deporte':      'gh_tipos_deporte',
+  'usos-tiempo-libre':  'gh_usos_tiempo_libre',
 };
 
 const resolveTable = (tabla: string): string | null => ALLOWED_TABLES[tabla] ?? null;
 
-const GENERIC_CATEGORIES = ['parentescos', 'tiempos-libres', 'personas-a-cargo', 'convivientes'];
+const GENERIC_CATEGORIES = ['parentescos'];
 
 export const getGhMiscelaneos = async (req: Request, res: Response) => {
   const tabla = req.params.tabla as string;
