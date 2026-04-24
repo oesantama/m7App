@@ -310,7 +310,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                       <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1.5">
-                          {e.estado !== 'COMPLETADO' && (
+                          {e.estado !== 'EST-05' && (
                             <button onClick={() => {
                               navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
                               toast.success('Link copiado');

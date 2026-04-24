@@ -548,6 +548,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
         const assigned        = total - unassigned;
         
+        const repiceRows      = invoices.filter(i => REPICE_STATUS.includes((i.item_status || '').toUpperCase()));
         const repiceCount     = repiceRows.length;
         const valorRepice     = repiceRows.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
 

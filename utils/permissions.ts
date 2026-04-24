@@ -24,6 +24,8 @@ export const ID_MAP: Record<string, string> = {
   'MATRIZ_PERMISOS': 'PAG-24',
   'PERSONAL_GH': 'PAG-43',
   'MISCELANEOS_GH': 'PAG-41',
+  'CONSULTA_FACTURAS': 'PAG-42',
+  'CONCILIACION': 'PAG-40',
   'CAPACITACIONES': 'CAPACITACIONES' // Nombre directo por ahora
 };
 
