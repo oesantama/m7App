@@ -369,8 +369,13 @@ export const api = {
   getDepartamentos: () => fetchJson(`${API_URL}/cfg-ciudades/departamentos`),
   getCiudades: (departamentoId: string | number) => fetchJson(`${API_URL}/cfg-ciudades/ciudades?departamentoId=${departamentoId}`),
   downloadSurveyPDF: async (id: number | string) => {
+    const token = localStorage.getItem('token') || 
+                 localStorage.getItem('m7_token') || 
+                 localStorage.getItem('m7_auth_token') || 
+                 localStorage.getItem('m7_client_token');
+    
     const response = await fetch(`${API_URL}/gh-personal/pdf/${id}`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('m7_token')}` }
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     if (!response.ok) throw new Error('Error al descargar PDF');
     const blob = await response.blob();
