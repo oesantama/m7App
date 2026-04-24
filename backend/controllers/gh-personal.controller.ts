@@ -98,6 +98,41 @@ const initTables = async () => {
       );
 
       CREATE TABLE IF NOT EXISTS gh_areas (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+      -- LMS Gamificado
+      CREATE TABLE IF NOT EXISTS gh_capacitaciones (
+        id SERIAL PRIMARY KEY,
+        titulo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        puntos_premio INTEGER DEFAULT 100,
+        estado VARCHAR(50) DEFAULT 'BORRADOR',
+        usuario_control VARCHAR(255),
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS gh_capacitacion_preguntas (
+        id SERIAL PRIMARY KEY,
+        capacitacion_id INTEGER REFERENCES gh_capacitaciones(id) ON DELETE CASCADE,
+        tipo VARCHAR(50) NOT NULL,
+        pregunta TEXT NOT NULL,
+        config_json JSONB,
+        orden INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS gh_capacitacion_asignaciones (
+        id SERIAL PRIMARY KEY,
+        capacitacion_id INTEGER REFERENCES gh_capacitaciones(id) ON DELETE CASCADE,
+        cedula VARCHAR(50) NOT NULL,
+        tipo_proceso VARCHAR(50),
+        desde DATE,
+        hasta DATE,
+        estado VARCHAR(50) DEFAULT 'PENDIENTE',
+        progreso INTEGER DEFAULT 0,
+        calificacion DECIMAL(5,2),
+        fecha_completado TIMESTAMP,
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
       CREATE TABLE IF NOT EXISTS gh_jefes_inmediatos (id SERIAL PRIMARY KEY, nombre VARCHAR(255), area_id INTEGER, personal_id INTEGER, estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
       CREATE TABLE IF NOT EXISTS gh_eps (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
       CREATE TABLE IF NOT EXISTS gh_afp (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
@@ -764,6 +799,146 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     res.send(pdfBuffer);
   } catch (err: any) {
     console.error('[PDF-ERROR]', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// --- LMS GAMIFICADO ---
+
+export const getCapacitaciones = async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT * FROM gh_capacitaciones ORDER BY fecha_creacion DESC');
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const saveCapacitacion = async (req: Request, res: Response) => {
+  const { id, titulo, descripcion, puntos_premio, estado, preguntas } = req.body;
+  const usuario = (req as any).user?.nombre || 'ADMIN';
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let capId = id;
+    
+    if (id) {
+      await client.query(`
+        UPDATE gh_capacitaciones 
+        SET titulo = $1, descripcion = $2, puntos_premio = $3, estado = $4, usuario_control = $5
+        WHERE id = $6
+      `, [titulo, descripcion, puntos_premio, estado, usuario, id]);
+      await client.query('DELETE FROM gh_capacitacion_preguntas WHERE capacitacion_id = $1', [id]);
+    } else {
+      const resCap = await client.query(`
+        INSERT INTO gh_capacitaciones (titulo, descripcion, puntos_premio, estado, usuario_control)
+        VALUES ($1, $2, $3, $4, $5) RETURNING id
+      `, [titulo, descripcion, puntos_premio, estado || 'BORRADOR', usuario]);
+      capId = resCap.rows[0].id;
+    }
+    
+    if (preguntas && preguntas.length > 0) {
+      for (let i = 0; i < preguntas.length; i++) {
+        const p = preguntas[i];
+        await client.query(`
+          INSERT INTO gh_capacitacion_preguntas (capacitacion_id, tipo, pregunta, config_json, orden)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [capId, p.tipo, p.pregunta, JSON.stringify(p.config_json), i]);
+      }
+    }
+    
+    await client.query('COMMIT');
+    res.json({ message: 'Capacitación guardada', id: capId });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+};
+
+export const getAsignacionesCapacitacion = async (req: Request, res: Response) => {
+  const { capId } = req.params;
+  try {
+    const result = await pool.query(`
+      SELECT a.*, p.nombre as colaborador_nombre, pr.nombre as area_nombre
+      FROM gh_capacitacion_asignaciones a
+      JOIN gh_personal p ON p.cedula = a.cedula
+      LEFT JOIN gh_areas pr ON pr.id = p.area_trabajo_id
+      WHERE a.capacitacion_id = $1
+      ORDER BY a.fecha_control DESC
+    `, [capId]);
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const asignarCapacitacion = async (req: Request, res: Response) => {
+  const { capacitacion_id, cedulas, desde, hasta } = req.body;
+  const usuario = (req as any).user?.nombre || 'ADMIN';
+  
+  try {
+    for (const cedula of cedulas) {
+      // Detección automática de Reinducción
+      const check = await pool.query(`
+        SELECT id FROM gh_capacitacion_asignaciones 
+        WHERE capacitacion_id = $1 AND cedula = $2 AND estado = 'COMPLETADO'
+      `, [capacitacion_id, cedula]);
+      
+      const tipo = check.rows.length > 0 ? 'REINDUCCION' : 'INDUCCION';
+      
+      await pool.query(`
+        INSERT INTO gh_capacitacion_asignaciones (capacitacion_id, cedula, tipo_proceso, desde, hasta, usuario_control)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [capacitacion_id, cedula, tipo, desde, hasta, usuario]);
+    }
+    res.json({ message: 'Personal asignado correctamente' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getPublicCapacitacion = async (req: Request, res: Response) => {
+  const { id, cedula } = req.query;
+  try {
+    const asig = await pool.query(`
+      SELECT a.*, c.titulo, c.descripcion, c.puntos_premio
+      FROM gh_capacitacion_asignaciones a
+      JOIN gh_capacitaciones c ON c.id = a.capacitacion_id
+      WHERE a.capacitacion_id = $1 AND a.cedula = $2 AND c.estado = 'ACTIVO'
+    `, [id, cedula]);
+    
+    if (asig.rows.length === 0) {
+      return res.status(403).json({ error: 'No tienes una asignación activa para esta capacitación' });
+    }
+    
+    const questions = await pool.query(`
+      SELECT * FROM gh_capacitacion_preguntas 
+      WHERE capacitacion_id = $1 ORDER BY orden ASC
+    `, [id]);
+    
+    res.json({
+      asignacion: asig.rows[0],
+      preguntas: questions.rows
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const submitCapacitacionResult = async (req: Request, res: Response) => {
+  const { asignacion_id, calificacion, progreso } = req.body;
+  try {
+    await pool.query(`
+      UPDATE gh_capacitacion_asignaciones 
+      SET calificacion = $1, progreso = $2, estado = CASE WHEN $2 >= 100 THEN 'COMPLETADO' ELSE 'EN_CURSO' END,
+          fecha_completado = CASE WHEN $2 >= 100 THEN CURRENT_TIMESTAMP ELSE fecha_completado END
+      WHERE id = $3
+    `, [calificacion, progreso, asignacion_id]);
+    res.json({ message: 'Progreso guardado' });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 };

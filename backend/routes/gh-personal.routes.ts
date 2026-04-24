@@ -11,7 +11,13 @@ import {
   getEncuestasResultados,
   getEncuestaDetail,
   generateEncuestaPDF,
-  exportEncuestasExcel
+  exportEncuestasExcel,
+  getCapacitaciones,
+  saveCapacitacion,
+  getAsignacionesCapacitacion,
+  asignarCapacitacion,
+  getPublicCapacitacion,
+  submitCapacitacionResult
 } from '../controllers/gh-personal.controller.js';
 
 const router = Router();
@@ -27,6 +33,14 @@ router.get('/resultados', getEncuestasResultados);
 router.get('/resultados/:id', getEncuestaDetail);
 router.get('/resultados/excel', exportEncuestasExcel);
 router.get('/pdf/:id', generateEncuestaPDF);
+
+// LMS Routes
+router.get('/capacitaciones', getCapacitaciones);
+router.post('/capacitaciones', saveCapacitacion);
+router.get('/capacitaciones/asignaciones/:capId', getAsignacionesCapacitacion);
+router.post('/capacitaciones/asignar', asignarCapacitacion);
+router.get('/capacitaciones/publica', getPublicCapacitacion);
+router.post('/capacitaciones/submit', submitCapacitacionResult);
 
 // Rutas Públicas (Whitelisted en server.ts)
 router.get('/public/survey/validate', validateSurveyAccess);

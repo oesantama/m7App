@@ -66,6 +66,7 @@ const SalidaProveedor = lazyWithRetry(() => import('./components/SalidaProveedor
 const GestionHumanaMiscelaneos = lazyWithRetry(() => import('./components/GestionHumana/Miscelaneos'));
 const GestionHumanaPersonal = lazyWithRetry(() => import('./components/GestionHumana/Personal'));
 const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/PublicSurvey'));
+const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/PublicTraining'));
 const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 
 
@@ -157,6 +158,8 @@ const App: React.FC = () => {
       } else if (window.location.pathname.startsWith('/attendance/register')) {
         setIsPortalMode(true);
       } else if (window.location.pathname.startsWith('/publico/encuesta')) {
+        setIsPortalMode(true);
+      } else if (window.location.pathname.startsWith('/publico/capacitacion')) {
         setIsPortalMode(true);
       } else {
         setIsPortalMode(false);
@@ -967,6 +970,14 @@ const App: React.FC = () => {
     return (
       <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}>
         <PublicSurvey />
+      </React.Suspense>
+    );
+  }
+
+  if (window.location.pathname.startsWith('/publico/capacitacion')) {
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+        <PublicTraining />
       </React.Suspense>
     );
   }

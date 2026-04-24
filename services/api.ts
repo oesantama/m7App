@@ -421,6 +421,23 @@ export const api = {
     a.remove();
   },
 
+  // LMS Gamificado
+  getCapacitaciones: () => fetchJson(`${API_URL}/gh-personal/capacitaciones`),
+  saveCapacitacion: (data: any) => fetchJson(`${API_URL}/gh-personal/capacitaciones`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getAsignacionesCapacitacion: (capId: number | string) => fetchJson(`${API_URL}/gh-personal/capacitaciones/asignaciones/${capId}`),
+  asignarCapacitacion: (data: any) => fetchJson(`${API_URL}/gh-personal/capacitaciones/asignar`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getPublicCapacitacion: (id: string, cedula: string) => fetchJson(`${API_URL}/gh-personal/capacitaciones/publica?id=${id}&cedula=${cedula}`),
+  submitCapacitacionResult: (data: any) => fetchJson(`${API_URL}/gh-personal/capacitaciones/submit`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
   saveMarca: (data: any) => fetchJson(`${API_URL}/marcas`, {
