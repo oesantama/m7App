@@ -343,8 +343,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                 </tbody>
               </table>
             </div>
-          ) : (
-          ) : activeTab === 'consultar' && (
+          ) : activeTab === 'consultar' ? (
             <div className="space-y-4">
               {/* Filtros */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100">
@@ -458,7 +457,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                 </table>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
