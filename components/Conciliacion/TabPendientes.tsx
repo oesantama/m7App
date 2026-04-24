@@ -536,7 +536,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
         return { 
             total, legalizadas, entregadas, devueltas, parciales, 
-            valorTotal, 
+            valorTotal, valorTotalGlobal,
             valorLegalizado: individualLeg, // Individual
             totalGrupal,
             totalLegalizado: individualLeg + totalGrupal + approvedSurch,
@@ -774,8 +774,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     {/* Fila 1: Resumen de Valores ($) */}
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/10 min-w-[120px]">
-                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Placa</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotal)}</span>
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Documento</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotalGlobal)}</span>
                                             <span className="text-[8px] text-slate-500 font-bold mt-1">{stats.total} Facturas</span>
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-900/10 min-w-[120px]">
@@ -795,7 +795,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-amber-100 uppercase tracking-widest leading-none mb-1">Pendiente</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotal - stats.totalLegalizado - stats.valorDevuelto))}</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotalGlobal - stats.totalLegalizado - stats.valorDevuelto))}</span>
                                             <span className="text-[8px] text-amber-100/70 font-bold mt-1">{stats.total - stats.legalizadas} Por Legalizar</span>
                                         </div>
                                         {(stats.approvedSurch > 0 || stats.pendingSurch > 0) && (
