@@ -42,12 +42,13 @@ interface Props {
   user: User;
 }
 
-type TabKey = 'personal' | 'encuestas';
+type TabKey = 'personal' | 'encuestas' | 'consultar';
 
 const Personal: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('personal');
   const [personal, setPersonal] = useState<PersonalRecord[]>([]);
   const [encuestas, setEncuestas] = useState<EncuestaRecord[]>([]);
+  const [resultados, setResultados] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   
@@ -87,8 +88,11 @@ const Personal: React.FC<Props> = ({ user }) => {
       if (activeTab === 'personal') {
         const data = await api.getPersonal();
         setPersonal(data);
-      } else {
+      } else if (activeTab === 'encuestas') {
         await fetchEncuestas();
+      } else if (activeTab === 'consultar') {
+        const data = await api.getEncuestasResultados();
+        setResultados(data);
       }
     } catch {
       toast.error('Error al cargar datos');
@@ -195,13 +199,19 @@ const Personal: React.FC<Props> = ({ user }) => {
             </button>
             <button onClick={() => setActiveTab('encuestas')}
               className={`px-6 py-4 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'encuestas' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-              Encuestas Sociodemográficas
+              Asignar Encuesta Sociodemográfica
+            </button>
+            <button onClick={() => setActiveTab('consultar')}
+              className={`px-6 py-4 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'consultar' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+              Consultar Encuestas Sociodemográficas
             </button>
           </div>
           
-          <button onClick={openCreate} className="h-9 px-4 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2">
-            <Icons.Plus className="w-3.5 h-3.5" /> {activeTab === 'personal' ? 'Agregar Personal' : 'Activar Encuesta'}
-          </button>
+          {activeTab !== 'consultar' && (
+            <button onClick={openCreate} className="h-9 px-4 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2">
+              <Icons.Plus className="w-3.5 h-3.5" /> {activeTab === 'personal' ? 'Agregar Personal' : 'Activar Encuesta'}
+            </button>
+          )}
         </div>
 
         <div className="p-6">
@@ -260,7 +270,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                 </table>
               </div>
             </div>
-          ) : (
+          ) : activeTab === 'encuestas' ? (
             <div className="overflow-x-auto rounded-2xl border border-slate-100">
               <table className="w-full text-left">
                 <thead>
@@ -295,6 +305,42 @@ const Personal: React.FC<Props> = ({ user }) => {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-slate-100">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                    <th className="px-4 py-3">Colaborador / Cédula</th>
+                    <th className="px-4 py-3">Cargo</th>
+                    <th className="px-4 py-3">Fecha Realización</th>
+                    <th className="px-4 py-3 text-right">Reporte</th>
+                  </tr>
+                </thead>
+                <tbody className="text-[11px] font-bold text-slate-600">
+                  {resultados.map(r => (
+                    <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-black text-slate-900 uppercase">{r.nombre}</p>
+                        <p className="text-[9px] text-slate-400">CC: {r.cedula}</p>
+                      </td>
+                      <td className="px-4 py-3 uppercase text-slate-500">{r.cargo || '—'}</td>
+                      <td className="px-4 py-3 text-slate-400">{new Date(r.fecha_realizacion).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={() => api.downloadSurveyPDF(r.id)} className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-all flex items-center gap-2 ml-auto">
+                          <Icons.FileText className="w-4 h-4" />
+                          <span className="text-[9px] font-black uppercase">Generar PDF</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {resultados.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-12 text-center text-slate-300 uppercase font-black text-[10px]">No hay encuestas completadas aún</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

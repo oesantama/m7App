@@ -365,6 +365,21 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  getEncuestasResultados: () => fetchJson(`${API_URL}/gh-personal/resultados`),
+  downloadSurveyPDF: async (id: number | string) => {
+    const response = await fetch(`${API_URL}/gh-personal/pdf/${id}`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('m7_token')}` }
+    });
+    if (!response.ok) throw new Error('Error al descargar PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Encuesta_${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  },
 
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),

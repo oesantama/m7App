@@ -7,7 +7,9 @@ import {
   activateEncuesta,
   deactivateEncuesta,
   validateSurveyAccess,
-  savePublicSurvey
+  savePublicSurvey,
+  getEncuestasResultados,
+  generateEncuestaPDF
 } from '../controllers/gh-personal.controller.js';
 
 const router = Router();
@@ -19,6 +21,8 @@ router.delete('/:id', deletePersonal);
 router.get('/encuestas', getPersonalEncuestas);
 router.post('/encuestas/activate', activateEncuesta);
 router.put('/encuestas/deactivate/:id', deactivateEncuesta);
+router.get('/resultados', getEncuestasResultados);
+router.get('/pdf/:id', generateEncuestaPDF);
 
 // Rutas Públicas (Whitelisted en server.ts)
 router.get('/public/survey/validate', validateSurveyAccess);

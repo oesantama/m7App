@@ -960,6 +960,18 @@ const App: React.FC = () => {
     }
   };
 
+  const handleBack = () => setActiveTab('dashboard');
+  
+  // 1. RUTA PÚBLICA PRIORITARIA: Encuesta Sociodemográfica (Sin login, sin portal)
+  if (window.location.pathname.startsWith('/publico/encuesta')) {
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+        <PublicSurvey />
+      </React.Suspense>
+    );
+  }
+
+  // 2. MODO PORTAL: Asistencia o Cliente
   if (isPortalMode) {
     const isAttendance = window.location.pathname.startsWith('/attendance/register');
     
@@ -985,16 +997,7 @@ const App: React.FC = () => {
     );
   }
 
-  const handleBack = () => setActiveTab('dashboard');
-
-  if (window.location.pathname.startsWith('/publico/encuesta')) {
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}>
-        <PublicSurvey />
-      </React.Suspense>
-    );
-  }
-
+  // 3. MODO ADMINISTRADOR (Requiere Login)
   if (!isAuthenticated || !user) {
     return <Login onLogin={handleLogin} />;
   }
