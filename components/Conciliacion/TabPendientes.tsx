@@ -284,7 +284,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             };
 
             // --- FUNCIÓN PARA FORMATEAR DATOS DE FACTURAS ---
-                const totalQty = i.items?.reduce((s, it) => s + (it.qty || 0), 0) || 1;
+            const mapInvoices = (list: any[]) => list.map(i => {
+                const totalQty = i.items?.reduce((s, it: any) => s + (it.qty || 0), 0) || 1;
                 const unitPrice = (i.invoice_value || 0) / (totalQty || 1);
                 const devVal = i.items?.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
                 

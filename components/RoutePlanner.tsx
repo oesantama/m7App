@@ -1574,7 +1574,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         cargoRows.push(row);
       }
       autoTable(pdf, {
-        startY: y, margin: { left: ML, right: MR },
+        startY: y, margin: { left: ML, right: MR, bottom: 28 },
         tableWidth: CW, // Forzar el ancho al margen de la tabla superior
         head: [['ID', 'CANT', 'NOTAS', 'ID', 'CANT', 'NOTAS', 'ID', 'CANT', 'NOTAS', 'ID', 'CANT', 'NOTAS']],
         body: cargoRows,
@@ -1594,8 +1594,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           10: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
           11: { cellWidth: 12 },
         },
-        theme: 'grid',
-        margin: { bottom: 28 }
+        theme: 'grid'
       });
       y = (pdf as any).lastAutoTable.finalY + 8;
     }
