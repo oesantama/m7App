@@ -18,6 +18,8 @@ const ALLOWED_TABLES: Record<string, string> = {
 
 const resolveTable = (tabla: string): string | null => ALLOWED_TABLES[tabla] ?? null;
 
+const GENERIC_CATEGORIES = ['parentescos', 'tiempos-libres', 'personas-a-cargo', 'convivientes'];
+
 export const getGhMiscelaneos = async (req: Request, res: Response) => {
   const tabla = req.params.tabla as string;
   const table = resolveTable(tabla);
@@ -36,17 +38,14 @@ export const getGhMiscelaneos = async (req: Request, res: Response) => {
       }
       const result = await pool.query(query);
       return res.json(result.rows);
-    } else {
-      // Intentar buscar en la tabla genérica gh_miscelaneos por categoría
+    } else if (GENERIC_CATEGORIES.includes(tabla)) {
+      // Buscar en la tabla genérica gh_miscelaneos por categoría
       const result = await pool.query(
         `SELECT id, nombre FROM gh_miscelaneos WHERE categoria = $1 ORDER BY nombre ASC`,
         [tabla]
       );
-      
-      if (result.rows.length > 0) {
-        return res.json(result.rows);
-      }
-      
+      return res.json(result.rows);
+    } else {
       return res.status(400).json({ error: 'Tabla o categoría no permitida' });
     }
   } catch (err: any) {
