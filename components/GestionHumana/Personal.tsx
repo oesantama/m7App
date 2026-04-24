@@ -59,6 +59,7 @@ const Personal: React.FC<Props> = ({ user }) => {
   const [epsList, setEpsList] = useState<MiscRecord[]>([]);
   const [afpList, setAfpList] = useState<MiscRecord[]>([]);
   const [estados, setEstados] = useState<{id: string, name: string}[]>([]);
+  const [confirmDeactivate, setConfirmDeactivate] = useState<number | null>(null);
 
   // Modal Personal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -141,7 +142,7 @@ const Personal: React.FC<Props> = ({ user }) => {
   };
 
   const handleDeactivate = async (id: number) => {
-    if (!window.confirm('¿Está seguro de inactivar esta encuesta?')) return;
+    setConfirmDeactivate(null);
     setLoading(true);
     try {
       await api.deactivateEncuesta(id);
@@ -302,8 +303,8 @@ const Personal: React.FC<Props> = ({ user }) => {
                       <td className="px-4 py-3 font-black text-slate-900">{e.cedula}</td>
                       <td className="px-4 py-3">{new Date(e.fecha_activacion).toLocaleString()}</td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${e.estado === 'COMPLETADO' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                          {e.estado}
+                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${e.estado === 'EST-05' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : e.estado === 'EST-01' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                          {estados.find(est => est.id === e.estado)?.name || e.estado}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
@@ -311,14 +312,14 @@ const Personal: React.FC<Props> = ({ user }) => {
                         <div className="flex justify-end gap-1.5">
                           {e.estado !== 'COMPLETADO' && (
                             <button onClick={() => {
-                              navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?cedula=${e.cedula}`);
+                              navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
                               toast.success('Link copiado');
                             }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
                               <Icons.Copy className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          {e.estado === 'ACTIVO' && (
-                            <button onClick={() => handleDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
+                          {e.estado === 'EST-01' && (
+                            <button onClick={() => setConfirmDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
                               <Icons.X className="w-3.5 h-3.5" />
                             </button>
                           )}
@@ -455,6 +456,26 @@ const Personal: React.FC<Props> = ({ user }) => {
                 {saving ? <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : <Icons.Check className="w-5 h-5" />}
                 {activeTab === 'personal' ? (editing ? 'Actualizar Colaborador' : 'Guardar Colaborador') : 'Activar Encuesta'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Confirmación Inactivar */}
+      {confirmDeactivate && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="p-8 text-center space-y-4">
+              <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto text-rose-500">
+                <Icons.AlertTriangle className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Confirmar Inactivación</h3>
+                <p className="text-xs font-medium text-slate-500 mt-2">¿Está seguro que desea inactivar esta encuesta? Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50 flex gap-3">
+              <button onClick={() => setConfirmDeactivate(null)} className="flex-1 h-12 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all">Cancelar</button>
+              <button onClick={() => handleDeactivate(confirmDeactivate)} className="flex-1 h-12 rounded-xl bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-500/20 active:scale-95">Inactivar</button>
             </div>
           </div>
         </div>

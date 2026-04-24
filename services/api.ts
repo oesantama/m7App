@@ -368,14 +368,15 @@ export const api = {
   deactivateEncuesta: (id: number | string) => fetchJson(`${API_URL}/gh-personal/encuestas/deactivate/${id}`, { method: 'PUT' }),
 
   // --- ENCUESTAS PÚBLICAS ---
-  validateSurveyAccess: (cedula: string) => fetchJson(`${API_URL}/gh-personal/public/survey/validate?cedula=${cedula}`),
+  validateSurveyAccess: (params: { cedula?: string, id?: string | number }) => {
+    const qs = new URLSearchParams(params as any).toString();
+    return fetchJson(`${API_URL}/gh-personal/public/survey/validate?${qs}`);
+  },
   savePublicSurvey: (data: { cedula: string, data: any, familia: any[] }) => fetchJson(`${API_URL}/gh-personal/public/survey/save`, {
     method: 'POST',
     body: JSON.stringify(data),
   }),
   getEncuestasResultados: () => fetchJson(`${API_URL}/gh-personal/resultados`),
-  getDepartamentos: () => fetchJson(`${API_URL}/cfg-ciudades/departamentos`),
-  getCiudades: (departamentoId: string | number) => fetchJson(`${API_URL}/cfg-ciudades/ciudades?departamentoId=${departamentoId}`),
   downloadSurveyPDF: async (id: number | string) => {
     const token = localStorage.getItem('token') || 
                  localStorage.getItem('m7_token') || 

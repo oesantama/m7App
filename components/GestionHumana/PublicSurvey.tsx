@@ -131,7 +131,11 @@ const PublicSurvey: React.FC = () => {
 
     const params = new URLSearchParams(window.location.search);
     const c = params.get('cedula');
-    if (c) setCedula(c);
+    const id = params.get('id');
+    
+    if (c || id) {
+      handleValidate(c || undefined, id || undefined);
+    }
     loadMaestros();
   }, []);
 
@@ -169,16 +173,19 @@ const PublicSurvey: React.FC = () => {
     });
   }, [form.cuantos_hijos]);
 
-  const handleValidate = async () => {
-    if (!cedula) return toast.error('Ingrese su número de cédula');
+  const handleValidate = async (forceCedula?: string, forceId?: string) => {
+    const valCedula = forceCedula || cedula;
+    if (!valCedula && !forceId) return toast.error('Ingrese su número de cédula');
+    
     setValidating(true);
     try {
-      const res = await api.validateSurveyAccess(cedula);
+      const res = await api.validateSurveyAccess({ cedula: valCedula, id: forceId });
       setPersonInfo(res);
+      setCedula(res.cedula); // Aseguramos que la cédula esté cargada para el guardado
       setIsValidated(true);
       toast.success(`Hola ${res.nombre}, puedes iniciar la encuesta.`);
     } catch (e: any) {
-      toast.error(e.response?.data?.error || 'No autorizado para realizar la encuesta');
+      toast.error(e.message || 'No autorizado para realizar la encuesta');
     } finally {
       setValidating(false);
     }

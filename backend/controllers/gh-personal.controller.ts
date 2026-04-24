@@ -205,7 +205,7 @@ export const savePersonal = async (req: Request, res: Response) => {
       `, [
         nombre, cedula, cargo, eps, afp, celular_personal, correo_personal,
         celular_corporativo, correo_corporativo, jefe_inmediato_id, area_trabajo_id,
-        es_jefe, fecha_ingreso, estado || 'ACTIVO', usuarioControl || 'System'
+        es_jefe, fecha_ingreso, estado || 'EST-01', usuarioControl || 'System'
       ]);
     }
     res.json({ success: true });
@@ -253,7 +253,7 @@ export const activateEncuesta = async (req: Request, res: Response) => {
 export const deactivateEncuesta = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
-    await pool.query("UPDATE gh_encuestas_activas SET estado = 'INACTIVO' WHERE id = $1", [id]);
+    await pool.query("UPDATE gh_encuestas_activas SET estado = 'EST-02' WHERE id = $1", [id]);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -267,7 +267,7 @@ export const validateSurveyAccess = async (req: Request, res: Response) => {
       SELECT p.nombre, p.cedula, p.cargo, p.fecha_ingreso
       FROM gh_personal p
       JOIN gh_encuestas_activas a ON a.cedula = p.cedula
-      WHERE p.cedula = $1 AND a.estado = 'ACTIVO'
+      WHERE p.cedula = $1 AND a.estado = 'EST-01'
       LIMIT 1
     `, [cedula]);
 
@@ -323,7 +323,7 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
       }
     }
 
-    await client.query("UPDATE gh_encuestas_activas SET estado = 'COMPLETADO' WHERE cedula = $1 AND estado = 'ACTIVO'", [cedula]);
+    await client.query("UPDATE gh_encuestas_activas SET estado = 'EST-05' WHERE cedula = $1 AND estado = 'EST-01'", [cedula]);
 
     await client.query('COMMIT');
     res.json({ success: true, message: 'Encuesta guardada exitosamente.' });

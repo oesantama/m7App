@@ -91,8 +91,9 @@ export const getCiudades = async (req: Request, res: Response) => {
       FROM cfg_ciudades c
       LEFT JOIN cfg_departamentos d ON c.id_departamento = d.id
     `;
-    const result = departamentoId
-      ? await pool.query(base + ` WHERE c.id_departamento=$1 ORDER BY c.nombre ASC`, [departamentoId])
+    const depId = (departamentoId && departamentoId !== 'undefined') ? departamentoId : null;
+    const result = depId
+      ? await pool.query(base + ` WHERE c.id_departamento=$1 ORDER BY c.nombre ASC`, [depId])
       : await pool.query(base + ` ORDER BY c.nombre ASC`);
     res.json(result.rows);
   } catch (err: any) {
