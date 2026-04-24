@@ -20,6 +20,8 @@ export const ID_MAP: Record<string, string> = {
   'DASHBOARD': 'PAG-25',
   'NOTIFICACIONES': 'PAG-07',
   'WHATSAPP': 'PAG-18',
+  'PERSONAL_GH': 'PAG-43',
+  'MISCELANEOS_GH': 'PAG-41',
   'CAPACITACIONES': 'CAPACITACIONES' // Nombre directo por ahora
 };
 

@@ -48,18 +48,10 @@ const initTables = async () => {
         fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Registrar Modulo y Paginas si no existen
-    INSERT INTO modules (id, name, icon_class, status_id)
-    SELECT 'MOD-GH', 'Gestión Humana', 'Users', 'EST-01'
-    WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-GH');
-
+    -- Registrar Pagina Personal si no existe
     INSERT INTO pages (id, parent_id, name, route, status_id)
-    SELECT 'PAG-GH-01', 'MOD-GH', 'Personal', 'gestion-humana-personal', 'EST-01'
-    WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-GH-01');
-
-    INSERT INTO pages (id, parent_id, name, route, status_id)
-    SELECT 'PAG-GH-02', 'MOD-GH', 'Misceláneos', 'gestion-humana-miscelaneos', 'EST-01'
-    WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-GH-02');
+    SELECT 'PAG-43', 'MOD-09', 'Personal', 'gestion-humana-personal', 'EST-01'
+    WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-43');
   `);
 };
 
