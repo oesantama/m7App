@@ -389,8 +389,11 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
              utl.nombre as tiempo_libre_nombre,
              tc.nombre as contrato_nombre, im.nombre as ingresos_nombre,
              afp.nombre as afp_nombre, eps.nombre as eps_nombre,
+             tl.nombre as turno_nombre,
              pac.nombre as pcargo_nombre, cvv.nombre as conviviente_nombre,
-             cg.nombre as cargo_enc_nombre
+             cg.nombre as cargo_enc_nombre,
+             fd.nombre as frec_deporte_nombre,
+             td.nombre as tipo_deporte_nombre
       FROM gh_encuestas_sociodemograficas r
       JOIN gh_personal p ON p.cedula = r.cedula
       LEFT JOIN gh_areas a ON a.id = p.area_trabajo_id
@@ -407,9 +410,12 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
       LEFT JOIN gh_miscelaneos im ON im.id = r.ingresos_mensuales_id
       LEFT JOIN gh_miscelaneos afp ON afp.id = r.afp_id
       LEFT JOIN gh_miscelaneos eps ON eps.id = r.eps_id
+      LEFT JOIN gh_miscelaneos tl ON tl.id = r.turno_laboral_id
       LEFT JOIN gh_miscelaneos pac ON pac.id = r.personas_a_cargo_id
       LEFT JOIN gh_miscelaneos cvv ON cvv.id = r.con_quien_vive_id
       LEFT JOIN gh_miscelaneos cg ON cg.id = r.cargo_id
+      LEFT JOIN gh_miscelaneos fd ON fd.id = r.frecuencia_deporte_id
+      LEFT JOIN gh_miscelaneos td ON td.id = r.tipo_deporte_id
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -423,9 +429,9 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
     const encuestas = resEnc.rows;
 
     // 2. Obtener hijos de estas encuestas
-    const ids = encuestas.map(e => e.id);
     let familia: any[] = [];
-    if (ids.length > 0) {
+    if (encuestas.length > 0) {
+      const ids = encuestas.map(e => e.id);
       const resFam = await pool.query(`
         SELECT f.*, r.cedula as cedula_personal, p.nombre as nombre_personal
         FROM gh_encuesta_familia f
@@ -438,40 +444,42 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
 
     // 3. Formatear para Excel
     const dataEnc = encuestas.map(e => ({
-      'FECHA REALIZACIÓN': new Date(e.fecha_realizacion).toLocaleString(),
+      'FECHA REALIZACIÓN': e.fecha_realizacion ? new Date(e.fecha_realizacion).toLocaleString() : '—',
       'CÉDULA': e.cedula,
       'NOMBRE': e.colaborador_nombre,
-      'ÁREA': e.area_nombre,
-      'CARGO ENCUESTA': e.cargo_enc_nombre,
-      'FECHA INGRESO': e.fecha_ingreso ? new Date(e.fecha_ingreso).toLocaleDateString() : 'N/A',
-      'LUGAR NACIMIENTO': `${e.mun_nac_nombre}, ${e.dep_nac_nombre}`,
-      'FECHA NACIMIENTO': e.fecha_nacimiento ? new Date(e.fecha_nacimiento).toLocaleDateString() : 'N/A',
-      'TIPO SANGRE': e.sangre_nombre,
-      'ESTADO CIVIL': e.civil_nombre,
-      'NIVEL EDUCATIVO': e.edu_nombre,
-      'TIPO CONTRATO': e.contrato_nombre,
-      'INGRESOS': e.ingresos_nombre,
-      'AFP': e.afp_nombre,
-      'EPS': e.eps_nombre,
-      'TURNO': e.turno_laboral,
-      'ESTRATO': e.estrato,
-      'TIPO VIVIENDA': e.vivienda_nombre,
-      'CIUDAD RESIDENCIA': `${e.mun_res_nombre}, ${e.dep_res_nombre}`,
-      'BARRIO': e.barrio,
-      'DIRECCIÓN': e.direccion,
-      'SUFRE ENFERMEDAD': e.sufre_enfermedad,
-      'VIVEN CONMIGO': e.viven_conmigo,
-      'SUSTENTADOR': e.principal_sustentador,
-      'PERS. A CARGO': e.pcargo_nombre,
-      'DISCAPACIDAD FAM.': e.discapacidad_familia,
-      'CON QUIEN VIVE': e.conviviente_nombre,
-      'CUANTOS HIJOS': e.cuantos_hijos,
-      'BEBE ALCOHOL': e.bebe_alcohol,
-      'FUMA': e.fuma,
-      'FUECUENCIA DEPORTE': e.tipo_deporte,
-      'USO TIEMPO LIBRE': e.tiempo_libre_nombre || e.uso_tiempo_libre_otros,
-      'CONTACTO EMERGENCIA': e.contacto_emergencia_nombre,
-      'TELÉFONO EMERGENCIA': e.contacto_emergencia_telefono
+      'ÁREA': e.area_nombre || '—',
+      'CARGO ENCUESTA': e.cargo_enc_nombre || e.cargo_actual || '—',
+      'FECHA INGRESO': e.fecha_ingreso ? new Date(e.fecha_ingreso).toLocaleDateString() : '—',
+      'LUGAR NACIMIENTO': `${e.mun_nac_nombre || '—'}, ${e.dep_nac_nombre || '—'}`,
+      'FECHA NACIMIENTO': e.fecha_nacimiento ? new Date(e.fecha_nacimiento).toLocaleDateString() : '—',
+      'TIPO SANGRE': e.sangre_nombre || '—',
+      'ESTADO CIVIL': e.civil_nombre || '—',
+      'NIVEL EDUCATIVO': e.edu_nombre || '—',
+      'TIPO CONTRATO': e.contrato_nombre || '—',
+      'INGRESOS': e.ingresos_nombre || '—',
+      'AFP': e.afp_nombre || '—',
+      'EPS': e.eps_nombre || '—',
+      'TURNO': e.turno_nombre || '—',
+      'ESTRATO': e.estrato || '—',
+      'TIPO VIVIENDA': e.vivienda_nombre || '—',
+      'CIUDAD RESIDENCIA': `${e.mun_res_nombre || '—'}, ${e.dep_res_nombre || '—'}`,
+      'BARRIO': e.barrio || '—',
+      'DIRECCIÓN': e.direccion || '—',
+      'SUFRE ENFERMEDAD': e.sufre_enfermedad || '—',
+      'VIVEN CONMIGO': e.viven_conmigo || '0',
+      'SUSTENTADOR': e.principal_sustentador || '—',
+      'PERS. A CARGO': e.pcargo_nombre || '—',
+      'DISCAPACIDAD FAM.': e.discapacidad_familia || '—',
+      'CON QUIEN VIVE': e.conviviente_nombre || '—',
+      'CUANTOS HIJOS': e.cuantos_hijos || '0',
+      'BEBE ALCOHOL': e.bebe_alcohol || '—',
+      'FUMA': e.fuma || '—',
+      'PRACTICA DEPORTE': e.practica_deporte || '—',
+      'TIPO DEPORTE': e.tipo_deporte_nombre || '—',
+      'FRECUENCIA DEPORTE': e.frec_deporte_nombre || '—',
+      'USO TIEMPO LIBRE': e.tiempo_libre_nombre || e.uso_tiempo_libre_otros || '—',
+      'CONTACTO EMERGENCIA': e.contacto_emergencia_nombre || '—',
+      'TELÉFONO EMERGENCIA': e.contacto_emergencia_telefono || '—'
     }));
 
     const dataFam = familia.map(f => ({
@@ -599,10 +607,26 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     const pageWidth = doc.internal.pageSize.width;
 
     // Header Estilo F-GA-013
-    const logoPath = path.join(process.cwd(), 'public', 'logo-encuesta.png');
-    if (fs.existsSync(logoPath)) {
+    // Header Estilo F-GA-013
+    const possiblePaths = [
+      path.join(process.cwd(), 'public', 'logo-encuesta.png'),
+      path.join(process.cwd(), '..', 'public', 'logo-encuesta.png'),
+      path.join(process.cwd(), 'dist', 'logo-encuesta.png'),
+      '/app/public/logo-encuesta.png',
+      '/app/backend/public/logo-encuesta.png',
+      path.join(__dirname, '..', '..', 'public', 'logo-encuesta.png')
+    ];
+    let logoPath = '';
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        logoPath = p;
+        break;
+      }
+    }
+
+    if (logoPath) {
       const logoData = fs.readFileSync(logoPath).toString('base64');
-      doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', 14, 10, 40, 20);
+      doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', 16, 12, 35, 16);
     }
 
     // Cuadrícula de encabezado
