@@ -108,11 +108,11 @@ app.use('/api', (req, res, next) => {
     '/grupo-inter/public/list',
     '/training/public/attendance',
     '/training/public/session',
-    '/api/gh-personal/public/survey/validate',
-    '/api/gh-personal/public/survey/save',
-    '/api/cfg-ciudades/departamentos',
-    '/api/cfg-ciudades/ciudades',
-    '/api/gh-miscelaneos'
+    '/gh-personal/public/survey/validate',
+    '/gh-personal/public/survey/save',
+    '/cfg-ciudades/departamentos',
+    '/cfg-ciudades/ciudades',
+    '/gh-miscelaneos'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {
