@@ -1275,10 +1275,6 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             {detailRoute && selectedDoc && (() => {
                 const fin = routeFinancials.get(detailRoute.plate) ?? {
                     valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
-                    efectivo: 0, credito: 0,
-                };
-                const fin = routeFinancials.get(detailRoute.plate) ?? {
-                    valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                     efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
                     repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
                 };
