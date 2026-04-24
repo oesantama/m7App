@@ -343,9 +343,12 @@ const Personal: React.FC<Props> = ({ user }) => {
                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Celular Personal</label>
                     <input value={form.celular_personal} onChange={e => setForm({...form, celular_personal: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
                   </div>
-                  <div className="space-y-1.5 md:col-span-2">
+                  <div className="space-y-1.5">
                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Correo Personal</label>
                     <input value={form.correo_personal} onChange={e => setForm({...form, correo_personal: e.target.value.toLowerCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <SearchableSelect label="Area de Trabajo" options={areas} value={form.area_trabajo_id || ''} onChange={val => setForm({ ...form, area_trabajo_id: val ? Number(val) : null })} placeholder="Seleccione Área..." />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">¿Es Jefe?</label>
@@ -368,8 +371,13 @@ const Personal: React.FC<Props> = ({ user }) => {
                 </>
               ) : (
                 <div className="col-span-3 space-y-1.5">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Cédula del Colaborador *</label>
-                  <input value={form.cedula} onChange={e => setForm({...form, cedula: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" placeholder="Ingrese número de cédula..." />
+                  <SearchableSelect
+                    label="Seleccionar Colaborador *"
+                    options={personal.map(p => ({ id: p.cedula, nombre: `${p.nombre} (${p.cedula})` }))}
+                    value={form.cedula || ''}
+                    onChange={val => setForm({ ...form, cedula: String(val) })}
+                    placeholder="Busque por nombre o cédula..."
+                  />
                 </div>
               )}
             </div>

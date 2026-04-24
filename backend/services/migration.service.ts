@@ -601,12 +601,12 @@ export const restoreSystem = async () => {
     // SEMILLAS DE DATOS LOCALHOST (Resumen de paridad)
     await client.query(`
       INSERT INTO vehicles (id, plate, brand, owner, capacity_m3, client_id, status_id, model_year, color, vehicle_type) VALUES
-      ('VEH-001', 'VEJ 509', 'MAR-022', NULL, 14, 'CLI-02', 'EST-01', '2024', 'gri', 'TV-01'),
-      ('VEH-002', 'SXI 118', 'MAR-022', NULL, 23, 'CLI-02', 'EST-01', '2024', 'blanco', 'TVH-001'),
-      ('VEH-003', 'JYO 631', 'MAR-022', NULL, 19, 'CLI-04', 'EST-01', '2026', 'blanco', 'TV-02'),
-      ('VEH-004', 'WDY 031', 'MAR-022', NULL, 22, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02'),
-      ('VEH-005', 'NNN 500', 'MAR-022', NULL, 19, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02')
-      ON CONFLICT (id) DO UPDATE SET plate = EXCLUDED.plate;
+      ('VEH-001', 'VEJ509', 'MAR-022', NULL, 14, 'CLI-02', 'EST-01', '2024', 'gri', 'TV-01'),
+      ('VEH-002', 'SXI118', 'MAR-022', NULL, 23, 'CLI-02', 'EST-01', '2024', 'blanco', 'TVH-001'),
+      ('VEH-003', 'JYO631', 'MAR-022', NULL, 19, 'CLI-04', 'EST-01', '2026', 'blanco', 'TV-02'),
+      ('VEH-004', 'WDY031', 'MAR-022', NULL, 22, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02'),
+      ('VEH-005', 'NNN500', 'MAR-022', NULL, 19, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02')
+      ON CONFLICT (id) DO NOTHING;
     `);
 
     await client.query(`
