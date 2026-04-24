@@ -805,20 +805,41 @@ export const restoreSystem = async () => {
 };
 
 async function seedGhMiscelaneos(client: any) {
-  const categories = {
+  const genericCategories = {
     'parentescos': ['Hijo/a', 'Padre', 'Madre', 'Cónyuge', 'Hermano/a', 'Otro'],
     'tiempos-libres': ['Estudio', 'Deporte', 'Labores del hogar', 'Recreación', 'Otro'],
     'personas-a-cargo': ['Ninguna', 'de 1 a 3 personas', 'de 4 a 6 personas', 'Mas de 6 personas'],
     'convivientes': ['Cónyuge o pareja', 'Padres', 'Hijos/as', 'Convivientes', 'Vivo solo']
   };
 
-  for (const [cat, items] of Object.entries(categories)) {
+  for (const [cat, items] of Object.entries(genericCategories)) {
     for (const item of items) {
       await client.query(`
         INSERT INTO gh_miscelaneos (categoria, nombre)
         SELECT $1, $2
         WHERE NOT EXISTS (SELECT 1 FROM gh_miscelaneos WHERE categoria = $1 AND nombre = $2)
       `, [cat, item]);
+    }
+  }
+
+  // Semillas para tablas específicas si están vacías
+  const tableSeeds = {
+    'gh_tipos_sangre': ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'],
+    'gh_estados_civiles': ['Soltero/a', 'Casado/a', 'Unión Libre', 'Divorciado/a', 'Viudo/a'],
+    'gh_niveles_educativos': ['Primaria', 'Secundaria', 'Técnico', 'Tecnólogo', 'Universitario', 'Postgrado'],
+    'gh_tipos_vivienda': ['Propia', 'Arrendada', 'Familiar', 'Compartida'],
+    'gh_tipos_contrato': ['Término Fijo', 'Término Indefinido', 'Obra o Labor', 'Prestación de Servicios'],
+    'gh_ingresos_mensuales': ['Menos de 1 SMMLV', '1 a 2 SMMLV', '2 a 4 SMMLV', 'Más de 4 SMMLV'],
+    'gh_eps': ['Sura', 'Sanitas', 'Nueva EPS', 'Salud Total', 'Compensar', 'Coosalud'],
+    'gh_afp': ['Protección', 'Porvenir', 'Colfondos', 'Skandia', 'Colpensiones']
+  };
+
+  for (const [table, items] of Object.entries(tableSeeds)) {
+    for (const item of items) {
+      await client.query(`
+        INSERT INTO ${table} (nombre)
+        SELECT $1 WHERE NOT EXISTS (SELECT 1 FROM ${table} WHERE nombre = $1)
+      `, [item]);
     }
   }
 }
