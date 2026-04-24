@@ -93,7 +93,7 @@ interface Props {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const fmtCOP = (v: number | undefined | null) =>
-    v != null && v > 0 ? `$${Number(v).toLocaleString('es-CO')}` : '—';
+    (v != null) ? `$${Number(v).toLocaleString('es-CO')}` : '—';
 
 const fmtDate = (d: string | undefined) =>
     d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -444,13 +444,17 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const sc     = Number(inv.sobrecosto) || 0;
             const metodo = (inv.forma_pago || '').toUpperCase();
             const metodoInv = (inv.invoice_metodo_pago || '').toUpperCase();
-            const isEfectivo = metodoInv.includes('EFE') || metodoInv === 'CASH' || metodoInv === ''; // Asumir efectivo si no tiene o dice EFE
+            const isEfectivo = metodoInv === 'EF' || metodoInv.includes('EFE') || metodoInv === 'CASH' || metodoInv === ''; 
+            const isCredito  = !isEfectivo; // Todo lo que no sea EF es Crédito/Cartera
             const status = (inv.item_status || '').toUpperCase();
 
-            // Solo sumar al valor total si es efectivo
+            // Solo sumar al valor total si es efectivo (EF)
             if (isEfectivo) {
                 cur.valor_total += invVal;
-            } else {
+            } 
+            
+            // Solo sumar al valor crédito si es DIFERENTE a EF
+            if (isCredito) {
                 cur.valor_credito += invVal;
             }
 
@@ -518,20 +522,20 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         
         const totalExtra      = totalGrupal + approvedSurch;
 
-        // FILTRO CRÍTICO: Solo EFECTIVO para valores financieros totales
+        // FILTRO CRÍTICO: 'EF' -> TOTAL DOCUMENTO, '030D' -> TOTAL CREDITO
         const efectivoInvoices = invoices.filter(i => {
-            const m = (i.invoice_metodo_pago || '').toUpperCase();
-            return m.includes('EFE') || m === 'CASH' || m === '';
+            const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+            return m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '';
         });
 
         const valorTotal      = efectivoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const valorDevuelto   = efectivoInvoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const valorParcial    = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).reduce((s, i) => s + (Number(i.valor) || 0), 0);
+        const valorParcial    = efectivoInvoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).reduce((s, i) => s + (Number(i.valor) || 0), 0);
 
-        // Filtrar Facturas a CRÉDITO (Cualquier método que NO sea efectivo)
+        // Filtrar Facturas a CRÉDITO (Todo lo que NO sea 'EF')
         const creditoInvoices = invoices.filter(i => {
-            const m = (i.invoice_metodo_pago || '').toUpperCase();
-            return !(m.includes('EFE') || m === 'CASH' || m === '');
+            const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+            return !(m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '');
         });
         const valorTotalCredito = creditoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
 
@@ -785,7 +789,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Documento</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotalGlobal)}</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotal)}</span>
                                             <span className="text-[8px] text-slate-500 font-bold mt-1">{stats.total} Facturas</span>
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-900/10 min-w-[120px]">
@@ -805,7 +809,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-amber-100 uppercase tracking-widest leading-none mb-1">Pendiente</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotalGlobal - stats.totalLegalizado - stats.valorDevuelto - stats.valorTotalCredito))}</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotal - (stats.valorLegalizado + stats.totalGrupal + stats.approvedSurch + stats.valorDevuelto)))}</span>
                                             <span className="text-[8px] text-amber-100/70 font-bold mt-1">{stats.total - stats.legalizadas} Por Legalizar</span>
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-600 text-white shadow-lg shadow-slate-900/10 min-w-[120px]">
@@ -1273,13 +1277,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                     efectivo: 0, credito: 0,
                 };
-                const routeInvs = invoices.filter(inv =>
-                    inv.route_vehicle_plate === detailRoute.plate ||
-                    inv.vehicle_plate === detailRoute.plate
-                );
-                const totalVal = routeInvs.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+                const fin = routeFinancials.get(detailRoute.plate) ?? {
+                    valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
+                    efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
+                    repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
+                };
+                const totalVal = fin.valor_total;
                 const legalPct = detailRoute.invoice_count > 0
-                    ? Math.round(((routeFinancials.get(detailRoute.plate)?.legalizadas ?? 0) / detailRoute.invoice_count) * 100)
+                    ? Math.round((fin.legalizadas / detailRoute.invoice_count) * 100)
                     : 0;
                 return (
                     <div className="fixed inset-0 z-[700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -1336,7 +1341,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     </div>
                                     <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-2 py-2 text-center cursor-default shadow-md">
                                         <p className="text-[7px] font-black text-amber-100 uppercase mb-0.5 leading-none">Pendiente</p>
-                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, (fin.valor_total || 0) - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + (fin.valor_credito || 0) + routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))))}</p>
+                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))))}</p>
                                     </div>
                                     <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'dev' ? 'bg-amber-600 text-white border-amber-700 shadow-lg' : 'bg-amber-50 border-amber-100 hover:bg-amber-100'}`}
                                         onClick={() => setActiveDetailCard(activeDetailCard === 'dev' ? null : 'dev')}>
