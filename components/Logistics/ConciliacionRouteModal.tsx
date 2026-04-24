@@ -814,7 +814,14 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     }, [sobrecostos]);
 
     const plateTotals = useMemo(() => {
-        const totalValue   = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        // FILTRO: Solo EFECTIVO
+        const efectivoInvoices = invoices.filter(i => {
+            const m = (i.invoice_metodo_pago || '').toUpperCase();
+            return m.includes('EFE') || m === 'CASH' || m === '';
+        });
+
+        const totalValue   = efectivoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        const valorDevuelto = efectivoInvoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const legalizedIndividual = invoices.filter(i => !!i.forma_pago).reduce((s, i) => s + (Number(i.valor) || 0), 0);
         
         // Sumar consignaciones grupales guardadas
@@ -824,7 +831,8 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         const totalLegalizado = legalizedIndividual + legalizedGrupal + surchargeStats.approved;
         
         const legalCount   = invoices.filter(i => !!i.forma_pago).length;
-        const pendingVal   = Math.max(0, totalValue - totalLegalizado);
+        // Pendiente = Total(Efe) - Legalizado - Devolución(Efe)
+        const pendingVal   = Math.max(0, totalValue - totalLegalizado - valorDevuelto);
         
         return { 
             totalValue, 
@@ -833,6 +841,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             legalizedGrupal,
             legalCount, 
             pendingVal, 
+            valorDevuelto,
             total: invoices.length 
         };
     }, [invoices, surchargeStats, initialGroupPayments]);
@@ -902,48 +911,47 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 flex-1 max-w-full">
-                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-emerald-500/10 border border-emerald-100/50">
-                                <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest mb-1 text-center">Legalización Individual</p>
-                                <p className="text-sm font-black text-emerald-800 leading-none text-center">{fmtCOP(plateTotals.legalizedIndividual)}</p>
-                                <p className="text-[7px] text-emerald-600/60 font-bold mt-1.5 text-center">{plateTotals.legalCount} Facts</p>
+                        <div className="grid grid-cols-2 lg:grid-cols-7 gap-2 flex-1 max-w-full">
+                            <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-emerald-500/10 border border-emerald-100/50">
+                                <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest mb-1 text-center">Individual</p>
+                                <p className="text-[11px] font-black text-emerald-800 leading-none text-center">{fmtCOP(plateTotals.legalizedIndividual)}</p>
+                                <p className="text-[6px] text-emerald-600/60 font-bold mt-1 text-center">{plateTotals.legalCount} Facts</p>
                             </div>
-                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-violet-500/10 border border-violet-100/50">
-                                <p className="text-[7px] font-black text-violet-600 uppercase tracking-widest mb-1 text-center">Legalización Grupal</p>
-                                <p className="text-sm font-black text-violet-800 leading-none text-center">{fmtCOP(plateTotals.legalizedGrupal)}</p>
-                                <p className="text-[7px] text-violet-600/60 font-bold mt-1.5 text-center">Consignado Ruta</p>
+                            <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-violet-500/10 border border-violet-100/50">
+                                <p className="text-[7px] font-black text-violet-600 uppercase tracking-widest mb-1 text-center">Grupal</p>
+                                <p className="text-[11px] font-black text-violet-800 leading-none text-center">{fmtCOP(plateTotals.legalizedGrupal)}</p>
+                                <p className="text-[6px] text-violet-600/60 font-bold mt-1 text-center">Ruta</p>
                             </div>
-                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-blue-500/10 border border-blue-100/50">
-                                <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mb-1 text-center">Total Legalizado</p>
-                                <p className="text-sm font-black text-blue-800 leading-none text-center">{fmtCOP(plateTotals.legalizedVal)}</p>
-                                <p className="text-[7px] text-blue-600/60 font-bold mt-1.5 text-center">Acumulado Total</p>
+                            <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-blue-500/10 border border-blue-100/50">
+                                <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mb-1 text-center">Total Leg.</p>
+                                <p className="text-[11px] font-black text-blue-800 leading-none text-center">{fmtCOP(plateTotals.legalizedVal)}</p>
                             </div>
-                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-amber-500/10 border border-amber-100/50">
-                                <p className="text-[7px] font-black text-amber-600 uppercase tracking-widest mb-1 text-center">Pendiente</p>
-                                <p className="text-sm font-black text-amber-800 leading-none text-center">{fmtCOP(plateTotals.pendingVal)}</p>
-                                <p className="text-[7px] text-amber-600/60 font-bold mt-1.5 text-center">Falta Cobrar</p>
+                            <div className="bg-amber-500 rounded-2xl px-3 py-2 shadow-lg shadow-amber-500/20 border border-amber-600/20 text-white">
+                                <p className="text-[7px] font-black text-amber-100 uppercase tracking-widest mb-1 text-center">Pendiente</p>
+                                <p className="text-[11px] font-black leading-none text-center">{fmtCOP(plateTotals.pendingVal)}</p>
+                                <p className="text-[6px] text-amber-100/60 font-bold mt-1 text-center">Falta Cobrar</p>
                             </div>
-                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-slate-500/10 border border-slate-100">
+                            {plateTotals.valorDevuelto > 0 && (
+                                <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-orange-500/10 border border-orange-100/50">
+                                    <p className="text-[7px] font-black text-orange-600 uppercase tracking-widest mb-1 text-center">Devuelto</p>
+                                    <p className="text-[11px] font-black text-orange-800 leading-none text-center">{fmtCOP(plateTotals.valorDevuelto)}</p>
+                                </div>
+                            )}
+                            <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-slate-500/10 border border-slate-100">
                                 <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Total Placa</p>
-                                <p className="text-sm font-black text-slate-800 leading-none text-center">{fmtCOP(plateTotals.totalValue)}</p>
-                                <p className="text-[7px] text-slate-400 font-bold mt-1.5 text-center">{plateTotals.total} Facts</p>
+                                <p className="text-[11px] font-black text-slate-800 leading-none text-center">{fmtCOP(plateTotals.totalValue)}</p>
+                                <p className="text-[6px] text-slate-400 font-bold mt-1 text-center">{plateTotals.total} Facts</p>
                             </div>
-                            <div className="bg-white rounded-2xl px-4 py-2.5 shadow-lg shadow-rose-500/10 border border-rose-100/50">
-                                <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center font-bold">Resumen Sobrecostos</p>
-                                <div className="space-y-1.5 mt-2">
-                                    <div className="flex justify-between items-center bg-amber-50/50 px-2 py-1 rounded-lg">
-                                        <p className="text-[7px] font-black text-amber-600 uppercase tracking-tight">Pendiente:</p>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black text-slate-700 leading-none">{fmtCOP(surchargeStats.pending)}</p>
-                                            <p className="text-[6px] font-bold text-slate-400 uppercase mt-0.5">Cant: {surchargeStats.pendingCount}</p>
-                                        </div>
+                            <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-rose-500/10 border border-rose-100/50">
+                                <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center font-bold">Sobrecostos</p>
+                                <div className="space-y-1 mt-1">
+                                    <div className="flex justify-between items-center bg-amber-50/50 px-1.5 py-0.5 rounded-lg">
+                                        <p className="text-[6px] font-black text-amber-600 uppercase tracking-tight">P:</p>
+                                        <p className="text-[8px] font-black text-slate-700 leading-none">{fmtCOP(surchargeStats.pending)}</p>
                                     </div>
-                                    <div className="flex justify-between items-center bg-emerald-50/50 px-2 py-1 rounded-lg">
-                                        <p className="text-[7px] font-black text-emerald-600 uppercase tracking-tight">Aprobados:</p>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black text-slate-700 leading-none">{fmtCOP(surchargeStats.approved)}</p>
-                                            <p className="text-[6px] font-bold text-slate-400 uppercase mt-0.5">Cant: {surchargeStats.approvedCount}</p>
-                                        </div>
+                                    <div className="flex justify-between items-center bg-emerald-50/50 px-1.5 py-0.5 rounded-lg">
+                                        <p className="text-[6px] font-black text-emerald-600 uppercase tracking-tight">A:</p>
+                                        <p className="text-[8px] font-black text-slate-700 leading-none">{fmtCOP(surchargeStats.approved)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -1019,6 +1027,9 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 <span className="text-[11px] font-black text-slate-900">{inv.invoice_number}</span>
                                                 <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${isLegalized ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                                                     {isLegalized ? 'Legalizada' : 'Pendiente'}
+                                                </span>
+                                                <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${inv.invoice_metodo_pago?.toUpperCase().includes('EFE') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                    {inv.invoice_metodo_pago || 'EFECTIVO'}
                                                 </span>
                                                 {msBadge && <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${msBadge.bg} ${msBadge.text}`}>🏢 MS: {inv.mastersuite_estado}</span>}
                                                 {(inv.item_status === 'repice' || inv.item_status === 'REPICE') && (

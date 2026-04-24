@@ -284,7 +284,6 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             };
 
             // --- FUNCIÓN PARA FORMATEAR DATOS DE FACTURAS ---
-            const mapInvoices = (invs: InvoiceRow[]) => invs.map(i => {
                 const totalQty = i.items?.reduce((s, it) => s + (it.qty || 0), 0) || 1;
                 const unitPrice = (i.invoice_value || 0) / (totalQty || 1);
                 const devVal = i.items?.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
@@ -294,11 +293,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     'CLIENTE': i.customer_name || '—',
                     'CIUDAD': i.city || '—',
                     'PLACA': i.route_vehicle_plate || '—',
+                    'METODO PAGO': i.invoice_metodo_pago || '—',
                     'ESTADO': getStatusName(i.item_status),
                     'VALOR FACTURA': i.invoice_value || 0,
                     'VALOR RECAUDADO': i.valor || 0,
                     'VALOR DEVUELTO': Math.round(devVal),
-                    'METODO': i.forma_pago || '—',
+                    'METODO CONCILIACION': i.forma_pago || '—',
                     'COMPROBANTE': i.comprobante || '—',
                     'FECHA PAGO': i.fecha_pago ? i.fecha_pago.slice(0, 10) : '—',
                     'FECHA CARGA SISTEMA': i.document_created_at ? i.document_created_at.slice(0, 10) : '—',
@@ -434,13 +434,20 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const cur = map.get(plate) ?? {
                 valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
-                repice_count: 0, valor_repice: 0, valor_grupal: 0
+                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0
             };
             const val    = Number(inv.valor) || 0;
             const invVal = Number(inv.invoice_value) || 0;
             const sc     = Number(inv.sobrecosto) || 0;
             const metodo = (inv.forma_pago || '').toUpperCase();
+            const metodoInv = (inv.invoice_metodo_pago || '').toUpperCase();
+            const isEfectivo = metodoInv.includes('EFE') || metodoInv === 'CASH' || metodoInv === ''; // Asumir efectivo si no tiene o dice EFE
             const status = (inv.item_status || '').toUpperCase();
+
+            // Solo sumar al valor total si es efectivo
+            if (isEfectivo) {
+                cur.valor_total += invVal;
+            }
 
             if (inv.forma_pago) {
                 cur.valor_legalizado += val;
@@ -454,7 +461,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 cur.valor_repice += invVal;
             }
 
-            if (inv.es_devolucion) cur.valor_devuelto += invVal;
+            // Solo sumar devoluciones si es efectivo
+            if (inv.es_devolucion && isEfectivo) cur.valor_devuelto += invVal;
+            
             if (PARCIAL_STATUS.includes(status)) { cur.valor_parcial += val; cur.parciales += 1; }
             if (inv.es_devolucion || DEVUELTO_STATUS.includes(status)) cur.devueltas += 1;
             if (ENTREGADO_STATUS.includes(status)) cur.completadas += 1;
@@ -491,8 +500,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         // RE-DEFINICIÓN: El 'Legalizado' en las cards principales se refiere a las FACTURAS.
         // Las consignaciones grupales y sobrecostos son 'Recaudos Extra' que no matan facturas directamente.
         const individualLeg   = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
-        const valorLegalizado = individualLeg;
-
+        
         // Recaudos adicionales: Solo contamos los que NO tienen factura asociada (los que son realmente grupales)
         const grupalRows      = groupPayments.filter(p => !p.invoice || p.invoice.trim() === '');
         const totalGrupal     = grupalRows.reduce((s, p) => s + (Number(p.valor) || 0), 0);
@@ -505,9 +513,16 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         
         const totalExtra      = totalGrupal + approvedSurch;
 
-        const valorDevuelto   = invoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const valorParcial    = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).reduce((s, i) => s + (Number(i.valor) || 0), 0);
-        
+        // FILTRO CRÍTICO: Solo EFECTIVO para valores financieros totales
+        const efectivoInvoices = invoices.filter(i => {
+            const m = (i.invoice_metodo_pago || '').toUpperCase();
+            return m.includes('EFE') || m === 'CASH' || m === '';
+        });
+
+        const valorTotal      = efectivoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        const valorDevuelto   = efectivoInvoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        const valorLegalizado = individualLeg; // El legalizado es lo que entró, sin importar el origen
+
         const assigned        = total - unassigned;
         
         const repiceRows      = invoices.filter(i => {
@@ -778,7 +793,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-amber-100 uppercase tracking-widest leading-none mb-1">Pendiente</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotal - stats.totalLegalizado))}</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotal - stats.totalLegalizado - stats.valorDevuelto))}</span>
                                             <span className="text-[8px] text-amber-100/70 font-bold mt-1">{stats.total - stats.legalizadas} Por Legalizar</span>
                                         </div>
                                         {(stats.approvedSurch > 0 || stats.pendingSurch > 0) && (
@@ -1292,7 +1307,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     </div>
                                     <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-2 py-2 text-center cursor-default shadow-md">
                                         <p className="text-[7px] font-black text-amber-100 uppercase mb-0.5 leading-none">Pendiente</p>
-                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, totalVal - (fin.valor_legalizado + fin.valor_grupal)))}</p>
+                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, (fin.valor_total || 0) - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))))}</p>
                                     </div>
                                     <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'dev' ? 'bg-amber-600 text-white border-amber-700 shadow-lg' : 'bg-amber-50 border-amber-100 hover:bg-amber-100'}`}
                                         onClick={() => setActiveDetailCard(activeDetailCard === 'dev' ? null : 'dev')}>
