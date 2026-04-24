@@ -114,9 +114,37 @@ const initTables = async () => {
       -- Asegurar columnas nuevas en gh_encuestas_sociodemograficas
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS fecha_ingreso DATE;
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS cargo_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS municipio_nacimiento_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS fecha_nacimiento DATE;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS tipo_sangre_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS estado_civil_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS nivel_educativo_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS tipo_contrato_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS ingresos_mensuales_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS afp_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS eps_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS turno_laboral_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS tipo_vivienda_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS estrato INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS municipio_residencia_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS barrio VARCHAR(255);
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS direccion TEXT;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS sufre_enfermedad VARCHAR(10);
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS viven_conmigo INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS principal_sustentador VARCHAR(10);
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS personas_a_cargo_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS discapacidad_familia VARCHAR(10);
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS con_quien_vive_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS cuantos_hijos INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS bebe_alcohol VARCHAR(50);
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS fuma VARCHAR(10);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS frecuencia_deporte_id INTEGER;
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS tipo_deporte_id INTEGER;
-      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS turno_laboral_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS uso_tiempo_libre_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS uso_tiempo_libre_otros TEXT;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS contacto_emergencia_nombre VARCHAR(255);
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS contacto_emergencia_telefono VARCHAR(50);
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS consentimiento BOOLEAN;
 
       -- Registrar Pagina Personal si no existe
       INSERT INTO pages (id, parent_id, name, route, status_id)

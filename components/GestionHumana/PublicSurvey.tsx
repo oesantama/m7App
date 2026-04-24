@@ -198,6 +198,45 @@ const PublicSurvey: React.FC = () => {
     }
   };
 
+  const validateStep = (currentStep: number) => {
+    if (currentStep === 1) {
+      const required = ['fecha_ingreso', 'cargo_id', 'tipo_contrato_id', 'turno_laboral_id', 'ingresos_mensuales_id', 'afp_id', 'eps_id', 'dep_nac', 'municipio_nacimiento_id', 'fecha_nacimiento', 'tipo_sangre_id', 'estado_civil_id', 'nivel_educativo_id'];
+      for (const field of required) {
+        if (!form[field]) return { ok: false, msg: `El campo "${field.replace(/_id/g, '').replace(/_/g, ' ')}" es obligatorio` };
+      }
+    }
+    if (currentStep === 2) {
+      const required = ['tipo_vivienda_id', 'estrato', 'departamento_res_id', 'municipio_residencia_id', 'barrio', 'direccion'];
+      for (const field of required) {
+        if (!form[field]) return { ok: false, msg: `El campo "${field.replace(/_id/g, '').replace(/_/g, ' ')}" es obligatorio` };
+      }
+    }
+    if (currentStep === 3) {
+      const required = ['viven_conmigo', 'principal_sustentador', 'personas_a_cargo_id', 'discapacidad_familia', 'con_quien_vive_id'];
+      for (const field of required) {
+        if (form[field] === '' || form[field] === null || form[field] === undefined) return { ok: false, msg: `El campo "${field.replace(/_id/g, '').replace(/_/g, ' ')}" es obligatorio` };
+      }
+      // Validar nombres e hijos si existen
+      for (let i = 0; i < familia.length; i++) {
+        if (!familia[i].nombre || !familia[i].fecha_nacimiento) return { ok: false, msg: `Diligencie nombre y fecha para todos los hijos registrados` };
+      }
+    }
+    if (currentStep === 4) {
+      const required = ['sufre_enfermedad', 'bebe_alcohol', 'fuma', 'frecuencia_deporte_id', 'uso_tiempo_libre_id', 'contacto_emergencia_nombre', 'contacto_emergencia_telefono'];
+      for (const field of required) {
+        if (!form[field]) return { ok: false, msg: `El campo "${field.replace(/_id/g, '').replace(/_/g, ' ')}" es obligatorio` };
+      }
+      if (!form.tipo_deporte_id) return { ok: false, msg: 'Seleccione tipo de deporte (o N/A)' };
+    }
+    return { ok: true };
+  };
+
+  const handleNext = () => {
+    const check = validateStep(step);
+    if (!check.ok) return toast.warning(check.msg);
+    setStep(step + 1);
+  };
+
 
   if (!isValidated) {
     return (
@@ -422,7 +461,7 @@ const PublicSurvey: React.FC = () => {
           <div className="flex justify-between items-center mt-12 pt-12 border-t border-slate-50">
             {step > 1 ? <button onClick={() => setStep(step - 1)} className="h-14 px-10 rounded-2xl bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Anterior</button> : <div />}
             {step < 5 ? (
-              <button onClick={() => setStep(step + 1)} className="h-14 px-12 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">Siguiente</button>
+              <button onClick={handleNext} className="h-14 px-12 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">Siguiente</button>
             ) : (
               <button onClick={handleSave} disabled={loading} className="h-14 px-12 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center gap-3">
                 {loading ? <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : <ClipboardCheck size={18} />}
