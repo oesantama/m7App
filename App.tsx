@@ -30,7 +30,7 @@ const lazyWithRetry = (componentImport: () => Promise<any>) =>
         window.sessionStorage.setItem('m7-chunk-failed-reload', 'true');
         window.location.reload();
         // Return a dummy promise that never resolves while reloading
-        return new Promise(() => {});
+        return new Promise(() => { });
       }
       throw error;
     }
@@ -62,11 +62,11 @@ const ConciliacionFacturas = lazyWithRetry(() => import('./components/Conciliaci
 const ConsultaFacturas = lazyWithRetry(() => import('./components/ConsultaFacturas'));
 const DevolucionesBodega = lazyWithRetry(() => import('./components/Devoluciones/DevolucionesBodega'));
 const ConsultaInventario = lazyWithRetry(() => import('./components/ConsultaInventario'));
-const SalidaProveedor   = lazyWithRetry(() => import('./components/SalidaProveedor'));
+const SalidaProveedor = lazyWithRetry(() => import('./components/SalidaProveedor'));
 const GestionHumanaMiscelaneos = lazyWithRetry(() => import('./components/GestionHumana/Miscelaneos'));
-const GestionHumanaPersonal    = lazyWithRetry(() => import('./components/GestionHumana/Personal'));
-const PublicSurvey            = lazyWithRetry(() => import('./components/GestionHumana/PublicSurvey'));
-const CfgCiudades       = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
+const GestionHumanaPersonal = lazyWithRetry(() => import('./components/GestionHumana/Personal'));
+const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/PublicSurvey'));
+const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 
 
 // Import Admin Module
@@ -155,9 +155,9 @@ const App: React.FC = () => {
           setPortalRoute('login');
         }
       } else if (window.location.pathname.startsWith('/attendance/register')) {
-          setIsPortalMode(true);
+        setIsPortalMode(true);
       } else if (window.location.pathname.startsWith('/publico/encuesta')) {
-          setIsPortalMode(true);
+        setIsPortalMode(true);
       } else {
         setIsPortalMode(false);
       }
@@ -174,9 +174,9 @@ const App: React.FC = () => {
     // Listener para fallos de JWT Global (401)
     const handleAuthFailure = (event: any) => {
       handleLogout(false);
-      toast.error(event.detail?.message || "Sesión Invalida", { 
+      toast.error(event.detail?.message || "Sesión Invalida", {
         description: "Por favor inicie sesión nuevamente.",
-        duration: 5000 
+        duration: 5000
       });
     };
 
@@ -207,7 +207,7 @@ const App: React.FC = () => {
             // M7 SOLUCIÓN NUCLEAR: Forzar refresco de permisos para TODOS en cada restauración
             // Esto evita que datos obsoletos en localStorage permitan peticiones prohibidas
             const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
-            
+
             if (freshPerms) {
               if (Array.isArray(freshPerms)) {
                 parsedUser.permissions = freshPerms;
@@ -292,19 +292,19 @@ const App: React.FC = () => {
 
         if (hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) {
           fetches.push(
-            api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => {}),
-            api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => {})
+            api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => { }),
+            api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => { })
           );
         }
         if (hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || activeTab === 'despacho') {
           fetches.push(
-            api.getRoutes().then(r => useAppStore.setState({ routes: r || [] })).catch(() => {}),
-            api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => {})
+            api.getRoutes().then(r => useAppStore.setState({ routes: r || [] })).catch(() => { }),
+            api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => { })
           );
         }
         if (hasPerm('VEHICULOS') || hasPerm('RUTAS')) {
           fetches.push(
-            api.getVehicles().then(v => useAppStore.setState({ vehicles: v || [] })).catch(() => {})
+            api.getVehicles().then(v => useAppStore.setState({ vehicles: v || [] })).catch(() => { })
           );
         }
 
@@ -352,38 +352,38 @@ const App: React.FC = () => {
       const userPermissions = await api.getUserPermissions(userData.id).catch(() => null);
 
       let mappedPermissions: any[] = userData.permissions || [];
-      
+
       // LOGIC FIX: Handle both Array (Admin mock) and Object (DB flat) formats
       if (userPermissions) {
         if (Array.isArray(userPermissions) && userPermissions.length > 0) {
-           mappedPermissions = userPermissions;
+          mappedPermissions = userPermissions;
         } else if (typeof userPermissions === 'object' && !Array.isArray(userPermissions)) {
-           // Transform flat object (page_PAG-01_view: true) to Array format for Layout
-           const permMap = new Map<string, Set<string>>();
-           Object.keys(userPermissions).forEach(key => {
-               if (userPermissions[key] === true) {
-                   const parts = key.toLowerCase().split('_');
-                   if (parts.length >= 3 && parts[0] === 'page') {
-                       const action = parts.pop();
-                       const pageId = parts.slice(1).join('_').toUpperCase();
-                       if (pageId && action) {
-                           if (!permMap.has(pageId)) permMap.set(pageId, new Set());
-                           permMap.get(pageId)?.add(action);
-                       }
-                   }
-               }
-           });
-           const transformed = Array.from(permMap.entries()).map(([module, actions]) => ({ 
-               module, 
-               actions: Array.from(actions) 
-           }));
-           
-           if (transformed.length > 0) mappedPermissions = transformed;
+          // Transform flat object (page_PAG-01_view: true) to Array format for Layout
+          const permMap = new Map<string, Set<string>>();
+          Object.keys(userPermissions).forEach(key => {
+            if (userPermissions[key] === true) {
+              const parts = key.toLowerCase().split('_');
+              if (parts.length >= 3 && parts[0] === 'page') {
+                const action = parts.pop();
+                const pageId = parts.slice(1).join('_').toUpperCase();
+                if (pageId && action) {
+                  if (!permMap.has(pageId)) permMap.set(pageId, new Set());
+                  permMap.get(pageId)?.add(action);
+                }
+              }
+            }
+          });
+          const transformed = Array.from(permMap.entries()).map(([module, actions]) => ({
+            module,
+            actions: Array.from(actions)
+          }));
+
+          if (transformed.length > 0) mappedPermissions = transformed;
         }
       }
 
-      const firstClientId = (userData.client_ids && userData.client_ids.length > 0) 
-        ? userData.client_ids[0] 
+      const firstClientId = (userData.client_ids && userData.client_ids.length > 0)
+        ? userData.client_ids[0]
         : (userData.client_id || 'CLI-01');
 
       const finalUser = {
@@ -405,7 +405,7 @@ const App: React.FC = () => {
 
       // Disparar hidratación de catálogos y Layout usando Lazy Load (Asíncrono real)
       refreshAppData(firstClientId);
-      
+
       // M7 FIX: Activar bandera de redirección inteligente tras login exitoso
       useAppStore.setState({ needsWelcomeRedirect: true });
 
@@ -433,12 +433,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && needsWelcomeRedirect && pages.length > 0 && modules.length > 0 && user) {
       console.log('[M7-ROUTING] Calculando ruta de bienvenida...');
-      
+
       const isSuperUser = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
-      
+
       // 1. PRIORIDAD: DASHBOARD (Usando utilidad centralizada)
       const hasDashboard = hasPermission(user, 'DASHBOARD', 'view');
-      
+
       if (hasDashboard) {
         setActiveTab('dashboard');
         setActivePageId(''); // Limpiar ID de página para evitar componentes residuales
@@ -512,7 +512,7 @@ const App: React.FC = () => {
         <MasterModule
           activeMaster={masterCat}
           user={user!}
-          onAudit={async () => {}}
+          onAudit={async () => { }}
         />
       );
     }
@@ -800,10 +800,10 @@ const App: React.FC = () => {
               }
             }}
             onDeleteVehicle={async (id) => {
-               try {
-                 await api.deleteVehicle(id);
-                 deleteVehicle(id);
-               } catch (e) { console.error(e); }
+              try {
+                await api.deleteVehicle(id);
+                deleteVehicle(id);
+              } catch (e) { console.error(e); }
             }}
             onAddDriver={async (d) => {
               try {
@@ -815,7 +815,7 @@ const App: React.FC = () => {
                   statusId: d.statusId || 'EST-01'
                 };
                 addDriver(newDriver);
-                
+
                 const currentMaster = (allMasterData as any).masterConductores || [];
                 setAllMasterData({
                   ...allMasterData,
@@ -832,7 +832,7 @@ const App: React.FC = () => {
               try {
                 await api.saveDriver({ ...data, id });
                 updateDriver(id, data);
-                
+
                 const currentMaster = (allMasterData as any).masterConductores || [];
                 setAllMasterData({
                   ...allMasterData,
@@ -874,7 +874,7 @@ const App: React.FC = () => {
                 toast.error('Error en asignación', { description: e.message || 'Conflicto en el servidor' });
               } finally {
                 // Siempre recargar desde el servidor para mantener estado real
-                api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => {});
+                api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => { });
               }
             }}
             onEndAssignment={async (aId) => {
@@ -885,7 +885,7 @@ const App: React.FC = () => {
                 console.error('Error ending assignment:', e);
                 toast.error('Error al finalizar asignación');
               } finally {
-                api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => {});
+                api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => { });
               }
             }}
           />
@@ -961,8 +961,8 @@ const App: React.FC = () => {
   };
 
   const handleBack = () => setActiveTab('dashboard');
-  
-  // 1. RUTA PÚBLICA PRIORITARIA: Encuesta Sociodemográfica (Sin login, sin portal)
+
+  // 1. RUTA PÚBLICA PRIORITARIA:Encuesta Sociodemográfica (Sin login, sin portal)
   if (window.location.pathname.startsWith('/publico/encuesta')) {
     return (
       <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}>
@@ -974,7 +974,7 @@ const App: React.FC = () => {
   // 2. MODO PORTAL: Asistencia o Cliente
   if (isPortalMode) {
     const isAttendance = window.location.pathname.startsWith('/attendance/register');
-    
+
     return (
       <>
         <Toaster position="top-right" richColors theme="dark" />
