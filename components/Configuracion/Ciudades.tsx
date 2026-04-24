@@ -114,8 +114,8 @@ const DepartamentosTab: React.FC<DepTabProps> = ({ user, estados, onDepChange })
         </div>
         <div className="flex gap-2">
           <button onClick={() => document.getElementById('excel-deps')?.click()}
-            className="flex items-center gap-2 h-10 px-4 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 shrink-0">
-            <Icons.Excel className="w-3.5 h-3.5" />Importar Excel
+            className="flex items-center gap-2 h-10 px-4 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95 shrink-0">
+            <Icons.FileText className="w-3.5 h-3.5" />Importar Excel
           </button>
           <input type="file" id="excel-deps" accept=".xlsx, .xls" className="hidden" 
             onChange={async (e) => {
@@ -270,7 +270,6 @@ const CiudadesTab: React.FC<CiudadTabProps> = ({ user, estados, departamentos })
   const [records, setRecords]         = useState<Ciudad[]>([]);
   const [loading, setLoading]         = useState(false);
   const [search, setSearch]           = useState('');
-  const [filterDep, setFilterDep]     = useState<string>('');
   const [page, setPage]               = useState(1);
   const PAGE_SIZE = 10;
 
@@ -348,8 +347,8 @@ const CiudadesTab: React.FC<CiudadTabProps> = ({ user, estados, departamentos })
         </div>
         <div className="flex gap-2 items-center flex-wrap">
           <button onClick={() => document.getElementById('excel-ciudades')?.click()}
-            className="flex items-center gap-2 h-10 px-4 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 shrink-0">
-            <Icons.Excel className="w-3.5 h-3.5" />Importar Excel
+            className="flex items-center gap-2 h-10 px-4 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95 shrink-0">
+            <Icons.FileText className="w-3.5 h-3.5" />Importar Excel
           </button>
           <input type="file" id="excel-ciudades" accept=".xlsx, .xls" className="hidden" 
             onChange={async (e) => {

@@ -30,6 +30,9 @@ export const saveDepartamento = async (req: Request, res: Response) => {
       );
     }
     res.json({ success: true });
+  } catch (err: any) {
+    console.error('[CFG-CIUDADES] Error SAVE departamento:', err);
+    res.status(500).json({ error: 'Error al guardar departamento' });
   }
 };
 
@@ -113,6 +116,9 @@ export const saveCiudad = async (req: Request, res: Response) => {
       );
     }
     res.json({ success: true });
+  } catch (err: any) {
+    console.error('[CFG-CIUDADES] Error SAVE ciudad:', err);
+    res.status(500).json({ error: 'Error al guardar ciudad' });
   }
 };
 
