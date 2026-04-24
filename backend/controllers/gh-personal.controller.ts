@@ -292,11 +292,11 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
       INSERT INTO gh_encuestas_sociodemograficas (
         cedula, fecha_ingreso, cargo_id, municipio_nacimiento_id, fecha_nacimiento,
         tipo_sangre_id, estado_civil_id, nivel_educativo_id, tipo_contrato_id,
-        ingresos_mensuales_id, afp_id, eps_id, turno_laboral, tipo_vivienda_id,
+        ingresos_mensuales_id, afp_id, eps_id, turno_laboral_id, tipo_vivienda_id,
         estrato, municipio_residencia_id, barrio, direccion, sufre_enfermedad,
         viven_conmigo, principal_sustentador, personas_a_cargo_id, discapacidad_familia,
-        con_quien_vive_id, cuantos_hijos, bebe_alcohol, fuma, practica_deporte,
-        tipo_deporte, uso_tiempo_libre_id, uso_tiempo_libre_otros,
+        con_quien_vive_id, cuantos_hijos, bebe_alcohol, fuma, frecuencia_deporte_id,
+        tipo_deporte_id, uso_tiempo_libre_id, uso_tiempo_libre_otros,
         contacto_emergencia_nombre, contacto_emergencia_telefono, consentimiento,
         usuario_control
       ) VALUES (
@@ -305,11 +305,11 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
     `, [
       cedula, data.fecha_ingreso, data.cargo_id, data.municipio_nacimiento_id, data.fecha_nacimiento,
       data.tipo_sangre_id, data.estado_civil_id, data.nivel_educativo_id, data.tipo_contrato_id,
-      data.ingresos_mensuales_id, data.afp_id, data.eps_id, data.turno_laboral, data.tipo_vivienda_id,
+      data.ingresos_mensuales_id, data.afp_id, data.eps_id, data.turno_laboral_id, data.tipo_vivienda_id,
       data.estrato, data.municipio_residencia_id, data.barrio, data.direccion, data.sufre_enfermedad,
       data.viven_conmigo, data.principal_sustentador, data.personas_a_cargo_id, data.discapacidad_familia,
-      data.con_quien_vive_id, data.cuantos_hijos, data.bebe_alcohol, data.fuma, data.practica_deporte,
-      data.tipo_deporte, data.uso_tiempo_libre_id, data.uso_tiempo_libre_otros,
+      data.con_quien_vive_id, data.cuantos_hijos, data.bebe_alcohol, data.fuma, data.frecuencia_deporte_id,
+      data.tipo_deporte_id, data.uso_tiempo_libre_id, data.uso_tiempo_libre_otros,
       data.contacto_emergencia_nombre, data.contacto_emergencia_telefono, data.consentimiento
     ]);
 
