@@ -1360,6 +1360,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
             {/* ── Dialog SOLO LECTURA — detalle de placa ────────────────────── */}
             {detailRoute && selectedDoc && (() => {
+                const routeInvs = invoices.filter(i => (i.route_vehicle_plate || i.vehicle_plate) === detailRoute.plate);
                 const fin = routeFinancials.get(detailRoute.plate) ?? {
                     valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                     efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
