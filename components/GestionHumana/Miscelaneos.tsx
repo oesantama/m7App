@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { api } from '../../services/api';
 import { User } from '../../types';
 import { Icons } from '../../constants';
+import * as XLSX from 'xlsx';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -181,6 +182,56 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
     }
   };
 
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+        const newNames = data.slice(1).map(row => row[0]?.toString().trim()).filter(Boolean);
+        if (newNames.length === 0) {
+          toast.error('No se encontraron registros en el archivo');
+          return;
+        }
+
+        setLoading(true);
+        let imported = 0;
+        let skipped = 0;
+
+        for (const nombre of newNames) {
+          const exists = records.some(r => r.nombre.toLowerCase() === nombre.toLowerCase());
+          if (!exists) {
+            await api.saveGhMiscelaneo(tabla, {
+              nombre,
+              estado: 'EST-01',
+              usuarioControl: user.name
+            });
+            imported++;
+          } else {
+            skipped++;
+          }
+        }
+
+        toast.success(`Importación finalizada: ${imported} creados, ${skipped} omitidos por duplicado`);
+        fetchData();
+      } catch (error) {
+        console.error(error);
+        toast.error('Error al procesar el archivo Excel');
+      } finally {
+        setLoading(false);
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const estadoLabel = (id: string) =>
     estados.find(e => e.id === id)?.name ?? id;
 
@@ -197,13 +248,33 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
             className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 placeholder:text-slate-300 w-full"
           />
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0"
-        >
-          <Icons.Plus className="w-3.5 h-3.5" />
-          Nuevo Registro
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {(tabla === 'eps' || tabla === 'afp') && (
+            <>
+              <input 
+                type="file" 
+                id="excel-import" 
+                className="hidden" 
+                accept=".xlsx, .xls"
+                onChange={handleImportExcel}
+              />
+              <button
+                onClick={() => document.getElementById('excel-import')?.click()}
+                className="flex items-center gap-2 h-10 px-6 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95 shrink-0"
+              >
+                <Icons.FileText className="w-3.5 h-3.5" />
+                Importar Excel
+              </button>
+            </>
+          )}
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0"
+          >
+            <Icons.Plus className="w-3.5 h-3.5" />
+            Nuevo Registro
+          </button>
+        </div>
       </div>
 
       {/* Tabla */}

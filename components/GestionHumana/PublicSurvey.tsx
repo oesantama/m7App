@@ -376,8 +376,18 @@ const PublicSurvey: React.FC = () => {
                 <Select label="¿Sufre alguna enfermedad?" name="sufre_enfermedad" options={['SI', 'NO']} value={form.sufre_enfermedad} onChange={(v:any) => setForm((p:any) => ({...p, sufre_enfermedad: v}))} />
                 <Select label="Consume bebidas alcohólicas" name="bebe_alcohol" options={['Si con frecuencia', 'Si ocasionalmente', 'No nunca']} value={form.bebe_alcohol} onChange={(v:any) => setForm((p:any) => ({...p, bebe_alcohol: v}))} />
                 <Select label="Fuma actualmente" name="fuma" options={['SI', 'NO']} value={form.fuma} onChange={(v:any) => setForm((p:any) => ({...p, fuma: v}))} />
-                <Select label="Practica algún deporte" name="frecuencia_deporte_id" options={maestros.frecuenciaDeporte} value={form.frecuencia_deporte_id} onChange={(v:any) => setForm((p:any) => ({...p, frecuencia_deporte_id: v}))} />
-                <Select label="Tipo de deporte que realiza" name="tipo_deporte_id" options={maestros.tiposDeporte} value={form.tipo_deporte_id} onChange={(v:any) => setForm((p:any) => ({...p, tipo_deporte_id: v}))} />
+                <Select label="Practica algún deporte" name="frecuencia_deporte_id" options={maestros.frecuenciaDeporte} value={form.frecuencia_deporte_id} onChange={(v:any) => {
+                  const noPractica = maestros.frecuenciaDeporte.find((f:any) => f.id.toString() === v)?.nombre?.toLowerCase().includes('no practico');
+                  if (noPractica) {
+                    const naId = maestros.tiposDeporte.find((t:any) => t.nombre.toUpperCase().includes('N/A'))?.id;
+                    setForm((p:any) => ({...p, frecuencia_deporte_id: v, tipo_deporte_id: naId || ''}));
+                  } else {
+                    setForm((p:any) => ({...p, frecuencia_deporte_id: v}));
+                  }
+                }} />
+                {!(maestros.frecuenciaDeporte.find((f:any) => f.id.toString() === form.frecuencia_deporte_id.toString())?.nombre?.toLowerCase().includes('no practico')) && (
+                  <Select label="Tipo de deporte que realiza" name="tipo_deporte_id" options={maestros.tiposDeporte} value={form.tipo_deporte_id} onChange={(v:any) => setForm((p:any) => ({...p, tipo_deporte_id: v}))} />
+                )}
                 <Select label="Uso del tiempo libre" name="uso_tiempo_libre_id" options={maestros.tiemposLibres} value={form.uso_tiempo_libre_id} onChange={(v:any) => setForm((p:any) => ({...p, uso_tiempo_libre_id: v}))} />
                 {form.uso_tiempo_libre_id === maestros.tiemposLibres.find((t:any) => t.nombre.toLowerCase().includes('otro'))?.id?.toString() && (
                   <Input label="Especifique otro uso" name="uso_tiempo_libre_otros" value={form.uso_tiempo_libre_otros} onChange={(v:any) => setForm((p:any) => ({...p, uso_tiempo_libre_otros: v}))} />

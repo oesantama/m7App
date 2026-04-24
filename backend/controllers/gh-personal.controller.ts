@@ -111,6 +111,13 @@ const initTables = async () => {
       CREATE TABLE IF NOT EXISTS gh_tipos_deporte (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
       CREATE TABLE IF NOT EXISTS gh_usos_tiempo_libre (id SERIAL PRIMARY KEY, nombre VARCHAR(255), estado VARCHAR(50) DEFAULT 'ACTIVO', usuario_control VARCHAR(255), fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
+      -- Asegurar columnas nuevas en gh_encuestas_sociodemograficas
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS fecha_ingreso DATE;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS cargo_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS frecuencia_deporte_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS tipo_deporte_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS turno_laboral_id INTEGER;
+
       -- Registrar Pagina Personal si no existe
       INSERT INTO pages (id, parent_id, name, route, status_id)
       SELECT 'PAG-43', 'MOD-09', 'Personal', 'gestion-humana-personal', 'EST-01'
