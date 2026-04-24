@@ -9,7 +9,9 @@ import {
   validateSurveyAccess,
   savePublicSurvey,
   getEncuestasResultados,
-  generateEncuestaPDF
+  getEncuestaDetail,
+  generateEncuestaPDF,
+  exportEncuestasExcel
 } from '../controllers/gh-personal.controller.js';
 
 const router = Router();
@@ -22,6 +24,8 @@ router.get('/encuestas', getPersonalEncuestas);
 router.post('/encuestas/activate', activateEncuesta);
 router.put('/encuestas/deactivate/:id', deactivateEncuesta);
 router.get('/resultados', getEncuestasResultados);
+router.get('/resultados/:id', getEncuestaDetail);
+router.get('/resultados/excel', exportEncuestasExcel);
 router.get('/pdf/:id', generateEncuestaPDF);
 
 // Rutas Públicas (Whitelisted en server.ts)

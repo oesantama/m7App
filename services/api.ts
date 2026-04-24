@@ -376,7 +376,31 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  getEncuestasResultados: () => fetchJson(`${API_URL}/gh-personal/resultados`),
+  getEncuestasResultados: (params?: { from?: string, to?: string, search?: string, areaId?: number }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
+    return fetchJson(`${API_URL}/gh-personal/resultados${qs}`);
+  },
+  getEncuestaDetail: (id: number | string) => fetchJson(`${API_URL}/gh-personal/resultados/${id}`),
+  exportEncuestasExcel: async (params?: { from?: string, to?: string, search?: string, areaId?: number }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
+    const token = localStorage.getItem('token') || 
+                 localStorage.getItem('m7_token') || 
+                 localStorage.getItem('m7_auth_token') || 
+                 localStorage.getItem('m7_client_token');
+    
+    const response = await fetch(`${API_URL}/gh-personal/resultados/excel${qs}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Error al exportar Excel');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Encuestas_Sociodemograficas.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  },
   downloadSurveyPDF: async (id: number | string) => {
     const token = localStorage.getItem('token') || 
                  localStorage.getItem('m7_token') || 

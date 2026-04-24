@@ -4,6 +4,8 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import fs from 'fs';
 import path from 'path';
+// @ts-ignore
+import * as XLSX from 'xlsx';
 
 const initTables = async () => {
   try {
@@ -345,13 +347,202 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
 
 export const getEncuestasResultados = async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
-      SELECT r.*, p.nombre, p.cargo 
+    const { from, to, search, areaId } = req.query;
+    let query = `
+      SELECT r.*, p.nombre, p.cargo, a.nombre as area_nombre
       FROM gh_encuestas_sociodemograficas r
       JOIN gh_personal p ON p.cedula = r.cedula
-      ORDER BY r.fecha_realizacion DESC
-    `);
+      LEFT JOIN gh_areas a ON a.id = p.area_trabajo_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    let p = 1;
+
+    if (from) { query += ` AND r.fecha_realizacion >= $${p++}`; params.push(from); }
+    if (to) { query += ` AND r.fecha_realizacion <= $${p++}`; params.push(`${to} 23:59:59`); }
+    if (search) { 
+      query += ` AND (p.nombre ILIKE $${p} OR p.cedula ILIKE $${p})`; 
+      params.push(`%${search}%`); 
+      p++;
+    }
+    if (areaId) { query += ` AND p.area_trabajo_id = $${p++}`; params.push(areaId); }
+
+    query += ` ORDER BY r.fecha_realizacion DESC`;
+    const result = await pool.query(query, params);
     res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const exportEncuestasExcel = async (req: Request, res: Response) => {
+  try {
+    const { from, to, search, areaId } = req.query;
+    
+    // 1. Obtener encuestas con todos los nombres de misceláneos
+    let query = `
+      SELECT r.*, p.nombre as colaborador_nombre, p.cargo as cargo_actual, a.nombre as area_nombre,
+             mn.nombre as mun_nac_nombre, dn.nombre as dep_nac_nombre,
+             mr.nombre as mun_res_nombre, dr.nombre as dep_res_nombre,
+             ts.nombre as sangre_nombre, ec.nombre as civil_nombre,
+             ne.nombre as edu_nombre, tv.nombre as vivienda_nombre,
+             utl.nombre as tiempo_libre_nombre,
+             tc.nombre as contrato_nombre, im.nombre as ingresos_nombre,
+             afp.nombre as afp_nombre, eps.nombre as eps_nombre,
+             pac.nombre as pcargo_nombre, cvv.nombre as conviviente_nombre,
+             cg.nombre as cargo_enc_nombre
+      FROM gh_encuestas_sociodemograficas r
+      JOIN gh_personal p ON p.cedula = r.cedula
+      LEFT JOIN gh_areas a ON a.id = p.area_trabajo_id
+      LEFT JOIN cfg_ciudades mn ON mn.id = r.municipio_nacimiento_id
+      LEFT JOIN cfg_departamentos dn ON dn.id = mn.id_departamento
+      LEFT JOIN cfg_ciudades mr ON mr.id = r.municipio_residencia_id
+      LEFT JOIN cfg_departamentos dr ON dr.id = mr.id_departamento
+      LEFT JOIN gh_miscelaneos ts ON ts.id = r.tipo_sangre_id
+      LEFT JOIN gh_miscelaneos ec ON ec.id = r.estado_civil_id
+      LEFT JOIN gh_miscelaneos ne ON ne.id = r.nivel_educativo_id
+      LEFT JOIN gh_miscelaneos tv ON tv.id = r.tipo_vivienda_id
+      LEFT JOIN gh_miscelaneos utl ON utl.id = r.uso_tiempo_libre_id
+      LEFT JOIN gh_miscelaneos tc ON tc.id = r.tipo_contrato_id
+      LEFT JOIN gh_miscelaneos im ON im.id = r.ingresos_mensuales_id
+      LEFT JOIN gh_miscelaneos afp ON afp.id = r.afp_id
+      LEFT JOIN gh_miscelaneos eps ON eps.id = r.eps_id
+      LEFT JOIN gh_miscelaneos pac ON pac.id = r.personas_a_cargo_id
+      LEFT JOIN gh_miscelaneos cvv ON cvv.id = r.con_quien_vive_id
+      LEFT JOIN gh_miscelaneos cg ON cg.id = r.cargo_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    let pCount = 1;
+    if (from) { query += ` AND r.fecha_realizacion >= $${pCount++}`; params.push(from); }
+    if (to) { query += ` AND r.fecha_realizacion <= $${pCount++}`; params.push(`${to} 23:59:59`); }
+    if (search) { query += ` AND (p.nombre ILIKE $${pCount} OR p.cedula ILIKE $${pCount})`; params.push(`%${search}%`); pCount++; }
+    if (areaId) { query += ` AND p.area_trabajo_id = $${pCount++}`; params.push(areaId); }
+
+    const resEnc = await pool.query(query, params);
+    const encuestas = resEnc.rows;
+
+    // 2. Obtener hijos de estas encuestas
+    const ids = encuestas.map(e => e.id);
+    let familia: any[] = [];
+    if (ids.length > 0) {
+      const resFam = await pool.query(`
+        SELECT f.*, r.cedula as cedula_personal, p.nombre as nombre_personal
+        FROM gh_encuesta_familia f
+        JOIN gh_encuestas_sociodemograficas r ON r.id = f.encuesta_id
+        JOIN gh_personal p ON p.cedula = r.cedula
+        WHERE f.encuesta_id = ANY($1)
+      `, [ids]);
+      familia = resFam.rows;
+    }
+
+    // 3. Formatear para Excel
+    const dataEnc = encuestas.map(e => ({
+      'FECHA REALIZACIÓN': new Date(e.fecha_realizacion).toLocaleString(),
+      'CÉDULA': e.cedula,
+      'NOMBRE': e.colaborador_nombre,
+      'ÁREA': e.area_nombre,
+      'CARGO ENCUESTA': e.cargo_enc_nombre,
+      'FECHA INGRESO': e.fecha_ingreso ? new Date(e.fecha_ingreso).toLocaleDateString() : 'N/A',
+      'LUGAR NACIMIENTO': `${e.mun_nac_nombre}, ${e.dep_nac_nombre}`,
+      'FECHA NACIMIENTO': e.fecha_nacimiento ? new Date(e.fecha_nacimiento).toLocaleDateString() : 'N/A',
+      'TIPO SANGRE': e.sangre_nombre,
+      'ESTADO CIVIL': e.civil_nombre,
+      'NIVEL EDUCATIVO': e.edu_nombre,
+      'TIPO CONTRATO': e.contrato_nombre,
+      'INGRESOS': e.ingresos_nombre,
+      'AFP': e.afp_nombre,
+      'EPS': e.eps_nombre,
+      'TURNO': e.turno_laboral,
+      'ESTRATO': e.estrato,
+      'TIPO VIVIENDA': e.vivienda_nombre,
+      'CIUDAD RESIDENCIA': `${e.mun_res_nombre}, ${e.dep_res_nombre}`,
+      'BARRIO': e.barrio,
+      'DIRECCIÓN': e.direccion,
+      'SUFRE ENFERMEDAD': e.sufre_enfermedad,
+      'VIVEN CONMIGO': e.viven_conmigo,
+      'SUSTENTADOR': e.principal_sustentador,
+      'PERS. A CARGO': e.pcargo_nombre,
+      'DISCAPACIDAD FAM.': e.discapacidad_familia,
+      'CON QUIEN VIVE': e.conviviente_nombre,
+      'CUANTOS HIJOS': e.cuantos_hijos,
+      'BEBE ALCOHOL': e.bebe_alcohol,
+      'FUMA': e.fuma,
+      'FUECUENCIA DEPORTE': e.tipo_deporte,
+      'USO TIEMPO LIBRE': e.tiempo_libre_nombre || e.uso_tiempo_libre_otros,
+      'CONTACTO EMERGENCIA': e.contacto_emergencia_nombre,
+      'TELÉFONO EMERGENCIA': e.contacto_emergencia_telefono
+    }));
+
+    const dataFam = familia.map(f => ({
+      'CÉDULA COLABORADOR': f.cedula_personal,
+      'NOMBRE COLABORADOR': f.nombre_personal,
+      'NOMBRE FAMILIAR': f.nombre,
+      'FECHA NACIMIENTO': f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : 'N/A',
+      'OCUPACIÓN': f.ocupacion
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const wsEnc = XLSX.utils.json_to_sheet(dataEnc);
+    const wsFam = XLSX.utils.json_to_sheet(dataFam);
+    XLSX.utils.book_append_sheet(wb, wsEnc, 'Encuestas');
+    XLSX.utils.book_append_sheet(wb, wsFam, 'Familiares');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Encuestas_Sociodemograficas.xlsx');
+    res.send(buffer);
+
+  } catch (err: any) {
+    console.error('[GH-EXCEL] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getEncuestaDetail = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(`
+      SELECT r.*, p.nombre as colaborador_nombre, p.cargo as cargo_actual, a.nombre as area_nombre,
+             mn.nombre as mun_nac_nombre, dn.nombre as dep_nac_nombre,
+             mr.nombre as mun_res_nombre, dr.nombre as dep_res_nombre,
+             ts.nombre as sangre_nombre, ec.nombre as civil_nombre,
+             ne.nombre as edu_nombre, tv.nombre as vivienda_nombre,
+             utl.nombre as tiempo_libre_nombre,
+             tc.nombre as contrato_nombre, im.nombre as ingresos_nombre,
+             afp.nombre as afp_nombre, eps.nombre as eps_nombre,
+             pac.nombre as pcargo_nombre, cvv.nombre as conviviente_nombre,
+             cg.nombre as cargo_enc_nombre
+      FROM gh_encuestas_sociodemograficas r
+      JOIN gh_personal p ON p.cedula = r.cedula
+      LEFT JOIN gh_areas a ON a.id = p.area_trabajo_id
+      LEFT JOIN cfg_ciudades mn ON mn.id = r.municipio_nacimiento_id
+      LEFT JOIN cfg_departamentos dn ON dn.id = mn.id_departamento
+      LEFT JOIN cfg_ciudades mr ON mr.id = r.municipio_residencia_id
+      LEFT JOIN cfg_departamentos dr ON dr.id = mr.id_departamento
+      LEFT JOIN gh_miscelaneos ts ON ts.id = r.tipo_sangre_id
+      LEFT JOIN gh_miscelaneos ec ON ec.id = r.estado_civil_id
+      LEFT JOIN gh_miscelaneos ne ON ne.id = r.nivel_educativo_id
+      LEFT JOIN gh_miscelaneos tv ON tv.id = r.tipo_vivienda_id
+      LEFT JOIN gh_miscelaneos utl ON utl.id = r.uso_tiempo_libre_id
+      LEFT JOIN gh_miscelaneos tc ON tc.id = r.tipo_contrato_id
+      LEFT JOIN gh_miscelaneos im ON im.id = r.ingresos_mensuales_id
+      LEFT JOIN gh_miscelaneos afp ON afp.id = r.afp_id
+      LEFT JOIN gh_miscelaneos eps ON eps.id = r.eps_id
+      LEFT JOIN gh_miscelaneos pac ON pac.id = r.personas_a_cargo_id
+      LEFT JOIN gh_miscelaneos cvv ON cvv.id = r.con_quien_vive_id
+      LEFT JOIN gh_miscelaneos cg ON cg.id = r.cargo_id
+      WHERE r.id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Encuesta no encontrada' });
+    
+    const fam = await pool.query('SELECT * FROM gh_encuesta_familia WHERE encuesta_id = $1', [id]);
+    
+    res.json({
+      ...result.rows[0],
+      familia: fam.rows
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -450,8 +641,8 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
         theme: 'grid',
         styles: { fontSize: 7, cellPadding: 2, font: 'helvetica' },
         columnStyles: {
-            0: { fillColor: [245, 245, 245], fontStyle: 'bold', width: 35 },
-            2: { fillColor: [245, 245, 245], fontStyle: 'bold', width: 35 }
+            0: { fillColor: [245, 245, 245], fontStyle: 'bold', cellWidth: 35 },
+            2: { fillColor: [245, 245, 245], fontStyle: 'bold', cellWidth: 35 }
         },
         margin: { left: 14, right: 14 }
       });
