@@ -790,6 +790,7 @@ export const restoreSystem = async () => {
 
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas
     await recoverOrphanedRoutes(client);
+    await seedGhMiscelaneos(client);
 
     console.log(`[M7-SYNC] Módulos Logísticos Sincronizados con Éxito - ${new Date().toLocaleString()}`);
 
@@ -802,6 +803,25 @@ export const restoreSystem = async () => {
     client.release();
   }
 };
+
+async function seedGhMiscelaneos(client: any) {
+  const categories = {
+    'parentescos': ['Hijo/a', 'Padre', 'Madre', 'Cónyuge', 'Hermano/a', 'Otro'],
+    'tiempos-libres': ['Estudio', 'Deporte', 'Labores del hogar', 'Recreación', 'Otro'],
+    'personas-a-cargo': ['Ninguna', 'de 1 a 3 personas', 'de 4 a 6 personas', 'Mas de 6 personas'],
+    'convivientes': ['Cónyuge o pareja', 'Padres', 'Hijos/as', 'Convivientes', 'Vivo solo']
+  };
+
+  for (const [cat, items] of Object.entries(categories)) {
+    for (const item of items) {
+      await client.query(`
+        INSERT INTO gh_miscelaneos (categoria, nombre)
+        SELECT $1, $2
+        WHERE NOT EXISTS (SELECT 1 FROM gh_miscelaneos WHERE categoria = $1 AND nombre = $2)
+      `, [cat, item]);
+    }
+  }
+}
 
 /**
  * M7-RECOVERY-TOOL: Rescata rutas que fueron "borradas" por la curación nuclear

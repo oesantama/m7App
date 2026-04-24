@@ -109,7 +109,10 @@ app.use('/api', (req, res, next) => {
     '/training/public/attendance',
     '/training/public/session',
     '/api/gh-personal/public/survey/validate',
-    '/api/gh-personal/public/survey/save'
+    '/api/gh-personal/public/survey/save',
+    '/api/cfg-ciudades/departamentos',
+    '/api/cfg-ciudades/ciudades',
+    '/api/gh-miscelaneos'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {
