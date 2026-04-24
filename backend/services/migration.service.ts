@@ -646,6 +646,7 @@ export const restoreSystem = async () => {
     `);
 
     // ── LIMPIAR Y RECONSTRUIR MÓDULOS (Pizarra Limpia = Réplica Exacta) ──────
+    /*
     await client.query(`
       DELETE FROM pages WHERE id NOT IN (
         'PAG-01','PAG-03','PAG-04','PAG-05','PAG-06','PAG-07','PAG-08','PAG-09','PAG-10','PAG-11',
@@ -658,6 +659,7 @@ export const restoreSystem = async () => {
     await client.query(`
       DELETE FROM modules WHERE id NOT IN ('MOD-01','MOD-02','MOD-03','MOD-04','MOD-05','MOD-06', 'MOD-07', 'MOD-08', 'MOD-09')
     `);
+    */
 
     await client.query(`
       INSERT INTO modules (id, name, icon_class, status_id) VALUES
@@ -733,6 +735,7 @@ export const restoreSystem = async () => {
 
       -- Gestión Humana (MOD-09)
       ('PAG-41', 'MISCELÁNEOS', 'gestion-humana-miscelaneos', 'MOD-09', 'MOD-09', 'EST-01'),
+      ('PAG-43', 'PERSONAL', 'gestion-humana-personal', 'MOD-09', 'MOD-09', 'EST-01'),
 
       -- Configuración Maestros extra (MOD-01)
       ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01')

@@ -112,6 +112,10 @@ const Personal: React.FC<Props> = ({ user }) => {
       toast.error('Nombre y Cédula son obligatorios');
       return;
     }
+    if (!form.es_jefe && !form.jefe_inmediato_id) {
+      toast.error('El Jefe Inmediato es obligatorio si no es jefe');
+      return;
+    }
     setSaving(true);
     try {
       await api.savePersonal({ ...form, usuarioControl: user.name });
@@ -347,14 +351,25 @@ const Personal: React.FC<Props> = ({ user }) => {
               </div>
 
               <div className="space-y-1.5">
-                <SearchableSelect
-                  label="Jefe Inmediato"
-                  options={jefes}
-                  value={form.jefe_inmediato_id || ''}
-                  onChange={val => setForm({ ...form, jefe_inmediato_id: val ? Number(val) : null })}
-                  placeholder="Seleccione Jefe..."
-                />
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">¿Es Jefe?</label>
+                <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-200">
+                  <button onClick={() => setForm({...form, es_jefe: true, jefe_inmediato_id: null})} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${form.es_jefe ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-100'}`}>Sí</button>
+                  <button onClick={() => setForm({...form, es_jefe: false})} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${!form.es_jefe ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-100'}`}>No</button>
+                </div>
               </div>
+
+              {!form.es_jefe && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                  <SearchableSelect
+                    label="Jefe Inmediato *"
+                    options={jefes}
+                    value={form.jefe_inmediato_id || ''}
+                    onChange={val => setForm({ ...form, jefe_inmediato_id: val ? Number(val) : null })}
+                    placeholder="Seleccione Jefe..."
+                  />
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <SearchableSelect
                   label="Área de Trabajo"
@@ -363,13 +378,6 @@ const Personal: React.FC<Props> = ({ user }) => {
                   onChange={val => setForm({ ...form, area_trabajo_id: val ? Number(val) : null })}
                   placeholder="Seleccione Área..."
                 />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">¿Es Jefe?</label>
-                <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-200">
-                  <button onClick={() => setForm({...form, es_jefe: true})} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${form.es_jefe ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-100'}`}>Sí</button>
-                  <button onClick={() => setForm({...form, es_jefe: false})} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${!form.es_jefe ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-100'}`}>No</button>
-                </div>
               </div>
 
               <div className="space-y-1.5">
