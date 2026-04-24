@@ -16,6 +16,8 @@ const initTables = async () => {
     CREATE TABLE IF NOT EXISTS gh_jefes_inmediatos (
         id SERIAL PRIMARY KEY,
         nombre VARCHAR(255) NOT NULL,
+        area_id INTEGER,
+        personal_id INTEGER,
         estado VARCHAR(50) DEFAULT 'ACTIVO',
         usuario_control VARCHAR(255),
         fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -52,6 +54,10 @@ const initTables = async () => {
     INSERT INTO pages (id, parent_id, name, route, status_id)
     SELECT 'PAG-43', 'MOD-09', 'Personal', 'gestion-humana-personal', 'EST-01'
     WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-43');
+
+    -- Asegurar columnas si ya existía la tabla
+    ALTER TABLE gh_jefes_inmediatos ADD COLUMN IF NOT EXISTS area_id INTEGER;
+    ALTER TABLE gh_jefes_inmediatos ADD COLUMN IF NOT EXISTS personal_id INTEGER;
   `);
 };
 

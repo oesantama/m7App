@@ -23,9 +23,18 @@ export const getGhMiscelaneos = async (req: Request, res: Response) => {
   if (!table) return res.status(400).json({ error: 'Tabla no permitida' });
 
   try {
-    const result = await pool.query(
-      `SELECT id, nombre, estado, usuario_control, fecha_control FROM ${table} ORDER BY nombre ASC`
-    );
+    let query = `SELECT id, nombre, estado, usuario_control, fecha_control FROM ${table} ORDER BY nombre ASC`;
+    
+    if (req.params.tabla === 'jefes-inmediatos') {
+      query = `
+        SELECT j.*, a.nombre as area_nombre 
+        FROM gh_jefes_inmediatos j
+        LEFT JOIN gh_areas a ON a.id = j.area_id
+        ORDER BY j.nombre ASC
+      `;
+    }
+
+    const result = await pool.query(query);
     res.json(result.rows);
   } catch (err: any) {
     console.error(`[GH-MISC] Error GET ${table}:`, err);
@@ -37,19 +46,33 @@ export const saveGhMiscelaneo = async (req: Request, res: Response) => {
   const table = resolveTable(req.params.tabla as string);
   if (!table) return res.status(400).json({ error: 'Tabla no permitida' });
 
-  const { id, nombre, estado, usuarioControl } = req.body;
+  const { id, nombre, estado, usuarioControl, area_id, personal_id } = req.body;
 
   try {
     if (id) {
-      await pool.query(
-        `UPDATE ${table} SET nombre=$1, estado=$2, usuario_control=$3, fecha_control=CURRENT_TIMESTAMP WHERE id=$4`,
-        [nombre, estado, usuarioControl || 'System', id]
-      );
+      if (req.params.tabla === 'jefes-inmediatos') {
+        await pool.query(
+          `UPDATE gh_jefes_inmediatos SET nombre=$1, estado=$2, usuario_control=$3, area_id=$4, personal_id=$5, fecha_control=CURRENT_TIMESTAMP WHERE id=$6`,
+          [nombre, estado, usuarioControl || 'System', area_id, personal_id, id]
+        );
+      } else {
+        await pool.query(
+          `UPDATE ${table} SET nombre=$1, estado=$2, usuario_control=$3, fecha_control=CURRENT_TIMESTAMP WHERE id=$4`,
+          [nombre, estado, usuarioControl || 'System', id]
+        );
+      }
     } else {
-      await pool.query(
-        `INSERT INTO ${table} (nombre, estado, usuario_control, fecha_control) VALUES ($1,$2,$3,CURRENT_TIMESTAMP)`,
-        [nombre, estado, usuarioControl || 'System']
-      );
+      if (req.params.tabla === 'jefes-inmediatos') {
+        await pool.query(
+          `INSERT INTO gh_jefes_inmediatos (nombre, estado, usuario_control, area_id, personal_id, fecha_control) VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP)`,
+          [nombre, estado, usuarioControl || 'System', area_id, personal_id]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO ${table} (nombre, estado, usuario_control, fecha_control) VALUES ($1,$2,$3,CURRENT_TIMESTAMP)`,
+          [nombre, estado, usuarioControl || 'System']
+        );
+      }
     }
     res.json({ success: true });
   } catch (err: any) {

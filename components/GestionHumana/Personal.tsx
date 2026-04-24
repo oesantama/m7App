@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { api } from '../../services/api';
 import { User } from '../../types';
 import { Icons } from '../../constants';
+import SearchableSelect from '../common/SearchableSelect';
 
 interface PersonalRecord {
   id: number;
@@ -53,6 +54,9 @@ const Personal: React.FC<Props> = ({ user }) => {
   // Maestros para selects
   const [areas, setAreas] = useState<MiscRecord[]>([]);
   const [jefes, setJefes] = useState<MiscRecord[]>([]);
+  const [cargos, setCargos] = useState<MiscRecord[]>([]);
+  const [epsList, setEpsList] = useState<MiscRecord[]>([]);
+  const [afpList, setAfpList] = useState<MiscRecord[]>([]);
   const [estados, setEstados] = useState<{id: string, name: string}[]>([]);
 
   // Modal Personal
@@ -90,6 +94,9 @@ const Personal: React.FC<Props> = ({ user }) => {
     // Cargar maestros una vez
     api.getGhMiscelaneos('areas').then(setAreas).catch(() => {});
     api.getGhMiscelaneos('jefes-inmediatos').then(setJefes).catch(() => {});
+    api.getGhMiscelaneos('cargos').then(setCargos).catch(() => {});
+    api.getGhMiscelaneos('eps').then(setEpsList).catch(() => {});
+    api.getGhMiscelaneos('afp').then(setAfpList).catch(() => {});
     api.getEstados().then(setEstados).catch(() => {});
   }, [fetchData]);
 
@@ -294,16 +301,31 @@ const Personal: React.FC<Props> = ({ user }) => {
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Cargo</label>
-                <input value={form.cargo} onChange={e => setForm({...form, cargo: e.target.value.toUpperCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500" />
+                <SearchableSelect
+                  label="Cargo"
+                  options={cargos.map(c => ({ id: c.nombre, nombre: c.nombre }))}
+                  value={form.cargo || ''}
+                  onChange={val => setForm({ ...form, cargo: String(val) })}
+                  placeholder="Seleccione Cargo..."
+                />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">EPS</label>
-                <input value={form.eps} onChange={e => setForm({...form, eps: e.target.value.toUpperCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500" />
+                <SearchableSelect
+                  label="EPS"
+                  options={epsList.map(e => ({ id: e.nombre, nombre: e.nombre }))}
+                  value={form.eps || ''}
+                  onChange={val => setForm({ ...form, eps: String(val) })}
+                  placeholder="Seleccione EPS..."
+                />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">AFP</label>
-                <input value={form.afp} onChange={e => setForm({...form, afp: e.target.value.toUpperCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500" />
+                <SearchableSelect
+                  label="AFP"
+                  options={afpList.map(a => ({ id: a.nombre, nombre: a.nombre }))}
+                  value={form.afp || ''}
+                  onChange={val => setForm({ ...form, afp: String(val) })}
+                  placeholder="Seleccione AFP..."
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -325,18 +347,22 @@ const Personal: React.FC<Props> = ({ user }) => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Jefe Inmediato</label>
-                <select value={form.jefe_inmediato_id || ''} onChange={e => setForm({...form, jefe_inmediato_id: e.target.value ? Number(e.target.value) : null})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500">
-                  <option value="">Seleccione Jefe...</option>
-                  {jefes.map(j => <option key={j.id} value={j.id}>{j.nombre}</option>)}
-                </select>
+                <SearchableSelect
+                  label="Jefe Inmediato"
+                  options={jefes}
+                  value={form.jefe_inmediato_id || ''}
+                  onChange={val => setForm({ ...form, jefe_inmediato_id: val ? Number(val) : null })}
+                  placeholder="Seleccione Jefe..."
+                />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Área de Trabajo</label>
-                <select value={form.area_trabajo_id || ''} onChange={e => setForm({...form, area_trabajo_id: e.target.value ? Number(e.target.value) : null})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500">
-                  <option value="">Seleccione Área...</option>
-                  {areas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                </select>
+                <SearchableSelect
+                  label="Área de Trabajo"
+                  options={areas}
+                  value={form.area_trabajo_id || ''}
+                  onChange={val => setForm({ ...form, area_trabajo_id: val ? Number(val) : null })}
+                  placeholder="Seleccione Área..."
+                />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">¿Es Jefe?</label>

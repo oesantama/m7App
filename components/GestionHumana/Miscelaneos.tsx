@@ -12,6 +12,9 @@ interface MiscRecord {
   estado: string;
   usuario_control: string;
   fecha_control: string;
+  area_id?: number;
+  personal_id?: number;
+  area_nombre?: string;
 }
 
 interface Estado {
@@ -56,6 +59,8 @@ const TABS: { key: TabKey; label: string }[] = [
 
 // ─── Sub-componente CRUD reutilizable ─────────────────────────────────────────
 
+import SearchableSelect from '../common/SearchableSelect';
+
 interface CrudTabProps {
   tabla: TabKey;
   user: User;
@@ -74,8 +79,14 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
   const [editing, setEditing]   = useState<MiscRecord | null>(null);
   const [formNombre, setFormNombre] = useState('');
   const [formEstado, setFormEstado] = useState('EST-01');
+  const [formAreaId, setFormAreaId] = useState<number | null>(null);
+  const [formPersonalId, setFormPersonalId] = useState<number | null>(null);
   const [saving, setSaving]     = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
+
+  // Maestros para selects especiales
+  const [personal, setPersonal] = useState<any[]>([]);
+  const [areas, setAreas]       = useState<any[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -89,7 +100,13 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
     }
   }, [tabla]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { 
+    fetchData(); 
+    if (tabla === 'jefes-inmediatos') {
+      api.getPersonal().then(data => setPersonal(data.filter((p: any) => p.es_jefe))).catch(() => {});
+      api.getGhMiscelaneos('areas').then(setAreas).catch(() => {});
+    }
+  }, [fetchData, tabla]);
 
   const filtered = useMemo(() =>
     records.filter(r => r.nombre?.toLowerCase().includes(search.toLowerCase())),
@@ -103,6 +120,8 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
     setEditing(null);
     setFormNombre('');
     setFormEstado('EST-01');
+    setFormAreaId(null);
+    setFormPersonalId(null);
     setIsOpen(true);
   };
 
@@ -110,6 +129,8 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
     setEditing(r);
     setFormNombre(r.nombre);
     setFormEstado(r.estado || 'EST-01');
+    setFormAreaId(r.area_id || null);
+    setFormPersonalId(r.personal_id || null);
     setIsOpen(true);
   };
 
@@ -122,6 +143,8 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
         nombre: formNombre.trim(),
         estado: formEstado,
         usuarioControl: user.name,
+        area_id: formAreaId,
+        personal_id: formPersonalId
       });
       toast.success(editing ? 'Registro actualizado' : 'Registro creado');
       setIsOpen(false);
@@ -179,6 +202,7 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">ID</th>
                 <th className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Nombre</th>
+                {tabla === 'jefes-inmediatos' && <th className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Área</th>}
                 <th className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Estado</th>
                 <th className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Usuario Control</th>
                 <th className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Fecha Control</th>
@@ -204,6 +228,7 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
                 <tr key={r.id} className={`border-b border-slate-50 hover:bg-slate-50/60 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-50/30'}`}>
                   <td className="px-5 py-3.5 text-[11px] font-black text-slate-400">{r.id}</td>
                   <td className="px-5 py-3.5 text-[11px] font-bold text-slate-700 uppercase">{r.nombre}</td>
+                  {tabla === 'jefes-inmediatos' && <td className="px-5 py-3.5 text-[11px] font-bold text-indigo-600 uppercase">{r.area_nombre || '—'}</td>}
                   <td className="px-5 py-3.5">
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
                       r.estado === 'EST-01'
@@ -296,15 +321,42 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
 
             {/* Formulario */}
             <div className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nombre *</label>
-                <input
-                  value={formNombre}
-                  onChange={e => setFormNombre(e.target.value)}
-                  placeholder="Ingrese el nombre..."
-                  className="w-full h-11 px-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase text-slate-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all"
-                />
-              </div>
+              {tabla === 'jefes-inmediatos' ? (
+                <>
+                  <div className="space-y-1.5">
+                    <SearchableSelect
+                      label="Personal (Jefes) *"
+                      options={personal}
+                      value={formPersonalId || ''}
+                      onChange={val => {
+                        const p = personal.find(x => x.id === Number(val));
+                        setFormPersonalId(val ? Number(val) : null);
+                        if (p) setFormNombre(p.nombre);
+                      }}
+                      placeholder="Seleccione Jefe de Personal..."
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <SearchableSelect
+                      label="Área *"
+                      options={areas}
+                      value={formAreaId || ''}
+                      onChange={val => setFormAreaId(val ? Number(val) : null)}
+                      placeholder="Seleccione Área..."
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nombre *</label>
+                  <input
+                    value={formNombre}
+                    onChange={e => setFormNombre(e.target.value)}
+                    placeholder="Ingrese el nombre..."
+                    className="w-full h-11 px-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase text-slate-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                  />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Estado</label>
                 <select
