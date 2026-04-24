@@ -294,7 +294,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     'CLIENTE': i.customer_name || '—',
                     'CIUDAD': i.city || '—',
                     'PLACA': i.route_vehicle_plate || '—',
-                    'METODO PAGO': i.invoice_metodo_pago || '—',
+                    'UN_CODE': i.un_code || '—',
+                    'METODO PAGO PLANILLA': i.invoice_metodo_pago || '—',
+                    'VALOR PLANILLA': i.invoice_value || 0,
                     'ESTADO': getStatusName(i.item_status),
                     'VALOR FACTURA': i.invoice_value || 0,
                     'VALOR RECAUDADO': i.valor || 0,
@@ -426,7 +428,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             efectivo: number; credito: number;
             completadas: number; devueltas: number; parciales: number; legalizadas: number;
             repice_count: number; valor_repice: number;
-            valor_grupal: number;
+            valor_grupal: number; valor_total: number; valor_credito: number;
         }>();
 
         invoices.forEach(inv => {
@@ -435,7 +437,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const cur = map.get(plate) ?? {
                 valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
-                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0
+                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
             };
             const val    = Number(inv.valor) || 0;
             const invVal = Number(inv.invoice_value) || 0;
@@ -448,6 +450,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             // Solo sumar al valor total si es efectivo
             if (isEfectivo) {
                 cur.valor_total += invVal;
+            } else {
+                cur.valor_credito += invVal;
             }
 
             if (inv.forma_pago) {
@@ -479,7 +483,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const cur = map.get(plate) ?? {
                 valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
-                repice_count: 0, valor_repice: 0, valor_grupal: 0
+                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
             };
             cur.valor_grupal += (Number(p.valor) || 0);
             map.set(plate, cur);
@@ -523,7 +527,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         const valorTotal      = efectivoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const valorDevuelto   = efectivoInvoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const valorParcial    = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).reduce((s, i) => s + (Number(i.valor) || 0), 0);
-        const valorLegalizado = individualLeg; // El legalizado es lo que entró, sin importar el origen
+
+        // Filtrar Facturas a CRÉDITO (Cualquier método que NO sea efectivo)
+        const creditoInvoices = invoices.filter(i => {
+            const m = (i.invoice_metodo_pago || '').toUpperCase();
+            return !(m.includes('EFE') || m === 'CASH' || m === '');
+        });
+        const valorTotalCredito = creditoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
 
         const assigned        = total - unassigned;
         
@@ -536,7 +546,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
         return { 
             total, legalizadas, entregadas, devueltas, parciales, 
-            valorTotal, valorTotalGlobal,
+            valorTotal, valorTotalGlobal, valorTotalCredito,
             valorLegalizado: individualLeg, // Individual
             totalGrupal,
             totalLegalizado: individualLeg + totalGrupal + approvedSurch,
@@ -795,8 +805,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         </div>
                                         <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10 min-w-[120px]">
                                             <span className="text-[8px] font-black text-amber-100 uppercase tracking-widest leading-none mb-1">Pendiente</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotalGlobal - stats.totalLegalizado - stats.valorDevuelto))}</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotalGlobal - stats.totalLegalizado - stats.valorDevuelto - stats.valorTotalCredito))}</span>
                                             <span className="text-[8px] text-amber-100/70 font-bold mt-1">{stats.total - stats.legalizadas} Por Legalizar</span>
+                                        </div>
+                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-600 text-white shadow-lg shadow-slate-900/10 min-w-[120px]">
+                                            <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Total Crédito</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotalCredito)}</span>
+                                            <span className="text-[8px] text-slate-400 font-bold mt-1">No efectivo</span>
                                         </div>
                                         {(stats.approvedSurch > 0 || stats.pendingSurch > 0) && (
                                             <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-900/10 min-w-[140px]">
@@ -946,11 +961,19 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                 <div className="grid grid-cols-2 gap-2 mt-3 mb-2">
                                                                     <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-2.5 py-2">
                                                                         <p className="text-[7px] font-black text-emerald-600 uppercase tracking-wider mb-0.5">💵 Legalizado</p>
-                                                                        <p className="text-xs font-black text-emerald-800">{fmtCOP(fin.valor_legalizado)}</p>
+                                                                        <p className="text-xs font-black text-emerald-800">{fmtCOP(fin.valor_legalizado + fin.valor_grupal)}</p>
                                                                     </div>
                                                                     <div className="bg-amber-50/50 border border-amber-100 rounded-xl px-2.5 py-2">
                                                                         <p className="text-[7px] font-black text-amber-600 uppercase tracking-wider mb-0.5">🔄 Devuelto</p>
                                                                         <p className="text-xs font-black text-amber-800">{fmtCOP(fin.valor_devuelto)}</p>
+                                                                    </div>
+                                                                    <div className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2">
+                                                                        <p className="text-[7px] font-black text-slate-500 uppercase tracking-wider mb-0.5">💳 Crédito</p>
+                                                                        <p className="text-xs font-black text-slate-700">{fmtCOP(fin.valor_credito)}</p>
+                                                                    </div>
+                                                                    <div className="bg-amber-500 border border-amber-600 rounded-xl px-2.5 py-2">
+                                                                        <p className="text-[7px] font-black text-amber-100 uppercase tracking-wider mb-0.5">⏳ Pendiente</p>
+                                                                        <p className="text-xs font-black text-white">{fmtCOP(Math.max(0, fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto)))}</p>
                                                                     </div>
                                                                     {fin.valor_parcial > 0 && (
                                                                         <div className="bg-orange-50/50 border border-orange-100 rounded-xl px-2.5 py-2">
@@ -1109,7 +1132,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                     {/* Valor de factura */}
                                                                     {inv.invoice_value != null && inv.invoice_value > 0 && (
                                                                         <p className="text-[8px] font-black text-slate-500 mt-0.5">
-                                                                            Valor: {fmtCOP(inv.invoice_value)}
+                                                                            Valor: {fmtCOP(inv.invoice_value)} | {inv.un_code || '—'} | {inv.invoice_metodo_pago || '—'}
                                                                         </p>
                                                                     )}
                                                                     {/* Info de conciliación si ya está legalizada */}
@@ -1287,9 +1310,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     </div>
                                     <span className="text-[9px] font-black text-emerald-700 shrink-0">{legalPct}% leg.</span>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2">
                                     <div className="bg-white border border-slate-100 rounded-xl px-2 py-2 text-center cursor-default">
-                                        <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5 leading-none">Total placa</p>
+                                        <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5 leading-none">Total documento</p>
                                         <p className="text-[11px] font-black text-slate-900 leading-none mt-1">{fmtCOP(totalVal)}</p>
                                     </div>
                                     <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'leg' ? 'bg-emerald-600 text-white border-emerald-700 shadow-lg' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100'}`}
@@ -1307,9 +1330,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'par' ? 'text-orange-100' : 'text-orange-600'}`}>Parcial</p>
                                         <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(fin.valor_parcial)}</p>
                                     </div>
+                                    <div className="bg-slate-800 text-white border border-slate-900 rounded-xl px-2 py-2 text-center cursor-default shadow-md">
+                                        <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5 leading-none">Crédito</p>
+                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(fin.valor_credito)}</p>
+                                    </div>
                                     <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-2 py-2 text-center cursor-default shadow-md">
                                         <p className="text-[7px] font-black text-amber-100 uppercase mb-0.5 leading-none">Pendiente</p>
-                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, (fin.valor_total || 0) - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))))}</p>
+                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, (fin.valor_total || 0) - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + (fin.valor_credito || 0) + routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))))}</p>
                                     </div>
                                     <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'dev' ? 'bg-amber-600 text-white border-amber-700 shadow-lg' : 'bg-amber-50 border-amber-100 hover:bg-amber-100'}`}
                                         onClick={() => setActiveDetailCard(activeDetailCard === 'dev' ? null : 'dev')}>

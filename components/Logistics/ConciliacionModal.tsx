@@ -27,6 +27,8 @@ interface InvoiceRow {
     conciliado_por_nombre?: string;
     invoice_value?: number;
     invoice_banco?: string;
+    un_code?: string;
+    invoice_metodo_pago?: string;
 }
 
 interface ConciliacionModalProps {
@@ -51,6 +53,9 @@ const COLOR_MAP: Record<string, { active: string; inactive: string }> = {
     blue:   { active: 'bg-blue-500 border-blue-500 text-white',     inactive: 'border-slate-200 text-slate-600 hover:border-blue-400'   },
     violet: { active: 'bg-violet-600 border-violet-600 text-white', inactive: 'border-slate-200 text-slate-600 hover:border-violet-400' },
 };
+
+const fmtCOP = (v: number | undefined | null) =>
+    v != null && v > 0 ? `$${Number(v).toLocaleString('es-CO')}` : '—';
 
 const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
     isOpen, onClose, invoice, documentId,
@@ -157,6 +162,28 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 custom-scrollbar">
+
+                    {/* Información de Planilla (Nueva sección solicitada) */}
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Datos de Planilla Importada</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-white rounded-xl p-2 border border-slate-100 shadow-sm">
+                                <p className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">UN_CODE</p>
+                                <p className="text-[10px] font-black text-slate-900 truncate">{invoice.un_code || '—'}</p>
+                            </div>
+                            <div className="bg-white rounded-xl p-2 border border-slate-100 shadow-sm">
+                                <p className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Método Pago</p>
+                                <p className="text-[10px] font-black text-slate-900 truncate">{invoice.invoice_metodo_pago || '—'}</p>
+                            </div>
+                            <div className="bg-white rounded-xl p-2 border border-slate-100 shadow-sm">
+                                <p className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Valor Planilla</p>
+                                <p className="text-[10px] font-black text-emerald-700">{fmtCOP(invoice.invoice_value)}</p>
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Forma de pago */}
                     <div>

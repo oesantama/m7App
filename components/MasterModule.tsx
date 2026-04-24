@@ -1782,7 +1782,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                     </td>
                   </tr>
                 ))}
-                {paginatedData.length === 0 && <tr><td colSpan={activeMaster === 'masterUsuarios' ? 4 : 3} className="py-20 text-center font-black text-slate-200 uppercase text-[10px] tracking-widest">Sin registros encontrados</td></tr>}
+                {paginatedData.length === 0 && <tr><td colSpan={10} className="py-20 text-center font-black text-slate-200 uppercase text-[10px] tracking-widest">Sin registros encontrados</td></tr>}
               </tbody>
             </table>
           ) : (

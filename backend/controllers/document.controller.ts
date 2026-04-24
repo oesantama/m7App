@@ -1160,11 +1160,17 @@ export const processDocumentLPayment = async (req: Request, res: Response) => {
           continue;
         }
 
+        let finalUnCode = pay.unCode;
+        if (String(pay.unCode).trim().toUpperCase() === 'AJV20' && String(pay.metodoPago).trim().toUpperCase() === 'EF') {
+          finalUnCode = '030D';
+        }
+
         // Insertar en la nueva tabla de pagos
         await client.query(`
           INSERT INTO document_l_payments (document_id, invoice, client_ref, un_code, metodo_pago, vmetodo, user_id)
           VALUES ($1, $2, $3, $4, $5, $6, $7)
           ON CONFLICT (invoice) DO UPDATE SET
+          un_code = EXCLUDED.un_code,
           metodo_pago = EXCLUDED.metodo_pago,
           vmetodo = EXCLUDED.vmetodo,
           processed_at = CURRENT_TIMESTAMP,
@@ -1173,7 +1179,7 @@ export const processDocumentLPayment = async (req: Request, res: Response) => {
           documentId,
           pay.invoice,
           pay.clientRef,
-          pay.unCode,
+          finalUnCode,
           pay.metodoPago,
           pay.vmetodo,
           userId

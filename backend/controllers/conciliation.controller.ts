@@ -252,6 +252,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 ic.created_at                               AS conciliado_at,
                 u.name                                      AS conciliado_por_nombre,
                 MAX(p.vmetodo)                              AS invoice_value,
+                MAX(p.un_code)                              AS un_code,
                 MAX(p.metodo_pago)                          AS invoice_metodo_pago,
                 MAX(di.item_status)                         AS item_status,
                 MAX(COALESCE(v2.plate, r2.vehicle_id::text)) AS route_vehicle_plate,
