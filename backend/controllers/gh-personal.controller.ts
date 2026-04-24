@@ -228,6 +228,11 @@ export const deletePersonal = async (req: Request, res: Response) => {
 
 export const getPersonalEncuestas = async (req: Request, res: Response) => {
   try {
+    // AUTO-MIGRACIÓN TEMPORAL DE ESTADOS (TEXTO -> ID)
+    await pool.query(`UPDATE gh_encuestas_activas SET estado = 'EST-01' WHERE estado = 'ACTIVO' OR estado = 'Activo'`);
+    await pool.query(`UPDATE gh_encuestas_activas SET estado = 'EST-05' WHERE estado = 'COMPLETADO' OR estado = 'Completado'`);
+    await pool.query(`UPDATE gh_encuestas_activas SET estado = 'EST-02' WHERE estado = 'INACTIVO' OR estado = 'Inactivo'`);
+
     const result = await pool.query('SELECT * FROM gh_encuestas_activas ORDER BY fecha_activacion DESC');
     res.json(result.rows);
   } catch (err: any) {
