@@ -338,8 +338,16 @@ export const api = {
     body: JSON.stringify(data),
   }),
   deleteDepartamento: (id: number) => fetchJson(`${API_URL}/cfg-ciudades/departamentos/${id}`, { method: 'DELETE' }),
+  bulkSaveDepartamentos: (data: { items: any[], usuarioControl: string }) => fetchJson(`${API_URL}/cfg-ciudades/departamentos/bulk`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
   getCiudades: (departamentoId?: number) => fetchJson(`${API_URL}/cfg-ciudades/ciudades${departamentoId ? `?departamentoId=${departamentoId}` : ''}`),
   saveCiudad: (data: any) => fetchJson(`${API_URL}/cfg-ciudades/ciudades`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  bulkSaveCiudades: (data: { items: any[], usuarioControl: string }) => fetchJson(`${API_URL}/cfg-ciudades/ciudades/bulk`, {
     method: 'POST',
     body: JSON.stringify(data),
   }),

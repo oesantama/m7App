@@ -30,9 +30,32 @@ export const saveDepartamento = async (req: Request, res: Response) => {
       );
     }
     res.json({ success: true });
+  }
+};
+
+export const bulkSaveDepartamentos = async (req: Request, res: Response) => {
+  const { items, usuarioControl } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const item of items) {
+      const nombre = item.nombre.trim();
+      const exist = await client.query('SELECT id FROM cfg_departamentos WHERE UPPER(nombre) = UPPER($1)', [nombre]);
+      if (exist.rowCount === 0) {
+        await client.query(
+          `INSERT INTO cfg_departamentos (nombre, estado, usuario_control, fecha_control) VALUES ($1,$2,$3,CURRENT_TIMESTAMP)`,
+          [nombre, 'EST-01', usuarioControl || 'System']
+        );
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ success: true });
   } catch (err: any) {
-    console.error('[CFG-CIUDADES] Error SAVE departamento:', err);
-    res.status(500).json({ error: 'Error al guardar departamento' });
+    await client.query('ROLLBACK');
+    console.error('[CFG-CIUDADES] Error BULK SAVE departamentos:', err);
+    res.status(500).json({ error: 'Error en importación masiva' });
+  } finally {
+    client.release();
   }
 };
 
@@ -90,9 +113,33 @@ export const saveCiudad = async (req: Request, res: Response) => {
       );
     }
     res.json({ success: true });
+  }
+};
+
+export const bulkSaveCiudades = async (req: Request, res: Response) => {
+  const { items, usuarioControl } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const item of items) {
+      const nombre = item.nombre.trim();
+      const idDep  = item.idDepartamento;
+      const exist = await client.query('SELECT id FROM cfg_ciudades WHERE UPPER(nombre) = UPPER($1) AND id_departamento = $2', [nombre, idDep]);
+      if (exist.rowCount === 0) {
+        await client.query(
+          `INSERT INTO cfg_ciudades (nombre, id_departamento, estado, usuario_control, fecha_control) VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP)`,
+          [nombre, idDep, 'EST-01', usuarioControl || 'System']
+        );
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ success: true });
   } catch (err: any) {
-    console.error('[CFG-CIUDADES] Error SAVE ciudad:', err);
-    res.status(500).json({ error: 'Error al guardar ciudad' });
+    await client.query('ROLLBACK');
+    console.error('[CFG-CIUDADES] Error BULK SAVE ciudades:', err);
+    res.status(500).json({ error: 'Error en importación masiva' });
+  } finally {
+    client.release();
   }
 };
 

@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { api } from '../../services/api';
 import { User } from '../../types';
 import { Icons } from '../../constants';
+import * as XLSX from 'xlsx';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -111,10 +112,57 @@ const DepartamentosTab: React.FC<DepTabProps> = ({ user, estados, onDepChange })
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Buscar departamento..."
             className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 placeholder:text-slate-300 w-full" />
         </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0">
-          <Icons.Plus className="w-3.5 h-3.5" />Nuevo Departamento
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => document.getElementById('excel-deps')?.click()}
+            className="flex items-center gap-2 h-10 px-4 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 shrink-0">
+            <Icons.Excel className="w-3.5 h-3.5" />Importar Excel
+          </button>
+          <input type="file" id="excel-deps" accept=".xlsx, .xls" className="hidden" 
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = async (evt) => {
+                try {
+                  const bstr = evt.target?.result;
+                  const wb = XLSX.read(bstr, { type: 'binary' });
+                  const wsname = wb.SheetNames[0];
+                  const ws = wb.Sheets[wsname];
+                  const data: any[] = XLSX.utils.sheet_to_json(ws);
+                  
+                  if (data.length === 0) { toast.error('El archivo está vacío'); return; }
+                  
+                  // Validar encabezado "departamento"
+                  const firstRow = data[0];
+                  if (!Object.keys(firstRow).some(k => k.toLowerCase() === 'departamento')) {
+                    toast.error('No se encontró la columna "departamento"');
+                    return;
+                  }
+
+                  setLoading(true);
+                  const items = data.map(row => {
+                    const key = Object.keys(row).find(k => k.toLowerCase() === 'departamento') || 'departamento';
+                    return { nombre: String(row[key]).toUpperCase() };
+                  }).filter(item => item.nombre && item.nombre !== 'undefined');
+
+                  await api.bulkSaveDepartamentos({ items, usuarioControl: user.name });
+                  toast.success('Importación completada');
+                  fetchData();
+                } catch (err: any) {
+                  toast.error('Error al procesar Excel: ' + err.message);
+                } finally {
+                  setLoading(false);
+                  e.target.value = '';
+                }
+              };
+              reader.readAsBinaryString(file);
+            }} 
+          />
+          <button onClick={openCreate}
+            className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0">
+            <Icons.Plus className="w-3.5 h-3.5" />Nuevo Departamento
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -247,10 +295,10 @@ const CiudadesTab: React.FC<CiudadTabProps> = ({ user, estados, departamentos })
 
   const filtered = useMemo(() =>
     records.filter(r =>
-      r.nombre?.toLowerCase().includes(search.toLowerCase()) &&
-      (filterDep === '' || String(r.id_departamento) === filterDep)
+      r.nombre?.toLowerCase().includes(search.toLowerCase()) ||
+      r.departamento_nombre?.toLowerCase().includes(search.toLowerCase())
     ),
-    [records, search, filterDep]
+    [records, search]
   );
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -289,26 +337,75 @@ const CiudadesTab: React.FC<CiudadTabProps> = ({ user, estados, departamentos })
   };
 
   const estadoLabel = (id: string) => estados.find(e => e.id === id)?.name ?? id;
-
+  
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex gap-2 flex-1 flex-wrap">
-          <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-60 border border-slate-100 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10">
-            <Icons.Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Buscar ciudad..."
-              className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 placeholder:text-slate-300 w-full" />
-          </div>
-          <select value={filterDep} onChange={e => { setFilterDep(e.target.value); setPage(1); }}
-            className="h-10 px-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] font-bold uppercase text-slate-600 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all">
-            <option value="">Todos los Departamentos</option>
-            {departamentos.map(d => <option key={d.id} value={String(d.id)}>{d.nombre}</option>)}
-          </select>
+        <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full sm:w-72 border border-slate-100 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10">
+          <Icons.Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Buscar ciudad..."
+            className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 placeholder:text-slate-300 w-full" />
         </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0">
-          <Icons.Plus className="w-3.5 h-3.5" />Nueva Ciudad
-        </button>
+        <div className="flex gap-2 items-center flex-wrap">
+          <button onClick={() => document.getElementById('excel-ciudades')?.click()}
+            className="flex items-center gap-2 h-10 px-4 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 shrink-0">
+            <Icons.Excel className="w-3.5 h-3.5" />Importar Excel
+          </button>
+          <input type="file" id="excel-ciudades" accept=".xlsx, .xls" className="hidden" 
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = async (evt) => {
+                try {
+                  const bstr = evt.target?.result;
+                  const wb = XLSX.read(bstr, { type: 'binary' });
+                  const wsname = wb.SheetNames[0];
+                  const ws = wb.Sheets[wsname];
+                  const data: any[] = XLSX.utils.sheet_to_json(ws);
+                  
+                  if (data.length === 0) { toast.error('El archivo está vacío'); return; }
+
+                  setLoading(true);
+                  const items: any[] = [];
+                  for (const row of data) {
+                    const ciudadKey = Object.keys(row).find(k => k.toLowerCase().includes('ciudad') || k.toLowerCase().includes('nombre')) || '';
+                    const depKey = Object.keys(row).find(k => k.toLowerCase().includes('departamento')) || '';
+                    
+                    if (!ciudadKey || !depKey) continue;
+
+                    const cityName = String(row[ciudadKey]).trim().toUpperCase();
+                    const depName  = String(row[depKey]).trim().toUpperCase();
+                    
+                    // Buscar ID de departamento por nombre
+                    const depObj = departamentos.find(d => d.nombre.toUpperCase() === depName);
+                    if (depObj) {
+                      items.push({ nombre: cityName, idDepartamento: depObj.id });
+                    }
+                  }
+
+                  if (items.length === 0) {
+                    toast.error('No se procesaron ciudades válidas (verifique nombres de departamentos)');
+                  } else {
+                    await api.bulkSaveCiudades({ items, usuarioControl: user.name });
+                    toast.success(`${items.length} ciudades importadas correctamente`);
+                    fetchData();
+                  }
+                } catch (err: any) {
+                  toast.error('Error al procesar Excel: ' + err.message);
+                } finally {
+                  setLoading(false);
+                  e.target.value = '';
+                }
+              };
+              reader.readAsBinaryString(file);
+            }} 
+          />
+          <button onClick={openCreate}
+            className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0">
+            <Icons.Plus className="w-3.5 h-3.5" />Nueva Ciudad
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
