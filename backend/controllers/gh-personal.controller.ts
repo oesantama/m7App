@@ -145,6 +145,7 @@ const initTables = async () => {
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS contacto_emergencia_nombre VARCHAR(255);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS contacto_emergencia_telefono VARCHAR(50);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS consentimiento BOOLEAN;
+      ALTER TABLE gh_encuestas_sociodemograficas ALTER COLUMN datos DROP NOT NULL;
 
       -- Registrar Pagina Personal si no existe
       INSERT INTO pages (id, parent_id, name, route, status_id)
