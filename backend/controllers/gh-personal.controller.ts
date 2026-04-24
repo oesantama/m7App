@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import fs from 'fs';
+import path from 'path';
 
 const initTables = async () => {
   try {
@@ -399,33 +401,61 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     const doc = new jsPDF() as any;
     const pageWidth = doc.internal.pageSize.width;
 
-    // Header
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 35, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("REPORTE SOCIODEMOGRÁFICO", 14, 15);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`COLABORADOR: ${enc.nombre} | CC: ${enc.cedula}`, 14, 25);
-    doc.text(`REALIZADA: ${new Date(enc.fecha_realizacion).toLocaleString()}`, pageWidth - 14, 25, { align: 'right' });
+    // Header Estilo F-GA-013
+    const logoPath = path.join(process.cwd(), 'public', 'logo-encuesta.png');
+    if (fs.existsSync(logoPath)) {
+      const logoData = fs.readFileSync(logoPath).toString('base64');
+      doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', 14, 10, 40, 20);
+    }
 
-    let y = 45;
+    // Cuadrícula de encabezado
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.1);
+    doc.rect(14, 10, pageWidth - 28, 20); // Marco exterior
+    doc.line(60, 10, 60, 30); // Divisor logo
+    doc.line(pageWidth - 60, 10, pageWidth - 60, 30); // Divisor control
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("ENCUESTA PERFIL SOCIODEMOGRÁFICO", 65, 18, { maxWidth: pageWidth - 125, align: 'center' });
+    
+    doc.setFontSize(7);
+    doc.text("Código: F-GA-013", pageWidth - 58, 15);
+    doc.text("Versión: 02", pageWidth - 58, 20);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, pageWidth - 58, 25);
+
+    let y = 35;
+
+    // Info Colaborador
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, y, pageWidth - 28, 8, 'F');
+    doc.rect(14, y, pageWidth - 28, 8, 'S');
+    doc.setFontSize(9);
+    doc.setTextColor(0);
+    doc.text(`DATOS DEL COLABORADOR: ${enc.nombre.toUpperCase()}`, 16, y + 5.5);
+    y += 12;
 
     const addSection = (title: string, data: any[]) => {
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(title, 14, y);
-      y += 4;
+      doc.setFillColor(15, 23, 42);
+      doc.rect(14, y, pageWidth - 28, 6, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.text(title, 16, y + 4.5);
+      y += 6;
+
       autoTable(doc, {
-        startY: y, body: data, theme: 'striped',
-        styles: { fontSize: 7, cellPadding: 1.5 },
-        headStyles: { fillColor: [15, 23, 42] },
+        startY: y,
+        body: data,
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2, font: 'helvetica' },
+        columnStyles: {
+            0: { fillColor: [245, 245, 245], fontStyle: 'bold', width: 35 },
+            2: { fillColor: [245, 245, 245], fontStyle: 'bold', width: 35 }
+        },
         margin: { left: 14, right: 14 }
       });
-      y = (doc as any).lastAutoTable.finalY + 8;
+      y = (doc as any).lastAutoTable.finalY + 6;
     };
 
     addSection("1. PERFIL CORPORATIVO", [
@@ -435,23 +465,24 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     ]);
 
     addSection("2. DATOS PERSONALES Y RESIDENCIA", [
+      ["Cédula", enc.cedula, "Tipo Sangre", enc.sangre_nombre],
       ["Lugar Nac.", `${enc.mun_nac_nombre}, ${enc.dep_nac_nombre}`, "Fecha Nac.", enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : 'N/A'],
-      ["Sangre", enc.sangre_nombre, "Estado Civil", enc.civil_nombre],
-      ["Nivel Educativo", enc.edu_nombre, "Estrato", enc.estrato],
-      ["Tipo Vivienda", enc.vivienda_nombre, "Ciudad Res.", `${enc.mun_res_nombre}, ${enc.dep_res_nombre}`],
-      ["Barrio", enc.barrio, "Dirección", enc.direccion]
+      ["Estado Civil", enc.civil_nombre, "Nivel Educativo", enc.edu_nombre],
+      ["Estrato", enc.estrato, "Tipo Vivienda", enc.vivienda_nombre],
+      ["Ciudad Res.", `${enc.mun_res_nombre}, ${enc.dep_res_nombre}`, "Barrio", enc.barrio],
+      ["Dirección", enc.direccion, "", ""]
     ]);
 
     addSection("3. ENTORNO FAMILIAR Y SOCIAL", [
-      ["Personas Hogar", enc.viven_conmigo, "Sustentador", enc.principal_sustentador],
-      ["Pers. a Cargo", enc.pcargo_nombre, "Discapacidad Fam.", enc.discapacidad_familia],
+      ["Personas Hogar", enc.viven_conmigo, "Sustentador Principal", enc.principal_sustentador],
+      ["Personas a Cargo", enc.pcargo_nombre, "Discapacidad Fam.", enc.discapacidad_familia],
       ["Vive con", enc.conviviente_nombre, "Hijos", enc.cuantos_hijos]
     ]);
 
     addSection("4. SALUD Y ESTILO DE VIDA", [
-      ["Enfermedad Crónica", enc.sufre_enfermedad, "Bebe Alcohol", enc.bebe_alcohol],
-      ["Fuma", enc.fuma, "Deporte", enc.practica_deporte],
-      ["Actividad Física", enc.tipo_deporte, "Tiempo Libre", enc.tiempo_libre_nombre || enc.uso_tiempo_libre_otros]
+      ["Enfermedad Crónica", enc.sufre_enfermedad, "Frecuencia Alcohol", enc.bebe_alcohol],
+      ["Fuma", enc.fuma, "Práctica Deporte", enc.practica_deporte],
+      ["Frecuencia Deporte", enc.tipo_deporte, "Uso Tiempo Libre", enc.tiempo_libre_nombre || enc.uso_tiempo_libre_otros]
     ]);
 
     addSection("5. CONTACTO DE EMERGENCIA", [
@@ -459,16 +490,28 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     ]);
 
     if (familia.length > 0) {
-      addSection("6. COMPOSICIÓN FAMILIAR (HIJOS/OTROS)", familia.map(f => [
+      addSection("6. COMPOSICIÓN FAMILIAR", familia.map(f => [
         f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'
       ]));
     }
 
-    if (y > 260) { doc.addPage(); y = 20; }
+    if (y > 250) { doc.addPage(); y = 20; }
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0);
+    doc.text("CONSENTIMIENTO INFORMADO", 14, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
-    doc.setFont("helvetica", "italic");
-    doc.setTextColor(100, 100, 100);
-    doc.text("Información confidencial (Ley 1581 de 2012). Consentimiento aceptado: " + (enc.consentimiento ? 'SÍ' : 'NO'), 14, y);
+    const disclaimer = "Declaro que la información suministrada es veraz y autorizo a la empresa para el tratamiento de mis datos personales según la Ley 1581 de 2012. Este reporte fue generado automáticamente el " + new Date(enc.fecha_realizacion).toLocaleString();
+    doc.text(doc.splitTextToSize(disclaimer, pageWidth - 28), 14, y);
+    
+    y += 15;
+    // Espacio para firma
+    doc.line(14, y, 80, y);
+    doc.text("Firma del Colaborador", 14, y + 4);
+    doc.text(`CC: ${enc.cedula}`, 14, y + 8);
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
     res.setHeader('Content-Type', 'application/pdf');
