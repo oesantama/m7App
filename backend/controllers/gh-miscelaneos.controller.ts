@@ -19,25 +19,38 @@ const ALLOWED_TABLES: Record<string, string> = {
 const resolveTable = (tabla: string): string | null => ALLOWED_TABLES[tabla] ?? null;
 
 export const getGhMiscelaneos = async (req: Request, res: Response) => {
-  const table = resolveTable(req.params.tabla as string);
-  if (!table) return res.status(400).json({ error: 'Tabla no permitida' });
+  const tabla = req.params.tabla as string;
+  const table = resolveTable(tabla);
 
   try {
-    let query = `SELECT id, nombre, estado, usuario_control, fecha_control FROM ${table} ORDER BY nombre ASC`;
-    
-    if (req.params.tabla === 'jefes-inmediatos') {
-      query = `
-        SELECT j.*, a.nombre as area_nombre 
-        FROM gh_jefes_inmediatos j
-        LEFT JOIN gh_areas a ON a.id = j.area_id
-        ORDER BY j.nombre ASC
-      `;
+    if (table) {
+      let query = `SELECT id, nombre, estado, usuario_control, fecha_control FROM ${table} ORDER BY nombre ASC`;
+      
+      if (tabla === 'jefes-inmediatos') {
+        query = `
+          SELECT j.*, a.nombre as area_nombre 
+          FROM gh_jefes_inmediatos j
+          LEFT JOIN gh_areas a ON a.id = j.area_id
+          ORDER BY j.nombre ASC
+        `;
+      }
+      const result = await pool.query(query);
+      return res.json(result.rows);
+    } else {
+      // Intentar buscar en la tabla genérica gh_miscelaneos por categoría
+      const result = await pool.query(
+        `SELECT id, nombre FROM gh_miscelaneos WHERE categoria = $1 ORDER BY nombre ASC`,
+        [tabla]
+      );
+      
+      if (result.rows.length > 0) {
+        return res.json(result.rows);
+      }
+      
+      return res.status(400).json({ error: 'Tabla o categoría no permitida' });
     }
-
-    const result = await pool.query(query);
-    res.json(result.rows);
   } catch (err: any) {
-    console.error(`[GH-MISC] Error GET ${table}:`, err);
+    console.error(`[GH-MISC] Error GET ${tabla}:`, err);
     res.status(500).json({ error: 'Error al obtener registros' });
   }
 };

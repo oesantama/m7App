@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { Toaster, toast } from 'sonner';
-import { Check, Search, User, FileText, Heart, Home, Users, Activity, ShieldCheck, ClipboardCheck, Plus, Trash2 } from 'lucide-react';
+import { Check, Search, User, FileText, Heart, Home, Users, Activity, ShieldCheck, ClipboardCheck, Plus, Trash2, Briefcase } from 'lucide-react';
 
 const PublicSurvey: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -13,30 +13,39 @@ const PublicSurvey: React.FC = () => {
 
   // Datos de la encuesta
   const [form, setForm] = useState<any>({
-    lugar_nacimiento: '',
+    fecha_ingreso: '',
+    cargo_id: '',
+    municipio_nacimiento_id: '',
     fecha_nacimiento: '',
     tipo_sangre_id: '',
     estado_civil_id: '',
     nivel_educativo_id: '',
-    estrato: '',
+    tipo_contrato_id: '',
+    ingresos_mensuales_id: '',
+    afp_id: '',
+    eps_id: '',
+    turno_laboral: '',
     tipo_vivienda_id: '',
-    departamento_id: '',
-    municipio_id: '',
+    estrato: '',
+    departamento_res_id: '', // Auxiliar para filtrar municipios
+    municipio_residencia_id: '',
+    barrio: '',
     direccion: '',
-    fuma: 'NO',
-    bebe_alcohol: 'No nunca',
-    practica_deporte: 'No practico deporte',
-    frecuencia_deporte: '',
-    uso_tiempo_libre_id: '',
-    uso_tiempo_libre_otros: '',
-    contacto_emergencia_nombre: '',
-    contacto_emergencia_telefono: '',
-    parentesco_emergencia_id: '',
+    sufre_enfermedad: 'NO',
     viven_conmigo: 0,
+    principal_sustentador: 'NO',
     personas_a_cargo_id: '',
     discapacidad_familia: 'NO',
     con_quien_vive_id: '',
     cuantos_hijos: 0,
+    bebe_alcohol: 'No nunca',
+    fuma: 'NO',
+    practica_deporte: 'No practico deporte',
+    tipo_deporte: '',
+    uso_tiempo_libre_id: '',
+    uso_tiempo_libre_otros: '',
+    contacto_emergencia_nombre: '',
+    contacto_emergencia_telefono: '',
     consentimiento: false
   });
 
@@ -48,53 +57,66 @@ const PublicSurvey: React.FC = () => {
     civil: [],
     educativo: [],
     vivienda: [],
-    parentescos: [],
-    tiemposLibres: [],
     departamentos: [],
-    municipios: [],
+    municipiosNac: [],
+    municipiosRes: [],
+    cargos: [],
+    contratos: [],
+    ingresos: [],
+    afp: [],
+    eps: [],
     personasCargo: [],
-    convivientes: []
+    convivientes: [],
+    tiemposLibres: []
   });
 
   useEffect(() => {
     const loadMaestros = async () => {
       try {
-        const [sangre, civil, edu, viv, par, tl, deptos, pc, conv] = await Promise.all([
+        const [sangre, civil, edu, viv, deptos, cargos, contratos, ingresos, afp, eps, pc, conv, tl] = await Promise.all([
           api.getGhMiscelaneos('tipos-sangre'),
           api.getGhMiscelaneos('estados-civiles'),
           api.getGhMiscelaneos('niveles-educativos'),
           api.getGhMiscelaneos('tipos-vivienda'),
-          api.getGhMiscelaneos('parentescos'),
-          api.getGhMiscelaneos('tiempos-libres'),
           api.getDepartamentos(),
+          api.getGhMiscelaneos('cargos'),
+          api.getGhMiscelaneos('tipos-contrato'),
+          api.getGhMiscelaneos('ingresos-mensuales'),
+          api.getGhMiscelaneos('afp'),
+          api.getGhMiscelaneos('eps'),
           api.getGhMiscelaneos('personas-a-cargo'),
-          api.getGhMiscelaneos('convivientes')
+          api.getGhMiscelaneos('convivientes'),
+          api.getGhMiscelaneos('tiempos-libres')
         ]);
-        setMaestros({ 
-          sangre, civil, educativo: edu, vivienda: viv, 
-          parentescos: par, tiemposLibres: tl, departamentos: deptos,
-          municipios: [], personasCargo: pc, convivientes: conv
-        });
+        setMaestros(prev => ({ 
+          ...prev, sangre, civil, educativo: edu, vivienda: viv, departamentos: deptos,
+          cargos, contratos, ingresos, afp, eps, personasCargo: pc, convivientes: conv,
+          tiemposLibres: tl
+        }));
       } catch (e) {}
     };
 
     const params = new URLSearchParams(window.location.search);
     const c = params.get('cedula');
     if (c) setCedula(c);
-
     loadMaestros();
   }, []);
 
-  // Cargar municipios cuando cambia depto
+  // Cargar municipios de residencia cuando cambia depto
   useEffect(() => {
-    if (form.departamento_id) {
-      api.getCiudades(form.departamento_id).then(res => {
-        setMaestros(prev => ({ ...prev, municipios: res }));
-      });
-    } else {
-      setMaestros(prev => ({ ...prev, municipios: [] }));
+    if (form.departamento_res_id) {
+      api.getCiudades(form.departamento_res_id).then(res => setMaestros(prev => ({ ...prev, municipiosRes: res })));
     }
-  }, [form.departamento_id]);
+  }, [form.departamento_res_id]);
+
+  // Para el lugar de nacimiento, cargaremos todos los municipios o dejaremos que busquen (simplificado por ahora con una carga inicial si se desea)
+  // O podemos añadir un select de depto para nacimiento también
+  const [depNacId, setDepNacId] = useState('');
+  useEffect(() => {
+    if (depNacId) {
+      api.getCiudades(depNacId).then(res => setMaestros(prev => ({ ...prev, municipiosNac: res })));
+    }
+  }, [depNacId]);
 
   const handleValidate = async () => {
     if (!cedula) return toast.error('Ingrese su número de cédula');
@@ -109,20 +131,6 @@ const PublicSurvey: React.FC = () => {
     } finally {
       setValidating(false);
     }
-  };
-
-  const addFamiliar = () => {
-    setFamilia([...familia, { nombre: '', parentesco_id: '', fecha_nacimiento: '', ocupacion: '' }]);
-  };
-
-  const removeFamiliar = (index: number) => {
-    setFamilia(familia.filter((_, i) => i !== index));
-  };
-
-  const updateFamiliar = (index: number, field: string, value: any) => {
-    const newFam = [...familia];
-    newFam[index] = { ...newFam[index], [field]: value };
-    setFamilia(newFam);
   };
 
   const handleSave = async () => {
@@ -147,18 +155,21 @@ const PublicSurvey: React.FC = () => {
         value={form[name]}
         onChange={e => setForm({ ...form, [name]: e.target.value })}
         placeholder={placeholder}
-        className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all"
+        className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500 transition-all"
       />
     </div>
   );
 
-  const Select = ({ label, name, options, labelField = 'nombre', valueField = 'id' }: any) => (
+  const Select = ({ label, name, options, labelField = 'nombre', valueField = 'id', onChange }: any) => (
     <div className="space-y-1.5">
       <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">{label}</label>
       <select
         value={form[name]}
-        onChange={e => setForm({ ...form, [name]: e.target.value })}
-        className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all"
+        onChange={e => {
+          if (onChange) onChange(e.target.value);
+          setForm({ ...form, [name]: e.target.value });
+        }}
+        className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500 transition-all"
       >
         <option value="">Seleccione...</option>
         {options.map((o: any) => (
@@ -172,25 +183,15 @@ const PublicSurvey: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 font-sans text-slate-900">
         <Toaster position="top-center" richColors />
-        <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl p-10 text-center">
+        <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl p-10 text-center animate-in zoom-in duration-500">
           <div className="w-24 h-24 bg-indigo-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
             <ClipboardCheck className="text-indigo-600" size={40} />
           </div>
           <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-2">Encuesta Sociodemográfica</h2>
           <p className="text-slate-500 text-sm font-medium mb-10">Ingrese su cédula para validar su autorización</p>
           <div className="space-y-6">
-            <input
-              value={cedula}
-              onChange={e => setCedula(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleValidate()}
-              placeholder="Número de Cédula"
-              className="w-full h-16 px-6 rounded-3xl bg-slate-50 border-2 border-slate-100 text-lg font-black text-slate-800 placeholder:text-slate-300 outline-none focus:border-indigo-500 transition-all text-center"
-            />
-            <button
-              onClick={handleValidate}
-              disabled={validating}
-              className="w-full h-16 rounded-3xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest shadow-xl shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
-            >
+            <input value={cedula} onChange={e => setCedula(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleValidate()} placeholder="Número de Cédula" className="w-full h-16 px-6 rounded-3xl bg-slate-50 border-2 border-slate-100 text-lg font-black text-slate-800 placeholder:text-slate-300 outline-none focus:border-indigo-500 transition-all text-center" />
+            <button onClick={handleValidate} disabled={validating} className="w-full h-16 rounded-3xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest shadow-xl shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3">
               {validating ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" /> : <Search size={20} strokeWidth={3} />}
               Validar Acceso
             </button>
@@ -237,26 +238,35 @@ const PublicSurvey: React.FC = () => {
           </div>
         </div>
 
-        {/* Content */}
         <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 p-8 md:p-12">
           
           {step === 1 && (
             <div className="space-y-8 animate-in fade-in duration-500">
               <div className="flex items-center gap-4 mb-2">
                 <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-inner">
-                  <User size={24} />
+                  <Briefcase size={24} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Información Personal</h3>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Identidad y Nacimiento</p>
+                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Perfil Laboral y Personal</h3>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Datos básicos y vinculación</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="Lugar de Nacimiento" name="lugar_nacimiento" placeholder="Ciudad, Depto" />
-                <Input label="Fecha de Nacimiento" name="fecha_nacimiento" type="date" />
-                <Select label="Tipo de Sangre" name="tipo_sangre_id" options={maestros.sangre} />
-                <Select label="Estado Civil" name="estado_civil_id" options={maestros.civil} />
-                <Select label="Nivel Educativo" name="nivel_educativo_id" options={maestros.educativo} />
+                <Input label="Fecha Ingreso" name="fecha_ingreso" type="date" />
+                <Select label="Cargo" name="cargo_id" options={maestros.cargos} />
+                <Select label="Tipo Contrato" name="tipo_contrato_id" options={maestros.contratos} />
+                <Input label="Turno Laboral" name="turno_laboral" placeholder="Mañana, Tarde, Rotativo..." />
+                <Select label="Ingresos Mensuales" name="ingresos_mensuales_id" options={maestros.ingresos} />
+                <Select label="AFP" name="afp_id" options={maestros.afp} />
+                <Select label="EPS" name="eps_id" options={maestros.eps} />
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+                  <Select label="Depto Nacimiento" name="dep_nac" options={maestros.departamentos} onChange={(v:any) => setDepNacId(v)} />
+                  <Select label="Ciudad Nacimiento" name="municipio_nacimiento_id" options={maestros.municipiosNac} />
+                  <Input label="Fecha de Nacimiento" name="fecha_nacimiento" type="date" />
+                  <Select label="Tipo de Sangre" name="tipo_sangre_id" options={maestros.sangre} />
+                  <Select label="Estado Civil" name="estado_civil_id" options={maestros.civil} />
+                  <Select label="Nivel Educativo" name="nivel_educativo_id" options={maestros.educativo} />
+                </div>
               </div>
             </div>
           )}
@@ -274,12 +284,11 @@ const PublicSurvey: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Select label="Tipo de Vivienda" name="tipo_vivienda_id" options={maestros.vivienda} />
-                <Select label="Departamento" name="departamento_id" options={maestros.departamentos} />
-                <Select label="Ciudad / Municipio" name="municipio_id" options={maestros.municipios} />
                 <Select label="Estrato" name="estrato" options={['1', '2', '3', '4', '5', '6']} />
-                <div className="md:col-span-2">
-                  <Input label="Dirección Exacta" name="direccion" placeholder="Calle, Número, Apto" />
-                </div>
+                <Select label="Departamento Residencia" name="departamento_res_id" options={maestros.departamentos} />
+                <Select label="Ciudad / Municipio" name="municipio_residencia_id" options={maestros.municipiosRes} />
+                <Input label="Barrio" name="barrio" />
+                <Input label="Dirección Exacta" name="direccion" />
               </div>
             </div>
           )}
@@ -296,48 +305,36 @@ const PublicSurvey: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="¿Cuántas personas viven con usted?" name="viven_conmigo" type="number" />
+                <Input label="Total personas en su hogar" name="viven_conmigo" type="number" />
+                <Select label="¿Es el principal sustentador?" name="principal_sustentador" options={['SI', 'NO']} />
                 <Select label="Personas a cargo" name="personas_a_cargo_id" options={maestros.personasCargo} />
-                <Select label="¿Alguien con discapacidad en familia?" name="discapacidad_familia" options={['SI', 'NO']} />
+                <Select label="¿Hay personas con discapacidad en su familia?" name="discapacidad_familia" options={['SI', 'NO']} />
                 <Select label="¿Con quién vive actualmente?" name="con_quien_vive_id" options={maestros.convivientes} />
+                <Input label="¿Cuántos hijos tiene?" name="cuantos_hijos" type="number" />
               </div>
               <div className="space-y-4 pt-4">
                 <div className="flex justify-between items-center">
-                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Hijos y Familiares</h4>
-                  <button onClick={addFamiliar} className="h-9 px-4 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase flex items-center gap-2 hover:bg-indigo-100 transition-all">
-                    <Plus size={14} /> Agregar Familiar / Hijo
+                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Hijos (Nombre y Fecha Nacimiento)</h4>
+                  <button onClick={() => setFamilia([...familia, { nombre: '', fecha_nacimiento: '' }])} className="h-9 px-4 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase flex items-center gap-2 hover:bg-indigo-100 transition-all">
+                    <Plus size={14} /> Agregar Hijo
                   </button>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {familia.map((fam, idx) => (
-                    <div key={idx} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end animate-in zoom-in-95 duration-300">
-                      <div className="md:col-span-4 space-y-1.5">
+                    <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                      <div className="md:col-span-6 space-y-1">
                         <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Nombre Completo</label>
-                        <input value={fam.nombre} onChange={e => updateFamiliar(idx, 'nombre', e.target.value)} className="w-full h-10 px-4 rounded-xl bg-white border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
+                        <input value={fam.nombre} onChange={e => { const n = [...familia]; n[idx].nombre = e.target.value; setFamilia(n); }} className="w-full h-10 px-4 rounded-xl bg-white border border-slate-200 text-[11px] font-bold outline-none" />
                       </div>
-                      <div className="md:col-span-3 space-y-1.5">
-                        <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Parentesco</label>
-                        <select value={fam.parentesco_id} onChange={e => updateFamiliar(idx, 'parentesco_id', e.target.value)} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500">
-                          <option value="">Seleccione...</option>
-                          {maestros.parentescos.map((p: any) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                        </select>
-                      </div>
-                      <div className="md:col-span-3 space-y-1.5">
+                      <div className="md:col-span-4 space-y-1">
                         <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Fecha Nacimiento</label>
-                        <input type="date" value={fam.fecha_nacimiento} onChange={e => updateFamiliar(idx, 'fecha_nacimiento', e.target.value)} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
+                        <input type="date" value={fam.fecha_nacimiento} onChange={e => { const n = [...familia]; n[idx].fecha_nacimiento = e.target.value; setFamilia(n); }} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] font-bold outline-none" />
                       </div>
                       <div className="md:col-span-2 flex justify-end">
-                        <button onClick={() => removeFamiliar(idx)} className="h-10 w-10 flex items-center justify-center bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all">
-                          <Trash2 size={16} />
-                        </button>
+                        <button onClick={() => setFamilia(familia.filter((_, i) => i !== idx))} className="h-10 w-10 flex items-center justify-center bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all"><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}
-                  {familia.length === 0 && (
-                    <div className="py-10 text-center border-2 border-dashed border-slate-200 rounded-[2rem]">
-                      <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest">No hay familiares registrados</p>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -350,30 +347,24 @@ const PublicSurvey: React.FC = () => {
                   <Heart size={24} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Hábitos y Salud</h3>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Estilo de vida</p>
+                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Salud y Estilo de Vida</h3>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Bienestar y hábitos</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Select label="Consumo de Alcohol" name="bebe_alcohol" options={['Si con frecuencia', 'Si ocasionalmente', 'No nunca']} />
-                <Select label="¿Fuma actualmente?" name="fuma" options={['SI', 'NO']} />
-                <Select label="¿Practica algún deporte?" name="practica_deporte" options={['Si varias veces a la semana', 'Si una vez a la semana', 'Si ocasionalmente', 'No practico deporte']} />
-                <Input label="¿Qué deporte o frecuencia?" name="frecuencia_deporte" placeholder="Especifique..." />
-                
+                <Select label="¿Sufre alguna enfermedad?" name="sufre_enfermedad" options={['SI', 'NO']} />
+                <Select label="Consume bebidas alcohólicas" name="bebe_alcohol" options={['Si con frecuencia', 'Si ocasionalmente', 'No nunca']} />
+                <Select label="Fuma actualmente" name="fuma" options={['SI', 'NO']} />
+                <Select label="Practica algún deporte" name="practica_deporte" options={['Si varias veces a la semana', 'Si una vez a la semana', 'Si ocasionalmente', 'No practico deporte']} />
+                <Input label="¿Qué tipo de deporte realiza?" name="tipo_deporte" />
                 <Select label="Uso del tiempo libre" name="uso_tiempo_libre_id" options={maestros.tiemposLibres} />
                 {form.uso_tiempo_libre_id === maestros.tiemposLibres.find((t:any) => t.nombre.toLowerCase().includes('otro'))?.id?.toString() && (
-                  <Input label="Especifique otro uso" name="uso_tiempo_libre_otros" placeholder="Indique su actividad..." />
+                  <Input label="Especifique otro uso" name="uso_tiempo_libre_otros" />
                 )}
-                
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-indigo-50/30 rounded-3xl border border-indigo-100">
-                  <div className="md:col-span-2">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-2">Contacto de Emergencia</h4>
-                  </div>
-                  <Input label="Nombre Completo" name="contacto_emergencia_nombre" placeholder="Nombre del contacto..." />
-                  <Input label="Teléfono / Celular" name="contacto_emergencia_telefono" placeholder="300 000 0000" />
-                  <div className="md:col-span-2">
-                    <Select label="Parentesco Emergencia" name="parentesco_emergencia_id" options={maestros.parentescos} />
-                  </div>
+                  <div className="md:col-span-2"><h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-2">Contacto de Emergencia</h4></div>
+                  <Input label="Nombre del contacto" name="contacto_emergencia_nombre" />
+                  <Input label="Teléfono / Celular" name="contacto_emergencia_telefono" />
                 </div>
               </div>
             </div>
@@ -381,60 +372,28 @@ const PublicSurvey: React.FC = () => {
 
           {step === 5 && (
             <div className="space-y-8 animate-in fade-in duration-500">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-inner">
-                  <ShieldCheck size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Finalizar</h3>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Consentimiento y Envío</p>
-                </div>
-              </div>
+              <div className="flex items-center gap-4 mb-2"><div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-inner"><ShieldCheck size={24} /></div>
+              <div><h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Finalizar</h3><p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Consentimiento</p></div></div>
               <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100">
                 <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-4">Consentimiento Informado</h4>
-                <p className="text-[11px] text-slate-500 leading-relaxed text-justify mb-6">
-                  Ley 1581 de 2012: de protección de datos personales, es una ley que complementa la regulación vigente para la protección del derecho fundamental que tienen todas las personas naturales a autorizar la información personal que es almacenada en bases de datos o archivos, así como su posterior actualización y rectificación. Autorizo el tratamiento de mis datos para fines relacionados con el sistema de gestión de seguridad y salud en el trabajo.
-                </p>
+                <p className="text-[11px] text-slate-500 leading-relaxed text-justify mb-6">Ley 1581 de 2012: de protección de datos personales, autorizo el tratamiento de mis datos para fines relacionados con el sistema de gestión de seguridad y salud en el trabajo.</p>
                 <label className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-200 cursor-pointer group hover:border-indigo-500 transition-all">
                   <div className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all ${form.consentimiento ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 group-hover:border-indigo-400'}`}>
                     {form.consentimiento && <Check size={14} className="text-white" strokeWidth={4} />}
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={form.consentimiento}
-                    onChange={e => setForm({ ...form, consentimiento: e.target.checked })}
-                    className="hidden"
-                  />
+                  <input type="checkbox" checked={form.consentimiento} onChange={e => setForm({ ...form, consentimiento: e.target.checked })} className="hidden" />
                   <span className="text-[11px] font-black uppercase text-slate-600 group-hover:text-indigo-600 transition-colors">He leído y acepto los términos</span>
                 </label>
               </div>
             </div>
           )}
 
-          {/* Navigation Buttons */}
           <div className="flex justify-between items-center mt-12 pt-12 border-t border-slate-50">
-            {step > 1 ? (
-              <button
-                onClick={() => setStep(step - 1)}
-                className="h-14 px-10 rounded-2xl bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
-              >
-                Anterior
-              </button>
-            ) : <div />}
-
+            {step > 1 ? <button onClick={() => setStep(step - 1)} className="h-14 px-10 rounded-2xl bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Anterior</button> : <div />}
             {step < 5 ? (
-              <button
-                onClick={() => setStep(step + 1)}
-                className="h-14 px-12 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
-              >
-                Siguiente
-              </button>
+              <button onClick={() => setStep(step + 1)} className="h-14 px-12 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">Siguiente</button>
             ) : (
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="h-14 px-12 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3"
-              >
+              <button onClick={handleSave} disabled={loading} className="h-14 px-12 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center gap-3">
                 {loading ? <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : <ClipboardCheck size={18} />}
                 Finalizar Encuesta
               </button>

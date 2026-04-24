@@ -38,29 +38,39 @@ const initTables = async () => {
       CREATE TABLE IF NOT EXISTS gh_encuestas_sociodemograficas (
         id SERIAL PRIMARY KEY,
         cedula VARCHAR(50) NOT NULL,
-        lugar_nacimiento VARCHAR(255),
+        fecha_ingreso DATE,
+        cargo_id INTEGER,
+        municipio_nacimiento_id INTEGER,
         fecha_nacimiento DATE,
         tipo_sangre_id INTEGER,
         estado_civil_id INTEGER,
         nivel_educativo_id INTEGER,
-        estrato INTEGER,
+        tipo_contrato_id INTEGER,
+        ingresos_mensuales_id INTEGER,
+        afp_id INTEGER,
+        eps_id INTEGER,
+        turno_laboral VARCHAR(100),
         tipo_vivienda_id INTEGER,
-        departamento_id INTEGER,
-        municipio_id INTEGER,
+        estrato INTEGER,
+        municipio_residencia_id INTEGER,
+        barrio VARCHAR(255),
         direccion TEXT,
-        fuma VARCHAR(10),
+        sufre_enfermedad VARCHAR(10),
+        viven_conmigo INTEGER,
+        principal_sustentador VARCHAR(10),
+        personas_a_cargo_id INTEGER,
+        discapacidad_familia VARCHAR(10),
+        con_quien_vive_id INTEGER,
+        cuantos_hijos INTEGER,
         bebe_alcohol VARCHAR(50),
+        fuma VARCHAR(10),
         practica_deporte VARCHAR(50),
-        frecuencia_deporte VARCHAR(100),
+        tipo_deporte VARCHAR(255),
         uso_tiempo_libre_id INTEGER,
         uso_tiempo_libre_otros TEXT,
         contacto_emergencia_nombre VARCHAR(255),
         contacto_emergencia_telefono VARCHAR(50),
-        parentesco_emergencia_id INTEGER,
-        viven_conmigo INTEGER,
-        personas_a_cargo_id INTEGER,
-        discapacidad_familia VARCHAR(10),
-        con_quien_vive_id INTEGER,
+        consentimiento BOOLEAN,
         fecha_realizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         usuario_control VARCHAR(255) DEFAULT 'PUBLIC_USER'
       );
@@ -218,22 +228,27 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
     
     const surveyRes = await client.query(`
       INSERT INTO gh_encuestas_sociodemograficas (
-        cedula, lugar_nacimiento, fecha_nacimiento, tipo_sangre_id, estado_civil_id,
-        nivel_educativo_id, estrato, tipo_vivienda_id, departamento_id, municipio_id,
-        direccion, fuma, bebe_alcohol, practica_deporte, frecuencia_deporte,
-        uso_tiempo_libre_id, uso_tiempo_libre_otros, contacto_emergencia_nombre,
-        contacto_emergencia_telefono, parentesco_emergencia_id, viven_conmigo,
-        personas_a_cargo_id, discapacidad_familia, con_quien_vive_id, usuario_control
+        cedula, fecha_ingreso, cargo_id, municipio_nacimiento_id, fecha_nacimiento,
+        tipo_sangre_id, estado_civil_id, nivel_educativo_id, tipo_contrato_id,
+        ingresos_mensuales_id, afp_id, eps_id, turno_laboral, tipo_vivienda_id,
+        estrato, municipio_residencia_id, barrio, direccion, sufre_enfermedad,
+        viven_conmigo, principal_sustentador, personas_a_cargo_id, discapacidad_familia,
+        con_quien_vive_id, cuantos_hijos, bebe_alcohol, fuma, practica_deporte,
+        tipo_deporte, uso_tiempo_libre_id, uso_tiempo_libre_otros,
+        contacto_emergencia_nombre, contacto_emergencia_telefono, consentimiento,
+        usuario_control
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'PUBLIC_USER'
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, 'PUBLIC_USER'
       ) RETURNING id
     `, [
-      cedula, data.lugar_nacimiento, data.fecha_nacimiento, data.tipo_sangre_id, data.estado_civil_id,
-      data.nivel_educativo_id, data.estrato, data.tipo_vivienda_id, data.departamento_id, data.municipio_id,
-      data.direccion, data.fuma, data.bebe_alcohol, data.practica_deporte, data.frecuencia_deporte,
-      data.uso_tiempo_libre_id, data.uso_tiempo_libre_otros, data.contacto_emergencia_nombre,
-      data.contacto_emergencia_telefono, data.parentesco_emergencia_id, data.viven_conmigo,
-      data.personas_a_cargo_id, data.discapacidad_familia, data.con_quien_vive_id
+      cedula, data.fecha_ingreso, data.cargo_id, data.municipio_nacimiento_id, data.fecha_nacimiento,
+      data.tipo_sangre_id, data.estado_civil_id, data.nivel_educativo_id, data.tipo_contrato_id,
+      data.ingresos_mensuales_id, data.afp_id, data.eps_id, data.turno_laboral, data.tipo_vivienda_id,
+      data.estrato, data.municipio_residencia_id, data.barrio, data.direccion, data.sufre_enfermedad,
+      data.viven_conmigo, data.principal_sustentador, data.personas_a_cargo_id, data.discapacidad_familia,
+      data.con_quien_vive_id, data.cuantos_hijos, data.bebe_alcohol, data.fuma, data.practica_deporte,
+      data.tipo_deporte, data.uso_tiempo_libre_id, data.uso_tiempo_libre_otros,
+      data.contacto_emergencia_nombre, data.contacto_emergencia_telefono, data.consentimiento
     ]);
 
     const encuestaId = surveyRes.rows[0].id;
@@ -241,9 +256,9 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
     if (familia && Array.isArray(familia)) {
       for (const fam of familia) {
         await client.query(`
-          INSERT INTO gh_encuesta_familia (encuesta_id, nombre, parentesco_id, fecha_nacimiento, ocupacion)
-          VALUES ($1, $2, $3, $4, $5)
-        `, [encuestaId, fam.nombre, fam.parentesco_id, fam.fecha_nacimiento, fam.ocupacion]);
+          INSERT INTO gh_encuesta_familia (encuesta_id, nombre, fecha_nacimiento)
+          VALUES ($1, $2, $3)
+        `, [encuestaId, fam.nombre, fam.fecha_nacimiento]);
       }
     }
 
@@ -253,6 +268,7 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
     res.json({ success: true, message: 'Encuesta guardada exitosamente.' });
   } catch (err: any) {
     await client.query('ROLLBACK');
+    console.error('[GH-SAVE] Error:', err);
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
@@ -277,34 +293,41 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const result = await pool.query(`
-      SELECT r.*, p.nombre, p.cargo, p.fecha_ingreso, p.celular_personal, p.correo_personal,
-             d.nombre as depto_nombre, m.nombre as mun_nombre,
+      SELECT r.*, p.nombre, p.cargo as cargo_original, p.fecha_ingreso as fi_original,
+             mn.nombre as mun_nac_nombre, dn.nombre as dep_nac_nombre,
+             mr.nombre as mun_res_nombre, dr.nombre as dep_res_nombre,
              ts.nombre as sangre_nombre, ec.nombre as civil_nombre,
              ne.nombre as edu_nombre, tv.nombre as vivienda_nombre,
-             utl.nombre as tiempo_libre_nombre
+             utl.nombre as tiempo_libre_nombre,
+             tc.nombre as contrato_nombre, im.nombre as ingresos_nombre,
+             afp.nombre as afp_nombre, eps.nombre as eps_nombre,
+             pac.nombre as pcargo_nombre, cvv.nombre as conviviente_nombre,
+             cg.nombre as cargo_enc_nombre
       FROM gh_encuestas_sociodemograficas r
       JOIN gh_personal p ON p.cedula = r.cedula
-      LEFT JOIN departamentos d ON d.id = r.departamento_id
-      LEFT JOIN municipios m ON m.id = r.municipio_id
+      LEFT JOIN cfg_ciudades mn ON mn.id = r.municipio_nacimiento_id
+      LEFT JOIN cfg_departamentos dn ON dn.id = mn.id_departamento
+      LEFT JOIN cfg_ciudades mr ON mr.id = r.municipio_residencia_id
+      LEFT JOIN cfg_departamentos dr ON dr.id = mr.id_departamento
       LEFT JOIN gh_miscelaneos ts ON ts.id = r.tipo_sangre_id
       LEFT JOIN gh_miscelaneos ec ON ec.id = r.estado_civil_id
       LEFT JOIN gh_miscelaneos ne ON ne.id = r.nivel_educativo_id
       LEFT JOIN gh_miscelaneos tv ON tv.id = r.tipo_vivienda_id
       LEFT JOIN gh_miscelaneos utl ON utl.id = r.uso_tiempo_libre_id
+      LEFT JOIN gh_miscelaneos tc ON tc.id = r.tipo_contrato_id
+      LEFT JOIN gh_miscelaneos im ON im.id = r.ingresos_mensuales_id
+      LEFT JOIN gh_miscelaneos afp ON afp.id = r.afp_id
+      LEFT JOIN gh_miscelaneos eps ON eps.id = r.eps_id
+      LEFT JOIN gh_miscelaneos pac ON pac.id = r.personas_a_cargo_id
+      LEFT JOIN gh_miscelaneos cvv ON cvv.id = r.con_quien_vive_id
+      LEFT JOIN gh_miscelaneos cg ON cg.id = r.cargo_id
       WHERE r.id = $1
     `, [id]);
 
     if (result.rows.length === 0) return res.status(404).json({ error: 'Encuesta no encontrada' });
 
     const enc = result.rows[0];
-    
-    // Obtener Familia
-    const famResult = await pool.query(`
-      SELECT f.*, p.nombre as parentesco_nombre
-      FROM gh_encuesta_familia f
-      LEFT JOIN gh_miscelaneos p ON p.id = f.parentesco_id
-      WHERE f.encuesta_id = $1
-    `, [id]);
+    const famResult = await pool.query(`SELECT * FROM gh_encuesta_familia WHERE encuesta_id = $1`, [id]);
     const familia = famResult.rows;
 
     const doc = new jsPDF() as any;
@@ -314,12 +337,12 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, pageWidth, 35, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("PERFIL SOCIODEMOGRÁFICO", 14, 15);
+    doc.text("REPORTE SOCIODEMOGRÁFICO", 14, 15);
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text(`CÉDULA: ${enc.cedula} | NOMBRE: ${enc.nombre}`, 14, 25);
+    doc.text(`COLABORADOR: ${enc.nombre} | CC: ${enc.cedula}`, 14, 25);
     doc.text(`REALIZADA: ${new Date(enc.fecha_realizacion).toLocaleString()}`, pageWidth - 14, 25, { align: 'right' });
 
     let y = 45;
@@ -330,61 +353,61 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
       doc.setTextColor(15, 23, 42);
       doc.text(title, 14, y);
       y += 4;
-      
       autoTable(doc, {
-        startY: y,
-        body: data,
-        theme: 'striped',
-        styles: { fontSize: 8, cellPadding: 2 },
+        startY: y, body: data, theme: 'striped',
+        styles: { fontSize: 7, cellPadding: 1.5 },
         headStyles: { fillColor: [15, 23, 42] },
         margin: { left: 14, right: 14 }
       });
-      y = (doc as any).lastAutoTable.finalY + 10;
+      y = (doc as any).lastAutoTable.finalY + 8;
     };
 
-    // Sección 1: Info Básica
-    addSection("1. INFORMACIÓN PERSONAL", [
-      ["Nombre", enc.nombre, "Cédula", enc.cedula],
-      ["Cargo", enc.cargo || 'N/A', "Fecha Ingreso", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : 'N/A'],
-      ["Estado Civil", enc.civil_nombre, "Nivel Educativo", enc.edu_nombre],
-      ["Tipo Sangre", enc.sangre_nombre, "Lugar Nac.", enc.lugar_nacimiento]
+    addSection("1. PERFIL CORPORATIVO", [
+      ["Cargo", enc.cargo_enc_nombre || enc.cargo_original, "Fecha Ingreso", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : 'N/A'],
+      ["Tipo Contrato", enc.contrato_nombre, "Turno", enc.turno_laboral],
+      ["Ingresos", enc.ingresos_nombre, "AFP / EPS", `${enc.afp_nombre} / ${enc.eps_nombre}`]
     ]);
 
-    // Sección 2: Vivienda y Salud
-    addSection("2. VIVIENDA Y HÁBITOS", [
-      ["Tipo Vivienda", enc.vivienda_nombre, "Estrato", enc.estrato],
-      ["Departamento", enc.depto_nombre, "Municipio", enc.mun_nombre],
-      ["Dirección", enc.direccion, "Tiempo Libre", enc.tiempo_libre_nombre || enc.uso_tiempo_libre_otros],
-      ["Fuma", enc.fuma, "Bebe", enc.bebe_alcohol],
-      ["Deporte", enc.practica_deporte, "Frecuencia", enc.frecuencia_deporte]
+    addSection("2. DATOS PERSONALES Y RESIDENCIA", [
+      ["Lugar Nac.", `${enc.mun_nac_nombre}, ${enc.dep_nac_nombre}`, "Fecha Nac.", enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : 'N/A'],
+      ["Sangre", enc.sangre_nombre, "Estado Civil", enc.civil_nombre],
+      ["Nivel Educativo", enc.edu_nombre, "Estrato", enc.estrato],
+      ["Tipo Vivienda", enc.vivienda_nombre, "Ciudad Res.", `${enc.mun_res_nombre}, ${enc.dep_res_nombre}`],
+      ["Barrio", enc.barrio, "Dirección", enc.direccion]
     ]);
 
-    // Sección 3: Contacto Emergencia
-    addSection("3. CONTACTO DE EMERGENCIA", [
-      ["Nombre", enc.contacto_emergencia_nombre, "Teléfono", enc.contacto_emergencia_telefono],
-      ["Parentesco", "", "", ""]
+    addSection("3. ENTORNO FAMILIAR Y SOCIAL", [
+      ["Personas Hogar", enc.viven_conmigo, "Sustentador", enc.principal_sustentador],
+      ["Pers. a Cargo", enc.pcargo_nombre, "Discapacidad Fam.", enc.discapacidad_familia],
+      ["Vive con", enc.conviviente_nombre, "Hijos", enc.cuantos_hijos]
     ]);
 
-    // Sección 4: Familia
+    addSection("4. SALUD Y ESTILO DE VIDA", [
+      ["Enfermedad Crónica", enc.sufre_enfermedad, "Bebe Alcohol", enc.bebe_alcohol],
+      ["Fuma", enc.fuma, "Deporte", enc.practica_deporte],
+      ["Actividad Física", enc.tipo_deporte, "Tiempo Libre", enc.tiempo_libre_nombre || enc.uso_tiempo_libre_otros]
+    ]);
+
+    addSection("5. CONTACTO DE EMERGENCIA", [
+      ["Nombre", enc.contacto_emergencia_nombre, "Teléfono", enc.contacto_emergencia_telefono]
+    ]);
+
     if (familia.length > 0) {
-      addSection("4. COMPOSICIÓN FAMILIAR", familia.map(f => [
-        f.nombre, f.parentesco_nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—', f.ocupacion || '—'
+      addSection("6. COMPOSICIÓN FAMILIAR (HIJOS/OTROS)", familia.map(f => [
+        f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'
       ]));
     }
 
-    // Consentimiento
-    if (y > 250) { doc.addPage(); y = 20; }
+    if (y > 260) { doc.addPage(); y = 20; }
     doc.setFontSize(7);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(100, 100, 100);
-    doc.text("Este documento contiene información confidencial protegida por la Ley 1581 de 2012 (Habeas Data).", 14, y);
-    doc.text("El colaborador ha manifestado su consentimiento informado al momento de realizar la encuesta.", 14, y + 4);
+    doc.text("Información confidencial (Ley 1581 de 2012). Consentimiento aceptado: " + (enc.consentimiento ? 'SÍ' : 'NO'), 14, y);
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=Encuesta_${enc.cedula}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=Perfil_${enc.cedula}.pdf`);
     res.send(pdfBuffer);
-
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
