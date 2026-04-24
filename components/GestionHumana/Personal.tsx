@@ -140,6 +140,20 @@ const Personal: React.FC<Props> = ({ user }) => {
     }
   };
 
+  const handleDeactivate = async (id: number) => {
+    if (!window.confirm('¿Está seguro de inactivar esta encuesta?')) return;
+    setLoading(true);
+    try {
+      await api.deactivateEncuesta(id);
+      toast.success('Encuesta inactivada');
+      fetchEncuestas();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al inactivar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleActivateNew = async () => {
     if (!form.cedula) {
       toast.error('La cédula es obligatoria');
@@ -294,14 +308,21 @@ const Personal: React.FC<Props> = ({ user }) => {
                       </td>
                       <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
                       <td className="px-4 py-3 text-right">
-                        {e.estado !== 'COMPLETADO' && (
-                          <button onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?cedula=${e.cedula}`);
-                            toast.success('Link copiado');
-                          }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200">
-                            <Icons.Copy className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <div className="flex justify-end gap-1.5">
+                          {e.estado !== 'COMPLETADO' && (
+                            <button onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?cedula=${e.cedula}`);
+                              toast.success('Link copiado');
+                            }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
+                              <Icons.Copy className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {e.estado === 'ACTIVO' && (
+                            <button onClick={() => handleDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
+                              <Icons.X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

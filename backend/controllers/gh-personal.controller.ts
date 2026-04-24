@@ -238,8 +238,6 @@ export const getPersonalEncuestas = async (req: Request, res: Response) => {
 export const activateEncuesta = async (req: Request, res: Response) => {
   const { cedula, usuarioControl } = req.body;
   try {
-    // Inactivar previas
-    await pool.query("UPDATE gh_encuestas_activas SET estado = 'INACTIVO' WHERE cedula = $1", [cedula]);
     
     await pool.query(`
       INSERT INTO gh_encuestas_activas (cedula, usuario_control)
