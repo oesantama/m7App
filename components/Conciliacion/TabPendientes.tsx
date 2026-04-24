@@ -496,7 +496,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         const devueltas       = invoices.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes(i.item_status || '')).length;
         const parciales       = invoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).length;
         
-        const valorTotal      = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+        const valorTotalGlobal = invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         
         // RE-DEFINICIÓN: El 'Legalizado' en las cards principales se refiere a las FACTURAS.
         // Las consignaciones grupales y sobrecostos son 'Recaudos Extra' que no matan facturas directamente.

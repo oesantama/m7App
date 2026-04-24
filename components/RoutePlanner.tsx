@@ -1494,7 +1494,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
 
       autoTable(pdf, {
-        startY: y, margin: { left: ML, right: MR },
+        startY: y, margin: { left: ML, right: MR, bottom: 28 },
         head: [['#', 'U.NEG', 'DOC L', 'FACTURA', 'PEDIDO', 'CANT', 'REF', 'VALOR', 'PAG', 'CLIENTE / DIRECCION']],
         body: list
           .sort((a, b) => String(a.invoiceNumber || '').localeCompare(String(b.invoiceNumber || ''), undefined, { numeric: true, sensitivity: 'base' }))
@@ -1530,7 +1530,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           9: { halign: 'left' },
         },
         theme: 'grid',
-        margin: { bottom: 28 },
         didParseCell: (data: any) => {
           if (data.section === 'body' && title) { // Si hay título es que estamos en tabla de repice
             data.cell.styles.fontStyle = 'bold';
