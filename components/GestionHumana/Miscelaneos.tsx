@@ -40,7 +40,13 @@ type TabKey =
   | 'estados-civiles'
   | 'niveles-educativos'
   | 'areas'
-  | 'jefes-inmediatos';
+  | 'jefes-inmediatos'
+  | 'turnos-laborales'
+  | 'personas-a-cargo'
+  | 'convivientes'
+  | 'frecuencia-deporte'
+  | 'tipos-deporte'
+  | 'usos-tiempo-libre';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'horarios-laborales', label: 'Horario Laboral' },
@@ -55,6 +61,12 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'niveles-educativos', label: 'Niveles Educativos' },
   { key: 'areas',              label: 'Áreas' },
   { key: 'jefes-inmediatos',   label: 'Jefes Inmediatos' },
+  { key: 'turnos-laborales',   label: 'Turnos Laborales' },
+  { key: 'personas-a-cargo',   label: 'Personas a Cargo' },
+  { key: 'convivientes',       label: 'Con Quién Vive' },
+  { key: 'frecuencia-deporte', label: 'Frecuencia Deporte' },
+  { key: 'tipos-deporte',      label: 'Tipos de Deporte' },
+  { key: 'usos-tiempo-libre',  label: 'Usos Tiempo Libre' },
 ];
 
 // ─── Sub-componente CRUD reutilizable ─────────────────────────────────────────
