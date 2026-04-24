@@ -1287,7 +1287,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     </div>
                                     <span className="text-[9px] font-black text-emerald-700 shrink-0">{legalPct}% leg.</span>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                                     <div className="bg-white border border-slate-100 rounded-xl px-2 py-2 text-center cursor-default">
                                         <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5 leading-none">Total placa</p>
                                         <p className="text-[11px] font-black text-slate-900 leading-none mt-1">{fmtCOP(totalVal)}</p>
@@ -1316,12 +1316,19 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'dev' ? 'text-amber-100' : 'text-amber-600'}`}>🔄 Devuelto</p>
                                         <p className="text-[11px] font-black mt-1 leading-none">{fmtCOP(fin.valor_devuelto)}</p>
                                     </div>
+                                    <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'sc' ? 'bg-emerald-600 text-white border-emerald-700 shadow-lg' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100'}`}
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'sc' ? null : 'sc')}>
+                                        <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'sc' ? 'text-emerald-100' : 'text-emerald-600'}`}>✅ S.C Aprobado</p>
+                                        <p className="text-[11px] font-black mt-1 leading-none">
+                                            {fmtCOP(routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))}
+                                        </p>
+                                    </div>
                                     <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'sc' ? 'bg-rose-600 text-white border-rose-700 shadow-lg' : 'bg-rose-50 border-rose-100 hover:bg-rose-100'}`}
-                                        onClick={() => {
-                                            setActiveDetailCard(activeDetailCard === 'sc' ? null : 'sc');
-                                        }}>
-                                        <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'sc' ? 'text-rose-100' : 'text-rose-600'}`}>⚠️ Sobrecosto</p>
-                                        <p className="text-[11px] font-black mt-1 leading-none">{fmtCOP(routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))}</p>
+                                        onClick={() => setActiveDetailCard(activeDetailCard === 'sc' ? null : 'sc')}>
+                                        <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'sc' ? 'text-rose-100' : 'text-rose-600'}`}>⚠️ S.C Pendiente</p>
+                                        <p className="text-[11px] font-black mt-1 leading-none">
+                                            {fmtCOP(routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id)).reduce((s, r) => s + (Number(r.valor) || 0), 0))}
+                                        </p>
                                     </div>
                                 </div>
 
