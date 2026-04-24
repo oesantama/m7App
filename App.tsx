@@ -65,6 +65,7 @@ const ConsultaInventario = lazyWithRetry(() => import('./components/ConsultaInve
 const SalidaProveedor   = lazyWithRetry(() => import('./components/SalidaProveedor'));
 const GestionHumanaMiscelaneos = lazyWithRetry(() => import('./components/GestionHumana/Miscelaneos'));
 const GestionHumanaPersonal    = lazyWithRetry(() => import('./components/GestionHumana/Personal'));
+const PublicSurvey            = lazyWithRetry(() => import('./components/GestionHumana/PublicSurvey'));
 const CfgCiudades       = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 
 
@@ -154,6 +155,8 @@ const App: React.FC = () => {
           setPortalRoute('login');
         }
       } else if (window.location.pathname.startsWith('/attendance/register')) {
+          setIsPortalMode(true);
+      } else if (window.location.pathname.startsWith('/publico/encuesta')) {
           setIsPortalMode(true);
       } else {
         setIsPortalMode(false);
@@ -983,6 +986,14 @@ const App: React.FC = () => {
   }
 
   const handleBack = () => setActiveTab('dashboard');
+
+  if (window.location.pathname.startsWith('/publico/encuesta')) {
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+        <PublicSurvey />
+      </React.Suspense>
+    );
+  }
 
   if (!isAuthenticated || !user) {
     return <Login onLogin={handleLogin} />;

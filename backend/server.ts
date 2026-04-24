@@ -107,7 +107,9 @@ app.use('/api', (req, res, next) => {
     '/geocode', 
     '/grupo-inter/public/list',
     '/training/public/attendance',
-    '/training/public/session'
+    '/training/public/session',
+    '/api/gh-personal/public/survey/validate',
+    '/api/gh-personal/public/survey/save'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {

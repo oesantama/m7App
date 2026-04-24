@@ -72,6 +72,15 @@ const Personal: React.FC<Props> = ({ user }) => {
     estado: 'EST-01'
   });
 
+  const fetchEncuestas = useCallback(async () => {
+    try {
+      const data = await api.getPersonalEncuestas();
+      setEncuestas(data);
+    } catch {
+      toast.error('Error al cargar encuestas');
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -79,19 +88,17 @@ const Personal: React.FC<Props> = ({ user }) => {
         const data = await api.getPersonal();
         setPersonal(data);
       } else {
-        const data = await api.getPersonalEncuestas();
-        setEncuestas(data);
+        await fetchEncuestas();
       }
     } catch {
       toast.error('Error al cargar datos');
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, fetchEncuestas]);
 
   useEffect(() => {
     fetchData();
-    // Cargar maestros una vez
     api.getGhMiscelaneos('areas').then(setAreas).catch(() => {});
     api.getGhMiscelaneos('jefes-inmediatos').then(setJefes).catch(() => {});
     api.getGhMiscelaneos('cargos').then(setCargos).catch(() => {});
@@ -129,6 +136,24 @@ const Personal: React.FC<Props> = ({ user }) => {
     }
   };
 
+  const handleActivateNew = async () => {
+    if (!form.cedula) {
+      toast.error('La cédula es obligatoria');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.activatePersonalEncuesta({ cedula: form.cedula, usuarioControl: user.name });
+      toast.success('Encuesta activada exitosamente');
+      setIsModalOpen(false);
+      fetchEncuestas();
+    } catch (e: any) {
+      toast.error(e.message || 'Error al activar encuesta');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openEdit = (p: PersonalRecord) => {
     setEditing(p);
     setForm({ ...p, fecha_ingreso: p.fecha_ingreso ? p.fecha_ingreso.slice(0, 10) : '' });
@@ -145,16 +170,6 @@ const Personal: React.FC<Props> = ({ user }) => {
       estado: 'EST-01'
     });
     setIsModalOpen(true);
-  };
-
-  const activateEncuesta = async (cedula: string) => {
-    try {
-      await api.activatePersonalEncuesta({ cedula, usuarioControl: user.name });
-      toast.success('Encuesta activada');
-      if (activeTab === 'encuestas') fetchData();
-    } catch (e: any) {
-      toast.error(e.message || 'Error al activar');
-    }
   };
 
   return (
@@ -184,11 +199,9 @@ const Personal: React.FC<Props> = ({ user }) => {
             </button>
           </div>
           
-          {activeTab === 'personal' && (
-            <button onClick={openCreate} className="h-9 px-4 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2">
-              <Icons.Plus className="w-3.5 h-3.5" /> Agregar Personal
-            </button>
-          )}
+          <button onClick={openCreate} className="h-9 px-4 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2">
+            <Icons.Plus className="w-3.5 h-3.5" /> {activeTab === 'personal' ? 'Agregar Personal' : 'Activar Encuesta'}
+          </button>
         </div>
 
         <div className="p-6">
@@ -236,9 +249,6 @@ const Personal: React.FC<Props> = ({ user }) => {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-1.5">
-                            <button onClick={() => activateEncuesta(p.cedula)} className="p-1.5 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100" title="Activar Encuesta">
-                              <Icons.ClipboardCheck className="w-3.5 h-3.5" />
-                            </button>
                             <button onClick={() => openEdit(p)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100">
                               <Icons.Edit className="w-3.5 h-3.5" />
                             </button>
@@ -259,6 +269,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     <th className="px-4 py-3">Fecha Activación</th>
                     <th className="px-4 py-3">Estado</th>
                     <th className="px-4 py-3">Activado por</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="text-[11px] font-bold text-slate-600">
@@ -272,6 +283,16 @@ const Personal: React.FC<Props> = ({ user }) => {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
+                      <td className="px-4 py-3 text-right">
+                        {e.estado !== 'COMPLETADO' && (
+                          <button onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?cedula=${e.cedula}`);
+                            toast.success('Link copiado');
+                          }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200">
+                            <Icons.Copy className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -286,117 +307,78 @@ const Personal: React.FC<Props> = ({ user }) => {
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl my-8">
             <div className="flex items-center justify-between p-8 border-b border-slate-100">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 mb-1">Maestro de Personal</p>
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{editing ? 'Editar Colaborador' : 'Nuevo Colaborador'}</h3>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 mb-1">
+                  {activeTab === 'personal' ? 'Maestro de Personal' : 'Activación de Encuesta'}
+                </p>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                  {activeTab === 'personal' ? (editing ? 'Editar Colaborador' : 'Nuevo Colaborador') : 'Nueva Activación'}
+                </h3>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="w-11 h-11 flex items-center justify-center rounded-2xl bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all">
                 <Icons.X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Nombre Completo *</label>
-                <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Cédula *</label>
-                <input value={form.cedula} onChange={e => setForm({...form, cedula: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
-              </div>
-              
-              <div className="space-y-1.5">
-                <SearchableSelect
-                  label="Cargo"
-                  options={cargos.map(c => ({ id: c.nombre, nombre: c.nombre }))}
-                  value={form.cargo || ''}
-                  onChange={val => setForm({ ...form, cargo: String(val) })}
-                  placeholder="Seleccione Cargo..."
-                />
-              </div>
-              <div className="space-y-1.5">
-                <SearchableSelect
-                  label="EPS"
-                  options={epsList.map(e => ({ id: e.nombre, nombre: e.nombre }))}
-                  value={form.eps || ''}
-                  onChange={val => setForm({ ...form, eps: String(val) })}
-                  placeholder="Seleccione EPS..."
-                />
-              </div>
-              <div className="space-y-1.5">
-                <SearchableSelect
-                  label="AFP"
-                  options={afpList.map(a => ({ id: a.nombre, nombre: a.nombre }))}
-                  value={form.afp || ''}
-                  onChange={val => setForm({ ...form, afp: String(val) })}
-                  placeholder="Seleccione AFP..."
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Celular Personal</label>
-                <input value={form.celular_personal} onChange={e => setForm({...form, celular_personal: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Correo Personal</label>
-                <input value={form.correo_personal} onChange={e => setForm({...form, correo_personal: e.target.value.toLowerCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Celular Corporativo</label>
-                <input value={form.celular_corporativo} onChange={e => setForm({...form, celular_corporativo: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Correo Corporativo</label>
-                <input value={form.correo_corporativo} onChange={e => setForm({...form, correo_corporativo: e.target.value.toLowerCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">¿Es Jefe?</label>
-                <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-200">
-                  <button onClick={() => setForm({...form, es_jefe: true, jefe_inmediato_id: null})} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${form.es_jefe ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-100'}`}>Sí</button>
-                  <button onClick={() => setForm({...form, es_jefe: false})} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${!form.es_jefe ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-100'}`}>No</button>
-                </div>
-              </div>
-
-              {!form.es_jefe && (
-                <div className="space-y-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                  <SearchableSelect
-                    label="Jefe Inmediato *"
-                    options={jefes}
-                    value={form.jefe_inmediato_id || ''}
-                    onChange={val => setForm({ ...form, jefe_inmediato_id: val ? Number(val) : null })}
-                    placeholder="Seleccione Jefe..."
-                  />
+            <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+              {activeTab === 'personal' ? (
+                <>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Nombre Completo *</label>
+                    <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Cédula *</label>
+                    <input value={form.cedula} onChange={e => setForm({...form, cedula: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <SearchableSelect label="Cargo" options={cargos.map(c => ({ id: c.nombre, nombre: c.nombre }))} value={form.cargo || ''} onChange={val => setForm({ ...form, cargo: String(val) })} placeholder="Seleccione..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <SearchableSelect label="EPS" options={epsList.map(e => ({ id: e.nombre, nombre: e.nombre }))} value={form.eps || ''} onChange={val => setForm({ ...form, eps: String(val) })} placeholder="Seleccione..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <SearchableSelect label="AFP" options={afpList.map(a => ({ id: a.nombre, nombre: a.nombre }))} value={form.afp || ''} onChange={val => setForm({ ...form, afp: String(val) })} placeholder="Seleccione..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Celular Personal</label>
+                    <input value={form.celular_personal} onChange={e => setForm({...form, celular_personal: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Correo Personal</label>
+                    <input value={form.correo_personal} onChange={e => setForm({...form, correo_personal: e.target.value.toLowerCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">¿Es Jefe?</label>
+                    <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-200">
+                      <button onClick={() => setForm({...form, es_jefe: true, jefe_inmediato_id: null})} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${form.es_jefe ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-100'}`}>Sí</button>
+                      <button onClick={() => setForm({...form, es_jefe: false})} className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${!form.es_jefe ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-100'}`}>No</button>
+                    </div>
+                  </div>
+                  {!form.es_jefe && (
+                    <div className="space-y-1.5">
+                      <SearchableSelect label="Jefe Inmediato *" options={jefes} value={form.jefe_inmediato_id || ''} onChange={val => setForm({ ...form, jefe_inmediato_id: val ? Number(val) : null })} placeholder="Seleccione..." />
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Estado</label>
+                    <select value={form.estado} onChange={e => setForm({...form, estado: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500">
+                      {estados.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <div className="col-span-3 space-y-1.5">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Cédula del Colaborador *</label>
+                  <input value={form.cedula} onChange={e => setForm({...form, cedula: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" placeholder="Ingrese número de cédula..." />
                 </div>
               )}
-
-              <div className="space-y-1.5">
-                <SearchableSelect
-                  label="Área de Trabajo"
-                  options={areas}
-                  value={form.area_trabajo_id || ''}
-                  onChange={val => setForm({ ...form, area_trabajo_id: val ? Number(val) : null })}
-                  placeholder="Seleccione Área..."
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Fecha Ingreso</label>
-                <input type="date" value={form.fecha_ingreso} onChange={e => setForm({...form, fecha_ingreso: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold outline-none focus:border-indigo-500" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Estado</label>
-                <select value={form.estado} onChange={e => setForm({...form, estado: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500">
-                  {estados.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                </select>
-              </div>
             </div>
 
             <div className="p-8 border-t border-slate-100 flex gap-4">
               <button onClick={() => setIsModalOpen(false)} className="flex-1 h-14 rounded-[1.5rem] border-2 border-slate-100 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 hover:bg-slate-50 transition-all">Cancelar</button>
-              <button onClick={handleSave} disabled={saving} className="flex-[2] h-14 rounded-[1.5rem] bg-indigo-600 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-60 flex items-center justify-center gap-3">
+              <button onClick={activeTab === 'personal' ? handleSave : handleActivateNew} disabled={saving} className="flex-[2] h-14 rounded-[1.5rem] bg-indigo-600 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-60 flex items-center justify-center gap-3">
                 {saving ? <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : <Icons.Check className="w-5 h-5" />}
-                {editing ? 'Actualizar Colaborador' : 'Guardar Colaborador'}
+                {activeTab === 'personal' ? (editing ? 'Actualizar Colaborador' : 'Guardar Colaborador') : 'Activar Encuesta'}
               </button>
             </div>
           </div>

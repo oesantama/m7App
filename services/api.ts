@@ -357,6 +357,14 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  deactivateEncuesta: (id: number | string) => fetchJson(`${API_URL}/gh-personal/encuestas/deactivate/${id}`, { method: 'PUT' }),
+
+  // --- ENCUESTAS PÚBLICAS ---
+  validateSurveyAccess: (cedula: string) => fetchJson(`${API_URL}/gh-personal/public/survey/validate?cedula=${cedula}`),
+  savePublicSurvey: (data: { cedula: string, datos: any }) => fetchJson(`${API_URL}/gh-personal/public/survey/save`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
