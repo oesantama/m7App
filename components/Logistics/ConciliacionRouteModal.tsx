@@ -620,6 +620,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }]);
     const [savingGrupal, setSavingGrupal]     = useState(false);
     const [searchTerm, setSearchTerm]         = useState('');
+    const [headerFilter, setHeaderFilter]     = useState<string | null>(null);
 
     // Estado sobrecostos
     const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
@@ -791,13 +792,25 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
 
     const filteredInvoices = useMemo(() => {
-        if (!searchTerm) return invoices;
-        const lower = searchTerm.toLowerCase();
-        return invoices.filter(inv => 
-            inv.invoice_number.toLowerCase().includes(lower) || 
-            inv.customer_name?.toLowerCase().includes(lower)
-        );
-    }, [invoices, searchTerm]);
+        let list = invoices.filter(inv => {
+            const num = (inv.invoice_number || '').toLowerCase();
+            const cli = (inv.customer_name || '').toLowerCase();
+            const term = searchTerm.toLowerCase();
+            return num.includes(term) || cli.includes(term);
+        });
+
+        if (headerFilter === 'individual') {
+            list = list.filter(i => !!i.forma_pago);
+        } else if (headerFilter === 'devolucion') {
+            list = list.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase()));
+        } else if (headerFilter === 'pendiente') {
+            list = list.filter(i => !i.forma_pago && ( (i.invoice_metodo_pago || '').toUpperCase().trim() === 'EF' || (i.invoice_metodo_pago || '').toUpperCase().trim().includes('EFE') || (i.invoice_metodo_pago || '').toUpperCase().trim() === '' ));
+        } else if (headerFilter === 'credito') {
+            list = list.filter(i => !( (i.invoice_metodo_pago || '').toUpperCase().trim() === 'EF' || (i.invoice_metodo_pago || '').toUpperCase().trim().includes('EFE') || (i.invoice_metodo_pago || '').toUpperCase().trim() === '' ));
+        }
+
+        return list;
+    }, [invoices, searchTerm, headerFilter]);
 
     const surchargeStats = useMemo(() => {
         const approved = sobrecostos
@@ -935,29 +948,33 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         </div>
 
                         <div className="grid grid-cols-2 lg:grid-cols-8 gap-2 flex-1 max-w-full">
-                            <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-emerald-500/10 border border-emerald-100/50">
-                                <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest mb-1 text-center">Individual</p>
-                                <p className="text-[11px] font-black text-emerald-800 leading-none text-center">{fmtCOP(plateTotals.legalizedIndividual)}</p>
-                                <p className="text-[6px] text-emerald-600/60 font-bold mt-1 text-center">{plateTotals.legalCount} Facts</p>
+                            <div onClick={() => { setHeaderFilter(headerFilter === 'individual' ? null : 'individual'); setTab('individual'); }}
+                                className={`rounded-2xl px-3 py-2 shadow-lg border cursor-pointer transition-all ${headerFilter === 'individual' ? 'bg-emerald-600 text-white border-emerald-700 shadow-emerald-500/40' : 'bg-white border-emerald-100/50 shadow-emerald-500/10'}`}>
+                                <p className={`text-[7px] font-black uppercase tracking-widest mb-1 text-center ${headerFilter === 'individual' ? 'text-emerald-100' : 'text-emerald-600'}`}>Individual</p>
+                                <p className="text-[11px] font-black leading-none text-center">{fmtCOP(plateTotals.legalizedIndividual)}</p>
+                                <p className={`text-[6px] font-bold mt-1 text-center ${headerFilter === 'individual' ? 'text-emerald-100/70' : 'text-emerald-600/60'}`}>{plateTotals.legalCount} Facts</p>
                             </div>
-                            <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-violet-500/10 border border-violet-100/50">
-                                <p className="text-[7px] font-black text-violet-600 uppercase tracking-widest mb-1 text-center">Grupal</p>
-                                <p className="text-[11px] font-black text-violet-800 leading-none text-center">{fmtCOP(plateTotals.legalizedGrupal)}</p>
-                                <p className="text-[6px] text-violet-600/60 font-bold mt-1 text-center">Ruta</p>
+                            <div onClick={() => { setHeaderFilter(headerFilter === 'grupal' ? null : 'grupal'); setTab('grupal'); }}
+                                className={`rounded-2xl px-3 py-2 shadow-lg border cursor-pointer transition-all ${headerFilter === 'grupal' ? 'bg-violet-600 text-white border-violet-700 shadow-violet-500/40' : 'bg-white border-violet-100/50 shadow-violet-500/10'}`}>
+                                <p className={`text-[7px] font-black uppercase tracking-widest mb-1 text-center ${headerFilter === 'grupal' ? 'text-violet-100' : 'text-violet-600'}`}>Grupal</p>
+                                <p className="text-[11px] font-black leading-none text-center">{fmtCOP(plateTotals.legalizedGrupal)}</p>
+                                <p className={`text-[6px] font-bold mt-1 text-center ${headerFilter === 'grupal' ? 'text-violet-100/70' : 'text-violet-600/60'}`}>Ruta</p>
                             </div>
                             <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-blue-500/10 border border-blue-100/50">
                                 <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mb-1 text-center">Total Leg.</p>
                                 <p className="text-[11px] font-black text-blue-800 leading-none text-center">{fmtCOP(plateTotals.legalizedVal)}</p>
                             </div>
-                            <div className="bg-amber-500 rounded-2xl px-3 py-2 shadow-lg shadow-amber-500/20 border border-amber-600/20 text-white">
-                                <p className="text-[7px] font-black text-amber-100 uppercase tracking-widest mb-1 text-center">Pendiente</p>
+                            <div onClick={() => { setHeaderFilter(headerFilter === 'pendiente' ? null : 'pendiente'); setTab('individual'); }}
+                                className={`rounded-2xl px-3 py-2 shadow-lg border cursor-pointer transition-all ${headerFilter === 'pendiente' ? 'bg-amber-600 text-white border-amber-700 shadow-amber-500/40' : 'bg-amber-500 text-white border-amber-600 shadow-amber-500/20'}`}>
+                                <p className={`text-[7px] font-black uppercase tracking-widest mb-1 text-center ${headerFilter === 'pendiente' ? 'text-amber-100' : 'text-amber-100'}`}>Pendiente</p>
                                 <p className="text-[11px] font-black leading-none text-center">{fmtCOP(plateTotals.pendingVal)}</p>
-                                <p className="text-[6px] text-amber-100/60 font-bold mt-1 text-center">Falta Cobrar</p>
+                                <p className={`text-[6px] font-bold mt-1 text-center ${headerFilter === 'pendiente' ? 'text-amber-100/70' : 'text-amber-100/60'}`}>Falta Cobrar</p>
                             </div>
                             {plateTotals.valorDevuelto > 0 && (
-                                <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-orange-500/10 border border-orange-100/50">
-                                    <p className="text-[7px] font-black text-orange-600 uppercase tracking-widest mb-1 text-center">Devuelto</p>
-                                    <p className="text-[11px] font-black text-orange-800 leading-none text-center">{fmtCOP(plateTotals.valorDevuelto)}</p>
+                                <div onClick={() => { setHeaderFilter(headerFilter === 'devolucion' ? null : 'devolucion'); setTab('individual'); }}
+                                    className={`rounded-2xl px-3 py-2 shadow-lg border cursor-pointer transition-all ${headerFilter === 'devolucion' ? 'bg-orange-600 text-white border-orange-700 shadow-orange-500/40' : 'bg-white border-orange-100/50 shadow-orange-500/10'}`}>
+                                    <p className={`text-[7px] font-black uppercase tracking-widest mb-1 text-center ${headerFilter === 'devolucion' ? 'text-orange-100' : 'text-orange-600'}`}>Devuelto</p>
+                                    <p className="text-[11px] font-black leading-none text-center">{fmtCOP(plateTotals.valorDevuelto)}</p>
                                 </div>
                             )}
                             <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-slate-500/10 border border-slate-100">
@@ -965,10 +982,11 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 <p className="text-[11px] font-black text-slate-800 leading-none text-center">{fmtCOP(plateTotals.totalValue)}</p>
                                 <p className="text-[6px] text-slate-400 font-bold mt-1 text-center">{plateTotals.total} Facts (EF)</p>
                             </div>
-                            <div className="bg-slate-800 rounded-2xl px-3 py-2 shadow-lg shadow-slate-900/10 border border-slate-900 text-white">
-                                <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center">Crédito</p>
+                            <div onClick={() => { setHeaderFilter(headerFilter === 'credito' ? null : 'credito'); setTab('individual'); }}
+                                className={`rounded-2xl px-3 py-2 shadow-lg border cursor-pointer transition-all ${headerFilter === 'credito' ? 'bg-slate-900 text-white border-slate-900 shadow-slate-900/40' : 'bg-slate-800 text-white border-slate-900 shadow-slate-900/10'}`}>
+                                <p className={`text-[7px] font-black uppercase tracking-widest mb-1 text-center ${headerFilter === 'credito' ? 'text-slate-400' : 'text-slate-400'}`}>Crédito</p>
                                 <p className="text-[11px] font-black leading-none text-center">{fmtCOP(plateTotals.valorCredito)}</p>
-                                <p className="text-[6px] text-slate-500 font-bold mt-1 text-center">Cartera</p>
+                                <p className={`text-[6px] font-bold mt-1 text-center ${headerFilter === 'credito' ? 'text-slate-500' : 'text-slate-500'}`}>Cartera</p>
                             </div>
                             <div className="bg-white rounded-2xl px-3 py-2 shadow-lg shadow-rose-500/10 border border-rose-100/50">
                                 <p className="text-[7px] font-black text-rose-600 uppercase tracking-widest mb-1 text-center font-bold">Sobrecostos</p>

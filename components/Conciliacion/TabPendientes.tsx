@@ -144,6 +144,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const msFileRef                             = React.useRef<HTMLInputElement>(null);
     const [pendingMsFile, setPendingMsFile]     = useState<File | null>(null);
     const [msPreviewData, setMsPreviewData]     = useState<any[]>([]);
+    const [summaryFilter, setSummaryFilter]     = useState<string | null>(null);
     const [showMsPreview, setShowMsPreview]     = useState(false);
 
     // ASIGNACIÓN
@@ -529,8 +530,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         });
 
         const valorTotal      = efectivoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const valorDevuelto   = efectivoInvoices.filter(i => i.es_devolucion).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
-        const valorParcial    = efectivoInvoices.filter(i => PARCIAL_STATUS.includes(i.item_status || '')).reduce((s, i) => s + (Number(i.valor) || 0), 0);
+        const valorDevuelto   = efectivoInvoices.reduce((s, i) => {
+            const isDev = i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase());
+            const isPar = PARCIAL_STATUS.includes((i.item_status || '').toUpperCase());
+            if (isDev) return s + (Number(i.invoice_value) || 0);
+            if (isPar && i.forma_pago) return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
+            return s;
+        }, 0);
+        const valorParcial    = efectivoInvoices.filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase())).reduce((s, i) => s + (Number(i.valor) || 0), 0);
 
         // Filtrar Facturas a CRÉDITO (Todo lo que NO sea 'EF')
         const creditoInvoices = invoices.filter(i => {
@@ -541,17 +548,17 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
         const assigned        = total - unassigned;
         
-        const repiceRows      = invoices.filter(i => {
-            const st = (i.item_status || '').toUpperCase();
-            return REPICE_STATUS.includes(st);
-        });
         const repiceCount     = repiceRows.length;
         const valorRepice     = repiceRows.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
+
+        // Valor de crédito pagado (para saber cuánto se ha legalizado de lo que era crédito)
+        const individualCredito = invoices.filter(i => !!i.forma_pago && !( (i.invoice_metodo_pago || '').toUpperCase().trim() === 'EF' || (i.invoice_metodo_pago || '').toUpperCase().trim().includes('EFE') )).reduce((s, i) => s + (Number(i.valor) || 0), 0);
 
         return { 
             total, legalizadas, entregadas, devueltas, parciales, 
             valorTotal, valorTotalGlobal, valorTotalCredito,
-            valorLegalizado: individualLeg, // Individual
+            valorLegalizado: individualLeg, // Individual total
+            individualCredito,
             totalGrupal,
             totalLegalizado: individualLeg + totalGrupal + approvedSurch,
             valorDevuelto, valorParcial, 
@@ -598,6 +605,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         <Icons.RefreshCw className={`w-3.5 h-3.5 ${loadingDocs ? 'animate-spin' : ''}`} />
                         Sincronizar
                     </button>
+                    {summaryFilter && (
+                        <button onClick={() => setSummaryFilter(null)}
+                            className="w-full py-2 bg-rose-600 hover:bg-rose-700 rounded-lg flex items-center justify-center gap-2 text-[10px] font-black text-white uppercase tracking-widest shadow-md">
+                            <Icons.X className="w-3.5 h-3.5" />
+                            Quitar Filtro
+                        </button>
+                    )}
                 </div>
                 <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex gap-2">
                     <span className="text-[8px] font-bold text-slate-500">{filteredDocs.length} documentos</span>
@@ -784,59 +798,73 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
 
                                 {/* ── Bloque de métricas del documento ─────── */}
-                                <div className="bg-white border-b border-slate-200 px-5 py-4">
-                                    {/* Fila 1: Resumen de Valores ($) */}
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/10 min-w-[120px]">
-                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Documento</span>
+                                <div className="bg-white border-b border-slate-200 px-5 py-4 overflow-x-auto custom-scrollbar">
+                                    <div className="flex gap-2 min-w-max pb-2">
+                                        <div onClick={() => setSummaryFilter(null)}
+                                            className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                ${!summaryFilter ? 'bg-slate-900 text-white border-slate-900 shadow-xl' : 'bg-white text-slate-900 border-slate-100 hover:border-slate-300 shadow-md'}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${!summaryFilter ? 'text-slate-400' : 'text-slate-500'}`}>Total Placa (EF)</span>
                                             <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotal)}</span>
-                                            <span className="text-[8px] text-slate-500 font-bold mt-1">{stats.total} Facturas</span>
+                                            <span className={`text-[8px] font-bold mt-1 ${!summaryFilter ? 'text-slate-500' : 'text-slate-400'}`}>{stats.total} Facts</span>
                                         </div>
-                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-900/10 min-w-[120px]">
-                                            <span className="text-[8px] font-black text-emerald-100 uppercase tracking-widest leading-none mb-1">Leg. Individual</span>
+
+                                        <div onClick={() => setSummaryFilter('individual')}
+                                            className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                ${summaryFilter === 'individual' ? 'bg-emerald-600 text-white border-emerald-700 shadow-xl' : 'bg-white text-emerald-600 border-emerald-100 hover:border-emerald-300 shadow-md'}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'individual' ? 'text-emerald-100' : 'text-emerald-500'}`}>Leg. Individual</span>
                                             <span className="text-base font-black leading-none">{fmtCOP(stats.valorLegalizado)}</span>
-                                            <span className="text-[8px] text-emerald-100/70 font-bold mt-1">{stats.legalizadas} Facturas</span>
+                                            <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'individual' ? 'text-emerald-100/70' : 'text-emerald-400'}`}>{stats.legalizadas} Facturas</span>
                                         </div>
-                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-900/10 min-w-[120px]">
-                                            <span className="text-[8px] font-black text-violet-100 uppercase tracking-widest leading-none mb-1">Leg. Grupal</span>
+
+                                        <div onClick={() => setSummaryFilter('grupal')}
+                                            className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                ${summaryFilter === 'grupal' ? 'bg-violet-600 text-white border-violet-700 shadow-xl' : 'bg-white text-violet-600 border-violet-100 hover:border-violet-300 shadow-md'}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'grupal' ? 'text-violet-100' : 'text-violet-500'}`}>Leg. Grupal</span>
                                             <span className="text-base font-black leading-none">{fmtCOP(stats.totalGrupal)}</span>
-                                            <span className="text-[8px] text-violet-100/70 font-bold mt-1">{stats.grupalCount} Movimientos</span>
+                                            <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'grupal' ? 'text-violet-100/70' : 'text-violet-400'}`}>{stats.grupalCount} Movs</span>
                                         </div>
-                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-900/10 min-w-[120px]">
-                                            <span className="text-[8px] font-black text-blue-100 uppercase tracking-widest leading-none mb-1">Total Legalizado</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(stats.totalLegalizado)}</span>
-                                            <span className="text-[8px] text-blue-100/70 font-bold mt-1">Acumulado Total</span>
-                                        </div>
-                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10 min-w-[120px]">
-                                            <span className="text-[8px] font-black text-amber-100 uppercase tracking-widest leading-none mb-1">Pendiente</span>
+
+                                        <div onClick={() => setSummaryFilter('pendiente')}
+                                            className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                ${summaryFilter === 'pendiente' ? 'bg-amber-500 text-white border-amber-600 shadow-xl' : 'bg-white text-amber-600 border-amber-100 hover:border-amber-300 shadow-md'}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'pendiente' ? 'text-amber-100' : 'text-amber-500'}`}>Pendiente</span>
                                             <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotal - (stats.valorLegalizado + stats.totalGrupal + stats.approvedSurch + stats.valorDevuelto)))}</span>
-                                            <span className="text-[8px] text-amber-100/70 font-bold mt-1">{stats.total - stats.legalizadas} Por Legalizar</span>
+                                            <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'pendiente' ? 'text-amber-100/70' : 'text-amber-400'}`}>{stats.total - stats.legalizadas} Por Cobrar</span>
                                         </div>
-                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-600 text-white shadow-lg shadow-slate-900/10 min-w-[120px]">
-                                            <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Total Crédito</span>
+
+                                        <div onClick={() => setSummaryFilter('credito')}
+                                            className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                ${summaryFilter === 'credito' ? 'bg-slate-800 text-white border-slate-900 shadow-xl' : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300 shadow-md'}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'credito' ? 'text-slate-400' : 'text-slate-500'}`}>Crédito</span>
                                             <span className="text-base font-black leading-none">{fmtCOP(stats.valorTotalCredito)}</span>
-                                            <span className="text-[8px] text-slate-400 font-bold mt-1">No efectivo</span>
+                                            <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'credito' ? 'text-slate-500' : 'text-slate-400'}`}>En Cartera</span>
                                         </div>
-                                        {(stats.approvedSurch > 0 || stats.pendingSurch > 0) && (
-                                            <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-900/10 min-w-[140px]">
-                                                <span className="text-[8px] font-black text-rose-100 uppercase tracking-widest leading-none mb-1">Sobre Costos</span>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <div className="flex justify-between items-center gap-4">
-                                                        <span className="text-[7px] font-bold text-rose-200 uppercase">Ok ({stats.approvedSurchCount}):</span>
-                                                        <span className="text-xs font-black">{fmtCOP(stats.approvedSurch)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center gap-4 border-t border-rose-500/30 pt-0.5">
-                                                        <span className="text-[7px] font-bold text-rose-200 uppercase">Pend ({stats.pendingSurchCount}):</span>
-                                                        <span className="text-xs font-black">{fmtCOP(stats.pendingSurch)}</span>
-                                                    </div>
-                                                </div>
+
+                                        <div onClick={() => setSummaryFilter('devolucion')}
+                                            className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                ${summaryFilter === 'devolucion' ? 'bg-orange-600 text-white border-orange-700 shadow-xl' : 'bg-white text-orange-600 border-orange-100 hover:border-orange-300 shadow-md'}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'devolucion' ? 'text-orange-100' : 'text-orange-500'}`}>Devolución</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorDevuelto)}</span>
+                                            <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'devolucion' ? 'text-orange-100/70' : 'text-orange-400'}`}>{stats.devueltas} Facturas</span>
+                                        </div>
+
+                                        <div onClick={() => setSummaryFilter('parcial')}
+                                            className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                ${summaryFilter === 'parcial' ? 'bg-orange-400 text-white border-orange-500 shadow-xl' : 'bg-white text-orange-400 border-orange-100 hover:border-orange-300 shadow-md'}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'parcial' ? 'text-orange-100' : 'text-orange-500'}`}>Parcial</span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorParcial)}</span>
+                                            <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'parcial' ? 'text-orange-100/70' : 'text-orange-400'}`}>{stats.parciales} Facturas</span>
+                                        </div>
+
+                                        {stats.approvedSurch > 0 && (
+                                            <div onClick={() => setSummaryFilter('sobrecostos')}
+                                                className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                    ${summaryFilter === 'sobrecostos' ? 'bg-rose-600 text-white border-rose-700 shadow-xl' : 'bg-white text-rose-600 border-rose-100 hover:border-rose-300 shadow-md'}`}>
+                                                <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'sobrecostos' ? 'text-rose-100' : 'text-rose-500'}`}>Sobrecostos (A)</span>
+                                                <span className="text-base font-black leading-none">{fmtCOP(stats.approvedSurch)}</span>
+                                                <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'sobrecostos' ? 'text-rose-100/70' : 'text-rose-400'}`}>{stats.approvedSurchCount} Aprobados</span>
                                             </div>
                                         )}
-                                        <div className="flex flex-col px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-900 shadow-lg shadow-slate-900/5 border border-slate-200 min-w-[120px]">
-                                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">📦 Repice</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(stats.valorRepice)}</span>
-                                            <span className="text-[8px] text-slate-400 font-bold mt-1">{stats.repiceCount} Facturas</span>
-                                        </div>
                                     </div>
 
                                     {/* Fila 2: Barra de Progreso Principal (AVANCE DE LEGALIZACIÓN) */}
@@ -884,8 +912,66 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                 </div>
 
                                 <div className="p-4 space-y-4">
+                                    {/* Vista filtrada por Tarjeta (Desglose solicitado por usuario) */}
+                                    {summaryFilter && (
+                                        <div className="bg-white rounded-[2rem] border-2 border-slate-100 overflow-hidden shadow-xl animate-in slide-in-from-top-2 duration-300">
+                                            <div className={`px-6 py-4 flex items-center justify-between border-b 
+                                                ${summaryFilter === 'individual' ? 'bg-emerald-50 border-emerald-100' : 
+                                                  summaryFilter === 'devolucion' ? 'bg-orange-50 border-orange-100' :
+                                                  summaryFilter === 'parcial'    ? 'bg-amber-50 border-amber-100' :
+                                                  'bg-slate-50 border-slate-200'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-lg
+                                                        ${summaryFilter === 'individual' ? 'bg-emerald-600' : 
+                                                          summaryFilter === 'devolucion' ? 'bg-orange-600' :
+                                                          summaryFilter === 'parcial'    ? 'bg-amber-500' :
+                                                          'bg-slate-800'}`}>
+                                                        <Icons.List className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Desglose: {summaryFilter}</h4>
+                                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Listado detallado de facturas</p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => setSummaryFilter(null)}
+                                                    className="w-8 h-8 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center shadow-sm border border-slate-200 transition-all">
+                                                    <Icons.X className="w-4 h-4 text-slate-500" />
+                                                </button>
+                                            </div>
+                                            <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-2">
+                                                {invoices.filter(i => {
+                                                    if (summaryFilter === 'individual') return !!i.forma_pago;
+                                                    if (summaryFilter === 'devolucion') return i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase());
+                                                    if (summaryFilter === 'parcial')    return PARCIAL_STATUS.includes((i.item_status || '').toUpperCase());
+                                                    if (summaryFilter === 'pendiente')  return !i.forma_pago && ( (i.invoice_metodo_pago || '').toUpperCase().trim() === 'EF' || (i.invoice_metodo_pago || '').toUpperCase().trim().includes('EFE') || (i.invoice_metodo_pago || '').toUpperCase().trim() === '' );
+                                                    if (summaryFilter === 'credito')    return !( (i.invoice_metodo_pago || '').toUpperCase().trim() === 'EF' || (i.invoice_metodo_pago || '').toUpperCase().trim().includes('EFE') || (i.invoice_metodo_pago || '').toUpperCase().trim() === '' );
+                                                    return true;
+                                                }).map(inv => {
+                                                    const legalizada = !!inv.forma_pago;
+                                                    const cfg = inv.forma_pago ? (FORMA_COLOR[inv.forma_pago] || { bg: 'bg-slate-100', text: 'text-slate-700', label: inv.forma_pago }) : null;
+                                                    return (
+                                                        <div key={inv.invoice_number} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all">
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-[11px] font-black text-slate-900">{inv.invoice_number}</p>
+                                                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">🚛 {inv.route_vehicle_plate || 'S/A'}</span>
+                                                                    {cfg && <span className={`${cfg.bg} ${cfg.text} text-[7px] font-black px-1.5 py-0.5 rounded-full`}>{cfg.label}</span>}
+                                                                </div>
+                                                                <p className="text-[9px] text-slate-500 font-bold truncate max-w-[200px]">{inv.customer_name}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-[10px] font-black text-slate-900">{fmtCOP(inv.invoice_value)}</p>
+                                                                {inv.valor > 0 && <p className="text-[8px] font-black text-emerald-600">Leg: {fmtCOP(inv.valor)}</p>}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* ── Tarjetas de placas/rutas ──────────── */}
-                                    {routes.length > 0 && (
+                                    {!summaryFilter && routes.length > 0 && (
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
