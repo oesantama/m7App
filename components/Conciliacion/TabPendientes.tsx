@@ -27,6 +27,9 @@ export interface DocSummary {
     conductor_name?: string;
     total_efectivo?: number;
     total_credito?: number;
+    total_legalizado_individual?: number;
+    total_pago_grupal?: number;
+    total_sobrecosto_ruta?: number;
     client_id?: string;
 }
 
@@ -648,8 +651,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         .slice(docPageSize === 'all' ? 0 : (docPage - 1) * docPageSize, docPageSize === 'all' ? filteredDocs.length : docPage * docPageSize)
                         .map(doc => {
                         const complete = doc.pendientes === 0;
-                        const pct = doc.total_invoices > 0
-                            ? Math.round((doc.conciliadas / doc.total_invoices) * 100) : 0;
+                        const totalEF = Number(doc.total_efectivo || 0);
+                        const totalLeg = Number(doc.total_legalizado_individual || 0) + 
+                                       Number(doc.total_pago_grupal || 0) + 
+                                       Number(doc.total_sobrecosto_ruta || 0);
+                        
+                        const pct = totalEF > 0
+                            ? Math.min(100, Math.round((totalLeg / totalEF) * 100)) 
+                            : (complete ? 100 : 0);
                         const isActive = selectedDoc?.id === doc.id;
                         return (
                             <button key={doc.id} onClick={() => loadDocDetail(doc)}
@@ -883,14 +892,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     {/* Fila 2: Barra de Progreso Principal (AVANCE DE LEGALIZACIÓN) */}
                                     <div className="mb-4">
                                         <div className="flex justify-between items-end mb-1.5">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Avance de Legalización</p>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Avance de Legalización (Económico EF)</p>
                                             <span className="text-[10px] font-black text-emerald-600">
-                                                {stats.legalizadas}/{stats.total} · {Math.round((stats.legalizadas/stats.total)*100) || 0}%
+                                                {fmtCOP(stats.totalLegalizado)} / {fmtCOP(stats.valorTotal)} · {stats.valorTotal > 0 ? Math.min(100, Math.round((stats.totalLegalizado / stats.valorTotal) * 100)) : 0}%
                                             </span>
                                         </div>
                                         <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
                                             <div className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                                                style={{ width: `${(stats.legalizadas/stats.total)*100 || 0}%` }} />
+                                                style={{ width: `${stats.valorTotal > 0 ? Math.min(100, (stats.totalLegalizado / stats.valorTotal) * 100) : 0}%` }} />
                                         </div>
                                     </div>
 
@@ -1008,8 +1017,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                         valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                                                         efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
                                                     };
-                                                    const pct = route.invoice_count > 0
-                                                        ? Math.round((fin.legalizadas / route.invoice_count) * 100) : 0;
+                                                    const pct = fin.efectivo > 0
+                                                        ? Math.min(100, Math.round((fin.valor_legalizado / fin.efectivo) * 100)) 
+                                                        : (fin.legalizadas === route.invoice_count && route.invoice_count > 0 ? 100 : 0);
                                                     return (
                                                         <div key={route.route_id}
                                                             className="rounded-2xl border-2 border-slate-100 bg-white transition-all overflow-hidden hover:border-slate-200">
