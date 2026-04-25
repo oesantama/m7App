@@ -313,11 +313,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
             // --- HOJA 1: CONSOLIDADO GENERAL ---
             const consolidatedData = mapInvoices(invoices);
-            const wsConsolidated = XLSX.utils.json_to_sheet(consolidatedData);
-            
-            // Agregar Pagos Grupales al final del consolidado
+            // Iniciamos con un título o vacío para controlar el orden
+            const wsConsolidated = XLSX.utils.aoa_to_sheet([['REPORTE CONSOLIDADO DE CONCILIACIÓN']]);
+            XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
+
+            // 1. CONSIGNACIONES GRUPALES
             if (groupPayments && groupPayments.length > 0) {
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
                 XLSX.utils.sheet_add_aoa(wsConsolidated, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
                 XLSX.utils.sheet_add_json(wsConsolidated, groupPayments.map(p => ({
                     'PLACA': p.plate || '—',
@@ -327,11 +328,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     'FECHA CONSIGNACION': p.fecha ? String(p.fecha).slice(0, 10) : '—',
                     'OBSERVACION': p.observacion || '—'
                 })), { origin: -1 });
+                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
             }
 
-            // Agregar Sobrecostos al final del consolidado
+            // 2. SOBRECOSTOS DE RUTA
             if (routeSurcharges && routeSurcharges.length > 0) {
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
                 XLSX.utils.sheet_add_aoa(wsConsolidated, [['SOBRECOSTOS DE RUTA']], { origin: -1 });
                 XLSX.utils.sheet_add_json(wsConsolidated, routeSurcharges.map(s => ({
                     'PLACA': s.plate || '—',
@@ -340,7 +341,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     'FECHA': s.fecha ? String(s.fecha).slice(0, 10) : '—',
                     'ESTADO': getScStatusName(s.status_id || s.statusId)
                 })), { origin: -1 });
+                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
             }
+
+            // 3. DETALLE DE FACTURAS
+            XLSX.utils.sheet_add_aoa(wsConsolidated, [['DETALLE DE FACTURAS']], { origin: -1 });
+            XLSX.utils.sheet_add_json(wsConsolidated, consolidatedData, { origin: -1 });
 
             XLSX.utils.book_append_sheet(wb, wsConsolidated, docName.slice(0, 30));
 
@@ -350,13 +356,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 if (!p) return;
                 const plateInvs = invoices.filter(i => i.route_vehicle_plate === p);
                 const plateData = mapInvoices(plateInvs);
-                const wsPlate = XLSX.utils.json_to_sheet(plateData);
+                
+                const wsPlate = XLSX.utils.aoa_to_sheet([['REPORTE DE CONCILIACIÓN - PLACA ' + p]]);
+                XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
 
-                // Pagos grupales de esta placa
+                // 1. Pagos grupales de esta placa
                 const plateGroup = groupPayments?.filter(g => g.plate === p) || [];
                 if (plateGroup.length > 0) {
-                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
-                    XLSX.utils.sheet_add_aoa(wsPlate, [['PAGOS GRUPALES - ' + p]], { origin: -1 });
+                    XLSX.utils.sheet_add_aoa(wsPlate, [['CONSIGNACIONES GRUPALES - ' + p]], { origin: -1 });
                     XLSX.utils.sheet_add_json(wsPlate, plateGroup.map(g => ({
                         'METODO': g.metodo_pago || g.metodo || '—',
                         'VALOR': Number(g.valor) || 0,
@@ -364,20 +371,25 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         'FECHA CONSIGNACION': g.fecha ? String(g.fecha).slice(0, 10) : '—',
                         'OBSERVACION': g.observacion || '—'
                     })), { origin: -1 });
+                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
                 }
 
-                // Sobrecostos de esta placa
+                // 2. Sobrecostos de esta placa
                 const plateSur = routeSurcharges?.filter(s => s.plate === p) || [];
                 if (plateSur.length > 0) {
-                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
-                    XLSX.utils.sheet_add_aoa(wsPlate, [['SOBRECOSTOS - ' + p]], { origin: -1 });
+                    XLSX.utils.sheet_add_aoa(wsPlate, [['SOBRECOSTOS DE RUTA - ' + p]], { origin: -1 });
                     XLSX.utils.sheet_add_json(wsPlate, plateSur.map(s => ({
                         'VALOR': Number(s.valor) || 0,
                         'REFERENCIA': s.referencia || s.nro_aprobacion || s.nroAprobacion || '—',
                         'FECHA': s.fecha ? String(s.fecha).slice(0, 10) : '—',
                         'ESTADO': getScStatusName(s.status_id || s.statusId)
                     })), { origin: -1 });
+                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
                 }
+
+                // 3. Detalle de facturas
+                XLSX.utils.sheet_add_aoa(wsPlate, [['DETALLE DE FACTURAS']], { origin: -1 });
+                XLSX.utils.sheet_add_json(wsPlate, plateData, { origin: -1 });
 
                 XLSX.utils.book_append_sheet(wb, wsPlate, p.slice(0, 30));
             });

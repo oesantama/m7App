@@ -61,7 +61,7 @@ router.get('/invoices', (req, res, next) => {
   if (isSuper || hasDocsPerm || hasRutasPerm || hasRecibidoPerm || hasManualPerm) return next();
   res.status(403).json({ success: false, error: 'Permiso insuficiente para ver facturas' });
 }, getInvoices);
-router.post('/process-l-payment', requirePermission('DOCUMENTOS_L', 'edit'), processDocumentLPayment);
+router.post('/payments-l', requirePermission('DOCUMENTOS_L', 'edit'), processDocumentLPayment);
 router.get('/mastersuite-report', (req, res, next) => {
   const user = (req as any).user;
   const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
