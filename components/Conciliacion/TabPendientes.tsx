@@ -887,6 +887,16 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                 <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'sobrecostos' ? 'text-rose-100/70' : 'text-rose-400'}`}>{stats.approvedSurchCount} Aprobados</span>
                                             </div>
                                         )}
+
+                                        {stats.pendingSurch > 0 && (
+                                            <div onClick={() => setSummaryFilter('sobrecostos_p')}
+                                                className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
+                                                    ${summaryFilter === 'sobrecostos_p' ? 'bg-amber-600 text-white border-amber-700 shadow-xl' : 'bg-white text-amber-600 border-amber-100 hover:border-amber-300 shadow-md'}`}>
+                                                <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'sobrecostos_p' ? 'text-amber-100' : 'text-amber-500'}`}>Sobrecostos (P)</span>
+                                                <span className="text-base font-black leading-none">{fmtCOP(stats.pendingSurch)}</span>
+                                                <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'sobrecostos_p' ? 'text-amber-100/70' : 'text-amber-400'}`}>{stats.pendingSurchCount} Pendientes</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Fila 2: Barra de Progreso Principal (AVANCE DE LEGALIZACIÓN) */}
