@@ -696,12 +696,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     </div>
                                     <span className={`shrink-0 px-2 py-0.5 rounded-full text-[7px] font-black uppercase
                                         ${complete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                        {complete ? '✅' : `${doc.pendientes} pend.`}
+                                        {complete ? '✅' : `${pct}% Rec.`}
                                     </span>
                                 </div>
                                 <div className="mt-2">
                                     <div className="flex justify-between mb-0.5">
-                                        <span className="text-[7px] text-slate-400">{doc.conciliadas}/{doc.total_invoices}</span>
+                                        <span className="text-[7px] text-slate-400">{fmtCOP(totalLeg)} / {fmtCOP(totalEF)}</span>
                                         <span className="text-[7px] font-bold text-slate-400">{pct}%</span>
                                     </div>
                                     <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
@@ -1016,9 +1016,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                     const fin = routeFinancials.get(route.plate) ?? {
                                                         valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
                                                         efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
+                                                        valor_grupal: 0, valor_total: 0
                                                     };
-                                                    const pct = fin.efectivo > 0
-                                                        ? Math.min(100, Math.round((fin.valor_legalizado / fin.efectivo) * 100)) 
+                                                    const totalLegPlate = fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto;
+                                                    const pct = fin.valor_total > 0
+                                                        ? Math.min(100, Math.round((totalLegPlate / fin.valor_total) * 100)) 
                                                         : (fin.legalizadas === route.invoice_count && route.invoice_count > 0 ? 100 : 0);
                                                     return (
                                                         <div key={route.route_id}
