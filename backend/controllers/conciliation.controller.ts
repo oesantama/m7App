@@ -127,13 +127,13 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                  WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name,
 
                 -- Sobrecostos de ruta acumulados
-                (SELECT COALESCE(SUM(valor), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id) AS total_sobrecosto_ruta,
+                (SELECT COALESCE(SUM(valor::numeric), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id) AS total_sobrecosto_ruta,
 
                 -- Pagos grupales acumulados
-                (SELECT COALESCE(SUM(valor), 0) FROM route_group_payments rgp WHERE rgp.document_id = dl.id) AS total_pago_grupal,
+                (SELECT COALESCE(SUM(valor::numeric), 0) FROM route_group_payments rgp WHERE rgp.document_id = dl.id) AS total_pago_grupal,
 
                 -- Legalizado individual (Suma de valor en invoice_conciliations)
-                (SELECT COALESCE(SUM(valor), 0) FROM invoice_conciliations ic WHERE ic.document_id = dl.id) AS total_legalizado_individual
+                (SELECT COALESCE(SUM(valor::numeric), 0) FROM invoice_conciliations ic WHERE ic.document_id = dl.id) AS total_legalizado_individual
 
             FROM documents_l dl
             ${where}
