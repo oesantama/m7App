@@ -532,9 +532,12 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
     XLSX.utils.book_append_sheet(wb, wsFam, 'Familiares');
 
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=Encuestas_Sociodemograficas.xlsx');
-    res.send(buffer);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=Encuestas_Sociodemograficas.xlsx',
+      'Content-Length': buffer.length
+    });
+    res.status(200).send(buffer);
 
   } catch (err: any) {
     console.error('[GH-EXCEL] Error:', err);
@@ -640,162 +643,147 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
 
     const doc = new jsPDF() as any;
     const pageWidth = doc.internal.pageSize.width;
+    const margin = 14;
+    const innerWidth = pageWidth - (margin * 2);
 
-    // Header Estilo F-GA-013
-    // Header Estilo F-GA-013
-    const possiblePaths = [
-      path.join(process.cwd(), 'public', 'logo-encuesta.png'),
-      path.join(process.cwd(), '..', 'public', 'logo-encuesta.png'),
-      path.join(process.cwd(), 'dist', 'logo-encuesta.png'),
-      '/app/public/logo-encuesta.png',
-      '/app/backend/public/logo-encuesta.png',
-      path.join(__dirname, '..', '..', 'public', 'logo-encuesta.png')
-    ];
-    let logoPath = '';
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        logoPath = p;
-        break;
-      }
-    }
-
-    if (logoPath) {
+    // 1. HEADER (Grid Style F-GA-013)
+    const logoPath = path.join(process.cwd(), 'public', 'logo-encuesta.png');
+    if (fs.existsSync(logoPath)) {
       const logoData = fs.readFileSync(logoPath).toString('base64');
-      doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', 16, 12, 35, 16);
+      doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', margin + 2, 12, 35, 16);
     }
 
-    // Cuadrícula de encabezado
     doc.setDrawColor(0);
-    doc.setLineWidth(0.1);
-    doc.rect(14, 10, pageWidth - 28, 20); // Marco exterior
-    doc.line(60, 10, 60, 30); // Divisor logo
-    doc.line(pageWidth - 60, 10, pageWidth - 60, 30); // Divisor control
+    doc.setLineWidth(0.3);
+    doc.rect(margin, 10, innerWidth, 20); // Main Header Box
+    doc.line(margin + 40, 10, margin + 40, 30); // Logo divider
+    doc.line(pageWidth - margin - 45, 10, pageWidth - margin - 45, 30); // Right Divider
 
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("ENCUESTA PERFIL SOCIODEMOGRÁFICO", 65, 18, { maxWidth: pageWidth - 125, align: 'center' });
-    
+    doc.text("ENCUESTA PERFIL SOCIODEMOGRÁFICO", margin + 42, 21, { maxWidth: innerWidth - 90, align: 'left' });
+
     doc.setFontSize(7);
-    doc.text("Código: F-GA-013", pageWidth - 58, 15);
-    doc.text("Versión: 02", pageWidth - 58, 20);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, pageWidth - 58, 25);
+    doc.text("Código: F-GA-013", pageWidth - margin - 43, 16);
+    doc.text("Versión: 02", pageWidth - margin - 43, 21);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, pageWidth - margin - 43, 26);
 
     let y = 35;
 
-    // Info Colaborador
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, y, pageWidth - 28, 8, 'F');
-    doc.rect(14, y, pageWidth - 28, 8, 'S');
-    doc.setFontSize(9);
-    doc.setTextColor(0);
-    doc.text(`DATOS DEL COLABORADOR: ${enc.nombre.toUpperCase()}`, 16, y + 5.5);
-    y += 12;
-
-    const addSection = (title: string, data: any[]) => {
-      doc.setFontSize(9);
+    // Helper para dibujar filas tipo formulario
+    const drawFormRow = (label1: string, val1: any, label2: string, val2: any, currentY: number) => {
+      const rowH = 7;
+      doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
-      doc.setFillColor(15, 23, 42);
-      doc.rect(14, y, pageWidth - 28, 6, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.text(title, 16, y + 4.5);
-      y += 6;
+      doc.setFillColor(245, 247, 250);
+      
+      // Col 1 Label
+      doc.rect(margin, currentY, 35, rowH, 'FD');
+      doc.setTextColor(0);
+      doc.text(label1, margin + 2, currentY + 4.5);
+      
+      // Col 1 Value
+      doc.rect(margin + 35, currentY, (innerWidth / 2) - 35, rowH, 'S');
+      doc.setFont("helvetica", "normal");
+      doc.text(String(val1 || '—'), margin + 37, currentY + 4.5);
 
-      autoTable(doc, {
-        startY: y,
-        body: data,
-        theme: 'grid',
-        styles: { fontSize: 7, cellPadding: 2, font: 'helvetica', textColor: [60, 60, 60] },
-        columnStyles: {
-            0: { fillColor: [245, 245, 245], fontStyle: 'bold', cellWidth: 35, textColor: [0, 0, 0] },
-            1: { cellWidth: (pageWidth - 28) / 2 - 35 },
-            2: { fillColor: [245, 245, 245], fontStyle: 'bold', cellWidth: 35, textColor: [0, 0, 0] },
-            3: { cellWidth: (pageWidth - 28) / 2 - 35 }
-        },
-        margin: { left: 14, right: 14 }
-      });
-      y = (doc as any).lastAutoTable.finalY + 6;
+      // Col 2 Label
+      doc.setFont("helvetica", "bold");
+      doc.rect(margin + (innerWidth / 2), currentY, 35, rowH, 'FD');
+      doc.text(label2, margin + (innerWidth / 2) + 2, currentY + 4.5);
+
+      // Col 2 Value
+      doc.rect(margin + (innerWidth / 2) + 35, currentY, (innerWidth / 2) - 35, rowH, 'S');
+      doc.setFont("helvetica", "normal");
+      doc.text(String(val2 || '—'), margin + (innerWidth / 2) + 37, currentY + 4.5);
+
+      return currentY + rowH;
     };
 
-    addSection("1. PERFIL CORPORATIVO", [
-      ["Cargo", enc.cargo_enc_nombre || enc.cargo_original || '—', "Fecha Ingreso", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—'],
-      ["Tipo Contrato", enc.contrato_nombre || '—', "Turno", enc.turno_nombre || '—'],
-      ["Ingresos", enc.ingresos_nombre || '—', "AFP / EPS", `${enc.afp_nombre || '—'} / ${enc.eps_nombre || '—'}`]
-    ]);
+    const drawSectionHeader = (title: string, currentY: number) => {
+      doc.setFillColor(15, 23, 42);
+      doc.rect(margin, currentY, innerWidth, 6, 'F');
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(255);
+      doc.text(title, margin + 2, currentY + 4.5);
+      doc.setTextColor(0);
+      return currentY + 6;
+    };
 
-    addSection("2. DATOS PERSONALES Y RESIDENCIA", [
-      ["Cédula", enc.cedula, "Tipo Sangre", enc.sangre_nombre || '—'],
-      ["Lugar Nac.", `${enc.mun_nac_nombre || '—'}, ${enc.dep_nac_nombre || '—'}`, "Fecha Nac.", enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—'],
-      ["Estado Civil", enc.civil_nombre || '—', "Nivel Educativo", enc.edu_nombre || '—'],
-      ["Estrato", enc.estrato || '—', "Tipo Vivienda", enc.vivienda_nombre || '—'],
-      ["Ciudad Res.", `${enc.mun_res_nombre || '—'}, ${enc.dep_res_nombre || '—'}`, "Barrio", enc.barrio || '—'],
-      ["Dirección", enc.direccion || '—', "", ""]
-    ]);
+    // DATOS EMPLEADO
+    y = drawSectionHeader("I. INFORMACIÓN GENERAL DEL COLABORADOR", y);
+    y = drawFormRow("NOMBRE COMPLETO", enc.nombre.toUpperCase(), "CÉDULA", enc.cedula, y);
+    y = drawFormRow("CARGO ACTUAL", enc.cargo_enc_nombre || enc.cargo_original, "FECHA INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', y);
+    y = drawFormRow("ÁREA / PROCESO", enc.area_nombre, "TIPO CONTRATO", enc.contrato_nombre, y);
+    y = drawFormRow("EPS", enc.eps_nombre, "AFP (Fondo Pensión)", enc.afp_nombre, y);
+    y = drawFormRow("TURNO LABORAL", enc.turno_nombre, "INGRESOS MENS.", enc.ingresos_nombre, y);
 
-    addSection("3. ENTORNO FAMILIAR Y SOCIAL", [
-      ["Personas Hogar", enc.viven_conmigo || '—', "Sustentador", enc.principal_sustentador || '—'],
-      ["Pers. a Cargo", enc.pcargo_nombre || '—', "Discapacidad Fam.", enc.discapacidad_familia || '—'],
-      ["Con Quien Vive", enc.conviviente_nombre || '—', "Cuantos Hijos", enc.cuantos_hijos || '0']
-    ]);
+    y += 5;
+    y = drawSectionHeader("II. DATOS PERSONALES Y RESIDENCIA", y);
+    y = drawFormRow("FECHA NACIMIENTO", enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—', "LUGAR NAC.", `${enc.mun_nac_nombre}, ${enc.dep_nac_nombre}`, y);
+    y = drawFormRow("ESTADO CIVIL", enc.civil_nombre, "NIVEL EDUCATIVO", enc.edu_nombre, y);
+    y = drawFormRow("TIPO SANGRE", enc.sangre_nombre, "ESTRATO", enc.estrato, y);
+    y = drawFormRow("CIUDAD RESIDENCIA", `${enc.mun_res_nombre}, ${enc.dep_res_nombre}`, "BARRIO", enc.barrio, y);
+    y = drawFormRow("DIRECCIÓN", enc.direccion, "TIPO VIVIENDA", enc.vivienda_nombre, y);
 
-    addSection("4. SALUD Y ESTILO DE VIDA", [
-      ["Sufre Enfermedad", enc.sufre_enfermedad || '—', "Bebe Alcohol", enc.bebe_alcohol || '—'],
-      ["Fuma", enc.fuma || '—', "Practica Deporte", enc.practica_deporte || '—'],
-      ["Tipo Deporte", enc.tipo_deporte_nombre || '—', "Frecuencia", enc.frec_deporte_nombre || '—'],
-      ["Uso Tiempo Libre", enc.tiempo_libre_nombre || enc.uso_tiempo_libre_otros || '—', "", ""]
-    ]);
+    y += 5;
+    y = drawSectionHeader("III. ENTORNO FAMILIAR Y SOCIAL", y);
+    y = drawFormRow("PERSONAS EN HOGAR", enc.viven_conmigo, "CON QUIÉN VIVE", enc.conviviente_nombre, y);
+    y = drawFormRow("PRINCIPAL SUSTENTO", enc.principal_sustentador, "PERSONAS A CARGO", enc.pcargo_nombre, y);
+    y = drawFormRow("HIJOS (CANTIDAD)", enc.cuantos_hijos, "DISCAPACIDAD FAM.", enc.discapacidad_familia, y);
 
-    addSection("5. CONTACTO DE EMERGENCIA", [
-      ["Nombre", enc.contacto_emergencia_nombre || '—', "Teléfono", enc.contacto_emergencia_telefono || '—']
-    ]);
+    y += 5;
+    y = drawSectionHeader("IV. ESTILO DE VIDA Y SALUD", y);
+    y = drawFormRow("ENFERMEDAD DIAG.", enc.sufre_enfermedad, "CONSUMO ALCOHOL", enc.bebe_alcohol, y);
+    y = drawFormRow("FUMA", enc.fuma, "PRACTICA DEPORTE", enc.practica_deporte, y);
+    y = drawFormRow("TIPO DEPORTE", enc.tipo_deporte_nombre, "FRECUENCIA", enc.frec_deporte_nombre, y);
+    const tiempoLibre = enc.tiempo_libre_nombre === 'Otros' ? enc.uso_tiempo_libre_otros : enc.tiempo_libre_nombre;
+    y = drawFormRow("USO TIEMPO LIBRE", tiempoLibre, "", "", y);
+
+    y += 5;
+    y = drawSectionHeader("V. CONTACTO EN CASO DE EMERGENCIA", y);
+    y = drawFormRow("NOMBRE CONTACTO", enc.contacto_emergencia_nombre, "TELÉFONO", enc.contacto_emergencia_telefono, y);
 
     if (familia.length > 0) {
-      if (y > 230) { doc.addPage(); y = 20; }
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setFillColor(15, 23, 42);
-      doc.rect(14, y, pageWidth - 28, 6, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.text("6. COMPOSICIÓN FAMILIAR (HIJOS / OTROS)", 16, y + 4.5);
-      y += 6;
-
+      y += 8;
+      if (y > 240) { doc.addPage(); y = 20; }
+      y = drawSectionHeader("VI. COMPOSICIÓN FAMILIAR (DETALLE)", y);
       const famData = familia.map(f => [f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—', f.ocupacion || '—']);
       autoTable(doc, {
         startY: y,
-        head: [['NOMBRE COMPLETO', 'FECHA NACIMIENTO', 'OCUPACIÓN']],
+        head: [['NOMBRE COMPLETO DEL FAMILIAR', 'FECHA NACIMIENTO', 'OCUPACIÓN']],
         body: famData,
         theme: 'grid',
         styles: { fontSize: 7, cellPadding: 2, textColor: [60, 60, 60] },
         headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
-        margin: { left: 14, right: 14 }
+        margin: { left: margin, right: margin }
       });
-      y = (doc as any).lastAutoTable.finalY + 12;
+      y = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    if (y > 250) { doc.addPage(); y = 20; }
-    
+    if (y > 240) { doc.addPage(); y = 20; }
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(0);
-    doc.text("CONSENTIMIENTO INFORMADO", 14, y);
+    doc.text("CONSENTIMIENTO INFORMADO", margin, y);
     y += 5;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
-    const disclaimer = "Declaro que la información suministrada en esta encuesta es veraz y autorizo a la empresa para el tratamiento de mis datos personales según la Ley 1581 de 2012 y demás normas concordantes. Este reporte fue generado automáticamente por el sistema OrbitM7 el " + new Date().toLocaleString();
-    doc.text(doc.splitTextToSize(disclaimer, pageWidth - 28), 14, y);
+    const disclaimer = "Declaro que la información suministrada en esta encuesta es veraz y autorizo a la empresa para el tratamiento de mis datos personales según la Ley 1581 de 2012 y demás normas concordantes. El registro de esta información es fundamental para los programas de Gestión Humana y Salud Ocupacional. Reporte generado por OrbitM7.";
+    doc.text(doc.splitTextToSize(disclaimer, innerWidth), margin, y);
     
     y += 20;
-    // Espacio para firma
     doc.setDrawColor(180);
-    doc.line(14, y, 80, y);
+    doc.line(margin, y, margin + 70, y);
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.text("Firma del Colaborador", 14, y + 5);
+    doc.text("FIRMA DEL COLABORADOR", margin, y + 5);
     doc.setFont("helvetica", "normal");
-    doc.text(`CC: ${enc.cedula}`, 14, y + 9);
+    doc.text(`C.C. No. ${enc.cedula}`, margin, y + 9);
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=Perfil_${enc.cedula}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=F-GA-013_${enc.cedula}.pdf`);
     res.send(pdfBuffer);
   } catch (err: any) {
     console.error('[PDF-ERROR]', err);

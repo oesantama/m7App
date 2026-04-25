@@ -1161,8 +1161,9 @@ export const processDocumentLPayment = async (req: Request, res: Response) => {
         }
 
         let finalUnCode = pay.unCode;
+        let finalMetodo = pay.metodoPago;
         if (String(pay.unCode).trim().toUpperCase() === 'AJV20' && String(pay.metodoPago).trim().toUpperCase() === 'EF') {
-          finalUnCode = '030D';
+          finalMetodo = '030D';
         }
 
         // Insertar en la nueva tabla de pagos
@@ -1180,7 +1181,7 @@ export const processDocumentLPayment = async (req: Request, res: Response) => {
           pay.invoice,
           pay.clientRef,
           finalUnCode,
-          pay.metodoPago,
+          finalMetodo,
           pay.vmetodo,
           userId
         ]);

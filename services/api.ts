@@ -570,6 +570,11 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, user })
   }),
+  processDocumentLPayment: (data: any) => fetchJson(`${API_URL}/documents/payments-l`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
   getRoutes: () => fetchJson(`${API_URL}/routes`),
   saveRoute: (data: any) => fetchJson(`${API_URL}/routes`, {
     method: 'POST',
