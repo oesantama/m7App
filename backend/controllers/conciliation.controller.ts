@@ -94,29 +94,21 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                   (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
                 ) AS pendientes,
 
-                -- Efectivo y crédito desde document_l_payments (Subquery para evitar fan-out)
+                -- Efectivo y crédito desde document_l_payments (Subquery simplificada por document_id)
                 (SELECT COALESCE(SUM(CASE 
-                    WHEN UPPER(TRIM(p.metodo_pago)) LIKE '%EFECTIVO%' OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
+                    WHEN UPPER(TRIM(p.metodo_pago)) IN ('EF', 'EFECTIVO', 'CASH') OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
                     THEN COALESCE(NULLIF(TRIM(p.vmetodo), '')::numeric, 0) ELSE 0 END), 0)
                  FROM document_l_payments p
-                 WHERE p.invoice IS NOT NULL AND TRIM(UPPER(p.invoice)) IN (
-                    SELECT DISTINCT TRIM(UPPER(di2.invoice)) 
-                    FROM document_items di2 
-                    WHERE di2.document_id = dl.id AND di2.invoice IS NOT NULL AND di2.invoice <> ''
-                 )
+                 WHERE p.document_id = dl.id
                 ) AS total_efectivo,
 
                 (SELECT COALESCE(SUM(CASE 
                     WHEN p.metodo_pago IS NOT NULL
-                         AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFECTIVO%'
+                         AND UPPER(TRIM(p.metodo_pago)) NOT IN ('EF', 'EFECTIVO', 'CASH')
                          AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFE%'
                     THEN COALESCE(NULLIF(TRIM(p.vmetodo), '')::numeric, 0) ELSE 0 END), 0)
                  FROM document_l_payments p
-                 WHERE p.invoice IS NOT NULL AND TRIM(UPPER(p.invoice)) IN (
-                    SELECT DISTINCT TRIM(UPPER(di2.invoice)) 
-                    FROM document_items di2 
-                    WHERE di2.document_id = dl.id AND di2.invoice IS NOT NULL AND di2.invoice <> ''
-                 )
+                 WHERE p.document_id = dl.id
                 ) AS total_credito,
 
                 -- Conductor y placa desde dispatch (última asignación del doc)
