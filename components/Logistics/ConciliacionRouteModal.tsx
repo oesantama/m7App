@@ -625,6 +625,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     // Estado sobrecostos
     const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
     const [savingSobrecosto, setSavingSobrecosto] = useState(false);
+    const [isGrupalUnlocked, setIsGrupalUnlocked] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -660,6 +661,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
         setTab('individual');
         setActiveDialog(null);
+        setIsGrupalUnlocked(false);
     }, [isOpen, invoices, initialGroupPayments, initialSurcharges]);
 
     const updateForm = useCallback((invoiceNum: string, patch: Partial<InvoiceFormState>) => {
@@ -1117,6 +1119,14 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Detalle de Consignaciones</h4>
                                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Registre los comprobantes de pago de la placa</p>
                                     </div>
+                                    <button 
+                                        onClick={() => setIsGrupalUnlocked(!isGrupalUnlocked)}
+                                        className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-2
+                                            ${isGrupalUnlocked 
+                                                ? 'bg-amber-500 border-amber-500 text-white shadow-md' 
+                                                : 'bg-white border-slate-200 text-slate-500 hover:border-violet-400 hover:text-violet-600'}`}>
+                                        {isGrupalUnlocked ? '🔒 Bloquear Edición' : '🔓 Habilitar Edición'}
+                                    </button>
                                 </div>
 
                                 <div className="space-y-3">
@@ -1125,7 +1135,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 ${String(c.id).startsWith('temp-') ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-80'}`}>
                                                 <div className="col-span-2">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
-                                                    <input type="text" value={c.valor} disabled={!String(c.id).startsWith('temp-')}
+                                                    <input type="text" value={c.valor} disabled={!String(c.id).startsWith('temp-') && !isGrupalUnlocked}
                                                         onChange={e => {
                                                             const val = e.target.value.replace(/\D/g, '');
                                                             const fmt = val ? new Intl.NumberFormat('es-CO').format(Number(val)) : '';
@@ -1137,7 +1147,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 </div>
                                                 <div className="col-span-2">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia</p>
-                                                    <input type="text" value={c.nroAprobacion} disabled={!String(c.id).startsWith('temp-')}
+                                                    <input type="text" value={c.nroAprobacion} disabled={!String(c.id).startsWith('temp-') && !isGrupalUnlocked}
                                                         onChange={e => {
                                                             const next = [...consignaciones];
                                                             next[idx].nroAprobacion = e.target.value;
@@ -1147,7 +1157,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 </div>
                                                 <div className="col-span-2">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Método</p>
-                                                    <select value={c.metodo || 'CONSIGNACION'} disabled={!String(c.id).startsWith('temp-')}
+                                                    <select value={c.metodo || 'CONSIGNACION'} disabled={!String(c.id).startsWith('temp-') && !isGrupalUnlocked}
                                                         onChange={e => {
                                                             const next = [...consignaciones];
                                                             next[idx].metodo = e.target.value as MetodoPago;
@@ -1160,7 +1170,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 </div>
                                                 <div className="col-span-2">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
-                                                    <input type="date" value={c.fecha} disabled={!String(c.id).startsWith('temp-')}
+                                                    <input type="date" value={c.fecha} disabled={!String(c.id).startsWith('temp-') && !isGrupalUnlocked}
                                                         onChange={e => {
                                                             const next = [...consignaciones];
                                                             next[idx].fecha = e.target.value;
@@ -1170,7 +1180,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 </div>
                                                 <div className="col-span-4">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p>
-                                                    <input type="text" value={c.observacion || ''} disabled={!String(c.id).startsWith('temp-')}
+                                                    <input type="text" value={c.observacion || ''} disabled={!String(c.id).startsWith('temp-') && !isGrupalUnlocked}
                                                         onChange={e => {
                                                             const next = [...consignaciones];
                                                             next[idx].observacion = e.target.value;
