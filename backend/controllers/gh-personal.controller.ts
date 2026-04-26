@@ -414,6 +414,8 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
   try {
     const { from, to, search, areaId } = req.query;
     
+    console.log('[GH-EXCEL] Iniciando exportación con filtros:', { from, to, search, areaId });
+
     // 1. Obtener encuestas con todos los nombres de misceláneos
     let query = `
       SELECT r.*, p.nombre as colaborador_nombre, p.cargo as cargo_actual, a.nombre as area_nombre,
@@ -455,10 +457,16 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
     `;
     const params: any[] = [];
     let pCount = 1;
-    if (from) { query += ` AND r.fecha_realizacion >= $${pCount++}`; params.push(from); }
-    if (to) { query += ` AND r.fecha_realizacion <= $${pCount++}`; params.push(`${to} 23:59:59`); }
-    if (search) { query += ` AND (p.nombre ILIKE $${pCount} OR p.cedula ILIKE $${pCount})`; params.push(`%${search}%`); pCount++; }
-    if (areaId) { query += ` AND p.area_trabajo_id = $${pCount++}`; params.push(areaId); }
+    if (from && from !== '') { query += ` AND r.fecha_realizacion >= $${pCount++}`; params.push(from); }
+    if (to && to !== '') { query += ` AND r.fecha_realizacion <= $${pCount++}`; params.push(`${to} 23:59:59`); }
+    if (search && search !== '') { 
+      query += ` AND (p.nombre ILIKE $${pCount} OR p.cedula ILIKE $${pCount})`; 
+      params.push(`%${search}%`); 
+      pCount++; 
+    }
+    if (areaId && areaId !== 'null' && areaId !== '') { query += ` AND p.area_trabajo_id = $${pCount++}`; params.push(areaId); }
+
+    query += ` ORDER BY r.fecha_realizacion DESC`;
 
     const resEnc = await pool.query(query, params);
     const encuestas = resEnc.rows;
@@ -479,11 +487,12 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
 
     // 3. Formatear para Excel
     const dataEnc = encuestas.map(e => ({
-      'FECHA REALIZACIÓN': e.fecha_realizacion ? new Date(e.fecha_realizacion).toLocaleString() : '—',
+      'COLABORADOR': e.colaborador_nombre,
       'CÉDULA': e.cedula,
-      'NOMBRE': e.colaborador_nombre,
       'ÁREA': e.area_nombre || '—',
-      'CARGO ENCUESTA': e.cargo_enc_nombre || e.cargo_actual || '—',
+      'CARGO ACTUAL': e.cargo_actual || '—',
+      'CARGO EN ENCUESTA': e.cargo_enc_nombre || '—',
+      'FECHA REALIZACIÓN': e.fecha_realizacion ? new Date(e.fecha_realizacion).toLocaleString() : '—',
       'FECHA INGRESO': e.fecha_ingreso ? new Date(e.fecha_ingreso).toLocaleDateString() : '—',
       'LUGAR NACIMIENTO': `${e.mun_nac_nombre || '—'}, ${e.dep_nac_nombre || '—'}`,
       'FECHA NACIMIENTO': e.fecha_nacimiento ? new Date(e.fecha_nacimiento).toLocaleDateString() : '—',
@@ -512,7 +521,7 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
       'PRACTICA DEPORTE': e.practica_deporte || '—',
       'TIPO DEPORTE': e.tipo_deporte_nombre || '—',
       'FRECUENCIA DEPORTE': e.frec_deporte_nombre || '—',
-      'USO TIEMPO LIBRE': e.tiempo_libre_nombre || e.uso_tiempo_libre_otros || '—',
+      'USO TIEMPO LIBRE': e.tiempo_libre_nombre === 'Otros' ? e.uso_tiempo_libre_otros : (e.tiempo_libre_nombre || '—'),
       'CONTACTO EMERGENCIA': e.contacto_emergencia_nombre || '—',
       'TELÉFONO EMERGENCIA': e.contacto_emergencia_telefono || '—'
     }));
@@ -532,16 +541,17 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
     XLSX.utils.book_append_sheet(wb, wsFam, 'Familiares');
 
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': 'attachment; filename=Encuestas_Sociodemograficas.xlsx',
-      'Content-Length': buffer.length
-    });
-    res.status(200).send(buffer);
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Reporte_Encuestas_Sociodemograficas.xlsx');
+    res.send(buffer);
 
   } catch (err: any) {
-    console.error('[GH-EXCEL] Error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('[GH-EXCEL-CRITICAL] Error:', err);
+    res.status(500).json({ 
+      error: 'Error al generar Excel', 
+      details: err.message
+    });
   }
 };
 

@@ -65,6 +65,7 @@ const Personal: React.FC<Props> = ({ user }) => {
   const [filterDates, setFilterDates] = useState({ from: '', to: '' });
   const [filterSearch, setFilterSearch] = useState('');
   const [filterArea, setFilterArea] = useState<number | null>(null);
+  const [colaboradoresConEncuesta, setColaboradoresConEncuesta] = useState<{cedula: string, nombre: string}[]>([]);
 
   // Modal Detalle Encuesta
   const [showDetail, setShowDetail] = useState<any | null>(null);
@@ -91,6 +92,23 @@ const Personal: React.FC<Props> = ({ user }) => {
     }
   }, []);
 
+  const handleConsultar = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getEncuestasResultados({
+        from: filterDates.from,
+        to: filterDates.to,
+        search: filterSearch,
+        areaId: filterArea || undefined
+      });
+      setResultados(data);
+    } catch {
+      toast.error('Error al consultar resultados');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -100,20 +118,24 @@ const Personal: React.FC<Props> = ({ user }) => {
       } else if (activeTab === 'encuestas') {
         await fetchEncuestas();
       } else if (activeTab === 'consultar') {
-        const data = await api.getEncuestasResultados({
-          from: filterDates.from,
-          to: filterDates.to,
-          search: filterSearch,
-          areaId: filterArea || undefined
-        });
-        setResultados(data);
+        // En la pestaña consultar, cargamos inicialmente los resultados sin filtros
+        handleConsultar();
+        
+        // Y cargamos la lista de colaboradores únicos que tienen encuesta
+        const resultadosFull = await api.getEncuestasResultados({});
+        const unique = Array.from(new Set(resultadosFull.map((r: any) => r.cedula)))
+          .map(cedula => {
+            const found = resultadosFull.find((r: any) => r.cedula === cedula);
+            return { cedula: found.cedula, nombre: found.nombre };
+          });
+        setColaboradoresConEncuesta(unique);
       }
     } catch {
       toast.error('Error al cargar datos');
     } finally {
       setLoading(false);
     }
-  }, [activeTab, fetchEncuestas, filterDates, filterSearch, filterArea]);
+  }, [activeTab, fetchEncuestas]); // Eliminamos dependencias de filtros para que no refresque solo
 
   useEffect(() => {
     fetchData();
@@ -123,7 +145,7 @@ const Personal: React.FC<Props> = ({ user }) => {
     api.getGhMiscelaneos('eps').then(setEpsList).catch(() => {});
     api.getGhMiscelaneos('afp').then(setAfpList).catch(() => {});
     api.getEstados().then(setEstados).catch(() => {});
-  }, [fetchData]);
+  }, [activeTab]); // Solo cuando cambia la pestaña
 
   const filteredPersonal = useMemo(() => 
     personal.filter(p => 
@@ -346,18 +368,15 @@ const Personal: React.FC<Props> = ({ user }) => {
           ) : activeTab === 'consultar' ? (
             <div className="space-y-4">
               {/* Filtros */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100 items-end">
+                <div className="space-y-1 md:col-span-1.5">
                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Colaborador / Cédula</label>
-                  <div className="relative">
-                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                    <input 
-                      value={filterSearch} 
-                      onChange={e => setFilterSearch(e.target.value)}
-                      placeholder="Buscar..." 
-                      className="w-full h-10 pl-9 pr-4 rounded-xl bg-white border border-slate-200 text-[11px] outline-none focus:border-indigo-500"
-                    />
-                  </div>
+                  <SearchableSelect
+                    options={colaboradoresConEncuesta.map(c => ({ id: c.cedula, nombre: `${c.nombre} (${c.cedula})` }))}
+                    value={filterSearch}
+                    onChange={val => setFilterSearch(String(val))}
+                    placeholder="TODOS LOS COLABORADORES"
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Desde</label>
@@ -377,18 +396,25 @@ const Personal: React.FC<Props> = ({ user }) => {
                     className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] outline-none focus:border-indigo-500"
                   />
                 </div>
-                <div className="flex items-end gap-2">
-                  <div className="flex-1 space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Área</label>
-                    <select 
-                      value={filterArea || ''} 
-                      onChange={e => setFilterArea(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500"
-                    >
-                      <option value="">TODAS LAS ÁREAS</option>
-                      {areas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                    </select>
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Área</label>
+                  <select 
+                    value={filterArea || ''} 
+                    onChange={e => setFilterArea(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500"
+                  >
+                    <option value="">TODAS LAS ÁREAS</option>
+                    {areas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={handleConsultar}
+                    className="h-10 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-sm flex-1 justify-center"
+                  >
+                    <Icons.Search className="w-4 h-4" />
+                    <span className="text-[10px] font-black uppercase">Consultar</span>
+                  </button>
                   <button 
                     onClick={() => api.exportEncuestasExcel({ from: filterDates.from, to: filterDates.to, search: filterSearch, areaId: filterArea || undefined })}
                     className="h-10 px-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-sm"
