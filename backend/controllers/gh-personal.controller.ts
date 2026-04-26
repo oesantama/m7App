@@ -672,29 +672,35 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     const innerWidth = pageWidth - (margin * 2);
 
     // 1. HEADER (Grid Style F-GA-013)
-    const logoPath = path.join(process.cwd(), 'public', 'logo-encuesta.png');
-    if (fs.existsSync(logoPath)) {
-      const logoData = fs.readFileSync(logoPath).toString('base64');
-      doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', margin + 2, 12, 35, 16);
-    }
+    const headerH = 20;
+    const logoW = 40;
+    const infoW = 45;
+    const titleW = innerWidth - logoW - infoW;
 
     doc.setDrawColor(0);
     doc.setLineWidth(0.3);
-    doc.rect(margin, 10, innerWidth, 20); // Main Header Box
-    doc.line(margin + 40, 10, margin + 40, 30); // Logo divider
-    doc.line(pageWidth - margin - 45, 10, pageWidth - margin - 45, 30); // Right Divider
+    
+    // Logo Box
+    doc.rect(margin, 10, logoW, headerH);
+    const logoPath = path.join(process.cwd(), 'public', 'logo-encuesta.png');
+    if (fs.existsSync(logoPath)) {
+      const logoData = fs.readFileSync(logoPath).toString('base64');
+      doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', margin + 2, 12, logoW - 4, headerH - 4);
+    }
 
+    // Title Box
+    doc.rect(margin + logoW, 10, titleW, headerH);
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    const headerTitle1 = "SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SG-SST, E. 3.1.1";
-    const headerTitle2 = "ENCUESTA PERFIL SOCIODEMOGRÁFICO";
-    doc.text(headerTitle1, margin + 40 + (innerWidth - 85) / 2, 18, { align: 'center' });
-    doc.text(headerTitle2, margin + 40 + (innerWidth - 85) / 2, 24, { align: 'center' });
+    const titleLines = doc.splitTextToSize("SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SG-SST, E. 3.1.1\nENCUESTA PERFIL SOCIODEMOGRÁFICO", titleW - 4);
+    doc.text(titleLines, margin + logoW + (titleW / 2), 17, { align: 'center' });
 
+    // Info Box
+    doc.rect(margin + logoW + titleW, 10, infoW, headerH);
     doc.setFontSize(7);
-    doc.text("CÓDIGO: F-GA-013", pageWidth - margin - 43, 16);
-    doc.text("VERSIÓN: 02", pageWidth - margin - 43, 21);
-    doc.text(`FECHA: 23/10/2024`, pageWidth - margin - 43, 26);
+    doc.text("CÓDIGO: F-GA-013", margin + logoW + titleW + 2, 16);
+    doc.text("VERSIÓN: 02", margin + logoW + titleW + 2, 21);
+    doc.text(`FECHA: 23/10/2024`, margin + logoW + titleW + 2, 26);
 
     let y = 30;
     const surveyDate = enc.fecha_realizacion ? new Date(enc.fecha_realizacion) : new Date();
@@ -713,44 +719,36 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     
     y += dateRowH;
 
-    // Row for Full Name
     doc.rect(margin, y, innerWidth, dateRowH);
     doc.setFont("helvetica", "bold");
     doc.text(`NOMBRES Y APELLIDOS COMPLETOS: ${enc.nombre.toUpperCase()}`, margin + 2, y + 5);
     
     y += dateRowH + 2;
 
-    // Helper para dibujar filas tipo formulario (VERTICAL STACK)
     const drawFormRow = (label1: string, val1: any, label2: string, val2: any, currentY: number) => {
-      const rowH = 12; // Aumentado para stack vertical
+      const rowH = 12;
       const colW = innerWidth / 2;
-      
       doc.setFontSize(7);
       doc.setTextColor(0);
+      const displayVal = (v: any) => (v !== null && v !== undefined && v !== '') ? String(v) : '—';
 
-      // Col 1 - Izquierda
       doc.setFont("helvetica", "bold");
-      doc.rect(margin, currentY, colW, rowH / 2); // Title Box No Fill
+      doc.rect(margin, currentY, colW, rowH / 2);
       doc.text(label1, margin + 2, currentY + 4);
-      
       doc.setFont("helvetica", "normal");
-      doc.rect(margin, currentY + (rowH / 2), colW, rowH / 2); // Value Box
-      doc.text(String(val1 || '—'), margin + 2, currentY + (rowH / 2) + 4, { maxWidth: colW - 4 });
+      doc.rect(margin, currentY + (rowH / 2), colW, rowH / 2);
+      doc.text(displayVal(val1), margin + 2, currentY + (rowH / 2) + 4, { maxWidth: colW - 4 });
 
-      // Col 2 - Derecha
       const col2X = margin + colW;
       doc.setFont("helvetica", "bold");
-      doc.rect(col2X, currentY, colW, rowH / 2); // Title Box No Fill
+      doc.rect(col2X, currentY, colW, rowH / 2);
       doc.text(label2, col2X + 2, currentY + 4);
-
       doc.setFont("helvetica", "normal");
-      doc.rect(col2X, currentY + (rowH / 2), colW, rowH / 2); // Value Box
-      doc.text(String(val2 || '—'), col2X + 2, currentY + (rowH / 2) + 4, { maxWidth: colW - 4 });
-
+      doc.rect(col2X, currentY + (rowH / 2), colW, rowH / 2);
+      doc.text(displayVal(val2), col2X + 2, currentY + (rowH / 2) + 4, { maxWidth: colW - 4 });
       return currentY + rowH;
     };
 
-    // FLUJO DE PREGUNTAS (VERTICAL STACK 1-L, 2-R...)
     const calculateAge = (birthDate: any) => {
       if (!birthDate) return '—';
       const today = new Date();
@@ -775,11 +773,10 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     y = drawFormRow("23. DISCAPACIDAD FAM.", enc.discapacidad_familia, "24. CON QUIÉN VIVE", enc.conviviente_nombre, y);
     
     y += 2;
-    // 25 y 26 (Hijos unificados en celda)
-    const numHijos = enc.cuantos_hijos || 0;
+    const numHijos = enc.cuantos_hijos === null || enc.cuantos_hijos === undefined ? '—' : enc.cuantos_hijos;
     const hijosText = familia.length > 0 
       ? familia.map(f => `${f.nombre} (${f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'})`).join('\n')
-      : (numHijos > 0 ? "Información no disponible" : "Ninguno");
+      : (enc.cuantos_hijos > 0 ? "Información no disponible" : "Ninguno");
     
     y = drawFormRow("25. CUANTOS HIJOS TIENE", numHijos, "26. HIJOS MENORES DE 18 (Nombre y Fecha Nacimiento)", hijosText, y);
 
@@ -792,7 +789,6 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     y += 5;
     if (y > 240) { doc.addPage(); y = 20; }
     
-    // 33. CONSENTIMIENTO INFORMADO (Estilo Cuadrícula)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.rect(margin, y, innerWidth, 6);
@@ -801,15 +797,26 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
 
     const consH = 15;
     const optW = 20;
-    doc.rect(margin, y, optW, consH); // Opt box
+    doc.rect(margin, y, optW, consH);
     doc.setFontSize(7);
-    doc.text("a) SI", margin + 2, y + 5);
-    doc.text("b) NO", margin + 2, y + 10);
+    const hasConsent = enc.consentimiento === true || enc.consentimiento === 't';
+    doc.text(`${hasConsent ? '[X]' : '[  ]'} a) SI`, margin + 2, y + 6);
+    doc.text(`${!hasConsent ? '[X]' : '[  ]'} b) NO`, margin + 2, y + 11);
     
-    doc.rect(margin + optW, y, innerWidth - optW, consH); // Text box
+    doc.rect(margin + optW, y, innerWidth - optW, consH);
     doc.setFont("helvetica", "normal");
     const disclaimer = "Ley 1581 de 2012: de protección de datos personales, es una ley que complementa la regulación vigente para la protección del derecho fundamental que tienen todas las personas naturales a autorizar la información personal que es almacenada en bases de datos o archivos, así como su posterior actualización y rectificación.";
     doc.text(doc.splitTextToSize(disclaimer, innerWidth - optW - 4), margin + optW + 2, y + 5);
+    y += consH + 10;
+
+    // Paginación (Pág. X de Y)
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Pág. ${i} de ${pageCount}`, pageWidth - margin, doc.internal.pageSize.height - 10, { align: 'right' });
+    }
     
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
     res.setHeader('Content-Type', 'application/pdf');
