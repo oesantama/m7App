@@ -695,18 +695,16 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     if (fs.existsSync(logoPath)) {
       try {
         const logoBuffer = fs.readFileSync(logoPath);
-        doc.addImage(logoBuffer, 'JPEG', margin + 2, 11, logoW - 4, headerH - 2);
+        const uint8 = new Uint8Array(logoBuffer);
+        
+        // Diagnóstico: Borde azul donde debería estar la imagen
+        doc.setDrawColor(0, 0, 255);
+        doc.rect(margin + 2, 11, logoW - 4, headerH - 2);
+        doc.setDrawColor(0);
+
+        doc.addImage(uint8, 'JPEG', margin + 2, 11, logoW - 4, headerH - 2);
       } catch (e) {
         console.error('[GH-PDF] Error renderizando logo:', e);
-      }
-    } else {
-      // Fallback a PNG si por alguna razón el JPG no está
-      const logoPathPng = path.resolve(__dirname, '../../public/logo-encuesta.png');
-      if (fs.existsSync(logoPathPng)) {
-        try {
-          const logoBuffer = fs.readFileSync(logoPathPng);
-          doc.addImage(logoBuffer, 'PNG', margin + 2, 11, logoW - 4, headerH - 2);
-        } catch (e) {}
       }
     }
 
