@@ -690,14 +690,16 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     
     // Logo Box
     doc.rect(margin, 10, logoW, headerH);
-    const logoPath = path.resolve(__dirname, '../../public/logo-encuesta.png');
+    const logoPath = '/home/oscars_it/Documentos/oscar/m7App/public/logo-encuesta.png';
     if (fs.existsSync(logoPath)) {
       try {
-        const logoData = fs.readFileSync(logoPath).toString('base64');
-        doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', margin + 2, 11, logoW - 4, headerH - 2);
+        const logoBuffer = fs.readFileSync(logoPath);
+        doc.addImage(logoBuffer, 'PNG', margin + 2, 11, logoW - 4, headerH - 2);
       } catch (e) {
-        console.error('[GH-PDF] Error logo:', e);
+        console.error('[GH-PDF] Error al procesar logo binario:', e);
       }
+    } else {
+      console.error('[GH-PDF] Logo no encontrado en ruta absoluta:', logoPath);
     }
 
     // Title Box
