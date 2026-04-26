@@ -4,6 +4,11 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // @ts-ignore
 import * as XLSX from 'xlsx';
 
@@ -581,7 +586,8 @@ export const getEncuestaDetail = async (req: Request, res: Response) => {
              cg.nombre as cargo_enc_nombre,
              fd.nombre as frec_deporte_nombre,
              td.nombre as tipo_deporte_nombre,
-             p.celular_personal as celular_personal
+             p.celular_personal as celular_personal,
+             tl.nombre as turno_nombre
       FROM gh_encuestas_sociodemograficas r
       JOIN gh_personal p ON p.cedula = r.cedula
       LEFT JOIN gh_areas a ON a.id = p.area_trabajo_id
@@ -598,6 +604,7 @@ export const getEncuestaDetail = async (req: Request, res: Response) => {
       LEFT JOIN gh_ingresos_mensuales im ON im.id = r.ingresos_mensuales_id
       LEFT JOIN gh_afp afp ON afp.id = r.afp_id
       LEFT JOIN gh_eps eps ON eps.id = r.eps_id
+      LEFT JOIN gh_turnos_laborales tl ON tl.id = r.turno_laboral_id
       LEFT JOIN gh_personas_a_cargo pac ON pac.id = r.personas_a_cargo_id
       LEFT JOIN gh_convivientes cvv ON cvv.id = r.con_quien_vive_id
       LEFT JOIN gh_cargos cg ON cg.id = r.cargo_id
@@ -635,7 +642,8 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
              pac.nombre as pcargo_nombre, cvv.nombre as conviviente_nombre,
              cg.nombre as cargo_enc_nombre,
              fd.nombre as frec_deporte_nombre,
-             td.nombre as tipo_deporte_nombre
+             td.nombre as tipo_deporte_nombre,
+             p.celular_personal as celular_personal
       FROM gh_encuestas_sociodemograficas r
       JOIN gh_personal p ON p.cedula = r.cedula
       LEFT JOIN cfg_ciudades mn ON mn.id = r.municipio_nacimiento_id
@@ -686,12 +694,10 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     if (fs.existsSync(logoPath)) {
       try {
         const logoData = fs.readFileSync(logoPath).toString('base64');
-        doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', margin + 2, 12, logoW - 4, headerH - 4);
+        doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', margin + 2, 11, logoW - 4, headerH - 2);
       } catch (e) {
-        console.error('Error al insertar logo en PDF:', e);
+        console.error('[GH-PDF] Error logo:', e);
       }
-    } else {
-      console.warn('Archivo de logo no encontrado en:', logoPath);
     }
 
     // Title Box
