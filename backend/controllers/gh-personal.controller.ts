@@ -757,23 +757,13 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     y = drawFormRow("23. DISCAPACIDAD FAM.", enc.discapacidad_familia, "24. CON QUIÉN VIVE", enc.conviviente_nombre, y);
     
     y += 2;
-    // 25 y 26 (Hijos)
+    // 25 y 26 (Hijos unificados en celda)
     const numHijos = enc.cuantos_hijos || 0;
-    y = drawFormRow("25. CUANTOS HIJOS TIENE", numHijos, "26. HIJOS MENORES DE 18 (Nombre y Fecha Nacimiento)", numHijos > 0 ? "Ver tabla" : "Ninguno", y);
-
-    if (familia.length > 0) {
-      const famData = familia.map(f => [`${f.nombre} - ${f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'}`]);
-      autoTable(doc, {
-        startY: y,
-        head: [['HIJO/A (NOMBRE Y FECHA NACIMIENTO)']],
-        body: famData,
-        theme: 'grid',
-        styles: { fontSize: 7, cellPadding: 2 },
-        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
-        margin: { left: margin, right: margin }
-      });
-      y = (doc as any).lastAutoTable.finalY + 2;
-    }
+    const hijosText = familia.length > 0 
+      ? familia.map(f => `${f.nombre} (${f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'})`).join('\n')
+      : (numHijos > 0 ? "Información no disponible" : "Ninguno");
+    
+    y = drawFormRow("25. CUANTOS HIJOS TIENE", numHijos, "26. HIJOS MENORES DE 18 (Nombre y Fecha Nacimiento)", hijosText, y);
 
     if (y > 230) { doc.addPage(); y = 20; }
     y = drawFormRow("27. CONSUME ALCOHOL", enc.bebe_alcohol, "28. FUMA ACTUALMENTE", enc.fuma, y);
@@ -782,22 +772,27 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     y = drawFormRow("31. USO TIEMPO LIBRE", tiempoLibre, "32. CONTACTO EMERGENCIA", `${enc.contacto_emergencia_nombre} (${enc.contacto_emergencia_telefono})`, y);
     
     y += 5;
+    if (y > 240) { doc.addPage(); y = 20; }
+    
+    // 33. CONSENTIMIENTO INFORMADO (Estilo Cuadrícula)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.text("33. CONSENTIMIENTO INFORMADO", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    const disclaimer = "Ley 1581 de 2012: de protección de datos personales, es una ley que complementa la regulación vigente para la protección del derecho fundamental que tienen todas las personas naturales a autorizar la información personal que es almacenada en bases de datos o archivos, así como su posterior actualización y rectificación.";
-    doc.text(doc.splitTextToSize(disclaimer, innerWidth), margin, y + 5);
-    y += 15;
-    doc.setDrawColor(180);
-    doc.line(margin, y, margin + 70, y);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text("FIRMA DEL COLABORADOR", margin, y + 5);
-    doc.setFont("helvetica", "normal");
-    doc.text(`C.C. No. ${enc.cedula}`, margin, y + 9);
+    doc.rect(margin, y, innerWidth, 6);
+    doc.text("33. CONSENTIMIENTO INFORMADO", margin + 2, y + 4.5);
+    y += 6;
 
+    const consH = 15;
+    const optW = 20;
+    doc.rect(margin, y, optW, consH); // Opt box
+    doc.setFontSize(7);
+    doc.text("a) SI", margin + 2, y + 5);
+    doc.text("b) NO", margin + 2, y + 10);
+    
+    doc.rect(margin + optW, y, innerWidth - optW, consH); // Text box
+    doc.setFont("helvetica", "normal");
+    const disclaimer = "Ley 1581 de 2012: de protección de datos personales, es una ley que complementa la regulación vigente para la protección del derecho fundamental que tienen todas las personas naturales a autorizar la información personal que es almacenada en bases de datos o archivos, así como su posterior actualización y rectificación.";
+    doc.text(doc.splitTextToSize(disclaimer, innerWidth - optW - 4), margin + optW + 2, y + 5);
+    
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=F-GA-013_${enc.cedula}.pdf`);
