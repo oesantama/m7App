@@ -710,65 +710,59 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     
     y += dateRowH + 5;
 
-    // Helper para dibujar filas tipo formulario
+    // Helper para dibujar filas tipo formulario (LADO A LADO)
     const drawFormRow = (label1: string, val1: any, label2: string, val2: any, currentY: number) => {
-      const rowH = 7;
+      const rowH = 8;
+      const labelW = 42;
+      const valW = (innerWidth / 2) - labelW;
+      
       doc.setFontSize(7);
-      doc.setFont("helvetica", "bold");
-      doc.setFillColor(245, 247, 250);
-      
-      // Col 1 Label
-      doc.rect(margin, currentY, 35, rowH, 'FD');
       doc.setTextColor(0);
-      doc.text(label1, margin + 2, currentY + 4.5);
-      
-      // Col 1 Value
-      doc.rect(margin + 35, currentY, (innerWidth / 2) - 35, rowH, 'S');
-      doc.setFont("helvetica", "normal");
-      doc.text(String(val1 || '—'), margin + 37, currentY + 4.5);
 
-      // Col 2 Label
+      // Col 1 - Izquierda
       doc.setFont("helvetica", "bold");
-      doc.rect(margin + (innerWidth / 2), currentY, 35, rowH, 'FD');
-      doc.text(label2, margin + (innerWidth / 2) + 2, currentY + 4.5);
-
-      // Col 2 Value
-      doc.rect(margin + (innerWidth / 2) + 35, currentY, (innerWidth / 2) - 35, rowH, 'S');
+      doc.setFillColor(235, 235, 235);
+      doc.rect(margin, currentY, labelW, rowH, 'FD'); // Label Box Gray
+      doc.text(label1, margin + 2, currentY + 5);
+      
       doc.setFont("helvetica", "normal");
-      doc.text(String(val2 || '—'), margin + (innerWidth / 2) + 37, currentY + 4.5);
+      doc.setFillColor(255, 255, 255);
+      doc.rect(margin + labelW, currentY, valW, rowH, 'FD'); // Value Box White
+      doc.text(String(val1 || '—'), margin + labelW + 2, currentY + 5, { maxWidth: valW - 4 });
+
+      // Col 2 - Derecha
+      const col2X = margin + (innerWidth / 2);
+      doc.setFont("helvetica", "bold");
+      doc.setFillColor(235, 235, 235);
+      doc.rect(col2X, currentY, labelW, rowH, 'FD'); // Label Box Gray
+      doc.text(label2, col2X + 2, currentY + 5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFillColor(255, 255, 255);
+      doc.rect(col2X + labelW, currentY, valW, rowH, 'FD'); // Value Box White
+      doc.text(String(val2 || '—'), col2X + labelW + 2, currentY + 5, { maxWidth: valW - 4 });
 
       return currentY + rowH;
     };
 
-    const drawSectionHeader = (title: string, currentY: number) => {
-      doc.setFillColor(15, 23, 42);
-      doc.rect(margin, currentY, innerWidth, 6, 'F');
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(255);
-      doc.text(title, margin + 2, currentY + 4.5);
-      doc.setTextColor(0);
-      return currentY + 6;
-    };
-
-    // DATOS FORMULARIO (ESTILO EXCEL LADO A LADO)
-    y = drawSectionHeader("I. INFORMACIÓN GENERAL Y LABORAL", y);
+    // FLUJO DE PREGUNTAS (1-L, 2-R, 3-L, 4-R...)
     y = drawFormRow("1. DOCUMENTO IDENTIDAD", enc.cedula, "2. LUGAR Y FECHA NAC.", `${enc.mun_nac_nombre} / ${enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—'}`, y);
     y = drawFormRow("3. TIPO DE SANGRE", enc.sangre_nombre, "4. ESTADO CIVIL", enc.civil_nombre, y);
     y = drawFormRow("5. EDAD", enc.fecha_nacimiento ? (new Date().getFullYear() - new Date(enc.fecha_nacimiento).getFullYear()) : '—', "6. NIVEL EDUCATIVO", enc.edu_nombre, y);
-    y = drawFormRow("6. FECHA DE INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', "7. CARGO", enc.cargo_enc_nombre || enc.cargo_original, y);
-    y = drawFormRow("8. TIPO DE CONTRATO", enc.contrato_nombre, "9. INGRESOS MENSUALES", enc.ingresos_nombre, y);
-    y = drawFormRow("9. AFP", enc.afp_nombre, "10. EPS", enc.eps_nombre, y);
-    y = drawFormRow("11. TURNO LABORAL", enc.turno_nombre, "12. TIPO DE VIVIENDA", enc.vivienda_nombre, y);
-    y = drawFormRow("13. MUNICIPIO . BARRIO RES.", `${enc.mun_res_nombre} / ${enc.barrio}`, "14. DIRECCIÓN", enc.direccion, y);
-
-    y += 5;
-    y = drawSectionHeader("II. SALUD, HOGAR Y BIENESTAR", y);
-    y = drawFormRow("15. SUFRE ENFERMEDAD", enc.sufre_enfermedad, "16. PERSONAS EN HOGAR", enc.viven_conmigo, y);
-    y = drawFormRow("16. ESTRATO SOCIOECON.", enc.estrato, "17. NÚMERO DE CELULAR", enc.celular_personal, y);
-    y = drawFormRow("18. ES PRINCIPAL SUSTENT.", enc.principal_sustentador, "19. PERSONAS A CARGO", enc.pcargo_nombre, y);
-    y = drawFormRow("20. DISCAPACIDAD FAM.", enc.discapacidad_familia, "21. CON QUIÉN VIVE", enc.conviviente_nombre, y);
-    y = drawFormRow("21. CUANTOS HIJOS TIENE", enc.cuantos_hijos, "22. HIJOS MENORES DE 18", "(Ver tabla abajo)", y);
+    y = drawFormRow("7. FECHA DE INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', "8. CARGO", enc.cargo_enc_nombre || enc.cargo_original, y);
+    y = drawFormRow("9. TIPO DE CONTRATO", enc.contrato_nombre, "10. INGRESOS MENSUALES", enc.ingresos_nombre, y);
+    y = drawFormRow("11. AFP", enc.afp_nombre, "12. EPS", enc.eps_nombre, y);
+    y = drawFormRow("13. TURNO LABORAL", enc.turno_nombre, "14. TIPO DE VIVIENDA", enc.vivienda_nombre, y);
+    y = drawFormRow("15. MUNICIPIO . BARRIO RES.", `${enc.mun_res_nombre} / ${enc.barrio}`, "16. DIRECCIÓN", enc.direccion, y);
+    y = drawFormRow("17. SUFRE ENFERMEDAD", enc.sufre_enfermedad, "18. PERSONAS EN HOGAR", enc.viven_conmigo, y);
+    y = drawFormRow("19. ESTRATO SOCIOECON.", enc.estrato, "20. NÚMERO DE CELULAR", enc.celular_personal, y);
+    y = drawFormRow("21. ES PRINCIPAL SUSTENT.", enc.principal_sustentador, "22. PERSONAS A CARGO", enc.pcargo_nombre, y);
+    y = drawFormRow("23. DISCAPACIDAD FAM.", enc.discapacidad_familia, "24. CON QUIÉN VIVE", enc.conviviente_nombre, y);
+    
+    y += 2;
+    // 25 y 26 (Hijos)
+    const numHijos = enc.cuantos_hijos || 0;
+    y = drawFormRow("25. CUANTOS HIJOS TIENE", numHijos, "26. HIJOS MENORES DE 18", numHijos > 0 ? "Ver tabla" : "Ninguno", y);
 
     if (familia.length > 0) {
       const famData = familia.map(f => [f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—']);
@@ -781,17 +775,20 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
         headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
         margin: { left: margin, right: margin }
       });
-      y = (doc as any).lastAutoTable.finalY + 5;
+      y = (doc as any).lastAutoTable.finalY + 2;
     }
 
     if (y > 230) { doc.addPage(); y = 20; }
-    y = drawFormRow("23. BEBE ALCOHOL", enc.bebe_alcohol, "24. FUMA ACTUALMENTE", enc.fuma, y);
-    y = drawFormRow("25. PRACTICA DEPORTE", enc.practica_deporte || (enc.frec_deporte_nombre?.toLowerCase().includes('no practico') ? 'NO' : (enc.frec_deporte_nombre ? 'SI' : '—')), "26. TIPO DE DEPORTE", enc.tipo_deporte_nombre, y);
+    y = drawFormRow("27. CONSUME ALCOHOL", enc.bebe_alcohol, "28. FUMA ACTUALMENTE", enc.fuma, y);
+    y = drawFormRow("29. PRACTICA DEPORTE", enc.practica_deporte || (enc.frec_deporte_nombre?.toLowerCase().includes('no practico') ? 'NO' : (enc.frec_deporte_nombre ? 'SI' : '—')), "30. TIPO DE DEPORTE", enc.tipo_deporte_nombre, y);
     const tiempoLibre = enc.tiempo_libre_nombre === 'Otros' ? enc.uso_tiempo_libre_otros : enc.tiempo_libre_nombre;
-    y = drawFormRow("27. USO TIEMPO LIBRE", tiempoLibre, "28. CONTACTO EMERGENCIA", `${enc.contacto_emergencia_nombre} (${enc.contacto_emergencia_telefono})`, y);
+    y = drawFormRow("31. USO TIEMPO LIBRE", tiempoLibre, "32. CONTACTO EMERGENCIA", `${enc.contacto_emergencia_nombre} (${enc.contacto_emergencia_telefono})`, y);
     
     y += 5;
-    y = drawSectionHeader("29. CONSENTIMIENTO INFORMADO", y);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("33. CONSENTIMIENTO INFORMADO", margin, y);
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     const disclaimer = "Ley 1581 de 2012: de protección de datos personales, es una ley que complementa la regulación vigente para la protección del derecho fundamental que tienen todas las personas naturales a autorizar la información personal que es almacenada en bases de datos o archivos, así como su posterior actualización y rectificación.";
     doc.text(doc.splitTextToSize(disclaimer, innerWidth), margin, y + 5);
