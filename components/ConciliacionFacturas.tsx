@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import TabPendientes, { DocSummary } from './Conciliacion/TabPendientes';
-import TabConciliado from './Conciliacion/TabConciliado';
+import TabDocumentosLegalizados from './Conciliacion/TabDocumentosLegalizados';
 import TabPlanilla from './Conciliacion/TabPlanilla';
 
 interface Props { user: any; }
 
 interface Client { id: string; name: string; }
 
-type Tab = 'pendientes' | 'conciliado' | 'planilla';
+type Tab = 'pendientes' | 'documentos_legalizados' | 'planilla';
 
 const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
     const [activeTab, setActiveTab] = useState<Tab>('pendientes');
@@ -102,7 +102,7 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
                 <div className="flex gap-1">
                     {([
                         { id: 'pendientes' as Tab, label: 'Pendientes',       icon: '⏳', badge: pendingBadge },
-                        { id: 'conciliado' as Tab, label: 'Conciliado',        icon: '✅', badge: 0           },
+                        { id: 'documentos_legalizados' as Tab, label: 'Documentos Legalizados', icon: '✅', badge: 0 },
                         { id: 'planilla'   as Tab, label: 'Descarga Planilla', icon: '📥', badge: 0           },
                     ]).map(tab => (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -137,8 +137,8 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
                     onRefresh={() => loadDocs(selectedClientId)}
                     user={user}
                 />
-            ) : activeTab === 'conciliado' ? (
-                <TabConciliado />
+            ) : activeTab === 'documentos_legalizados' ? (
+                <TabDocumentosLegalizados user={user} />
             ) : (
                 <TabPlanilla user={user} />
             )}

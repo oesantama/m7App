@@ -186,6 +186,8 @@ export const api = {
     sobrecosto?: number; itemsReturned?: any[];
     targetRouteId?: string;
   }) => fetchJson(`${API_URL}/conciliation/save`, { method: 'POST', body: JSON.stringify(data) }),
+  closeConciliationCycle: (data: { documentId: string; userId: string }) =>
+    fetchJson(`${API_URL}/conciliation/close-cycle`, { method: 'POST', body: JSON.stringify(data) }),
   generateConciliationReport: (documentId: string, targetEmail: string | string[]) =>
     fetchJson(`${API_URL}/conciliation/report`, { method: 'POST', body: JSON.stringify({ documentId, targetEmail }) }),
   importMasterSuite: (file: File) => {

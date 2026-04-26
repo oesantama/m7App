@@ -149,6 +149,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [msPreviewData, setMsPreviewData]     = useState<any[]>([]);
     const [summaryFilter, setSummaryFilter]     = useState<string | null>(null);
     const [showMsPreview, setShowMsPreview]     = useState(false);
+    const [closingCycle, setClosingCycle]       = useState(false);
 
     // ASIGNACIÓN
     const [vehicles, setVehicles]           = useState<any[]>([]);
@@ -246,6 +247,23 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             setImportingMS(false);
             setPendingMsFile(null);
             setMsPreviewData([]);
+        }
+    };
+
+    const handleCloseCycle = async () => {
+        if (!selectedDoc) return;
+        if (!window.confirm(`¿Está seguro de cerrar administrativamente el documento ${selectedDoc.external_doc_id}? Las facturas restantes se marcarán como conciliadas.`)) return;
+        
+        setClosingCycle(true);
+        try {
+            const res = await api.closeConciliationCycle({ documentId: selectedDoc.id, userId: user.id });
+            toast.success(`Ciclo cerrado: ${res.closedCount} facturas conciliadas administrativamente.`);
+            loadDocDetail(selectedDoc);
+            onRefresh();
+        } catch (err: any) {
+            toast.error(err.message || 'Error cerrando ciclo');
+        } finally {
+            setClosingCycle(false);
         }
     };
 
@@ -772,6 +790,19 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         className="hidden"
                                         onChange={handleImportMasterSuite}
                                     />
+                                    {/* Cerrar Facturación */}
+                                    <button
+                                        onClick={handleCloseCycle}
+                                        disabled={closingCycle || Math.abs(stats.pendiente ?? 0) > 1500}
+                                        title="Cerrar administrativamente las facturas restantes (solo si el pendiente es +/- 1500)"
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm
+                                            ${Math.abs(stats.pendiente ?? 0) <= 1500 
+                                                ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse' 
+                                                : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                                        {closingCycle ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.Lock className="w-3 h-3" />}
+                                        Cerrar Facturación
+                                    </button>
+
                                     <button
                                         onClick={handleExportExcel}
                                         className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm">

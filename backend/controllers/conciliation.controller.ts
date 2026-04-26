@@ -10,11 +10,19 @@ import { readFileSync, unlink } from 'fs';
 // no tienen conciliación completa (al menos 1 factura sin conciliar).
 export const getPendingConciliations = async (req: Request, res: Response) => {
     try {
-        const { clientId, plate, from, to } = req.query;
+        const { clientId, plate, from, to, docId } = req.query;
 
-        const conditions: string[] = [`dl.plan_type ILIKE '%plan r%'`];
+        const conditions: string[] = [];
         const params: any[] = [];
         let p = 1;
+
+        // Si no hay docId, forzamos Plan R (comportamiento original para la lista de pendientes)
+        if (!docId) {
+            conditions.push(`dl.plan_type ILIKE '%plan r%'`);
+        } else {
+            conditions.push(`dl.external_doc_id = $${p++}`);
+            params.push(docId);
+        }
 
         if (clientId) { conditions.push(`dl.client_id = $${p++}`); params.push(clientId); }
         if (plate)    { conditions.push(`dl.vehicle_plate ILIKE $${p++}`); params.push(`%${plate}%`); }
@@ -64,6 +72,16 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
             END $$;
         `);
 
+        // El HAVING solo se aplica si NO estamos buscando un documento específico (docId)
+        const havingClause = docId ? '' : `
+            HAVING (
+                (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
+                - 
+                (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
+            ) > 0
+              AND (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '') > 0
+        `;
+
         const result = await pool.query(`
             SELECT
                 dl.id,
@@ -76,7 +94,6 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                 dl.delivery_date,
                 dl.client_id,
 
-                -- Conteo de facturas en el documento (Subquery para evitar fan-out de joins)
                 (SELECT COUNT(DISTINCT di.invoice) 
                  FROM document_items di 
                  WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
@@ -87,14 +104,12 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                  WHERE ic.document_id = dl.id
                 ) AS conciliadas,
 
-                -- Cálculo de pendientes
                 (
                   (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
                   - 
                   (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
                 ) AS pendientes,
 
-                -- Efectivo y crédito desde document_l_payments (Subquery simplificada por document_id)
                 (SELECT COALESCE(SUM(CASE 
                     WHEN UPPER(TRIM(p.metodo_pago)) IN ('EF', 'EFECTIVO', 'CASH') OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
                     THEN COALESCE(NULLIF(TRIM(p.vmetodo), '')::numeric, 0) ELSE 0 END), 0)
@@ -111,32 +126,20 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                  WHERE p.document_id = dl.id
                 ) AS total_credito,
 
-                -- Conductor y placa desde dispatch (última asignación del doc)
                 (SELECT da.driver_id FROM dispatch_assignments da
                  WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_id,
                 (SELECT u.name FROM dispatch_assignments da
                  LEFT JOIN users u ON u.id = da.driver_id
                  WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name,
 
-                -- Sobrecostos de ruta acumulados (Solo aprobados para el progreso)
                 (SELECT COALESCE(SUM(valor::numeric), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id AND rs.status_id IN ('APROBADO', 'EST-02')) AS total_sobrecosto_ruta,
-
-                -- Pagos grupales acumulados
                 (SELECT COALESCE(SUM(valor::numeric), 0) FROM route_group_payments rgp WHERE rgp.document_id = dl.id) AS total_pago_grupal,
-
-                -- Legalizado individual (Suma de valor en invoice_conciliations)
                 (SELECT COALESCE(SUM(valor::numeric), 0) FROM invoice_conciliations ic WHERE ic.document_id = dl.id) AS total_legalizado_individual
 
             FROM documents_l dl
             ${where}
-            -- El filtro de "al menos una pendiente" se aplica en el HAVING del resultado final o simplemente se filtra aquí
             GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.codplan, dl.plan_type, dl.status, dl.created_at, dl.delivery_date, dl.client_id
-            HAVING (
-                (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
-                - 
-                (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
-            ) > 0
-              AND (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '') > 0
+            ${havingClause}
             ORDER BY dl.created_at DESC
         `, params);
 
@@ -1023,6 +1026,70 @@ export const saveRouteGroupPayments = async (req: Request, res: Response) => {
     } catch (err: any) {
         if (client) await client.query('ROLLBACK');
         console.error('[CONCILIATION] saveRouteGroupPayments error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
+
+// --- POST /conciliation/close-cycle -------------------------------------------
+// Cierra administrativamente las facturas que faltan por conciliar
+export const closeConciliationCycle = async (req: Request, res: Response) => {
+    const { documentId, userId } = req.body;
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // 1. Buscar facturas del documento que NO están en invoice_conciliations
+        const pendingItemsRes = await client.query(`
+            SELECT di.invoice, di.item_status, di.vmetodo, di.un_code, di.metodo_pago
+            FROM document_items di
+            LEFT JOIN invoice_conciliations ic 
+              ON ic.document_id::text = di.document_id::text 
+             AND ic.invoice_number = di.invoice
+            WHERE di.document_id = $1
+              AND ic.id IS NULL
+        `, [documentId]);
+
+        if (pendingItemsRes.rows.length === 0) {
+            await client.query('COMMIT');
+            return res.json({ success: true, message: 'No hay facturas pendientes por cerrar.' });
+        }
+
+        const pendingItems = pendingItemsRes.rows;
+
+        // 2. Para cada factura pendiente, crear registro de conciliación "Administrativo"
+        for (const item of pendingItems) {
+            // Insertar conciliación con valor 0 (ya que el dinero ya se saldó con EF o es Crédito)
+            await client.query(`
+                INSERT INTO invoice_conciliations
+                    (document_id, invoice_number, valor, comprobante, fecha_pago,
+                     forma_pago, es_devolucion, conciliado_por, created_at, updated_at)
+                VALUES ($1, $2, 0, 'CIERRE_ADMINISTRATIVO', NOW(), 'OTRO', false, $3, NOW(), NOW())
+                ON CONFLICT (document_id, invoice_number) DO NOTHING
+            `, [documentId, item.invoice, userId]);
+
+            // Actualizar estado del item a Entregado (EST-12)
+            await client.query(`
+                UPDATE document_items SET item_status = 'EST-12'
+                WHERE document_id = $1 AND invoice = $2
+            `, [documentId, item.invoice]);
+
+            // Registrar en historial
+            await client.query(`
+                INSERT INTO invoice_status_history
+                    (document_id, invoice_number, evento, estado_anterior, estado_nuevo,
+                     usuario_id, created_at)
+                VALUES ($1, $2, 'CIERRE_ADMIN', $3, 'EST-12', $4, NOW())
+            `, [documentId, item.invoice, item.item_status, userId]);
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, closedCount: pendingItems.length });
+    } catch (err: any) {
+        if (client) await client.query('ROLLBACK');
+        console.error('[CONCILIATION] closeConciliationCycle error:', err.message);
         res.status(500).json({ success: false, error: err.message });
     } finally {
         client.release();
