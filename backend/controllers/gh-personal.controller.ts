@@ -530,8 +530,7 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
       'CÉDULA COLABORADOR': f.cedula_personal,
       'NOMBRE COLABORADOR': f.nombre_personal,
       'NOMBRE FAMILIAR': f.nombre,
-      'FECHA NACIMIENTO': f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : 'N/A',
-      'OCUPACIÓN': f.ocupacion
+      'FECHA NACIMIENTO': f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : 'N/A'
     }));
 
     const wb = XLSX.utils.book_new();
@@ -759,10 +758,10 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
       y += 8;
       if (y > 240) { doc.addPage(); y = 20; }
       y = drawSectionHeader("VI. COMPOSICIÓN FAMILIAR (DETALLE)", y);
-      const famData = familia.map(f => [f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—', f.ocupacion || '—']);
+      const famData = familia.map(f => [f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—']);
       autoTable(doc, {
         startY: y,
-        head: [['NOMBRE COMPLETO DEL FAMILIAR', 'FECHA NACIMIENTO', 'OCUPACIÓN']],
+        head: [['NOMBRE COMPLETO DEL FAMILIAR', 'FECHA NACIMIENTO']],
         body: famData,
         theme: 'grid',
         styles: { fontSize: 7, cellPadding: 2, textColor: [60, 60, 60] },

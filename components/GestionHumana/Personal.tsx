@@ -689,17 +689,15 @@ const Personal: React.FC<Props> = ({ user }) => {
                       <table className="w-full text-[10px]">
                         <thead className="bg-slate-200/50">
                           <tr>
-                            <th className="px-6 py-3 font-black uppercase text-slate-500">Nombre</th>
-                            <th className="px-6 py-3 font-black uppercase text-slate-500 text-center">Fecha Nacimiento</th>
-                            <th className="px-6 py-3 font-black uppercase text-slate-500 text-right">Ocupación</th>
+                            <th className="px-6 py-3 font-black uppercase text-slate-500 text-left">Nombre</th>
+                            <th className="px-6 py-3 font-black uppercase text-slate-500 text-right">Fecha Nacimiento</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {showDetail.familia.map((f: any, idx: number) => (
                             <tr key={idx} className="hover:bg-white transition-all">
-                              <td className="px-6 py-3 font-black text-slate-900 uppercase">{f.nombre}</td>
-                              <td className="px-6 py-3 text-center text-slate-600">{f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'}</td>
-                              <td className="px-6 py-3 text-right text-slate-600 uppercase font-bold">{f.ocupacion || '—'}</td>
+                              <td className="px-6 py-3 font-black text-slate-900 uppercase text-left">{f.nombre}</td>
+                              <td className="px-6 py-3 text-right text-slate-600">{f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
