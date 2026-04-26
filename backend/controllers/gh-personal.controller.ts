@@ -708,9 +708,7 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     doc.setFont("helvetica", "bold");
     doc.text(`NOMBRES Y APELLIDOS COMPLETOS: ${enc.nombre.toUpperCase()}`, margin + 2, y + 5);
     
-    y += dateRowH + 5;
-
-    y += dateRowH + 5;
+    y += dateRowH + 2;
 
     // Helper para dibujar filas tipo formulario (VERTICAL STACK)
     const drawFormRow = (label1: string, val1: any, label2: string, val2: any, currentY: number) => {
