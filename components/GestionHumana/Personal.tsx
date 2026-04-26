@@ -368,8 +368,8 @@ const Personal: React.FC<Props> = ({ user }) => {
           ) : activeTab === 'consultar' ? (
             <div className="space-y-4">
               {/* Filtros */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100 items-end">
-                <div className="space-y-1 md:col-span-1.5">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100 items-end">
+                <div className="space-y-1 lg:col-span-3">
                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Colaborador / Cédula</label>
                   <SearchableSelect
                     options={colaboradoresConEncuesta.map(c => ({ id: c.cedula, nombre: `${c.nombre} (${c.cedula})` }))}
@@ -378,7 +378,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     placeholder="TODOS LOS COLABORADORES"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 lg:col-span-2">
                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Desde</label>
                   <input 
                     type="date"
@@ -387,7 +387,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] outline-none focus:border-indigo-500"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 lg:col-span-2">
                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Hasta</label>
                   <input 
                     type="date"
@@ -396,7 +396,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-[11px] outline-none focus:border-indigo-500"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 lg:col-span-2">
                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Área</label>
                   <select 
                     value={filterArea || ''} 
@@ -407,17 +407,17 @@ const Personal: React.FC<Props> = ({ user }) => {
                     {areas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
                   </select>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 lg:col-span-3">
                   <button 
                     onClick={handleConsultar}
-                    className="h-10 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-sm flex-1 justify-center"
+                    className="h-10 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-sm flex-1 justify-center whitespace-now nowrap"
                   >
                     <Icons.Search className="w-4 h-4" />
                     <span className="text-[10px] font-black uppercase">Consultar</span>
                   </button>
                   <button 
                     onClick={() => api.exportEncuestasExcel({ from: filterDates.from, to: filterDates.to, search: filterSearch, areaId: filterArea || undefined })}
-                    className="h-10 px-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-sm"
+                    className="h-10 px-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-sm whitespace-now nowrap"
                     title="Exportar a Excel"
                   >
                     <Icons.Download className="w-4 h-4" />

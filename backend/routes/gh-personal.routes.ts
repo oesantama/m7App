@@ -29,9 +29,9 @@ router.delete('/:id', deletePersonal);
 router.get('/encuestas', getPersonalEncuestas);
 router.post('/encuestas/activate', activateEncuesta);
 router.put('/encuestas/deactivate/:id', deactivateEncuesta);
+router.get('/resultados/excel', exportEncuestasExcel);
 router.get('/resultados', getEncuestasResultados);
 router.get('/resultados/:id', getEncuestaDetail);
-router.get('/resultados/excel', exportEncuestasExcel);
 router.get('/pdf/:id', generateEncuestaPDF);
 
 // LMS Routes
