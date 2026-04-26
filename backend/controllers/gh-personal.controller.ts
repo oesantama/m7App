@@ -690,25 +690,15 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     
     // Logo Box
     doc.rect(margin, 10, logoW, headerH);
-    // Ruta dinámica que funciona en local y servidor (Coolify)
     const logoPath = path.resolve(__dirname, '../../public/logo-encuesta.png');
-    
+
     if (fs.existsSync(logoPath)) {
       try {
         const logoBuffer = fs.readFileSync(logoPath);
+        // El PNG ya fue corregido (no entrelazado) para compatibilidad total con jsPDF
         doc.addImage(logoBuffer, 'PNG', margin + 2, 11, logoW - 4, headerH - 2);
       } catch (e) {
-        console.error('[GH-PDF] Error al procesar logo binario:', e);
-      }
-    } else {
-      console.warn('[GH-PDF] Logo no encontrado en:', logoPath);
-      // Intento alternativo por si la estructura cambia en Docker
-      const fallbackPath = path.join(process.cwd(), 'public/logo-encuesta.png');
-      if (fs.existsSync(fallbackPath)) {
-        try {
-          const logoBuffer = fs.readFileSync(fallbackPath);
-          doc.addImage(logoBuffer, 'PNG', margin + 2, 11, logoW - 4, headerH - 2);
-        } catch (e) {}
+        console.error('[GH-PDF] Error renderizando logo:', e);
       }
     }
 
