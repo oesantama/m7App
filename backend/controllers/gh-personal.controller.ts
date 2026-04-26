@@ -675,8 +675,10 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
 
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.text("SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SG-SST, E. 3.1.1", margin + 42, 18, { maxWidth: innerWidth - 90, align: 'left' });
-    doc.text("ENCUESTA PERFIL SOCIODEMOGRÁFICO", margin + 42, 24, { maxWidth: innerWidth - 90, align: 'left' });
+    const headerTitle1 = "SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SG-SST, E. 3.1.1";
+    const headerTitle2 = "ENCUESTA PERFIL SOCIODEMOGRÁFICO";
+    doc.text(headerTitle1, margin + 40 + (innerWidth - 85) / 2, 18, { align: 'center' });
+    doc.text(headerTitle2, margin + 40 + (innerWidth - 85) / 2, 24, { align: 'center' });
 
     doc.setFontSize(7);
     doc.text("CÓDIGO: F-GA-013", pageWidth - margin - 43, 16);
@@ -684,18 +686,19 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     doc.text(`FECHA: 23/10/2024`, pageWidth - margin - 43, 26);
 
     let y = 30;
+    const surveyDate = enc.fecha_realizacion ? new Date(enc.fecha_realizacion) : new Date();
 
     // Row for Fecha, Dia, Año, N°
     const dateRowH = 8;
     doc.rect(margin, y, innerWidth, dateRowH);
     doc.setFontSize(7);
-    doc.text("FECHA:", margin + 2, y + 5);
+    doc.text(`FECHA: ${surveyDate.toLocaleDateString()}`, margin + 2, y + 5);
     doc.line(margin + 60, y, margin + 60, y + dateRowH);
-    doc.text("DIA:", margin + 62, y + 5);
+    doc.text(`DIA: ${surveyDate.getDate()}`, margin + 62, y + 5);
     doc.line(margin + 100, y, margin + 100, y + dateRowH);
-    doc.text("AÑO:", margin + 102, y + 5);
+    doc.text(`AÑO: ${surveyDate.getFullYear()}`, margin + 102, y + 5);
     doc.line(pageWidth - margin - 30, y, pageWidth - margin - 30, y + dateRowH);
-    doc.text("N°", pageWidth - margin - 28, y + 5);
+    doc.text(`N°: ${enc.id}`, pageWidth - margin - 28, y + 5);
     
     y += dateRowH;
 
@@ -747,21 +750,21 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
       return currentY + 6;
     };
 
-    // DATOS EMPLEADO
+    // DATOS EMPLEADO (ESTILO EXCEL LADO A LADO)
     y = drawSectionHeader("I. INFORMACIÓN GENERAL DEL COLABORADOR", y);
-    y = drawFormRow("NOMBRE COMPLETO", enc.nombre.toUpperCase(), "CÉDULA", enc.cedula, y);
-    y = drawFormRow("CARGO ACTUAL", enc.cargo_enc_nombre || enc.cargo_original, "FECHA INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', y);
-    y = drawFormRow("ÁREA / PROCESO", enc.area_nombre, "TIPO CONTRATO", enc.contrato_nombre, y);
-    y = drawFormRow("EPS", enc.eps_nombre, "AFP (Fondo Pensión)", enc.afp_nombre, y);
-    y = drawFormRow("TURNO LABORAL", enc.turno_nombre, "INGRESOS MENS.", enc.ingresos_nombre, y);
+    y = drawFormRow("1. DOCUMENTO IDENTIDAD", enc.cedula, "2. LUGAR Y FECHA NAC.", `${enc.mun_nac_nombre} / ${enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—'}`, y);
+    y = drawFormRow("3. TIPO DE SANGRE", enc.sangre_nombre, "4. ESTADO CIVIL", enc.civil_nombre, y);
+    y = drawFormRow("5. EDAD", enc.fecha_nacimiento ? (new Date().getFullYear() - new Date(enc.fecha_nacimiento).getFullYear()) : '—', "6. NIVEL EDUCATIVO", enc.edu_nombre, y);
+    y = drawFormRow("7. CARGO ACTUAL", enc.cargo_enc_nombre || enc.cargo_original, "8. FECHA INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', y);
+    y = drawFormRow("9. ÁREA / PROCESO", enc.area_nombre, "10. TIPO CONTRATO", enc.contrato_nombre, y);
+    y = drawFormRow("11. EPS", enc.eps_nombre, "12. AFP (PENSIÓN)", enc.afp_nombre, y);
+    y = drawFormRow("13. TURNO LABORAL", enc.turno_nombre, "14. INGRESOS MENS.", enc.ingresos_nombre, y);
 
     y += 5;
-    y = drawSectionHeader("II. DATOS PERSONALES Y RESIDENCIA", y);
-    y = drawFormRow("FECHA NACIMIENTO", enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—', "LUGAR NAC.", `${enc.mun_nac_nombre}, ${enc.dep_nac_nombre}`, y);
-    y = drawFormRow("ESTADO CIVIL", enc.civil_nombre, "NIVEL EDUCATIVO", enc.edu_nombre, y);
-    y = drawFormRow("TIPO SANGRE", enc.sangre_nombre, "ESTRATO", enc.estrato, y);
+    y = drawSectionHeader("II. DATOS DE RESIDENCIA", y);
     y = drawFormRow("CIUDAD RESIDENCIA", `${enc.mun_res_nombre}, ${enc.dep_res_nombre}`, "BARRIO", enc.barrio, y);
     y = drawFormRow("DIRECCIÓN", enc.direccion, "TIPO VIVIENDA", enc.vivienda_nombre, y);
+    y = drawFormRow("ESTRATO", enc.estrato, "", "", y);
 
     y += 5;
     y = drawSectionHeader("III. ENTORNO FAMILIAR Y SOCIAL", y);
