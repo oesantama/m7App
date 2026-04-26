@@ -710,42 +710,39 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     
     y += dateRowH + 5;
 
-    // Helper para dibujar filas tipo formulario (LADO A LADO)
+    y += dateRowH + 5;
+
+    // Helper para dibujar filas tipo formulario (VERTICAL STACK)
     const drawFormRow = (label1: string, val1: any, label2: string, val2: any, currentY: number) => {
-      const rowH = 8;
-      const labelW = 42;
-      const valW = (innerWidth / 2) - labelW;
+      const rowH = 12; // Aumentado para stack vertical
+      const colW = innerWidth / 2;
       
       doc.setFontSize(7);
       doc.setTextColor(0);
 
       // Col 1 - Izquierda
       doc.setFont("helvetica", "bold");
-      doc.setFillColor(235, 235, 235);
-      doc.rect(margin, currentY, labelW, rowH, 'FD'); // Label Box Gray
-      doc.text(label1, margin + 2, currentY + 5);
+      doc.rect(margin, currentY, colW, rowH / 2); // Title Box No Fill
+      doc.text(label1, margin + 2, currentY + 4);
       
       doc.setFont("helvetica", "normal");
-      doc.setFillColor(255, 255, 255);
-      doc.rect(margin + labelW, currentY, valW, rowH, 'FD'); // Value Box White
-      doc.text(String(val1 || '—'), margin + labelW + 2, currentY + 5, { maxWidth: valW - 4 });
+      doc.rect(margin, currentY + (rowH / 2), colW, rowH / 2); // Value Box
+      doc.text(String(val1 || '—'), margin + 2, currentY + (rowH / 2) + 4, { maxWidth: colW - 4 });
 
       // Col 2 - Derecha
-      const col2X = margin + (innerWidth / 2);
+      const col2X = margin + colW;
       doc.setFont("helvetica", "bold");
-      doc.setFillColor(235, 235, 235);
-      doc.rect(col2X, currentY, labelW, rowH, 'FD'); // Label Box Gray
-      doc.text(label2, col2X + 2, currentY + 5);
+      doc.rect(col2X, currentY, colW, rowH / 2); // Title Box No Fill
+      doc.text(label2, col2X + 2, currentY + 4);
 
       doc.setFont("helvetica", "normal");
-      doc.setFillColor(255, 255, 255);
-      doc.rect(col2X + labelW, currentY, valW, rowH, 'FD'); // Value Box White
-      doc.text(String(val2 || '—'), col2X + labelW + 2, currentY + 5, { maxWidth: valW - 4 });
+      doc.rect(col2X, currentY + (rowH / 2), colW, rowH / 2); // Value Box
+      doc.text(String(val2 || '—'), col2X + 2, currentY + (rowH / 2) + 4, { maxWidth: colW - 4 });
 
       return currentY + rowH;
     };
 
-    // FLUJO DE PREGUNTAS (1-L, 2-R, 3-L, 4-R...)
+    // FLUJO DE PREGUNTAS (VERTICAL STACK 1-L, 2-R...)
     y = drawFormRow("1. DOCUMENTO IDENTIDAD", enc.cedula, "2. LUGAR Y FECHA NAC.", `${enc.mun_nac_nombre} / ${enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—'}`, y);
     y = drawFormRow("3. TIPO DE SANGRE", enc.sangre_nombre, "4. ESTADO CIVIL", enc.civil_nombre, y);
     y = drawFormRow("5. EDAD", enc.fecha_nacimiento ? (new Date().getFullYear() - new Date(enc.fecha_nacimiento).getFullYear()) : '—', "6. NIVEL EDUCATIVO", enc.edu_nombre, y);
@@ -762,13 +759,13 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     y += 2;
     // 25 y 26 (Hijos)
     const numHijos = enc.cuantos_hijos || 0;
-    y = drawFormRow("25. CUANTOS HIJOS TIENE", numHijos, "26. HIJOS MENORES DE 18", numHijos > 0 ? "Ver tabla" : "Ninguno", y);
+    y = drawFormRow("25. CUANTOS HIJOS TIENE", numHijos, "26. HIJOS MENORES DE 18 (Nombre y Fecha Nacimiento)", numHijos > 0 ? "Ver tabla" : "Ninguno", y);
 
     if (familia.length > 0) {
-      const famData = familia.map(f => [f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—']);
+      const famData = familia.map(f => [`${f.nombre} - ${f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'}`]);
       autoTable(doc, {
         startY: y,
-        head: [['NOMBRE COMPLETO DEL HIJO/A', 'FECHA NACIMIENTO']],
+        head: [['HIJO/A (NOMBRE Y FECHA NACIMIENTO)']],
         body: famData,
         theme: 'grid',
         styles: { fontSize: 7, cellPadding: 2 },
