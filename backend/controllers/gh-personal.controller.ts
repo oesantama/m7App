@@ -570,7 +570,8 @@ export const getEncuestaDetail = async (req: Request, res: Response) => {
              pac.nombre as pcargo_nombre, cvv.nombre as conviviente_nombre,
              cg.nombre as cargo_enc_nombre,
              fd.nombre as frec_deporte_nombre,
-             td.nombre as tipo_deporte_nombre
+             td.nombre as tipo_deporte_nombre,
+             p.celular_personal as celular_personal
       FROM gh_encuestas_sociodemograficas r
       JOIN gh_personal p ON p.cedula = r.cedula
       LEFT JOIN gh_areas a ON a.id = p.area_trabajo_id
@@ -750,68 +751,51 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
       return currentY + 6;
     };
 
-    // DATOS EMPLEADO (ESTILO EXCEL LADO A LADO)
-    y = drawSectionHeader("I. INFORMACIÓN GENERAL DEL COLABORADOR", y);
+    // DATOS FORMULARIO (ESTILO EXCEL LADO A LADO)
+    y = drawSectionHeader("I. INFORMACIÓN GENERAL Y LABORAL", y);
     y = drawFormRow("1. DOCUMENTO IDENTIDAD", enc.cedula, "2. LUGAR Y FECHA NAC.", `${enc.mun_nac_nombre} / ${enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—'}`, y);
     y = drawFormRow("3. TIPO DE SANGRE", enc.sangre_nombre, "4. ESTADO CIVIL", enc.civil_nombre, y);
     y = drawFormRow("5. EDAD", enc.fecha_nacimiento ? (new Date().getFullYear() - new Date(enc.fecha_nacimiento).getFullYear()) : '—', "6. NIVEL EDUCATIVO", enc.edu_nombre, y);
-    y = drawFormRow("7. CARGO ACTUAL", enc.cargo_enc_nombre || enc.cargo_original, "8. FECHA INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', y);
-    y = drawFormRow("9. ÁREA / PROCESO", enc.area_nombre, "10. TIPO CONTRATO", enc.contrato_nombre, y);
-    y = drawFormRow("11. EPS", enc.eps_nombre, "12. AFP (PENSIÓN)", enc.afp_nombre, y);
-    y = drawFormRow("13. TURNO LABORAL", enc.turno_nombre, "14. INGRESOS MENS.", enc.ingresos_nombre, y);
+    y = drawFormRow("6. FECHA DE INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', "7. CARGO", enc.cargo_enc_nombre || enc.cargo_original, y);
+    y = drawFormRow("8. TIPO DE CONTRATO", enc.contrato_nombre, "9. INGRESOS MENSUALES", enc.ingresos_nombre, y);
+    y = drawFormRow("9. AFP", enc.afp_nombre, "10. EPS", enc.eps_nombre, y);
+    y = drawFormRow("11. TURNO LABORAL", enc.turno_nombre, "12. TIPO DE VIVIENDA", enc.vivienda_nombre, y);
+    y = drawFormRow("13. MUNICIPIO . BARRIO RES.", `${enc.mun_res_nombre} / ${enc.barrio}`, "14. DIRECCIÓN", enc.direccion, y);
 
     y += 5;
-    y = drawSectionHeader("II. DATOS DE RESIDENCIA", y);
-    y = drawFormRow("CIUDAD RESIDENCIA", `${enc.mun_res_nombre}, ${enc.dep_res_nombre}`, "BARRIO", enc.barrio, y);
-    y = drawFormRow("DIRECCIÓN", enc.direccion, "TIPO VIVIENDA", enc.vivienda_nombre, y);
-    y = drawFormRow("ESTRATO", enc.estrato, "", "", y);
-
-    y += 5;
-    y = drawSectionHeader("III. ENTORNO FAMILIAR Y SOCIAL", y);
-    y = drawFormRow("PERSONAS EN HOGAR", enc.viven_conmigo, "CON QUIÉN VIVE", enc.conviviente_nombre, y);
-    y = drawFormRow("PRINCIPAL SUSTENTO", enc.principal_sustentador, "PERSONAS A CARGO", enc.pcargo_nombre, y);
-    y = drawFormRow("HIJOS (CANTIDAD)", enc.cuantos_hijos, "DISCAPACIDAD FAM.", enc.discapacidad_familia, y);
-
-    y += 5;
-    y = drawSectionHeader("IV. ESTILO DE VIDA Y SALUD", y);
-    y = drawFormRow("ENFERMEDAD DIAG.", enc.sufre_enfermedad, "CONSUMO ALCOHOL", enc.bebe_alcohol, y);
-    y = drawFormRow("FUMA", enc.fuma, "PRACTICA DEPORTE", enc.practica_deporte || (enc.frec_deporte_nombre?.toLowerCase().includes('no practico') ? 'NO' : (enc.frec_deporte_nombre ? 'SI' : '—')), y);
-    y = drawFormRow("TIPO DEPORTE", enc.tipo_deporte_nombre, "FRECUENCIA", enc.frec_deporte_nombre, y);
-    const tiempoLibre = enc.tiempo_libre_nombre === 'Otros' ? enc.uso_tiempo_libre_otros : enc.tiempo_libre_nombre;
-    y = drawFormRow("USO TIEMPO LIBRE", tiempoLibre, "", "", y);
-
-    y += 5;
-    y = drawSectionHeader("V. CONTACTO EN CASO DE EMERGENCIA", y);
-    y = drawFormRow("NOMBRE CONTACTO", enc.contacto_emergencia_nombre, "TELÉFONO", enc.contacto_emergencia_telefono, y);
+    y = drawSectionHeader("II. SALUD, HOGAR Y BIENESTAR", y);
+    y = drawFormRow("15. SUFRE ENFERMEDAD", enc.sufre_enfermedad, "16. PERSONAS EN HOGAR", enc.viven_conmigo, y);
+    y = drawFormRow("16. ESTRATO SOCIOECON.", enc.estrato, "17. NÚMERO DE CELULAR", enc.celular_personal, y);
+    y = drawFormRow("18. ES PRINCIPAL SUSTENT.", enc.principal_sustentador, "19. PERSONAS A CARGO", enc.pcargo_nombre, y);
+    y = drawFormRow("20. DISCAPACIDAD FAM.", enc.discapacidad_familia, "21. CON QUIÉN VIVE", enc.conviviente_nombre, y);
+    y = drawFormRow("21. CUANTOS HIJOS TIENE", enc.cuantos_hijos, "22. HIJOS MENORES DE 18", "(Ver tabla abajo)", y);
 
     if (familia.length > 0) {
-      y += 8;
-      if (y > 240) { doc.addPage(); y = 20; }
-      y = drawSectionHeader("VI. COMPOSICIÓN FAMILIAR (DETALLE)", y);
       const famData = familia.map(f => [f.nombre, f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—']);
       autoTable(doc, {
         startY: y,
-        head: [['NOMBRE COMPLETO DEL FAMILIAR', 'FECHA NACIMIENTO']],
+        head: [['NOMBRE COMPLETO DEL HIJO/A', 'FECHA NACIMIENTO']],
         body: famData,
         theme: 'grid',
-        styles: { fontSize: 7, cellPadding: 2, textColor: [60, 60, 60] },
-        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
         margin: { left: margin, right: margin }
       });
-      y = (doc as any).lastAutoTable.finalY + 10;
+      y = (doc as any).lastAutoTable.finalY + 5;
     }
 
-    if (y > 240) { doc.addPage(); y = 20; }
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text("CONSENTIMIENTO INFORMADO", margin, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    const disclaimer = "Declaro que la información suministrada en esta encuesta es veraz y autorizo a la empresa para el tratamiento de mis datos personales según la Ley 1581 de 2012 y demás normas concordantes. El registro de esta información es fundamental para los programas de Gestión Humana y Salud Ocupacional. Reporte generado por OrbitM7.";
-    doc.text(doc.splitTextToSize(disclaimer, innerWidth), margin, y);
+    if (y > 230) { doc.addPage(); y = 20; }
+    y = drawFormRow("23. BEBE ALCOHOL", enc.bebe_alcohol, "24. FUMA ACTUALMENTE", enc.fuma, y);
+    y = drawFormRow("25. PRACTICA DEPORTE", enc.practica_deporte || (enc.frec_deporte_nombre?.toLowerCase().includes('no practico') ? 'NO' : (enc.frec_deporte_nombre ? 'SI' : '—')), "26. TIPO DE DEPORTE", enc.tipo_deporte_nombre, y);
+    const tiempoLibre = enc.tiempo_libre_nombre === 'Otros' ? enc.uso_tiempo_libre_otros : enc.tiempo_libre_nombre;
+    y = drawFormRow("27. USO TIEMPO LIBRE", tiempoLibre, "28. CONTACTO EMERGENCIA", `${enc.contacto_emergencia_nombre} (${enc.contacto_emergencia_telefono})`, y);
     
-    y += 20;
+    y += 5;
+    y = drawSectionHeader("29. CONSENTIMIENTO INFORMADO", y);
+    doc.setFontSize(7);
+    const disclaimer = "Ley 1581 de 2012: de protección de datos personales, es una ley que complementa la regulación vigente para la protección del derecho fundamental que tienen todas las personas naturales a autorizar la información personal que es almacenada en bases de datos o archivos, así como su posterior actualización y rectificación.";
+    doc.text(doc.splitTextToSize(disclaimer, innerWidth), margin, y + 5);
+    y += 15;
     doc.setDrawColor(180);
     doc.line(margin, y, margin + 70, y);
     doc.setFontSize(8);
