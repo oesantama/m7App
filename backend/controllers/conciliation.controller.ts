@@ -596,14 +596,17 @@ export const saveConciliation = async (req: Request, res: Response) => {
             INSERT INTO invoice_status_history
                 (document_id, invoice_number, evento, estado_anterior, estado_nuevo,
                  valor_factura, valor_entregado, valor_devuelto,
+                 banco, comprobante,
                  usuario_id, usuario_nombre, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
         `, [
             documentId, invoiceNumber, eventoHistorial,
             prevItemStatus, nuevoItemStatus,
             facturaNum > 0 ? facturaNum : null,
             valorEntregado > 0 ? valorEntregado : null,
             valorDevuelto  > 0 ? valorDevuelto  : null,
+            banco || 'Bancolombia',
+            comprobante || null,
             conciliadoPor  || null,
             usuarioNombre  || null,
         ]).catch(e => console.warn('[CONCILIATION] history insert skipped:', e.message));

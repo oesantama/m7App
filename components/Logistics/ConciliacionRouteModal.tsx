@@ -897,13 +897,25 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             return;
         }
 
+        // Validación de comprobante y valor obligatorio para Entregado/Parcial
+        if (!esDevolucion && form.estadoEntrega !== 'repice') {
+            if (!form.numConsignacion || form.numConsignacion.trim() === '') {
+                toast.error('El número de comprobante / referencia es obligatorio.');
+                return;
+            }
+            if (valorNum <= 0) {
+                toast.error('El total a consignar debe ser mayor a $0 para facturas entregadas.');
+                return;
+            }
+        }
+
         updateForm(inv.invoice_number, { saving: true });
         try {
             await api.saveConciliation({
                 documentId,
                 invoiceNumber:  inv.invoice_number,
                 valor:          esDevolucion ? 0 : valorNum,
-                banco:          form.banco || undefined,
+                banco:          'Bancolombia',
                 comprobante:    form.numConsignacion || undefined,
                 fechaPago:      form.fecha    || undefined,
                 formaPago:      esDevolucion ? 'DEVOLUCION' : form.metodo,

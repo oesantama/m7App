@@ -94,7 +94,7 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
     if (!isOpen) return null;
 
     const needsBanco = true; // Siempre aplica para transferencia y consignación
-    const canSave    = formaPago !== '' && valor.trim() !== '' && Number(valor) > 0;
+    const canSave    = formaPago !== '' && valor.trim() !== '' && Number(valor) > 0 && comprobante.trim() !== '';
 
     const handleSave = async () => {
         if (!canSave) return;
@@ -104,6 +104,7 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                 documentId,
                 invoiceNumber:  invoice.invoice_number,
                 valor:          Number(valor),
+                banco:          'Bancolombia',
                 comprobante:    comprobante || undefined,
                 fechaPago:      fechaPago || undefined,
                 formaPago:      formaPago as FormaPago,
