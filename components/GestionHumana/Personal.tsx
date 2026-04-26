@@ -628,6 +628,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     <DetailItem label="Cargo" value={showDetail.cargo_enc_nombre || showDetail.cargo_actual} />
                     <DetailItem label="Fecha Ingreso" value={showDetail.fecha_ingreso ? new Date(showDetail.fecha_ingreso).toLocaleDateString() : 'N/A'} />
                     <DetailItem label="Tipo Contrato" value={showDetail.contrato_nombre} />
+                    <DetailItem label="Turno Laboral" value={showDetail.turno_nombre} />
                     <DetailItem label="Ingresos" value={showDetail.ingresos_nombre} />
                     <DetailItem label="AFP / EPS" value={`${showDetail.afp_nombre} / ${showDetail.eps_nombre}`} />
                   </div>
@@ -644,8 +645,11 @@ const Personal: React.FC<Props> = ({ user }) => {
                     <DetailItem label="Sangre / Civil" value={`${showDetail.sangre_nombre} · ${showDetail.civil_nombre}`} />
                     <DetailItem label="Nivel Educativo" value={showDetail.edu_nombre} />
                     <DetailItem label="Residencia" value={`${showDetail.mun_res_nombre}, ${showDetail.dep_nac_nombre}`} />
-                    <DetailItem label="Dirección" value={`${showDetail.direccion} (${showDetail.barrio})`} />
+                    <DetailItem label="Barrio" value={showDetail.barrio} />
+                    <DetailItem label="Dirección" value={showDetail.direccion} />
                     <DetailItem label="Celular Encuesta" value={showDetail.celular} />
+                    <DetailItem label="Tipo Vivienda" value={showDetail.vivienda_nombre} />
+                    <DetailItem label="Estrato" value={showDetail.estrato} />
                   </div>
                 </div>
 
@@ -660,6 +664,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     <DetailItem label="Sustentador" value={showDetail.principal_sustentador} />
                     <DetailItem label="Personas a Cargo" value={showDetail.pcargo_nombre} />
                     <DetailItem label="Vive con" value={showDetail.conviviente_nombre} />
+                    <DetailItem label="Discapacidad Fam." value={showDetail.discapacidad_familia} />
                     <DetailItem label="Hijos" value={showDetail.cuantos_hijos} />
                   </div>
                 </div>
@@ -677,6 +682,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     <DetailItem label="Tipo Deporte" value={showDetail.tipo_deporte_nombre} />
                     <DetailItem label="Tiempo Libre" value={showDetail.tiempo_libre_nombre || showDetail.uso_tiempo_libre_otros} />
                     <DetailItem label="Emergencia" value={`${showDetail.contacto_emergencia_nombre} (${showDetail.contacto_emergencia_telefono})`} />
+                    <DetailItem label="Consentimiento" value={showDetail.consentimiento ? 'AUTORIZADO (SI)' : 'NO AUTORIZADO (NO)'} />
                   </div>
                 </div>
 

@@ -682,10 +682,16 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     
     // Logo Box
     doc.rect(margin, 10, logoW, headerH);
-    const logoPath = path.join(process.cwd(), 'public', 'logo-encuesta.png');
+    const logoPath = path.resolve(__dirname, '../../public/logo-encuesta.png');
     if (fs.existsSync(logoPath)) {
-      const logoData = fs.readFileSync(logoPath).toString('base64');
-      doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', margin + 2, 12, logoW - 4, headerH - 4);
+      try {
+        const logoData = fs.readFileSync(logoPath).toString('base64');
+        doc.addImage(`data:image/png;base64,${logoData}`, 'PNG', margin + 2, 12, logoW - 4, headerH - 4);
+      } catch (e) {
+        console.error('Error al insertar logo en PDF:', e);
+      }
+    } else {
+      console.warn('Archivo de logo no encontrado en:', logoPath);
     }
 
     // Title Box
