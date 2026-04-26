@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
         react(),
         tailwindcss(),
         VitePWA({
-          registerType: 'prompt',
+          registerType: 'autoUpdate',
           includeAssets: ['m7_favicon.png'],
           workbox: {
             globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],

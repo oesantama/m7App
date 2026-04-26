@@ -93,6 +93,7 @@ export const fetchJson = async (url: string, options?: any) => {
 };
 
 export const api = {
+  getHealth: () => fetchJson(API_URL.replace('/api', '/health')),
   // Autenticación
   login: async (email: string, pass: string) => {
     const res = await fetch(`${API_URL}/auth/login`, {

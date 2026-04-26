@@ -8,9 +8,16 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { randomUUID } from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import apiRoutes from './routes/index.js';
 import { initDeliveryTables } from './controllers/dispatch.controller.js';
 import { initScheduler } from './services/scheduler.service.js';
+import fs from 'fs';
+
+// Leer versión desde package.json
+const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8'));
+const APP_VERSION = pkg.version || '1.0.0';
 
 const app = express();
 
@@ -49,8 +56,6 @@ app.use((req: any, _res, next) => {
 });
 
 // Servir archivos estáticos públicos (Manual Técnico, logos, etc.)
-import path from 'path';
-import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
@@ -86,7 +91,7 @@ app.use('/api/auth/login', loginLimiter);
 let systemReady = false;
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'UP', ready: systemReady, version: '1.9.21-STABLE', timestamp: new Date() });
+  res.json({ status: 'UP', ready: systemReady, version: APP_VERSION, timestamp: new Date() });
 });
 
 // /ready: usado por Docker healthcheck — retorna 503 mientras migración no termine
@@ -123,7 +128,7 @@ app.use('/api', (req, res, next) => {
 
 // Health Check Global para Proxies (Coolify/Nginx)
 app.get('/', (req, res) => {
-  res.json({ ok: true, message: 'Orbit Kernal Operational', version: '1.9.21-STABLE' });
+  res.json({ ok: true, message: 'Orbit Kernal Operational', version: APP_VERSION });
 });
 
 // Manejo Seguro de Rutas no Encontradas (Hallazgo QA: Ocultar nginx/express)
@@ -150,7 +155,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
   console.log(`[ORBIT-SYSTEM] Servidor Operacional en Puerto ${PORT}`);
-  console.log(`[ORBIT-SYSTEM] Versión: 1.9.21-STABLE`);
+  console.log(`[ORBIT-SYSTEM] Versión: ${APP_VERSION}`);
   console.log(`[ORBIT-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
   initScheduler();

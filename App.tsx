@@ -13,6 +13,7 @@ import { useAppStore } from './stores/useAppStore';
 import { useAppData } from './hooks/useAppData';
 import { normalizeData } from './utils/normalize';
 import { hasPermission } from './utils/permissions';
+import AutoUpdate from './components/shared/AutoUpdate';
 
 // ========== LAZY LOADING (CODE SPLITTING CHUNKS) ==========
 // Wrapper para auto-recargar la PWA si un chunk falla por cambio de nombre
@@ -968,17 +969,23 @@ const App: React.FC = () => {
   // 1. RUTA PÚBLICA PRIORITARIA:Encuesta Sociodemográfica (Sin login, sin portal)
   if (window.location.pathname.startsWith('/publico/encuesta')) {
     return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}>
-        <PublicSurvey />
-      </React.Suspense>
+      <>
+        <AutoUpdate />
+        <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+          <PublicSurvey />
+        </React.Suspense>
+      </>
     );
   }
 
   if (window.location.pathname.startsWith('/publico/capacitacion')) {
     return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
-        <PublicTraining />
-      </React.Suspense>
+      <>
+        <AutoUpdate />
+        <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+          <PublicTraining />
+        </React.Suspense>
+      </>
     );
   }
 
@@ -990,6 +997,7 @@ const App: React.FC = () => {
       <>
         <Toaster position="top-right" richColors theme="dark" />
         <PWABanner />
+        <AutoUpdate />
 
         <PortalLayout>
           {isAttendance ? (
@@ -1025,6 +1033,7 @@ const App: React.FC = () => {
         }}
       />
       <PWABanner />
+      <AutoUpdate />
 
       <React.Suspense fallback={
         <div className="flex items-center justify-center h-screen w-full bg-slate-950">
