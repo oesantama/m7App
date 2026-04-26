@@ -73,6 +73,7 @@ const PublicSurvey: React.FC = () => {
     uso_tiempo_libre_otros: '',
     contacto_emergencia_nombre: '',
     contacto_emergencia_telefono: '',
+    celular: '',
     consentimiento: false
   });
 
@@ -213,7 +214,7 @@ const PublicSurvey: React.FC = () => {
       }
     }
     if (currentStep === 2) {
-      const required = ['tipo_vivienda_id', 'estrato', 'departamento_res_id', 'municipio_residencia_id', 'barrio', 'direccion'];
+      const required = ['tipo_vivienda_id', 'estrato', 'departamento_res_id', 'municipio_residencia_id', 'barrio', 'direccion', 'celular'];
       for (const field of required) {
         if (!form[field]) return { ok: false, msg: `El campo "${field.replace(/_id/g, '').replace(/_/g, ' ')}" es obligatorio` };
       }
@@ -361,7 +362,8 @@ const PublicSurvey: React.FC = () => {
                   <Select label="Ciudad / Municipio" name="municipio_residencia_id" options={maestros.municipiosRes} value={form.municipio_residencia_id} onChange={(v:any) => setForm((p:any) => ({...p, municipio_residencia_id: v}))} />
                 </div>
                 <Input label="Barrio" name="barrio" value={form.barrio} onChange={(v:any) => setForm((p:any) => ({...p, barrio: v}))} />
-                <Input label="Dirección Exacta" name="direccion" value={form.direccion} onChange={(v:any) => setForm((p:any) => ({...p, direccion: v}))} />
+                <Input label="Dirección de Residencia" value={form.direccion} onChange={(v: string) => setForm({ ...form, direccion: v })} />
+                <Input label="Número de Celular" type="tel" value={form.celular} onChange={(v: string) => setForm({ ...form, celular: v })} placeholder="Ej: 3101234567" />
               </div>
             </div>
           )}

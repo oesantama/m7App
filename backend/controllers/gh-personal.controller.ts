@@ -179,13 +179,22 @@ const initTables = async () => {
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS fuma VARCHAR(10);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS frecuencia_deporte_id INTEGER;
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS tipo_deporte_id INTEGER;
-      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS practica_deporte VARCHAR(10);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS uso_tiempo_libre_id INTEGER;
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS uso_tiempo_libre_otros TEXT;
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS contacto_emergencia_nombre VARCHAR(255);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS contacto_emergencia_telefono VARCHAR(50);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS consentimiento BOOLEAN;
-      ALTER TABLE gh_encuestas_sociodemograficas ALTER COLUMN datos DROP NOT NULL;
+      
+      -- Migración: practica_deporte -> celular
+      DO $$ 
+      BEGIN 
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gh_encuestas_sociodemograficas' AND column_name='practica_deporte') THEN
+          ALTER TABLE gh_encuestas_sociodemograficas RENAME COLUMN practica_deporte TO celular;
+        ELSE
+          ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS celular VARCHAR(20);
+        END IF;
+      END $$;
+      ALTER TABLE gh_encuestas_sociodemograficas DROP COLUMN IF EXISTS datos;
 
       -- Registrar Pagina Personal si no existe
       INSERT INTO pages (id, parent_id, name, route, status_id)
@@ -340,7 +349,7 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
         estrato, municipio_residencia_id, barrio, direccion, sufre_enfermedad,
         viven_conmigo, principal_sustentador, personas_a_cargo_id, discapacidad_familia,
         con_quien_vive_id, cuantos_hijos, bebe_alcohol, fuma, frecuencia_deporte_id,
-        tipo_deporte_id, practica_deporte, uso_tiempo_libre_id, uso_tiempo_libre_otros,
+        tipo_deporte_id, celular, uso_tiempo_libre_id, uso_tiempo_libre_otros,
         contacto_emergencia_nombre, contacto_emergencia_telefono, consentimiento,
         usuario_control
       ) VALUES (
@@ -517,9 +526,10 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
       'DISCAPACIDAD FAM.': e.discapacidad_familia || '—',
       'CON QUIEN VIVE': e.conviviente_nombre || '—',
       'CUANTOS HIJOS': e.cuantos_hijos || '0',
-      'BEBE ALCOHOL': e.bebe_alcohol || '—',
+      'CONSUMO ALCOHOL': e.bebe_alcohol || '—',
       'FUMA': e.fuma || '—',
-      'PRACTICA DEPORTE': e.practica_deporte || (e.frec_deporte_nombre?.toLowerCase().includes('no practico') ? 'NO' : (e.frec_deporte_nombre ? 'SI' : '—')),
+      'PRACTICA DEPORTE': e.frec_deporte_nombre || '—',
+      'CELULAR ENCUESTA': e.celular || '—',
       'TIPO DEPORTE': e.tipo_deporte_nombre || '—',
       'FRECUENCIA DEPORTE': e.frec_deporte_nombre || '—',
       'USO TIEMPO LIBRE': e.tiempo_libre_nombre === 'Otros' ? e.uso_tiempo_libre_otros : (e.tiempo_libre_nombre || '—'),
@@ -741,16 +751,26 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     };
 
     // FLUJO DE PREGUNTAS (VERTICAL STACK 1-L, 2-R...)
+    const calculateAge = (birthDate: any) => {
+      if (!birthDate) return '—';
+      const today = new Date();
+      const birth = new Date(birthDate);
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      return age;
+    };
+
     y = drawFormRow("1. DOCUMENTO IDENTIDAD", enc.cedula, "2. LUGAR Y FECHA NAC.", `${enc.mun_nac_nombre} / ${enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—'}`, y);
     y = drawFormRow("3. TIPO DE SANGRE", enc.sangre_nombre, "4. ESTADO CIVIL", enc.civil_nombre, y);
-    y = drawFormRow("5. EDAD", enc.fecha_nacimiento ? (new Date().getFullYear() - new Date(enc.fecha_nacimiento).getFullYear()) : '—', "6. NIVEL EDUCATIVO", enc.edu_nombre, y);
+    y = drawFormRow("5. EDAD", calculateAge(enc.fecha_nacimiento), "6. NIVEL EDUCATIVO", enc.edu_nombre, y);
     y = drawFormRow("7. FECHA DE INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', "8. CARGO", enc.cargo_enc_nombre || enc.cargo_original, y);
     y = drawFormRow("9. TIPO DE CONTRATO", enc.contrato_nombre, "10. INGRESOS MENSUALES", enc.ingresos_nombre, y);
     y = drawFormRow("11. AFP", enc.afp_nombre, "12. EPS", enc.eps_nombre, y);
     y = drawFormRow("13. TURNO LABORAL", enc.turno_nombre, "14. TIPO DE VIVIENDA", enc.vivienda_nombre, y);
     y = drawFormRow("15. MUNICIPIO . BARRIO RES.", `${enc.mun_res_nombre} / ${enc.barrio}`, "16. DIRECCIÓN", enc.direccion, y);
     y = drawFormRow("17. SUFRE ENFERMEDAD", enc.sufre_enfermedad, "18. PERSONAS EN HOGAR", enc.viven_conmigo, y);
-    y = drawFormRow("19. ESTRATO SOCIOECON.", enc.estrato, "20. NÚMERO DE CELULAR", enc.celular_personal, y);
+    y = drawFormRow("19. ESTRATO SOCIOECON.", enc.estrato, "20. CELULAR", enc.celular || enc.celular_personal, y);
     y = drawFormRow("21. ES PRINCIPAL SUSTENT.", enc.principal_sustentador, "22. PERSONAS A CARGO", enc.pcargo_nombre, y);
     y = drawFormRow("23. DISCAPACIDAD FAM.", enc.discapacidad_familia, "24. CON QUIÉN VIVE", enc.conviviente_nombre, y);
     
@@ -765,7 +785,7 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
 
     if (y > 230) { doc.addPage(); y = 20; }
     y = drawFormRow("27. CONSUME ALCOHOL", enc.bebe_alcohol, "28. FUMA ACTUALMENTE", enc.fuma, y);
-    y = drawFormRow("29. PRACTICA DEPORTE", enc.practica_deporte || (enc.frec_deporte_nombre?.toLowerCase().includes('no practico') ? 'NO' : (enc.frec_deporte_nombre ? 'SI' : '—')), "30. TIPO DE DEPORTE", enc.tipo_deporte_nombre, y);
+    y = drawFormRow("29. PRACTICA DEPORTE", enc.frec_deporte_nombre || '—', "30. TIPO DE DEPORTE", enc.tipo_deporte_nombre, y);
     const tiempoLibre = enc.tiempo_libre_nombre === 'Otros' ? enc.uso_tiempo_libre_otros : enc.tiempo_libre_nombre;
     y = drawFormRow("31. USO TIEMPO LIBRE", tiempoLibre, "32. CONTACTO EMERGENCIA", `${enc.contacto_emergencia_nombre} (${enc.contacto_emergencia_telefono})`, y);
     

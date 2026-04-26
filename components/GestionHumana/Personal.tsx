@@ -643,8 +643,9 @@ const Personal: React.FC<Props> = ({ user }) => {
                     <DetailItem label="Nacimiento" value={`${showDetail.mun_nac_nombre}, ${showDetail.dep_nac_nombre}`} />
                     <DetailItem label="Sangre / Civil" value={`${showDetail.sangre_nombre} · ${showDetail.civil_nombre}`} />
                     <DetailItem label="Nivel Educativo" value={showDetail.edu_nombre} />
-                    <DetailItem label="Residencia" value={`${showDetail.mun_res_nombre}, ${showDetail.dep_res_nombre}`} />
+                    <DetailItem label="Residencia" value={`${showDetail.mun_res_nombre}, ${showDetail.dep_nac_nombre}`} />
                     <DetailItem label="Dirección" value={`${showDetail.direccion} (${showDetail.barrio})`} />
+                    <DetailItem label="Celular Encuesta" value={showDetail.celular} />
                   </div>
                 </div>
 
@@ -672,7 +673,8 @@ const Personal: React.FC<Props> = ({ user }) => {
                   <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 space-y-3">
                     <DetailItem label="Enfermedad Crónica" value={showDetail.sufre_enfermedad} />
                     <DetailItem label="Alcohol / Fuma" value={`${showDetail.bebe_alcohol} · ${showDetail.fuma}`} />
-                    <DetailItem label="Deporte" value={`${showDetail.practica_deporte} (${showDetail.tipo_deporte || 'N/A'})`} />
+                    <DetailItem label="Deporte" value={showDetail.frec_deporte_nombre} />
+                    <DetailItem label="Tipo Deporte" value={showDetail.tipo_deporte_nombre} />
                     <DetailItem label="Tiempo Libre" value={showDetail.tiempo_libre_nombre || showDetail.uso_tiempo_libre_otros} />
                     <DetailItem label="Emergencia" value={`${showDetail.contacto_emergencia_nombre} (${showDetail.contacto_emergencia_telefono})`} />
                   </div>
