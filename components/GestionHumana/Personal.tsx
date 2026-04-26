@@ -723,7 +723,9 @@ const Personal: React.FC<Props> = ({ user }) => {
 const DetailItem: React.FC<{ label: string, value: any }> = ({ label, value }) => (
   <div className="flex justify-between items-center group">
     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
-    <span className="text-[10px] font-black text-slate-700 uppercase group-hover:text-indigo-600 transition-colors">{value || '—'}</span>
+    <span className="text-[10px] font-black text-slate-700 uppercase group-hover:text-indigo-600 transition-colors">
+      {value !== undefined && value !== null && value !== '' ? value : '—'}
+    </span>
   </div>
 );
 

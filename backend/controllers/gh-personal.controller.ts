@@ -179,6 +179,7 @@ const initTables = async () => {
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS fuma VARCHAR(10);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS frecuencia_deporte_id INTEGER;
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS tipo_deporte_id INTEGER;
+      ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS practica_deporte VARCHAR(10);
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS uso_tiempo_libre_id INTEGER;
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS uso_tiempo_libre_otros TEXT;
       ALTER TABLE gh_encuestas_sociodemograficas ADD COLUMN IF NOT EXISTS contacto_emergencia_nombre VARCHAR(255);
@@ -339,11 +340,11 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
         estrato, municipio_residencia_id, barrio, direccion, sufre_enfermedad,
         viven_conmigo, principal_sustentador, personas_a_cargo_id, discapacidad_familia,
         con_quien_vive_id, cuantos_hijos, bebe_alcohol, fuma, frecuencia_deporte_id,
-        tipo_deporte_id, uso_tiempo_libre_id, uso_tiempo_libre_otros,
+        tipo_deporte_id, practica_deporte, uso_tiempo_libre_id, uso_tiempo_libre_otros,
         contacto_emergencia_nombre, contacto_emergencia_telefono, consentimiento,
         usuario_control
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, 'PUBLIC_USER'
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, 'PUBLIC_USER'
       ) RETURNING id
     `, [
       cedula, data.fecha_ingreso, data.cargo_id, data.municipio_nacimiento_id, data.fecha_nacimiento,
@@ -352,7 +353,7 @@ export const savePublicSurvey = async (req: Request, res: Response) => {
       data.estrato, data.municipio_residencia_id, data.barrio, data.direccion, data.sufre_enfermedad,
       data.viven_conmigo, data.principal_sustentador, data.personas_a_cargo_id, data.discapacidad_familia,
       data.con_quien_vive_id, data.cuantos_hijos, data.bebe_alcohol, data.fuma, data.frecuencia_deporte_id,
-      data.tipo_deporte_id, data.uso_tiempo_libre_id, data.uso_tiempo_libre_otros,
+      data.tipo_deporte_id, data.practica_deporte, data.uso_tiempo_libre_id, data.uso_tiempo_libre_otros,
       data.contacto_emergencia_nombre, data.contacto_emergencia_telefono, data.consentimiento
     ]);
 
@@ -518,7 +519,7 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
       'CUANTOS HIJOS': e.cuantos_hijos || '0',
       'BEBE ALCOHOL': e.bebe_alcohol || '—',
       'FUMA': e.fuma || '—',
-      'PRACTICA DEPORTE': e.practica_deporte || '—',
+      'PRACTICA DEPORTE': e.practica_deporte || (e.frec_deporte_nombre?.toLowerCase().includes('no practico') ? 'NO' : (e.frec_deporte_nombre ? 'SI' : '—')),
       'TIPO DEPORTE': e.tipo_deporte_nombre || '—',
       'FRECUENCIA DEPORTE': e.frec_deporte_nombre || '—',
       'USO TIEMPO LIBRE': e.tiempo_libre_nombre === 'Otros' ? e.uso_tiempo_libre_otros : (e.tiempo_libre_nombre || '—'),
@@ -567,7 +568,9 @@ export const getEncuestaDetail = async (req: Request, res: Response) => {
              tc.nombre as contrato_nombre, im.nombre as ingresos_nombre,
              afp.nombre as afp_nombre, eps.nombre as eps_nombre,
              pac.nombre as pcargo_nombre, cvv.nombre as conviviente_nombre,
-             cg.nombre as cargo_enc_nombre
+             cg.nombre as cargo_enc_nombre,
+             fd.nombre as frec_deporte_nombre,
+             td.nombre as tipo_deporte_nombre
       FROM gh_encuestas_sociodemograficas r
       JOIN gh_personal p ON p.cedula = r.cedula
       LEFT JOIN gh_areas a ON a.id = p.area_trabajo_id
@@ -587,6 +590,8 @@ export const getEncuestaDetail = async (req: Request, res: Response) => {
       LEFT JOIN gh_personas_a_cargo pac ON pac.id = r.personas_a_cargo_id
       LEFT JOIN gh_convivientes cvv ON cvv.id = r.con_quien_vive_id
       LEFT JOIN gh_cargos cg ON cg.id = r.cargo_id
+      LEFT JOIN gh_frecuencia_deporte fd ON fd.id = r.frecuencia_deporte_id
+      LEFT JOIN gh_tipos_deporte td ON td.id = r.tipo_deporte_id
       WHERE r.id = $1
     `, [id]);
 
@@ -668,16 +673,38 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     doc.line(margin + 40, 10, margin + 40, 30); // Logo divider
     doc.line(pageWidth - margin - 45, 10, pageWidth - margin - 45, 30); // Right Divider
 
-    doc.setFontSize(11);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.text("ENCUESTA PERFIL SOCIODEMOGRÁFICO", margin + 42, 21, { maxWidth: innerWidth - 90, align: 'left' });
+    doc.text("SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SG-SST, E. 3.1.1", margin + 42, 18, { maxWidth: innerWidth - 90, align: 'left' });
+    doc.text("ENCUESTA PERFIL SOCIODEMOGRÁFICO", margin + 42, 24, { maxWidth: innerWidth - 90, align: 'left' });
 
     doc.setFontSize(7);
-    doc.text("Código: F-GA-013", pageWidth - margin - 43, 16);
-    doc.text("Versión: 02", pageWidth - margin - 43, 21);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, pageWidth - margin - 43, 26);
+    doc.text("CÓDIGO: F-GA-013", pageWidth - margin - 43, 16);
+    doc.text("VERSIÓN: 02", pageWidth - margin - 43, 21);
+    doc.text(`FECHA: 23/10/2024`, pageWidth - margin - 43, 26);
 
-    let y = 35;
+    let y = 30;
+
+    // Row for Fecha, Dia, Año, N°
+    const dateRowH = 8;
+    doc.rect(margin, y, innerWidth, dateRowH);
+    doc.setFontSize(7);
+    doc.text("FECHA:", margin + 2, y + 5);
+    doc.line(margin + 60, y, margin + 60, y + dateRowH);
+    doc.text("DIA:", margin + 62, y + 5);
+    doc.line(margin + 100, y, margin + 100, y + dateRowH);
+    doc.text("AÑO:", margin + 102, y + 5);
+    doc.line(pageWidth - margin - 30, y, pageWidth - margin - 30, y + dateRowH);
+    doc.text("N°", pageWidth - margin - 28, y + 5);
+    
+    y += dateRowH;
+
+    // Row for Full Name
+    doc.rect(margin, y, innerWidth, dateRowH);
+    doc.setFont("helvetica", "bold");
+    doc.text(`NOMBRES Y APELLIDOS COMPLETOS: ${enc.nombre.toUpperCase()}`, margin + 2, y + 5);
+    
+    y += dateRowH + 5;
 
     // Helper para dibujar filas tipo formulario
     const drawFormRow = (label1: string, val1: any, label2: string, val2: any, currentY: number) => {
@@ -745,7 +772,7 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     y += 5;
     y = drawSectionHeader("IV. ESTILO DE VIDA Y SALUD", y);
     y = drawFormRow("ENFERMEDAD DIAG.", enc.sufre_enfermedad, "CONSUMO ALCOHOL", enc.bebe_alcohol, y);
-    y = drawFormRow("FUMA", enc.fuma, "PRACTICA DEPORTE", enc.practica_deporte, y);
+    y = drawFormRow("FUMA", enc.fuma, "PRACTICA DEPORTE", enc.practica_deporte || (enc.frec_deporte_nombre?.toLowerCase().includes('no practico') ? 'NO' : (enc.frec_deporte_nombre ? 'SI' : '—')), y);
     y = drawFormRow("TIPO DEPORTE", enc.tipo_deporte_nombre, "FRECUENCIA", enc.frec_deporte_nombre, y);
     const tiempoLibre = enc.tiempo_libre_nombre === 'Otros' ? enc.uso_tiempo_libre_otros : enc.tiempo_libre_nombre;
     y = drawFormRow("USO TIEMPO LIBRE", tiempoLibre, "", "", y);
