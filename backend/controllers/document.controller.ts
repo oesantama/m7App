@@ -1694,7 +1694,7 @@ export const updateConsolidatedCount2 = async (req: any, res: Response) => {
 
     // Leer estado actual del consolidado
     const current = await client.query(
-      'SELECT count_2, document_id FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
+      'SELECT count_2, document_id, inventory_observation FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
       [String(docId), String(articleId)]
     );
     if (current.rows.length === 0) {
@@ -1702,14 +1702,27 @@ export const updateConsolidatedCount2 = async (req: any, res: Response) => {
       return res.status(404).json({ error: 'Item consolidado no encontrado' });
     }
     const oldCount2 = Number(current.rows[0].count_2 || 0);
+    const oldObservation = current.rows[0].inventory_observation || '';
     const delta = Number(newCount2) - oldCount2;
 
-    // Actualizar consolidado
+    const now = new Date();
+    const formattedDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const appendText = `${String(observation).trim()} (${user} - ${formattedDate})`;
+    const finalObservation = oldObservation ? `${oldObservation} | ${appendText}` : appendText;
+
+    // Actualizar consolidado con observación concatenada
     await client.query(
       `UPDATE document_consolidated_items
        SET count_2 = $1::numeric, inventory_observation = $2::text, inventory_user = $3::text
        WHERE document_id = $4::text AND article_id = $5::text`,
-      [Number(newCount2), String(observation).trim(), user, String(docId), String(articleId)]
+      [Number(newCount2), finalObservation, user, String(docId), String(articleId)]
+    );
+
+    // Insertar el log limpio estructurado en la nueva tabla
+    await client.query(
+      `INSERT INTO inventory_conciliation_logs (document_id, article_id, old_count_2, new_count_2, observation, changed_by)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [String(docId), String(articleId), oldCount2, Number(newCount2), String(observation).trim(), user]
     );
 
     // Ajustar inventario_clientes con delta (suma o resta)

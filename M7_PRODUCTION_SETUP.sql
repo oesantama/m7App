@@ -229,3 +229,4 @@ UPDATE document_items SET item_status = 'PENDIENTE' WHERE item_status IS NULL;
 UPDATE document_items SET invoice = 'S/I' WHERE invoice IS NULL OR invoice = '';
 
 COMMIT;
+\n-- Tabla de Histórico de Conciliaciones\nCREATE TABLE IF NOT EXISTS inventory_conciliation_logs (\n    id SERIAL PRIMARY KEY,\n    document_id VARCHAR(255) NOT NULL,\n    article_id VARCHAR(255) NOT NULL,\n    old_count_2 NUMERIC,\n    new_count_2 NUMERIC,\n    observation TEXT,\n    changed_by VARCHAR(255),\n    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n

@@ -95,7 +95,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       const resp = await fetch('/api/documents/consolidated-count2', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ docId: selectedDoc.id, articleId, newCount2: newVal, observation: finalObs }),
+        body: JSON.stringify({ docId: selectedDoc.id, articleId, newCount2: newVal, observation: obs }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Error al guardar');
@@ -512,7 +512,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                         </button>
                       )}
 
-                      {canEditAudit && (doc.consolidatedItems || []).some((it: any) => Number(it.count_2 || it.count2 || 0) !== Number(it.expected_qty || it.expectedQty || 0)) && (
+                      {canEditAudit && (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO') && (doc.consolidatedItems || []).some((it: any) => Number(it.count_2 || it.count2 || 0) !== Number(it.expected_qty || it.expectedQty || 0)) && (
                         <button 
                           onClick={() => { setSelectedDoc(doc); setActiveDetailTab('audit'); }}
                           className="p-3 bg-amber-50 text-amber-500 rounded-xl hover:bg-amber-600 hover:text-white transition-all"

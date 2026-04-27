@@ -106,7 +106,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       const resp = await fetch('/api/documents/consolidated-count2', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ docId: selectedPendingDoc.id, articleId, newCount2: newVal, observation: finalObs }),
+        body: JSON.stringify({ docId: selectedPendingDoc.id, articleId, newCount2: newVal, observation: obs }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Error al guardar');
