@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { useAppData } from '../../hooks/useAppData';
+import { hasPermission } from '../../utils/permissions';
 import { toast } from 'sonner';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -611,6 +612,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     initialSurcharges, initialGroupPayments, allRoutes
 }) => {
     const { user } = useAppData();
+    const canDelete = hasPermission(user, 'CONCILIACION', 'delete');
     const [tab, setTab]         = useState<ModalTab>('individual');
     const [forms, setForms]     = useState<Map<string, InvoiceFormState>>(new Map());
     const [activeDialog, setActiveDialog] = useState<string | null>(null);
@@ -1236,15 +1238,18 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 <div className="space-y-3">
                                     {sobrecostos.map((s, idx) => {
                                         const isApproved = s.statusId === 'APROBADO' || s.statusId === 'EST-02';
-                                        const isPending  = !isApproved;
+                                        const isAnulado  = s.statusId === 'ANULADO';
+                                        const isPending  = !isApproved && !isAnulado;
+                                        const isNew      = String(s.id).length > 10;
+                                        const showDelete = isNew || (isPending && canDelete);
 
                                         return (
                                             <div key={s.id} className={`grid grid-cols-12 gap-3 p-3 rounded-2xl border-2 shadow-sm relative group transition-all
-                                                ${isApproved ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}>
+                                                ${isApproved ? 'bg-blue-50 border-blue-200' : isAnulado ? 'bg-slate-100 border-slate-200 opacity-60 grayscale' : 'bg-white border-slate-100'}`}>
                                                 
                                                 <div className="col-span-3">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
-                                                    <input type="text" value={s.valor} disabled={isApproved}
+                                                    <input type="text" value={s.valor} disabled={!isPending}
                                                         onChange={e => {
                                                             const val = e.target.value.replace(/\D/g, '');
                                                             const fmt = val ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Number(val)) : '';
@@ -1253,33 +1258,35 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                             setSobrecostos(next);
                                                         }}
                                                         placeholder="$ 0.00" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-blue-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                            ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
                                                 <div className="col-span-3">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia / NIT</p>
-                                                    <input type="text" value={s.nroAprobacion} disabled={isApproved}
+                                                    <input type="text" value={s.nroAprobacion} disabled={!isPending}
                                                         onChange={e => {
                                                             const next = [...sobrecostos];
                                                             next[idx].nroAprobacion = e.target.value;
                                                             setSobrecostos(next);
                                                         }}
                                                         placeholder="Obligatorio" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-blue-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                            ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
                                                 <div className="col-span-3">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
-                                                    <input type="date" value={s.fecha} disabled={isApproved}
+                                                    <input type="date" value={s.fecha} disabled={!isPending}
                                                         onChange={e => {
                                                             const next = [...sobrecostos];
                                                             next[idx].fecha = e.target.value;
                                                             setSobrecostos(next);
                                                         }}
                                                         className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-blue-900' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                            ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
                                                 <div className="col-span-3 flex flex-col justify-end">
                                                     {isApproved ? (
                                                         <span className="bg-blue-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Aprobado</span>
+                                                    ) : isAnulado ? (
+                                                        <span className="bg-slate-400 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Anulado</span>
                                                     ) : (
                                                         <button onClick={() => handleApproveSurcharge(s.id)}
                                                             className="bg-emerald-500 hover:bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest shadow-sm shadow-emerald-200">
@@ -1288,9 +1295,17 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     )}
                                                 </div>
 
-                                                {isPending && (
-                                                    <button onClick={() => setSobrecostos(sobrecostos.filter(x => x.id !== s.id))}
-                                                        className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100">
+                                                {showDelete && (
+                                                    <button onClick={() => {
+                                                        if (isNew) {
+                                                            setSobrecostos(sobrecostos.filter(x => x.id !== s.id));
+                                                        } else {
+                                                            const next = [...sobrecostos];
+                                                            next[idx].statusId = 'ANULADO';
+                                                            setSobrecostos(next);
+                                                        }
+                                                    }}
+                                                        className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100 z-10">
                                                         <Icons.X className="w-3 h-3" />
                                                     </button>
                                                 )}
