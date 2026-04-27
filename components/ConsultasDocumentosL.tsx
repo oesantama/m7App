@@ -512,7 +512,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                         </button>
                       )}
 
-                      {canEditAudit && (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO') && (doc.consolidatedItems || []).some((it: any) => Number(it.count_2 || it.count2 || 0) !== Number(it.expected_qty || it.expectedQty || 0)) && (
+                      {canEditAudit && (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO' || doc.status === 'EST-08') && (doc.consolidatedItems || []).some((it: any) => Number(it.count_2 || it.count2 || 0) !== Number(it.expected_qty || it.expectedQty || 0)) && (
                         <button 
                           onClick={() => { setSelectedDoc(doc); setActiveDetailTab('audit'); }}
                           className="p-3 bg-amber-50 text-amber-500 rounded-xl hover:bg-amber-600 hover:text-white transition-all"
@@ -759,7 +759,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                               <td className="px-4 py-2 uppercase italic text-slate-400 max-w-[200px] truncate font-medium" title={it.inventory_observation || it.inventoryObservation}>{it.inventory_observation || it.inventoryObservation || '-'}</td>
                               {canEditAudit && (
                                 <td className="px-4 py-2 text-center">
-                                  {hasDiff && (
+                                  {hasDiff && selectedDoc && (selectedDoc.status === DocStatus.INVENTORED || selectedDoc.status === 'INVENTARIADO' || selectedDoc.statusId === 'EST-08') && (
                                     <button
                                       onClick={() => { setEditingAuditItem(it); setEditCount2(String(itCount2)); setEditObservation(''); setEditAuditError(null); }}
                                       className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"

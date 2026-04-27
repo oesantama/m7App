@@ -1220,7 +1220,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                       <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[200px]" title={it.inventoryObservation}>{it.inventoryObservation || 'SIN NOVEDAD'}</td>
                                       {canEditAudit && (
                                         <td className="py-2 px-4 text-center">
-                                          {hasDiff && (
+                                          {hasDiff && selectedPendingDoc && (selectedPendingDoc.status === DocStatus.INVENTORED || selectedPendingDoc.status === 'INVENTARIADO' || selectedPendingDoc.statusId === 'EST-08') && (
                                             <button
                                               onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(''); setEditAuditError(null); }}
                                               className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
