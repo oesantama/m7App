@@ -781,13 +781,15 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                               {canEditAudit && (
                                 <td className="px-4 py-2 text-center">
                                   <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={() => fetchHistory(selectedDoc?.id || '', it.article_id || it.articleId || it.sku)}
-                                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all"
-                                      title="Ver Historial de Conciliación"
-                                    >
-                                      <Icons.History className="w-3.5 h-3.5" />
-                                    </button>
+                                    {!!(it.inventory_observation || it.inventoryObservation) && (
+                                      <button
+                                        onClick={() => fetchHistory(selectedDoc?.id || '', it.article_id || it.articleId || it.sku)}
+                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all"
+                                        title="Ver Historial de Conciliación"
+                                      >
+                                        <Icons.History className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                     {hasDiff && selectedDoc && (selectedDoc.status === DocStatus.INVENTORED || selectedDoc.status === 'INVENTARIADO' || selectedDoc.statusId === 'EST-08') && (
                                       <button
                                         onClick={() => { setEditingAuditItem(it); setEditCount2(String(itCount2)); setEditObservation(''); setEditAuditError(null); }}

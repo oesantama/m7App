@@ -1844,6 +1844,9 @@ export const getConciliationHistory = async (req: any, res: Response) => {
     );
     res.json({ success: true, data: result.rows });
   } catch (err: any) {
+    if (err.code === '42P01') {
+      return res.json({ success: true, data: [] });
+    }
     res.status(500).json({ error: err.message });
   }
 };

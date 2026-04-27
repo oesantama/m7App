@@ -1242,13 +1242,15 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                       {canEditAudit && (
                                         <td className="py-2 px-4 text-center">
                                           <div className="flex items-center justify-center gap-2">
-                                            <button
-                                              onClick={() => fetchHistory(selectedPendingDoc?.id || '', it.articleId || it.article_id || it.sku)}
-                                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all"
-                                              title="Ver Historial de Conciliación"
-                                            >
-                                              <Icons.History className="w-3.5 h-3.5" />
-                                            </button>
+                                            {!!(it.inventory_observation || it.inventoryObservation) && (
+                                              <button
+                                                onClick={() => fetchHistory(selectedPendingDoc?.id || '', it.articleId || it.article_id || it.sku)}
+                                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all"
+                                                title="Ver Historial de Conciliación"
+                                              >
+                                                <Icons.History className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
                                             {hasDiff && selectedPendingDoc && (selectedPendingDoc.status === DocStatus.INVENTORED || selectedPendingDoc.status === 'INVENTARIADO' || selectedPendingDoc.statusId === 'EST-08') && (
                                               <button
                                                 onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(''); setEditAuditError(null); }}
