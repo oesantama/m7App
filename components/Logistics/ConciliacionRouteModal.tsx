@@ -1041,15 +1041,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         })}
                     </div>
 
-                    <div className="mt-4">
-                        <div className="flex items-center justify-between mb-1">
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Avance de Legalización</span>
-                            <span className="text-[9px] font-black text-emerald-600">{plateTotals.legalCount}/{plateTotals.total} · {pct}%</span>
-                        </div>
-                        <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
-                        </div>
-                    </div>
+
                 </div>
 
                 {/* Content */}

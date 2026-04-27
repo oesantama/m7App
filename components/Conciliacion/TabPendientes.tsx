@@ -1063,6 +1063,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                     const pct = fin.valor_total > 0
                                                         ? Math.min(100, Math.round((totalLegPlate / fin.valor_total) * 100)) 
                                                         : (fin.legalizadas === route.invoice_count && route.invoice_count > 0 ? 100 : 0);
+                                                    
+                                                    const hasPendingSurcharge = routeSurcharges.some(s => s.plate === route.plate && (s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id));
+
                                                     return (
                                                         <div key={route.route_id}
                                                             className="rounded-2xl border-2 border-slate-100 bg-white transition-all overflow-hidden hover:border-slate-200">
@@ -1180,7 +1183,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                 <button
                                                                     onClick={() => setModalRoute(route)}
                                                                     className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
-                                                                        ${pct === 100 ? 'hidden' : 'bg-slate-900 text-white hover:bg-emerald-600'}`}>
+                                                                        ${pct === 100 && !hasPendingSurcharge ? 'hidden' : 'bg-slate-900 text-white hover:bg-emerald-600'}`}>
                                                                     Conciliar →
                                                                 </button>
                                                             </div>
