@@ -77,8 +77,16 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     if (!editingAuditItem || !selectedDoc) return;
     const obs = editObservation.trim();
     if (!obs) { setEditAuditError('La observación es obligatoria'); return; }
+    
     const newVal = Number(editCount2);
     if (isNaN(newVal) || newVal < 0) { setEditAuditError('Ingrese un número válido mayor o igual a 0'); return; }
+    
+    const currentObs = editingAuditItem.inventory_observation || editingAuditItem.inventoryObservation || '';
+    const now = new Date();
+    const formattedDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const appendText = `${obs} (${user.name} - ${formattedDate})`;
+    const finalObs = currentObs ? `${currentObs} | ${appendText}` : appendText;
+
     setEditAuditLoading(true);
     setEditAuditError(null);
     try {
@@ -87,7 +95,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       const resp = await fetch('/api/documents/consolidated-count2', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ docId: selectedDoc.id, articleId, newCount2: newVal, observation: obs }),
+        body: JSON.stringify({ docId: selectedDoc.id, articleId, newCount2: newVal, observation: finalObs }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Error al guardar');
@@ -96,7 +104,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       (updated as any).consolidatedItems = ((updated as any).consolidatedItems || []).map((it: any) => {
         const itId = it.article_id || it.articleId || it.sku;
         return itId === articleId
-          ? { ...it, count_2: newVal, count2: newVal, inventory_observation: obs, inventoryObservation: obs }
+          ? { ...it, count_2: newVal, count2: newVal, inventory_observation: finalObs, inventoryObservation: finalObs }
           : it;
       });
       setSelectedDoc(updated);
@@ -504,6 +512,16 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                         </button>
                       )}
 
+                      {canEditAudit && (doc.consolidatedItems || []).some((it: any) => Number(it.count_2 || it.count2 || 0) !== Number(it.expected_qty || it.expectedQty || 0)) && (
+                        <button 
+                          onClick={() => { setSelectedDoc(doc); setActiveDetailTab('audit'); }}
+                          className="p-3 bg-amber-50 text-amber-500 rounded-xl hover:bg-amber-600 hover:text-white transition-all"
+                          title="Conciliar Inventario"
+                        >
+                          <Icons.Audit className="w-4 h-4" />
+                        </button>
+                      )}
+
                       {doc.planType === 'Plan R' && (
                       <button
                         onClick={() => {
@@ -743,11 +761,11 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                                 <td className="px-4 py-2 text-center">
                                   {hasDiff && (
                                     <button
-                                      onClick={() => { setEditingAuditItem(it); setEditCount2(String(itCount2)); setEditObservation(it.inventory_observation || it.inventoryObservation || ''); setEditAuditError(null); }}
+                                      onClick={() => { setEditingAuditItem(it); setEditCount2(String(itCount2)); setEditObservation(''); setEditAuditError(null); }}
                                       className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
                                       title="Corregir Conteo 2"
                                     >
-                                      EDITAR
+                                      CONCILIAR
                                     </button>
                                   )}
                                 </td>

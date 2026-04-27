@@ -88,26 +88,36 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     if (!editingAuditItem || !selectedPendingDoc) return;
     const obs = editObservation.trim();
     if (!obs) { setEditAuditError('La observación es obligatoria'); return; }
+    
     const newVal = Number(editCount2);
     if (isNaN(newVal) || newVal < 0) { setEditAuditError('Ingrese un número válido mayor o igual a 0'); return; }
+    
+    const currentObs = editingAuditItem.inventory_observation || editingAuditItem.inventoryObservation || '';
+    const now = new Date();
+    const formattedDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const appendText = `${obs} (${user.name} - ${formattedDate})`;
+    const finalObs = currentObs ? `${currentObs} | ${appendText}` : appendText;
+
     setEditAuditLoading(true);
     setEditAuditError(null);
     try {
       const token = localStorage.getItem('token') || '';
+      const articleId = editingAuditItem.article_id || editingAuditItem.articleId || editingAuditItem.sku;
       const resp = await fetch('/api/documents/consolidated-count2', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ docId: selectedPendingDoc.id, articleId: editingAuditItem.articleId, newCount2: newVal, observation: obs }),
+        body: JSON.stringify({ docId: selectedPendingDoc.id, articleId, newCount2: newVal, observation: finalObs }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Error al guardar');
       // Actualizar localmente el item en consolidatedItems
       const updated = { ...selectedPendingDoc };
-      (updated as any).consolidatedItems = ((updated as any).consolidatedItems || []).map((it: any) =>
-        it.articleId === editingAuditItem.articleId
-          ? { ...it, count2: newVal, inventoryObservation: obs }
+      (updated as any).consolidatedItems = ((updated as any).consolidatedItems || []).map((it: any) => {
+        const itId = it.article_id || it.articleId || it.sku;
+        return itId === articleId
+          ? { ...it, count_2: newVal, count2: newVal, inventory_observation: finalObs, inventoryObservation: finalObs }
           : it
-      );
+      });
       setSelectedPendingDoc(updated);
       setEditingAuditItem(null);
     } catch (e: any) {
@@ -1212,11 +1222,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                         <td className="py-2 px-4 text-center">
                                           {hasDiff && (
                                             <button
-                                              onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(it.inventoryObservation || ''); setEditAuditError(null); }}
+                                              onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(''); setEditAuditError(null); }}
                                               className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
                                               title="Corregir Conteo 2"
                                             >
-                                              EDITAR
+                                              CONCILIAR
                                             </button>
                                           )}
                                         </td>
