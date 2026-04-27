@@ -1747,7 +1747,7 @@ export const updateConsolidatedCount2 = async (req: any, res: Response) => {
       if (docInfo.rows.length > 0) {
         const clientId = docInfo.rows[0].client_id;
         const batchRes = await client.query(
-          'SELECT batch FROM document_consolidated_items WHERE document_id = $1::text AND article_id = $2::text',
+          'SELECT batch FROM document_items WHERE document_id = $1::text AND article_id = $2::text LIMIT 1',
           [String(docId), String(articleId)]
         );
         const batch = batchRes.rows[0]?.batch || 'S/L';
