@@ -1832,3 +1832,18 @@ Si no encuentras ninguno, responde: {"remisiones": []}`;
   }
 };
 
+export const getConciliationHistory = async (req: any, res: Response) => {
+  const { docId, articleId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT old_count_2, new_count_2, observation, changed_by, changed_at
+       FROM inventory_conciliation_logs
+       WHERE document_id = $1 AND article_id = $2
+       ORDER BY changed_at DESC`,
+      [docId, articleId]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};

@@ -127,6 +127,27 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     }
   };
 
+  // Estados para Historial de Conciliación
+  const [historyTarget, setHistoryTarget] = useState<any | null>(null);
+  const [historyLogs, setHistoryLogs] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const fetchHistory = async (docId: string, articleId: string) => {
+    setHistoryTarget(articleId);
+    setLoadingHistory(true);
+    setHistoryLogs([]);
+    try {
+      const res = await api.get(`/documents/conciliations/${docId}/${articleId}`);
+      if (res.data.success) {
+        setHistoryLogs(res.data.data);
+      }
+    } catch (err) {
+      toast.error('Error al cargar el historial');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   // Utilidad para exportar a Excel
   const exportToExcel = (data: any[], fileName: string) => {
     const ws = XLSX.utils.json_to_sheet(data);
@@ -1220,15 +1241,24 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                       <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[200px]" title={it.inventoryObservation}>{it.inventoryObservation || 'SIN NOVEDAD'}</td>
                                       {canEditAudit && (
                                         <td className="py-2 px-4 text-center">
-                                          {hasDiff && selectedPendingDoc && (selectedPendingDoc.status === DocStatus.INVENTORED || selectedPendingDoc.status === 'INVENTARIADO' || selectedPendingDoc.statusId === 'EST-08') && (
+                                          <div className="flex items-center justify-center gap-2">
                                             <button
-                                              onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(''); setEditAuditError(null); }}
-                                              className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
-                                              title="Corregir Conteo 2"
+                                              onClick={() => fetchHistory(selectedPendingDoc?.id || '', it.articleId || it.article_id || it.sku)}
+                                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all"
+                                              title="Ver Historial de Conciliación"
                                             >
-                                              CONCILIAR
+                                              <Icons.History className="w-3.5 h-3.5" />
                                             </button>
-                                          )}
+                                            {hasDiff && selectedPendingDoc && (selectedPendingDoc.status === DocStatus.INVENTORED || selectedPendingDoc.status === 'INVENTARIADO' || selectedPendingDoc.statusId === 'EST-08') && (
+                                              <button
+                                                onClick={() => { setEditingAuditItem(it); setEditCount2(String(it.count2 || 0)); setEditObservation(''); setEditAuditError(null); }}
+                                                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
+                                                title="Corregir Conteo 2"
+                                              >
+                                                CONCILIAR
+                                              </button>
+                                            )}
+                                          </div>
                                         </td>
                                       )}
                                     </tr>
@@ -1386,6 +1416,83 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             </div>
          </div>
       )}
+      {/* Modal Historial de Conciliación */}
+      {historyTarget && (
+        <div className="fixed inset-0 z-[610] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setHistoryTarget(null)} />
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100 flex flex-col max-h-[80vh]">
+            <div className="p-8 pb-4 shrink-0 flex justify-between items-center border-b border-slate-100">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                  <Icons.History className="w-6 h-6 text-indigo-500" />
+                  Historial de Conciliación
+                </h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
+                  Artículo: <span className="text-indigo-600">{historyTarget}</span>
+                </p>
+              </div>
+              <button onClick={() => setHistoryTarget(null)} className="w-10 h-10 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-slate-400 rounded-2xl flex items-center justify-center transition-all">
+                <Icons.X />
+              </button>
+            </div>
+            <div className="p-8 overflow-y-auto flex-1 bg-slate-50/50">
+              {loadingHistory ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-slate-400">
+                  <Icons.Loader className="w-8 h-8 animate-spin" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">Cargando historial...</p>
+                </div>
+              ) : historyLogs.length === 0 ? (
+                <div className="text-center py-10">
+                  <Icons.Info className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-slate-500">No hay correcciones registradas para este artículo.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {historyLogs.map((log, idx) => (
+                    <div key={idx} className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-indigo-400 to-indigo-600"></div>
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Modificado por</p>
+                          <p className="text-xs font-black text-slate-800 uppercase bg-slate-100 px-2 py-1 rounded-md inline-block">{log.changed_by || 'SISTEMA'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Fecha y Hora</p>
+                          <p className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 px-2 py-1 rounded-md">
+                            {new Date(log.changed_at).toLocaleString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-6 py-3 border-y border-slate-100 my-4">
+                        <div className="flex-1">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Valor Anterior</p>
+                          <p className="text-xl font-black text-rose-500">{log.old_count_2}</p>
+                        </div>
+                        <div className="text-slate-300">
+                          <Icons.ChevronRight className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 text-right">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Nuevo Valor</p>
+                          <p className="text-xl font-black text-emerald-500">{log.new_count_2}</p>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Motivo / Observación</p>
+                        <p className="text-[11px] font-bold text-slate-600 italic bg-amber-50/50 p-3 rounded-xl border border-amber-100/50">
+                          "{log.observation || 'Sin justificación registrada'}"
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
