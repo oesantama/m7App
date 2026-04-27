@@ -578,6 +578,7 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
+  getConciliationLogs: (docId: string, articleId: string) => fetchJson(`${API_URL}/documents/conciliations/${encodeURIComponent(docId)}/${encodeURIComponent(articleId)}`),
   getRoutes: () => fetchJson(`${API_URL}/routes`),
   saveRoute: (data: any) => fetchJson(`${API_URL}/routes`, {
     method: 'POST',

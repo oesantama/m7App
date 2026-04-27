@@ -137,11 +137,12 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     setLoadingHistory(true);
     setHistoryLogs([]);
     try {
-      const res = await api.get(`/documents/conciliations/${docId}/${articleId}`);
-      if (res.data.success) {
-        setHistoryLogs(res.data.data);
+      const res = await api.getConciliationLogs(docId, articleId);
+      if (res.success) {
+        setHistoryLogs(res.data);
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error('Error fetching history:', err);
       toast.error('Error al cargar el historial');
     } finally {
       setLoadingHistory(false);
