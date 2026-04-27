@@ -1550,7 +1550,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                 </div>
                                                                 <div className="text-right">
                                                                     <p className="text-[11px] font-black text-emerald-700">{fmtCOP(p.valor)}</p>
-                                                                    <p className="text-[8px] text-emerald-400">{p.created_at ? String(p.created_at).slice(0, 10) : '—'}</p>
+                                                                    <p className="text-[8px] text-emerald-400">{p.fecha ? String(p.fecha).slice(0, 10) : '—'}</p>
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -1709,7 +1709,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             id: String(p.id),
                             valor: String(p.valor || 0),
                             nroAprobacion: p.referencia || '',
-                            fecha: p.processed_at ? p.processed_at.slice(0, 10) : '',
+                            fecha: p.fecha ? String(p.fecha).slice(0, 10) : '',
                             observacion: p.observacion || '',
                             metodo: p.metodo_pago || 'CONSIGNACION'
                         }))}
