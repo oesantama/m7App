@@ -58,7 +58,7 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
         }
     }, [selectedClientId, loadDocs]);
 
-    const pendingBadge = docs.filter(d => d.pendientes > 0).length;
+    const pendingBadge = docs.filter(d => d.pendientes > 0 || (d as any).pending_surcharges > 0).length;
     const selectedClientName = clients.find(c => c.id === selectedClientId)?.name ?? '';
 
     return (

@@ -5,10 +5,10 @@ import pool from '../config/database.js';
 export const getRolePermissions = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
-      SELECT rp.*, r.name as role_name 
-      FROM role_permissions rp
-      LEFT JOIN roles r ON rp.role_id = r.id
-      ORDER BY rp.role_id ASC
+      SELECT r.id as role_id, r.name as role_name, rp.id, rp.permissions, rp.status_id, rp.created_at, rp.updated_at, rp.created_by, rp.updated_by
+      FROM roles r
+      LEFT JOIN role_permissions rp ON rp.role_id = r.id
+      ORDER BY r.name ASC
     `);
     
     // Aplanar los resultados para que el frontend reciba un objeto lineal

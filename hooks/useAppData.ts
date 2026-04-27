@@ -67,7 +67,7 @@ export const useAppData = () => {
       if (isSuper || hasPerm('USUARIOS')) {
           api.getUsers().then(res => updateCat('masterUsuarios', res)).catch(() => []);
       }
-      if (isSuper) {
+      if (isSuper || hasPerm('ROLES') || hasPerm('MATRIZ_ROLES')) {
           api.getRoles().then(res => updateCat('masterRol', res)).catch(() => []);
           api.getPermissions().then(res => updateCat('masterPermisosRol', res)).catch(() => []);
       }

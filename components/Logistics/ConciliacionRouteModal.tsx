@@ -1237,10 +1237,10 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
                                         return (
                                             <div key={s.id} className={`grid grid-cols-12 gap-3 p-3 rounded-2xl border-2 shadow-sm relative group transition-all
-                                                ${isApproved ? 'bg-blue-50 border-blue-200' : isAnulado ? 'bg-slate-100 border-slate-200 opacity-60 grayscale' : 'bg-white border-slate-100'}`}>
+                                                ${isApproved ? 'bg-blue-50 border-blue-200' : isAnulado ? 'bg-slate-100 border-slate-200 opacity-60' : 'bg-white border-slate-100'}`}>
                                                 
                                                 <div className="col-span-3">
-                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Valor</p>
+                                                    <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Valor</p>
                                                     <input type="text" value={s.valor} disabled={!isPending}
                                                         onChange={e => {
                                                             const val = e.target.value.replace(/\D/g, '');
@@ -1253,7 +1253,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                             ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
                                                 <div className="col-span-3">
-                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Referencia / NIT</p>
+                                                    <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Referencia / NIT</p>
                                                     <input type="text" value={s.nroAprobacion} disabled={!isPending}
                                                         onChange={e => {
                                                             const next = [...sobrecostos];
@@ -1264,7 +1264,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                             ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
                                                 <div className="col-span-3">
-                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Fecha</p>
+                                                    <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Fecha</p>
                                                     <input type="date" value={s.fecha} disabled={!isPending}
                                                         onChange={e => {
                                                             const next = [...sobrecostos];

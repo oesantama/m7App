@@ -5,9 +5,9 @@ import pool from '../config/database.js';
 export const getAllUserPermissions = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
-      SELECT up.*, u.name as user_name, u.email as user_email
-      FROM user_permissions up
-      LEFT JOIN users u ON up.user_id = u.id
+      SELECT u.id as user_id, u.name as user_name, u.email as user_email, up.id, up.permissions, up.status_id, up.created_at, up.updated_at, up.created_by, up.updated_by
+      FROM users u
+      LEFT JOIN user_permissions up ON up.user_id = u.id
       ORDER BY u.name ASC
     `);
     

@@ -458,7 +458,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const routeFinancials = useMemo(() => {
         const map = new Map<string, {
             valor_legalizado: number; valor_devuelto: number;
-            valor_parcial: number; total_sobrecosto: number;
+            valor_parcial: number; total_sobrecosto_aprobado: number;
             efectivo: number; credito: number;
             completadas: number; devueltas: number; parciales: number; legalizadas: number;
             repice_count: number; valor_repice: number;
@@ -469,7 +469,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const plate = inv.route_vehicle_plate || inv.vehicle_plate || '';
             if (!plate) return;
             const cur = map.get(plate) ?? {
-                valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
+                valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto_aprobado: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
                 repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
             };
@@ -510,7 +510,10 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             if (PARCIAL_STATUS.includes(status)) { cur.valor_parcial += val; cur.parciales += 1; }
             if (inv.es_devolucion || DEVUELTO_STATUS.includes(status)) cur.devueltas += 1;
             if (ENTREGADO_STATUS.includes(status)) cur.completadas += 1;
-            cur.total_sobrecosto += sc;
+            // Individual surcharge (if any)
+            if (isEfectivo && (inv.item_status === 'APROBADO' || inv.item_status === 'EST-02')) {
+                cur.total_sobrecosto_aprobado += sc;
+            }
             map.set(plate, cur);
         });
 
@@ -519,7 +522,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const plate = p.plate || '';
             if (!plate) return;
             const cur = map.get(plate) ?? {
-                valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
+                valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto_aprobado: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
                 repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
             };
@@ -527,8 +530,22 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             map.set(plate, cur);
         });
 
+        // Sumar sobrecostos globales aprobados por placa
+        routeSurcharges.forEach(s => {
+            if (s.status_id !== 'APROBADO' && s.status_id !== 'EST-02') return;
+            const plate = s.plate || '';
+            if (!plate) return;
+            const cur = map.get(plate) ?? {
+                valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto_aprobado: 0,
+                efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
+                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
+            };
+            cur.total_sobrecosto_aprobado += (Number(s.valor) || 0);
+            map.set(plate, cur);
+        });
+
         return map;
-    }, [invoices, groupPayments]);
+    }, [invoices, groupPayments, routeSurcharges]);
 
     // ── Métricas globales del documento ───────────────────────────────────────
     const stats = useMemo(() => {
@@ -930,19 +947,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         )}
                                     </div>
 
-                                    {/* Fila 2: Barra de Progreso Principal (AVANCE DE LEGALIZACIÓN) */}
-                                    <div className="mb-4">
-                                        <div className="flex justify-between items-end mb-1.5">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Avance de Legalización (Económico EF)</p>
-                                            <span className="text-[10px] font-black text-emerald-600">
-                                                {fmtCOP(stats.totalLegalizado)} / {fmtCOP(stats.valorTotal)} · {stats.valorTotal > 0 ? Math.min(100, Math.round((stats.totalLegalizado / stats.valorTotal) * 100)) : 0}%
-                                            </span>
-                                        </div>
-                                        <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                                                style={{ width: `${stats.valorTotal > 0 ? Math.min(100, (stats.totalLegalizado / stats.valorTotal) * 100) : 0}%` }} />
-                                        </div>
-                                    </div>
+                                    {/* SECCIÓN ELIMINADA: BARRA DE AVANCE PRINCIPAL */}
 
                                     {/* Fila 3: Otros Valores y Conteo de Estados */}
                                     <div className="flex flex-wrap items-center gap-3">
@@ -1055,11 +1060,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                 {filteredRoutes.map(route => {
                                                     // Usar valores calculados desde invoices individuales (sin multiplicación SQL)
                                                     const fin = routeFinancials.get(route.plate) ?? {
-                                                        valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto: 0,
+                                                        valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto_aprobado: 0,
                                                         efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
                                                         valor_grupal: 0, valor_total: 0
                                                     };
-                                                    const totalLegPlate = fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto;
+                                                    const totalLegPlate = fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto_aprobado;
                                                     const pct = fin.valor_total > 0
                                                         ? Math.min(100, Math.round((totalLegPlate / fin.valor_total) * 100)) 
                                                         : (fin.legalizadas === route.invoice_count && route.invoice_count > 0 ? 100 : 0);
@@ -1132,7 +1137,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                     </div>
                                                                     <div className="bg-amber-500 border border-amber-600 rounded-xl px-2.5 py-2">
                                                                         <p className="text-[7px] font-black text-amber-100 uppercase tracking-wider mb-0.5">⏳ Pendiente</p>
-                                                                        <p className="text-xs font-black text-white">{fmtCOP(Math.max(0, fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto)))}</p>
+                                                                        <p className="text-xs font-black text-white">{fmtCOP(Math.max(0, fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + fin.total_sobrecosto_aprobado)))}</p>
                                                                     </div>
                                                                     {fin.valor_parcial > 0 && (
                                                                         <div className="bg-orange-50/50 border border-orange-100 rounded-xl px-2.5 py-2">

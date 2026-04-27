@@ -75,10 +75,14 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
         // El HAVING solo se aplica si NO estamos buscando un documento específico (docId)
         const havingClause = docId ? '' : `
             HAVING (
-                (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
-                - 
-                (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
-            ) > 0
+                (
+                  (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
+                  - 
+                  (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
+                ) > 0
+                OR
+                (SELECT COUNT(*) FROM route_surcharges rs WHERE rs.document_id = dl.id AND (rs.status_id IN ('PENDIENTE', 'EST-01') OR rs.status_id IS NULL)) > 0
+            )
               AND (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '') > 0
         `;
 
@@ -133,6 +137,7 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                  WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name,
 
                 (SELECT COALESCE(SUM(valor::numeric), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id AND rs.status_id IN ('APROBADO', 'EST-02')) AS total_sobrecosto_ruta,
+                (SELECT COUNT(*) FROM route_surcharges rs WHERE rs.document_id = dl.id AND (rs.status_id IN ('PENDIENTE', 'EST-01') OR rs.status_id IS NULL)) AS pending_surcharges,
                 (SELECT COALESCE(SUM(valor::numeric), 0) FROM route_group_payments rgp WHERE rgp.document_id = dl.id) AS total_pago_grupal,
                 (SELECT COALESCE(SUM(valor::numeric), 0) FROM invoice_conciliations ic WHERE ic.document_id = dl.id) AS total_legalizado_individual
 
@@ -260,8 +265,8 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 MAX(p.un_code)                              AS un_code,
                 MAX(p.metodo_pago)                          AS invoice_metodo_pago,
                 MAX(di.item_status)                         AS item_status,
-                MAX(COALESCE(v2.plate, r2.vehicle_id::text)) AS route_vehicle_plate,
-                MAX(ri2.created_at)                          AS assigned_at,
+                MAX(ri2.plate)                              AS route_vehicle_plate,
+                MAX(ri2.created_at)                         AS assigned_at,
                 (SELECT json_agg(json_build_object(
                     'id', di2.id,
                     'article_id', di2.article_id,
@@ -298,11 +303,17 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
             LEFT JOIN users u ON u.id = ic.conciliado_por
             LEFT JOIN document_l_payments p
                 ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
-            LEFT JOIN route_invoices ri2
-                ON (TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = TRIM(ri2.invoice_id)
-                    OR CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = ri2.invoice_id)
-            LEFT JOIN routes r2 ON r2.id::text = ri2.route_id::text
-            LEFT JOIN vehicles v2 ON v2.id::text = r2.vehicle_id::text
+            LEFT JOIN LATERAL (
+                SELECT 
+                    COALESCE(v_lat.plate, r_lat.vehicle_id::text) AS plate,
+                    ri_lat.created_at
+                FROM route_invoices ri_lat
+                JOIN routes r_lat ON r_lat.id::text = ri_lat.route_id::text
+                LEFT JOIN vehicles v_lat ON v_lat.id::text = r_lat.vehicle_id::text
+                WHERE (TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = TRIM(ri_lat.invoice_id)
+                    OR CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = ri_lat.invoice_id)
+                ORDER BY ri_lat.id DESC LIMIT 1
+            ) ri2 ON true
             WHERE di.document_id = $1
               AND di.invoice IS NOT NULL
               AND di.invoice <> ''
