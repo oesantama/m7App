@@ -1718,6 +1718,20 @@ export const updateConsolidatedCount2 = async (req: any, res: Response) => {
       [Number(newCount2), finalObservation, user, String(docId), String(articleId)]
     );
 
+    // Garantizar que la tabla exista (Creación "Lazy") antes de insertar
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inventory_conciliation_logs (
+          id SERIAL PRIMARY KEY,
+          document_id VARCHAR(255) NOT NULL,
+          article_id VARCHAR(255) NOT NULL,
+          old_count_2 NUMERIC,
+          new_count_2 NUMERIC,
+          observation TEXT,
+          changed_by VARCHAR(255),
+          changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Insertar el log limpio estructurado en la nueva tabla
     await client.query(
       `INSERT INTO inventory_conciliation_logs (document_id, article_id, old_count_2, new_count_2, observation, changed_by)
