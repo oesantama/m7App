@@ -76,27 +76,65 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                     </button>
                 </div>
 
-                <div className="bg-amber-50 p-4 border-b border-amber-100 flex items-center justify-center gap-4">
-                    <input 
-                        id="m7-dispatch-barcode-input"
-                        type="text"
-                        autoFocus
-                        autoComplete="off"
-                        placeholder="ESCANEANDO... ESPERANDO BARCODE"
-                        className="bg-transparent text-center text-sm font-mono font-black text-slate-900 outline-none w-full max-w-md"
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                const val = e.currentTarget.value.trim();
-                                if (val) {
-                                    handleBarcodeScan(val);
-                                    e.currentTarget.value = '';
+                <div className="bg-amber-50 p-4 border-b border-amber-100 flex flex-col md:flex-row items-center justify-center gap-6">
+                    <div className="flex-1 flex items-center gap-4 w-full">
+                        <input 
+                            id="m7-dispatch-barcode-input"
+                            type="text"
+                            autoFocus
+                            autoComplete="off"
+                            placeholder="ESCANEANDO... ESPERANDO BARCODE"
+                            className="bg-white border-2 border-amber-200 rounded-2xl px-6 py-3 text-center text-sm font-mono font-black text-slate-900 outline-none w-full shadow-inner focus:border-amber-400 transition-all"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const val = e.currentTarget.value.trim();
+                                    if (val) {
+                                        handleBarcodeScan(val);
+                                        e.currentTarget.value = '';
+                                    }
                                 }
-                            }
-                        }}
-                    />
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Lectora Activa</span>
+                            }}
+                        />
+                        <div className="hidden md:flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Lectora Activa</span>
+                        </div>
+                    </div>
+
+                    {/* CONTROL DE MULTIPLICADOR DINÁMICO (BASADO EN TABLA ARTICULOS) */}
+                    <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-amber-200 shadow-sm">
+                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest ml-2">Multiplicador:</span>
+                        <div className="flex items-center gap-1">
+                            {(() => {
+                                const factors = new Set<number>([1]);
+                                (invoice.items || []).forEach((it: any) => {
+                                    if (it.factorInter && Number(it.factorInter) > 1) factors.add(Number(it.factorInter));
+                                    if (it.factorStd && Number(it.factorStd) > 1) factors.add(Number(it.factorStd));
+                                });
+                                return Array.from(factors).sort((a, b) => a - b).map(m => (
+                                    <button 
+                                        key={m}
+                                        onClick={() => {
+                                            const input = document.getElementById('m7-dispatch-multiplier') as HTMLInputElement;
+                                            if (input) input.value = String(m);
+                                        }}
+                                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all border border-amber-100"
+                                    >
+                                        x{m}
+                                    </button>
+                                ));
+                            })()}
+                            <div className="relative ml-2">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">x</span>
+                                <input 
+                                    id="m7-dispatch-multiplier"
+                                    type="number" 
+                                    defaultValue={1}
+                                    min={1}
+                                    className="w-16 pl-5 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-slate-900 outline-none focus:border-emerald-500"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 

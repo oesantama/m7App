@@ -51,11 +51,18 @@ export const getDocuments = async (req: Request, res: Response) => {
                p.client_ref      as "paymentRef",
                c.count_1         as "count1",
                c.count_2         as "count2",
-               c.inventory_observation as "inventoryNote"
+               c.inventory_observation as "inventoryNote",
+               a.factor_inter    as "factorInter",
+               a.factor_std      as "factorStd",
+               u_i.name          as "uomInterName",
+               u_s.name          as "uomStdName"
         FROM document_items i
         LEFT JOIN estados e_i ON e_i.id = i.item_status
         LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND TRIM(UPPER(i.invoice)) = TRIM(UPPER(p.invoice))
         LEFT JOIN document_consolidated_items c ON i.document_id = c.document_id AND TRIM(UPPER(i.article_id)) = TRIM(UPPER(c.article_id))
+        LEFT JOIN articles a ON TRIM(UPPER(a.id)) = TRIM(UPPER(i.article_id))
+        LEFT JOIN unidad_medida u_i ON u_i.id = a.uom_inter_id
+        LEFT JOIN unidad_medida u_s ON u_s.id = a.uom_std
         WHERE i.document_id = d.id
       ) item_with_payment) as items,
       (SELECT COUNT(*) FROM inventory_news n WHERE n.document_id = d.id AND n.created_at >= NOW() - INTERVAL '30 hours') as "newsCount",

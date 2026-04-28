@@ -1297,9 +1297,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             return;
         }
 
+        // Obtener el multiplicador desde el DOM (para evitar problemas de estado en escaneo rápido)
+        const multInput = document.getElementById('m7-dispatch-multiplier') as HTMLInputElement;
+        const multiplier = multInput ? (Number(multInput.value) || 1) : 1;
+
         const newScanned = {
             ...scannedItems,
-            [sku]: currentCount + 1
+            [sku]: Math.min(expected, currentCount + multiplier)
         };
 
         setScannedItems(newScanned);
@@ -2011,7 +2015,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 {/* DESPACHAR — solo si NO está en ruta y no tiene firma pendiente */}
                                                 {!['EST-11','EST-12','EST-13','EST-14'].includes(effectiveStatus) && !hasPendingSignature && (
                                                     <button
-                                                        onClick={() => setAssigningInvoice(inv)}
+                                                        onClick={() => {
+                                                            setAssigningInvoice(inv);
+                                                            // Por defecto, todas las firmas en DESPUÉS para agilizar
+                                                            setSignNowMap({ [user.id]: false });
+                                                        }}
                                                         className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg"
                                                     >
                                                         <Icons.Truck className="w-4 h-4" />
@@ -2180,7 +2188,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
             <DispatchControlModal 
                 isOpen={!!assigningInvoice}
-                onClose={() => { setAssigningInvoice(null); setScannedItems({}); }}
+                onClose={() => { 
+                    setAssigningInvoice(null); 
+                    setScannedItems({}); 
+                    setSignNowMap({});
+                    setSignatureKeys({});
+                }}
                 invoice={assigningInvoice}
                 scannedItems={scannedItems}
                 handleBarcodeScan={handleBarcodeScan}
