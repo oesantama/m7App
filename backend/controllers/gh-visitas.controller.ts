@@ -5,27 +5,33 @@ export const getVisitas = async (req: Request, res: Response) => {
     try {
         const { from, to, search } = req.query;
         let query = `
-            SELECT * FROM gh_visitas 
+            SELECT 
+                v.*, 
+                a.nombre as area_nombre,
+                u.name as registrado_por_nombre
+            FROM gh_visitas v
+            LEFT JOIN gh_areas a ON a.id::text = v.area_dependencia::text
+            LEFT JOIN users u ON u.id::text = v.registrado_por_id::text
             WHERE 1=1
         `;
         const params: any[] = [];
         let p = 1;
 
         if (from) {
-            query += ` AND fecha_entrada >= $${p++}`;
+            query += ` AND v.fecha_entrada >= $${p++}`;
             params.push(from);
         }
         if (to) {
-            query += ` AND fecha_entrada <= $${p++}`;
+            query += ` AND v.fecha_entrada <= $${p++}`;
             params.push(`${to} 23:59:59`);
         }
         if (search) {
-            query += ` AND (nombre ILIKE $${p} OR cedula ILIKE $${p})`;
+            query += ` AND (v.nombre ILIKE $${p} OR v.cedula ILIKE $${p})`;
             params.push(`%${search}%`);
             p++;
         }
 
-        query += ` ORDER BY fecha_entrada DESC`;
+        query += ` ORDER BY v.fecha_entrada DESC`;
         
         const result = await pool.query(query, params);
         res.json(result.rows);
@@ -39,7 +45,7 @@ export const saveVisita = async (req: Request, res: Response) => {
     const {
         nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
         contacto_emergencia, acuerdo_requisitos, contiene_equipos,
-        marca_dispositivo, numero_serie, registrado_por_id, registrado_por_nombre,
+        marca_dispositivo, numero_serie, registrado_por_id,
         fecha_entrada, hora_salida
     } = req.body;
 
@@ -48,14 +54,14 @@ export const saveVisita = async (req: Request, res: Response) => {
             INSERT INTO gh_visitas (
                 nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
                 contacto_emergencia, acuerdo_requisitos, contiene_equipos,
-                marca_dispositivo, numero_serie, registrado_por_id, registrado_por_nombre,
+                marca_dispositivo, numero_serie, registrado_por_id,
                 fecha_entrada, fecha_registro, hora_salida
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13)
             RETURNING *
         `, [
             nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
             contacto_emergencia, acuerdo_requisitos, contiene_equipos,
-            marca_dispositivo, numero_serie, registrado_por_id, registrado_por_nombre,
+            marca_dispositivo, numero_serie, registrado_por_id,
             fecha_entrada || new Date(),
             hora_salida || null
         ]);

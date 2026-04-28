@@ -22,6 +22,7 @@ interface Visita {
     nombre: string;
     cedula: string;
     area_dependencia: string;
+    area_nombre?: string;
     cuenta_arl: boolean;
     cuenta_eps: boolean;
     contacto_emergencia: string;
@@ -118,7 +119,6 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
             const payload = {
                 ...form,
                 registrado_por_id: user.id,
-                registrado_por_nombre: user.name,
                 hora_salida: combinedSalida
             };
             await api.saveVisita(payload);
@@ -229,7 +229,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                 >
                                     <option value="">Seleccione el área...</option>
                                     {areas.map(area => (
-                                        <option key={area.id} value={area.nombre}>{area.nombre}</option>
+                                        <option key={area.id} value={area.id}>{area.nombre}</option>
                                     ))}
                                 </select>
                             </div>
@@ -393,6 +393,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Visitante</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ingreso</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Destino</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registrado Por</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Salud/ARL</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Equipos</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
@@ -415,7 +416,10 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className="text-xs font-black text-slate-600 uppercase">{v.area_dependencia}</span>
+                                                <span className="text-xs font-black text-slate-600 uppercase">{v.area_nombre || v.area_dependencia}</span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase">{v.registrado_por_nombre || '—'}</span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex justify-center gap-1.5">
