@@ -61,6 +61,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [selectedHelpers, setSelectedHelpers] = useState<string[]>([]);
     const [itemPickingModes, setItemPickingModes] = useState<Record<string, 'UND' | 'CAJA' | 'STD'>>({});
     const [pendingSignatures, setPendingSignatures] = useState<any[]>([]);
+    const [articlesMaster, setArticlesMaster]       = useState<any[]>([]);
     // All unsigned signatures for each invoice (keyed by invoiceId) — used to block ENTREGAR
     const [invoiceAllPending, setInvoiceAllPending] = useState<Record<string, any[]>>({});
     // IDs of invoices dispatched this session — bulletproof guard against any stale-data overwrite
@@ -239,15 +240,28 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 setVehicleLocations(res);
                 updateMarkers(res);
             }
-        } catch (error) {
-            console.error('[M7-GPS-FETCH-ERR]', error);
-            toast.error("Error al obtener ubicaciones GPS");
-        } finally {
-            setIsValidating(false);
+    const fetchArticles = async () => {
+        try {
+            const res = await api.getArticles();
+            if (Array.isArray(res)) setArticlesMaster(res);
+        } catch (e) {
+            console.error('[M7-ARTICLES-MASTER-ERR]', e);
         }
     };
 
-    const updateMarkers = (locations: any[]) => {
+    useEffect(() => {
+        fetchData();
+        fetchLocations();
+        fetchPendingSignatures();
+        fetchArticles();
+        
+        const interval = setInterval(fetchLocations, 30000);
+        const sigInterval = setInterval(fetchPendingSignatures, 60000);
+        return () => {
+            clearInterval(interval);
+            clearInterval(sigInterval);
+        };
+    }, []);
         if (!mapRef.current) return;
 
         // Limpiar marcadores antiguos
@@ -2095,7 +2109,26 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 {!['EST-11','EST-12','EST-13','EST-14'].includes(effectiveStatus) && !hasPendingSignature && (
                                                     <button
                                                         onClick={() => {
-                                                            setAssigningInvoice(inv);
+                                                            // M7-FIX: Enriquecer items con el maestro para tener los factores de conversión (CAJA, STD)
+                                                            const enrichedItems = (inv.items || []).map((it: any) => {
+                                                                const master = articlesMaster.find(a => 
+                                                                    String(a.sku || '').trim().toUpperCase() === String(it.sku || '').trim().toUpperCase() ||
+                                                                    String(a.id || '').trim().toUpperCase() === String(it.sku || '').trim().toUpperCase()
+                                                                );
+                                                                if (master) {
+                                                                    return {
+                                                                        ...it,
+                                                                        factorInter: master.factor_inter || master.factorInter || 0,
+                                                                        factorStd:   master.factor_std   || master.factorStd   || 0,
+                                                                        uomInterName: master.uom_inter_name || master.uomInterName || master.unidad_intermedia || 'CAJA',
+                                                                        uomStdName:   master.uom_std_name   || master.uomStdName   || master.unidad_estandar   || 'STD',
+                                                                        unit: master.unit || master.unidad_estandar || it.unit || 'UND'
+                                                                    };
+                                                                }
+                                                                return it;
+                                                            });
+
+                                                            setAssigningInvoice({ ...inv, items: enrichedItems });
                                                             // Por defecto, todas las firmas en DESPUÉS para agilizar
                                                             setSignNowMap({ [user.id]: false });
                                                         }}
