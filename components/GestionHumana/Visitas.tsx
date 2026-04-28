@@ -48,8 +48,15 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
     });
 
     // Formulario de registro
+    const getLocalISOString = () => {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000; // offset in milliseconds
+        const localISOTime = new Date(now.getTime() - offset).toISOString().slice(0, 16);
+        return localISOTime;
+    };
+
     const initialForm: Visita = {
-        fecha_entrada: new Date().toISOString().slice(0, 16),
+        fecha_entrada: getLocalISOString(),
         nombre: '',
         cedula: '',
         area_dependencia: '',
@@ -116,7 +123,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
             };
             await api.saveVisita(payload);
             toast.success('Visita registrada exitosamente');
-            setForm(initialForm);
+            setForm({ ...initialForm, fecha_entrada: getLocalISOString() });
             if (activeTab === 'consulta') fetchVisitas();
         } catch (error) {
             toast.error('Error al registrar visita');
