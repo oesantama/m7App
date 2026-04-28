@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
@@ -111,13 +112,14 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
             'NOMBRE': v.nombre,
             'CÉDULA': v.cedula,
             'DESTINO': v.area_nombre || v.area_dependencia,
-            'FECHA ENTRADA': new Date(v.fecha_entrada).toLocaleString(),
-            'HORA SALIDA': v.hora_salida ? new Date(v.hora_salida).toLocaleString() : 'Pendiente',
-            'CONTACTO EMERGENCIA': v.contacto_emergencia,
-            'REGISTRADO POR': v.registrado_por_nombre,
+            'FECHA ENTRADA': v.fecha_entrada ? new Date(v.fecha_entrada).toLocaleString('es-CO') : '—',
+            'HORA SALIDA': v.hora_salida ? new Date(v.hora_salida).toLocaleString('es-CO') : 'Pendiente',
+            'CONTACTO EMERGENCIA': v.contacto_emergencia || '—',
+            'REGISTRADO POR': v.registrado_por_nombre || '—',
+            'FECHA REGISTRO': v.fecha_registro ? new Date(v.fecha_registro).toLocaleString('es-CO') : '—',
             'ARL': v.cuenta_arl ? 'SÍ' : 'NO',
             'EPS': v.cuenta_eps ? 'SÍ' : 'NO',
-            'EQUIPOS': v.contiene_equipos ? `SÍ (${v.marca_dispositivo} - ${v.numero_serie})` : 'NO'
+            'EQUIPOS': v.contiene_equipos ? `SÍ (${v.marca_dispositivo || 'S/M'} - ${v.numero_serie || 'S/S'})` : 'NO'
         }));
 
         const ws = XLSX.utils.json_to_sheet(data);
@@ -460,7 +462,6 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Salud/ARL</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Equipos</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -511,16 +512,6 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                                                         <span className="text-[9px] font-black uppercase tracking-widest">En Planta</span>
                                                     </div>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                {!v.hora_salida && (
-                                                    <button 
-                                                        onClick={() => v.id && handleMarcarSalida(v.id)}
-                                                        className="px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-900 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
-                                                    >
-                                                        Registrar Salida
-                                                    </button>
                                                 )}
                                             </td>
                                         </tr>

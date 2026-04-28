@@ -51,6 +51,7 @@ interface InvoiceItem {
     qty: number;
     unit: string;
     returned_qty?: number;
+    returned_value?: number;
 }
 
 interface RouteGroup {
@@ -216,7 +217,7 @@ const LegalizationDialog: React.FC<{
     form: InvoiceFormState;
     onClose: () => void;
     onUpdate: (patch: Partial<InvoiceFormState>) => void;
-    onUpdateItem: (itemId: string | number, rq: number) => void;
+    onUpdateItem: (itemId: string | number, rq: number, rv?: number) => void;
     onSave: () => void;
     allRoutes?: RouteGroup[];
 }> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes }) => {
@@ -235,7 +236,7 @@ const LegalizationDialog: React.FC<{
 
     const totalQtyItems = form.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
     const unitPrice     = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
-    const returnedVal   = form.items.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0);
+    const returnedVal   = form.items.reduce((s, it) => s + (it.returned_value ?? (Number(it.returned_qty || 0) * unitPrice)), 0);
     const expectedVal   = form.estadoEntrega === 'parcial' ? (invoiceVal - returnedVal) : (form.estadoEntrega === 'repice' || form.estadoEntrega === 'devolucion' ? 0 : invoiceVal);
     const diff          = expectedVal - (Number(form.valor) || 0);
 
@@ -448,9 +449,10 @@ const LegalizationDialog: React.FC<{
                                                                     <input type="number" min={0} max={it.qty} value={it.returned_qty}
                                                                         onChange={e => {
                                                                             const rq = Math.min(Number(it.qty), Math.max(0, Number(e.target.value) || 0));
-                                                                            onUpdateItem(it.id, rq);
-                                                                            const otherDev = form.items.filter(x => x.id !== it.id).reduce((s, x) => s + (Number(x.returned_qty) || 0) * unitPrice, 0);
-                                                                            const finalVal = Math.max(0, invoiceVal - (otherDev + (rq * unitPrice)));
+                                                                            const newVal = rq * unitPrice;
+                                                                            onUpdateItem(it.id, rq, newVal);
+                                                                            const otherDev = form.items.filter(x => x.id !== it.id).reduce((s, x) => s + (x.returned_value ?? (Number(x.returned_qty) || 0) * unitPrice), 0);
+                                                                            const finalVal = Math.max(0, invoiceVal - (otherDev + newVal));
                                                                             onUpdate({ valor: String(Math.round(finalVal)) });
                                                                         }}
                                                                         className="w-16 text-center bg-white border border-amber-200 rounded-lg py-1.5 font-black text-amber-800 outline-none" />
@@ -459,7 +461,26 @@ const LegalizationDialog: React.FC<{
                                                         )}
                                                         <td className="px-4 py-2.5 text-right font-black text-slate-500">
                                                             {form.estadoEntrega === 'parcial' ? (
-                                                                <span className="text-rose-500">{fmtCOP(devVal)}</span>
+                                                                <div className="flex flex-col items-end gap-1">
+                                                                    {!canEdit ? (
+                                                                        <span className="font-black text-rose-500">{fmtCOP(it.returned_value ?? devVal)}</span>
+                                                                    ) : (
+                                                                        <div className="relative group/val">
+                                                                            <span className="absolute -left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-300">$</span>
+                                                                            <input type="number" 
+                                                                                value={Math.round(it.returned_value ?? devVal)}
+                                                                                onChange={e => {
+                                                                                    const val = Number(e.target.value) || 0;
+                                                                                    onUpdateItem(it.id, Number(it.returned_qty) || 0, val);
+                                                                                    const otherDev = form.items.filter(x => x.id !== it.id).reduce((s, x) => s + (x.returned_value ?? (Number(x.returned_qty) || 0) * unitPrice), 0);
+                                                                                    const finalVal = Math.max(0, invoiceVal - (otherDev + val));
+                                                                                    onUpdate({ valor: String(Math.round(finalVal)) });
+                                                                                }}
+                                                                                className="w-24 text-right bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 font-black text-rose-600 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-50 transition-all" />
+                                                                        </div>
+                                                                    )}
+                                                                    <span className="text-[7px] font-bold text-slate-400 uppercase">Manual</span>
+                                                                </div>
                                                             ) : (
                                                                 <span className="text-emerald-600">Completo</span>
                                                             )}
@@ -681,12 +702,21 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         });
     }, []);
 
-    const updateItem = useCallback((invoiceNum: string, itemId: string | number, returnedQty: number) => {
+    const updateItem = useCallback((invoiceNum: string, itemId: string | number, returnedQty: number, returnedValue?: number) => {
         setForms(prev => {
             const next = new Map(prev);
             const cur  = next.get(invoiceNum);
             if (cur) {
-                const nextItems = cur.items.map(it => it.id === itemId ? { ...it, returned_qty: returnedQty } : it);
+                const nextItems = cur.items.map(it => {
+                    if (it.id === itemId) {
+                        return { 
+                            ...it, 
+                            returned_qty: returnedQty,
+                            returned_value: returnedValue !== undefined ? returnedValue : it.returned_value
+                        };
+                    }
+                    return it;
+                });
                 next.set(invoiceNum, { ...cur, items: nextItems });
             }
             return next;
