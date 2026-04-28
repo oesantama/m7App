@@ -123,7 +123,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
     }, [visitas, filters.search]);
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 p-6 md:p-8 animate-in fade-in duration-500 overflow-y-auto custom-scrollbar">
+        <div className="flex flex-col bg-slate-50 p-6 md:p-8 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div>
                     <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Registro de Visitas</h2>
@@ -147,7 +147,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
             </div>
 
             {activeTab === 'registro' ? (
-                <div className="max-w-4xl mx-auto w-full bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+                <div className="max-w-4xl mx-auto w-full bg-white rounded-[2.5rem] shadow-xl border border-slate-100">
                     <div className="bg-slate-900 p-8 text-white flex items-center gap-4">
                         <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center">
                             <Icons.UserPlus className="text-emerald-500 w-6 h-6" />
