@@ -1271,18 +1271,30 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // LOGICA DE NEGOCIO PARA DESPACHO (MOVIDA ANTES DEL RETURN)
     const handleManualAdd = (sku: string, qty: number) => {
         if (!assigningInvoice) return;
+        
+        // Buscar con máxima flexibilidad: SKU, Barcode o ID
         const item = (assigningInvoice.items || []).find((it: any) => 
             String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() || 
+            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase() ||
             String(it.articleId || '').trim().toUpperCase() === sku.toUpperCase()
         );
-        if (!item) return;
+
+        if (!item) {
+            toast.error(`No se encontró el SKU "${sku}" en esta factura`, {
+                description: 'Verifique que el artículo pertenezca a la carga actual.',
+                duration: 4000
+            });
+            return;
+        }
 
         const itemSku = item.sku || item.articleId;
         const currentCount = scannedItems[itemSku] || 0;
         const expected = Number(item.qty || item.expectedQty || item.quantity || 0);
 
         if (currentCount >= expected) {
-            toast.error(`LÍMITE ALCANZADO: ${item.articleName || itemSku}`);
+            toast.error(`LÍMITE ALCANZADO: ${item.articleName || itemSku}`, {
+                description: 'Ya se escaneó la cantidad total facturada.'
+            });
             return;
         }
 
@@ -1292,9 +1304,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             [itemSku]: currentCount + added
         });
         
-        toast.success(`Añadido: ${item.articleName || itemSku} (+${added})`, {
-            duration: 1000,
-            position: 'bottom-right'
+        toast.success(`Añadido: ${item.articleName || itemSku}`, {
+            description: `Se sumaron ${added} unidades (${currentCount + added}/${expected})`,
+            icon: '📦',
+            duration: 2000
         });
     };
 
