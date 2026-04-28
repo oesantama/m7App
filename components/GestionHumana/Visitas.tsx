@@ -459,7 +459,6 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 border-b border-slate-100">
                                     <tr>
-                                    <tr>
                                         <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha y Hora de Entrada</th>
                                         <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Nombre</th>
                                         <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Cédula</th>
