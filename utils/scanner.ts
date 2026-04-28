@@ -25,14 +25,14 @@ export const cleanSkuM7 = (raw: string): string => {
     }
   }
 
-  // 2. PDF417 Ajover: SKU es la parte ANTES del primer ':'
-  // Condicion: parte izquierda >= 3 chars Y parte derecha >= 2 chars
-  // (evita falsos positivos en codigos cortos como "A:1")
-  if (code.includes(':')) {
-    const colonIdx = code.indexOf(':');
-    const left = code.substring(0, colonIdx);
-    const right = code.substring(colonIdx + 1);
-    if (left.length >= 3 && right.length >= 2) {
+  // 2. PDF417 Ajover / Composite Barcodes: SKU es la parte ANTES del primer separador (':' o 'Ñ')
+  // Condicion: parte izquierda >= 3 chars para evitar falsos positivos
+  const separatorMatch = code.match(/[:Ñ]/);
+  if (separatorMatch) {
+    const idx = separatorMatch.index!;
+    const left = code.substring(0, idx);
+    const right = code.substring(idx + 1);
+    if (left.length >= 3) {
       code = left;
     }
   }
@@ -42,12 +42,10 @@ export const cleanSkuM7 = (raw: string): string => {
   if (code.startsWith('(01)')) code = code.substring(4);
 
   // 4. Limpiar caracteres de control remanentes
-  // N (sin tilde) = ENTER en teclado ES con layout EN en algunos modelos Android
-  code = code.replace(/[Ñ\t\n]/g, '');
+  code = code.replace(/[\t\n]/g, '');
 
-  // 5. Eliminar ':' al final (algunos scanners envían el código terminado en ':' sin datos siguientes)
-  // Ejemplo: "D702401LS4:" → "D702401LS4"
-  code = code.replace(/:+$/, '');
+  // 5. Eliminar separadores al final
+  code = code.replace(/[:Ñ]+$/, '');
 
   return code.trim();
 };

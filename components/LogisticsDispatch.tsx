@@ -1301,16 +1301,20 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const handleBarcodeScan = async (rawBarcode: string) => {
         if (!assigningInvoice) return;
         
-        let sku = '';
+        // 1. Limpiar el SKU usando la nueva lógica que corta en 'Ñ' o ':'
+        const sku = cleanSkuM7(rawBarcode);
         let multiplier = 1;
 
+        // 2. Si es un código compuesto (Ñ), intentar extraer la cantidad del resto de la cadena
         if (rawBarcode.includes('Ñ')) {
             const parts = rawBarcode.split('Ñ').map(p => p.trim());
-            sku = parts[0]; 
-            const possibleQty = parts.find(p => !isNaN(Number(p)) && p.length > 0 && p.length <= 4);
-            multiplier = possibleQty ? Number(possibleQty) : 1;
+            // Buscamos un número en las partes siguientes (posible cantidad)
+            const possibleQty = parts.slice(1).find(p => !isNaN(Number(p)) && p.length > 0 && p.length <= 4);
+            if (possibleQty) {
+                multiplier = Number(possibleQty);
+            }
         } else {
-            sku = cleanSkuM7(rawBarcode);
+            // Si no tiene Ñ, usamos el multiplicador manual de la interfaz
             const multInput = document.getElementById('m7-dispatch-multiplier') as HTMLInputElement;
             multiplier = multInput ? (Number(multInput.value) || 1) : 1;
         }
