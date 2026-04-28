@@ -45,7 +45,8 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
     const [filters, setFilters] = useState({
         from: new Date().toISOString().split('T')[0],
         to: new Date().toISOString().split('T')[0],
-        search: ''
+        search: '',
+        area_id: 'all'
     });
 
     // Formulario de registro
@@ -98,6 +99,31 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleExportExcel = () => {
+        if (visitas.length === 0) {
+            toast.warning('No hay datos para exportar');
+            return;
+        }
+
+        const data = visitas.map(v => ({
+            'NOMBRE': v.nombre,
+            'CÉDULA': v.cedula,
+            'DESTINO': v.area_nombre || v.area_dependencia,
+            'FECHA ENTRADA': new Date(v.fecha_entrada).toLocaleString(),
+            'HORA SALIDA': v.hora_salida ? new Date(v.hora_salida).toLocaleString() : 'Pendiente',
+            'CONTACTO EMERGENCIA': v.contacto_emergencia,
+            'REGISTRADO POR': v.registrado_por_nombre,
+            'ARL': v.cuenta_arl ? 'SÍ' : 'NO',
+            'EPS': v.cuenta_eps ? 'SÍ' : 'NO',
+            'EQUIPOS': v.contiene_equipos ? `SÍ (${v.marca_dispositivo} - ${v.numero_serie})` : 'NO'
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Visitas");
+        XLSX.writeFile(wb, `Reporte_Visitas_${filters.from}_${filters.to}.xlsx`);
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -351,38 +377,75 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                 </div>
             ) : (
                 <div className="flex flex-col gap-6 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="md:col-span-2 relative">
-                            <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                            <input 
-                                type="text" 
-                                placeholder="Buscar por nombre o cédula..."
-                                value={filters.search}
-                                onChange={e => setFilters({...filters, search: e.target.value})}
-                                className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium shadow-sm"
-                            />
+                    {/* FILTROS DE CONSULTA */}
+                    <div className="p-8 bg-white border-b border-slate-100">
+                        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+                            <div className="flex-1 space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Buscar Visitante</label>
+                                <div className="relative">
+                                    <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    <input 
+                                        type="text"
+                                        placeholder="Nombre o Cédula..."
+                                        value={filters.search}
+                                        onChange={e => setFilters({...filters, search: e.target.value})}
+                                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-slate-900 transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="w-full lg:w-48 space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Área / Destino</label>
+                                <select 
+                                    value={filters.area_id}
+                                    onChange={e => setFilters({...filters, area_id: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-slate-900 transition-all appearance-none cursor-pointer"
+                                >
+                                    <option value="all">Todas las áreas</option>
+                                    {areas.map(a => (
+                                        <option key={a.id} value={a.id}>{a.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="w-full lg:w-44 space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Desde</label>
+                                <input 
+                                    type="date"
+                                    value={filters.from}
+                                    onChange={e => setFilters({...filters, from: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-slate-900 transition-all"
+                                />
+                            </div>
+
+                            <div className="w-full lg:w-44 space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hasta</label>
+                                <input 
+                                    type="date"
+                                    value={filters.to}
+                                    onChange={e => setFilters({...filters, to: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-slate-900 transition-all"
+                                />
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={fetchVisitas}
+                                    disabled={isLoading}
+                                    className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-sm font-bold hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    <Icons.Search className="w-4 h-4" />
+                                    {isLoading ? 'Cargando...' : 'Consultar'}
+                                </button>
+                                <button 
+                                    onClick={handleExportExcel}
+                                    className="px-4 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 transition-all flex items-center gap-2"
+                                    title="Exportar a Excel"
+                                >
+                                    <Icons.Download className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <input 
-                                type="date" 
-                                value={filters.from}
-                                onChange={e => setFilters({...filters, from: e.target.value})}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-bold uppercase shadow-sm"
-                            />
-                            <input 
-                                type="date" 
-                                value={filters.to}
-                                onChange={e => setFilters({...filters, to: e.target.value})}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-bold uppercase shadow-sm"
-                            />
-                        </div>
-                        <button 
-                            onClick={fetchVisitas}
-                            className="bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Icons.RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                            Consultar
-                        </button>
                     </div>
 
                     <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">

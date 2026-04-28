@@ -3,7 +3,7 @@ import pool from '../config/database.js';
 
 export const getVisitas = async (req: Request, res: Response) => {
     try {
-        const { from, to, search } = req.query;
+        const { from, to, search, area_id } = req.query;
         let query = `
             SELECT 
                 v.*, 
@@ -29,6 +29,10 @@ export const getVisitas = async (req: Request, res: Response) => {
             query += ` AND (v.nombre ILIKE $${p} OR v.cedula ILIKE $${p})`;
             params.push(`%${search}%`);
             p++;
+        }
+        if (area_id && area_id !== 'all') {
+            query += ` AND v.area_dependencia::text = $${p++}`;
+            params.push(area_id);
         }
 
         query += ` ORDER BY v.fecha_entrada DESC`;
