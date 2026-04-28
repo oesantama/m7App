@@ -1038,10 +1038,16 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 estadoEntrega:  form.estadoEntrega,
                 valorFactura:   invoiceVal || undefined,
                 itemsReturned:  (form.estadoEntrega === 'parcial' || form.estadoEntrega === 'devolucion')
-                                ? form.items.map(it => ({
-                                    ...it,
-                                    returned_qty: form.estadoEntrega === 'devolucion' ? it.qty : it.returned_qty
-                                  })).filter(it => (Number(it.returned_qty) || 0) > 0)
+                                ? form.items.map(it => {
+                                    const qty = form.estadoEntrega === 'devolucion' ? it.qty : it.returned_qty;
+                                    // Calculamos el valor final (manual o proporcional) para que quede fijo en la DB
+                                    const val = it.returned_value ?? (Number(qty || 0) * unitPrice);
+                                    return {
+                                        ...it,
+                                        returned_qty: qty,
+                                        returned_value: Math.round(Number(val))
+                                    };
+                                  }).filter(it => (Number(it.returned_qty) || 0) > 0)
                                 : [],
                 targetRouteId:  form.targetRouteId, // Enviamos el destino de reasignación
             });
