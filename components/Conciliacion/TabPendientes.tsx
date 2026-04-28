@@ -110,8 +110,8 @@ const FORMA_COLOR: Record<string, { bg: string; text: string; label: string }> =
 };
 
 const ENTREGADO_STATUS = ['EST-12', 'ENTREGADO', 'COMPLETED', 'FINALIZADO'];
-const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO'];
-const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL'];
+const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO', 'DEVUELT'];
+const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL', 'PARCIAL'];
 const REPICE_STATUS    = ['EST-15', 'REPICE'];
 
 // ── Sub-componente: Metric pill ───────────────────────────────────────────────
@@ -322,7 +322,24 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     'ESTADO': getStatusName(i.item_status),
                     'VALOR FACTURA': i.invoice_value || 0,
                     'VALOR RECAUDADO': i.valor || 0,
-                    'VALOR DEVUELTO': Math.round(devVal),
+                    'VALOR DEVUELTO': (() => {
+                        const upperStatus = (i.item_status || '').toUpperCase();
+                        const isDev = i.es_devolucion || DEVUELTO_STATUS.includes(upperStatus);
+                        const isPar = PARCIAL_STATUS.includes(upperStatus);
+                        const invVal = Number(i.invoice_value) || 0;
+                        const recVal = Number(i.valor) || 0;
+
+                        if (isDev) return invVal;
+                        
+                        // Para parciales, PRIORIZAMOS el valor de los ítems devueltos registrados
+                        const itemsDev = i.items?.reduce((s: number, it: any) => s + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                        if (isPar && itemsDev > 0) return Math.round(itemsDev);
+                        
+                        // Si es parcial pero no hay ítems (o el valor es 0), usamos la diferencia como último recurso
+                        if (isPar) return Math.max(0, invVal - recVal);
+                        
+                        return Math.round(itemsDev);
+                    })(),
                     'METODO CONCILIACION': i.forma_pago || '—',
                     'COMPROBANTE': i.comprobante || '—',
                     'FECHA PAGO': i.fecha_pago ? i.fecha_pago.slice(0, 10) : '—',
@@ -505,7 +522,24 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             }
 
             // Solo sumar devoluciones si es efectivo
-            if (inv.es_devolucion && isEfectivo) cur.valor_devuelto += invVal;
+            const isDev = inv.es_devolucion || DEVUELTO_STATUS.includes(status);
+            const isPar = PARCIAL_STATUS.includes(status);
+            if (isEfectivo) {
+                if (isDev) {
+                    cur.valor_devuelto += invVal;
+                } else if (isPar) {
+                    // Priorizar ítems
+                    const totalQtyItems = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
+                    const unitPrice     = invVal / (totalQtyItems || 1);
+                    const itemsDevVal   = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                    
+                    if (itemsDevVal > 0) {
+                        cur.valor_devuelto += itemsDevVal;
+                    } else if (inv.forma_pago) {
+                        cur.valor_devuelto += Math.max(0, invVal - val);
+                    }
+                }
+            }
             
             if (PARCIAL_STATUS.includes(status)) { cur.valor_parcial += val; cur.parciales += 1; }
             if (inv.es_devolucion || DEVUELTO_STATUS.includes(status)) cur.devueltas += 1;
@@ -581,10 +615,25 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
         const valorTotal      = efectivoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const valorDevuelto   = efectivoInvoices.reduce((s, i) => {
-            const isDev = i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase());
-            const isPar = PARCIAL_STATUS.includes((i.item_status || '').toUpperCase());
+            const status = (i.item_status || '').toUpperCase();
+            const isDev = i.es_devolucion || DEVUELTO_STATUS.includes(status);
+            const isPar = PARCIAL_STATUS.includes(status);
+            
             if (isDev) return s + (Number(i.invoice_value) || 0);
-            if (isPar && i.forma_pago) return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
+            
+            if (isPar) {
+                // Priorizar valor de ítems devueltos
+                const totalQtyItems = i.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
+                const unitPrice     = (Number(i.invoice_value) || 0) / (totalQtyItems || 1);
+                const itemsDevVal   = i.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                
+                if (itemsDevVal > 0) return s + itemsDevVal;
+                
+                // Fallback a diferencia si ya está legalizado (forma_pago)
+                if (i.forma_pago) {
+                    return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
+                }
+            }
             return s;
         }, 0);
         const valorParcial    = efectivoInvoices.filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase())).reduce((s, i) => s + (Number(i.valor) || 0), 0);

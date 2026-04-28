@@ -118,9 +118,15 @@ const fmtCOP = (v: number | undefined | null) =>
         ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
         : '—';
 
+const getYesterday = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+};
+
 const ENTREGADO_STATUS = ['EST-12', 'ENTREGADO', 'COMPLETED', 'FINALIZADO'];
-const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO'];
-const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL'];
+const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO', 'DEVUELT'];
+const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL', 'PARCIAL'];
 
 // Determina qué opciones están disponibles según MasterSuite
 function getMsConstraint(inv: InvoiceRow): { allowed: Set<EstadoEntrega>; hint: string | null } {
@@ -274,10 +280,10 @@ const LegalizationDialog: React.FC<{
                             </div>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
-                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!canEdit || !currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)) })} />
-                            <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!canEdit || !currentAllowed.has('parcial')}    onClick={() => onUpdate({ estadoEntrega: 'parcial' })} />
-                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={!canEdit || !currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: '0' })} />
-                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!canEdit || !currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0' })} />
+                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!canEdit || !currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)), fecha: new Date().toISOString().slice(0, 10) })} />
+                            <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!canEdit || !currentAllowed.has('parcial')}    onClick={() => onUpdate({ estadoEntrega: 'parcial', fecha: getYesterday() })} />
+                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={!canEdit || !currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: '0', fecha: new Date().toISOString().slice(0, 10) })} />
+                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!canEdit || !currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0', fecha: new Date().toISOString().slice(0, 10) })} />
                         </div>
                     </div>
 
@@ -619,7 +625,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
 
     // Estado consignación grupal
-    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }]);
+    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION' }]);
     const [savingGrupal, setSavingGrupal]     = useState(false);
     const [searchTerm, setSearchTerm]         = useState('');
     const [headerFilter, setHeaderFilter]     = useState<string | null>(null);
@@ -852,10 +858,22 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             const isDev = i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase());
             const isPar = PARCIAL_STATUS.includes((i.item_status || '').toUpperCase());
             
+            // Si es una devolución total, sumamos el valor completo de la factura
             if (isDev) return s + (Number(i.invoice_value) || 0);
-            if (isPar && i.forma_pago) {
-                // Si es parcial y ya se legalizó, la diferencia es devolución
-                return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
+            
+            // Si es parcial, la parte devuelta es el valor de los ítems retornados
+            if (isPar) {
+                // Intentar calcular basado en los ítems si están presentes
+                const totalQtyItems = i.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
+                const unitPrice     = (Number(i.invoice_value) || 0) / (totalQtyItems || 1);
+                const itemsDevVal   = i.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                
+                if (itemsDevVal > 0) return s + itemsDevVal;
+
+                // Si no hay ítems detallados pero ya se legalizó, usamos la diferencia (Total - Recaudado)
+                if (i.forma_pago) {
+                    return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
+                }
             }
             return s;
         }, 0);
@@ -907,8 +925,9 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 toast.error('El número de comprobante / referencia es obligatorio.');
                 return;
             }
-            if (valorNum <= 0) {
-                toast.error('El total a consignar debe ser mayor a $0 para facturas entregadas.');
+            // Para 'entregado' debe ser > 0, para 'parcial' puede ser 0
+            if (valorNum < 0 || (form.estadoEntrega === 'entregado' && valorNum <= 0)) {
+                toast.error(form.estadoEntrega === 'parcial' ? 'El valor no puede ser negativo.' : 'El total a consignar debe ser mayor a $0 para facturas entregadas.');
                 return;
             }
         }
@@ -930,7 +949,12 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 conductorName:  inv.conductor_name || route.driver_name || undefined,
                 estadoEntrega:  form.estadoEntrega,
                 valorFactura:   invoiceVal || undefined,
-                itemsReturned:  form.estadoEntrega === 'parcial' ? form.items.filter(it => (Number(it.returned_qty) || 0) > 0) : [],
+                itemsReturned:  (form.estadoEntrega === 'parcial' || form.estadoEntrega === 'devolucion')
+                                ? form.items.map(it => ({
+                                    ...it,
+                                    returned_qty: form.estadoEntrega === 'devolucion' ? it.qty : it.returned_qty
+                                  })).filter(it => (Number(it.returned_qty) || 0) > 0)
+                                : [],
                 targetRouteId:  form.targetRouteId, // Enviamos el destino de reasignación
             });
             toast.success(`✅ ${inv.invoice_number} legalizada`);
@@ -1192,7 +1216,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     ))}
                                 </div>
 
-                                <button onClick={() => setConsignaciones([...consignaciones, { id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }])}
+                                <button onClick={() => setConsignaciones([...consignaciones, { id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION' }])}
                                     className="mt-4 w-full py-2.5 border-2 border-dashed border-slate-300 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest hover:border-violet-400 hover:text-violet-600 transition-all">
                                     + Agregar otra consignación
                                 </button>
