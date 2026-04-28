@@ -237,18 +237,12 @@ const ItemRow: React.FC<{
         const newVal = n * unitPrice;
         setLocalVal(String(Math.round(newVal)));
         onUpdateItem(it.id, n, newVal);
-        
-        const otherDev = form.items.filter(x => x.id !== it.id).reduce((s, x) => s + (x.returned_value ?? (Number(x.returned_qty) || 0) * unitPrice), 0);
-        onUpdate({ valor: String(Math.round(Math.max(0, invoiceVal - (otherDev + newVal)))) });
     };
 
     const handleValChange = (val: string) => {
         setLocalVal(val);
         const n = Number(val) || 0;
         onUpdateItem(it.id, Number(it.returned_qty) || 0, n);
-        
-        const otherDev = form.items.filter(x => x.id !== it.id).reduce((s, x) => s + (x.returned_value ?? (Number(x.returned_qty) || 0) * unitPrice), 0);
-        onUpdate({ valor: String(Math.round(Math.max(0, invoiceVal - (otherDev + n)))) });
     };
 
     return (
@@ -754,11 +748,30 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     }
                     return it;
                 });
-                next.set(invoiceNum, { ...cur, items: nextItems });
+
+                // Si es entrega parcial, auto-calcular el valor total a cobrar basándose en lo devuelto
+                let nextValor = cur.valor;
+                if (cur.estadoEntrega === 'parcial') {
+                    const originalInvoice = invoices.find(i => i.invoice_number === invoiceNum);
+                    const invoiceVal = Number(originalInvoice?.invoice_value) || 0;
+                    const totalQtyItems = nextItems.reduce((acc, x) => acc + (Number(x.qty) || 0), 0);
+                    const unitPrice = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
+                    
+                    const totalReturnedVal = nextItems.reduce((acc, x) => {
+                        const val = x.returned_value !== undefined 
+                            ? Number(x.returned_value) 
+                            : (Number(x.returned_qty) || 0) * unitPrice;
+                        return acc + val;
+                    }, 0);
+
+                    nextValor = String(Math.round(Math.max(0, invoiceVal - totalReturnedVal)));
+                }
+
+                next.set(invoiceNum, { ...cur, items: nextItems, valor: nextValor });
             }
             return next;
         });
-    }, []);
+    }, [invoices]);
 
     const handleSaveGrupal = async () => {
         const activePayments = consignaciones.filter(c => Number(String(c.valor).replace(/\D/g, '')) > 0);
@@ -936,7 +949,12 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 // Intentar calcular basado en los ítems si están presentes
                 const totalQtyItems = i.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
                 const unitPrice     = (Number(i.invoice_value) || 0) / (totalQtyItems || 1);
-                const itemsDevVal   = i.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                const itemsDevVal   = i.items?.reduce((acc: number, it: any) => {
+                    const val = it.returned_value !== undefined 
+                        ? Number(it.returned_value) 
+                        : (Number(it.returned_qty || 0) * unitPrice);
+                    return acc + val;
+                }, 0) || 0;
                 
                 if (itemsDevVal > 0) return s + itemsDevVal;
 
@@ -1209,7 +1227,12 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         if (isDev) return invoiceVal;
                                                         const totalQtyItems = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
                                                         const unitPrice     = invoiceVal / (totalQtyItems || 1);
-                                                        const itemsDevVal   = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                                                        const itemsDevVal   = inv.items?.reduce((acc: number, it: any) => {
+                                                            const val = it.returned_value !== undefined 
+                                                                ? Number(it.returned_value) 
+                                                                : (Number(it.returned_qty || 0) * unitPrice);
+                                                            return acc + val;
+                                                        }, 0) || 0;
                                                         if (itemsDevVal > 0) return itemsDevVal;
                                                         if (isLegalized) return Math.max(0, invoiceVal - (Number(inv.valor) || 0));
                                                         return 0;

@@ -48,8 +48,16 @@ const Personal: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('personal');
   const [personal, setPersonal] = useState<PersonalRecord[]>([]);
   const [encuestas, setEncuestas] = useState<EncuestaRecord[]>([]);
-  const [resultados, setResultados] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState<number | null>(null);
+
+  // Maestros para selects
+  const [areas, setAreas] = useState<MiscRecord[]>([]);
+  const [jefes, setJefes] = useState<MiscRecord[]>([]);
+  const [cargos, setCargos] = useState<MiscRecord[]>([]);
+  const [epsList, setEpsList] = useState<MiscRecord[]>([]);
+  const [afpList, setAfpList] = useState<MiscRecord[]>([]);
+  const [estados, setEstados] = useState<{id: string, name: string}[]>([]);
   
   // Paginación y Búsqueda
   const [search, setSearch] = useState('');
