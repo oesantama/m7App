@@ -176,6 +176,10 @@ app.listen(PORT, () => {
       console.log('[ORBIT-BOOT] Ejecutando Restauración Nuclear...');
       const result = await m.restoreSystem();
       console.log(`[ORBIT-BOOT] Sistema configurado en ${Date.now() - dbStart}ms:`, result.message);
+      
+      // Lanzar optimizaciones pesadas en segundo plano para no bloquear el 200 OK del healthcheck
+      m.runBackgroundOptimizations().catch(() => {});
+
       // Marcar sistema como listo — el healthcheck de Docker ahora responderá OK
       systemReady = true;
       console.log('[ORBIT-BOOT] ✓ Sistema LISTO para recibir tráfico.');

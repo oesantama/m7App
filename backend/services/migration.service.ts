@@ -456,11 +456,6 @@ const healSchema = async (client: any) => {
       ON inventario_clientes (client_id, article_id, batch)
     `);
 
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_vehicle_locations_latest 
-      ON vehicle_locations (vehicle_id, updated_at DESC)
-    `);
-
     console.log('[M7-DB-IQ] Configurando restricciones de Aprendizaje Granular...');
     await client.query(`
       DROP INDEX IF EXISTS unq_routing_patterns_city_veh;
@@ -814,6 +809,26 @@ export const restoreSystem = async () => {
   } finally {
     client.release();
   }
+};
+
+/**
+ * Ejecuta optimizaciones pesadas en segundo plano para no bloquear el arranque del sistema (Evita 503)
+ */
+export const runBackgroundOptimizations = async () => {
+    const client = await pool.connect();
+    try {
+        console.log('[M7-BACKGROUND] Iniciando optimizaciones de rendimiento (No bloqueante)...');
+        // Índice para corregir el timeout en GPS (Lentitud en DISTINCT ON)
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_vehicle_locations_latest 
+            ON vehicle_locations (vehicle_id, updated_at DESC)
+        `);
+        console.log('[M7-BACKGROUND] Optimizaciones completadas exitosamente.');
+    } catch (err: any) {
+        console.error('[M7-BACKGROUND-ERROR] Falló optimización de índices:', err.message);
+    } finally {
+        client.release();
+    }
 };
 
 async function seedGhMiscelaneos(client: any) {
