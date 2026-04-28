@@ -48,6 +48,7 @@ const Personal: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('personal');
   const [personal, setPersonal] = useState<PersonalRecord[]>([]);
   const [encuestas, setEncuestas] = useState<EncuestaRecord[]>([]);
+  const [resultados, setResultados] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState<number | null>(null);
 
