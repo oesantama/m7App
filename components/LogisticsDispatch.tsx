@@ -59,6 +59,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [isAccompanied, setIsAccompanied] = useState(false);
     const [helperCount, setHelperCount] = useState(1);
     const [selectedHelpers, setSelectedHelpers] = useState<string[]>([]);
+    const [pickingMode, setPickingMode] = useState<'UND' | 'CAJA' | 'STD'>('UND');
     const [pendingSignatures, setPendingSignatures] = useState<any[]>([]);
     // All unsigned signatures for each invoice (keyed by invoiceId) — used to block ENTREGAR
     const [invoiceAllPending, setInvoiceAllPending] = useState<Record<string, any[]>>({});
@@ -1327,9 +1328,18 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 multiplier = Number(possibleQty);
             }
         } else {
-            // Si no tiene Ñ, usamos el multiplicador manual de la interfaz
-            const multInput = document.getElementById('m7-dispatch-multiplier') as HTMLInputElement;
-            multiplier = multInput ? (Number(multInput.value) || 1) : 1;
+            // 3. MODO AUTO: Si no tiene cantidad interna, usamos el modo seleccionado (CAJA, STD, UND)
+            if (pickingMode !== 'UND') {
+                const item = (assigningInvoice.items || []).find((it: any) => 
+                    String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() || 
+                    String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase() ||
+                    String(it.articleId || '').trim().toUpperCase() === sku.toUpperCase()
+                );
+                if (item) {
+                    if (pickingMode === 'CAJA') multiplier = Number(item.factorInter) || 1;
+                    else if (pickingMode === 'STD') multiplier = Number(item.factorStd) || 1;
+                }
+            }
         }
 
         handleManualAdd(sku, multiplier);
@@ -2241,6 +2251,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 isValidating={isValidating}
                 handleConfirmDispatch={handleConfirmDispatch}
                 onAddQty={handleManualAdd}
+                pickingMode={pickingMode}
+                setPickingMode={setPickingMode}
             />
 
             {/* MODAL: REASIGNAR PLACA / LIBERAR FACTURA */}

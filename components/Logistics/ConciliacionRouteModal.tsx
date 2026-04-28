@@ -1519,7 +1519,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         form={form} 
                         onClose={() => setActiveDialog(null)}
                         onUpdate={(patch) => updateForm(inv.invoice_number, patch)}
-                        onUpdateItem={(itemId, rq) => updateItem(inv.invoice_number, itemId, rq)}
+                        onUpdateItem={(itemId, rq, rv) => updateItem(inv.invoice_number, itemId, rq, rv)}
                         onSave={() => handleSave(inv)}
                         allRoutes={allRoutes}
                     />

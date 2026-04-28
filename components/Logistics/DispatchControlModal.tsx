@@ -8,6 +8,8 @@ interface DispatchControlModalProps {
     invoice: any;
     scannedItems: Record<string, number>;
     handleBarcodeScan: (barcode: string) => void;
+    pickingMode: 'UND' | 'CAJA' | 'STD';
+    setPickingMode: (mode: 'UND' | 'CAJA' | 'STD') => void;
     isAccompanied: boolean;
     setIsAccompanied: (val: boolean) => void;
     helperCount: number;
@@ -88,16 +90,15 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                             className="bg-white border-2 border-amber-200 rounded-2xl px-6 py-3 text-center text-sm font-mono font-black text-slate-900 outline-none w-full shadow-inner focus:border-amber-400 transition-all"
                             onChange={(e) => {
                                 const val = e.target.value;
-                                // AUTO-PROCESAR si detectamos un separador y no queremos esperar al Enter
                                 if (val.includes('Ñ') || val.includes(':')) {
-                                    // Esperar un pequeño delay para que el scanner termine de escupir la cadena
+                                    // Delay ultra-corto para respuesta inmediata
                                     setTimeout(() => {
                                         const finalVal = document.getElementById('m7-dispatch-barcode-input') as HTMLInputElement;
-                                        if (finalVal && finalVal.value.length > 5) {
+                                        if (finalVal && (finalVal.value.includes('Ñ') || finalVal.value.includes(':'))) {
                                             handleBarcodeScan(finalVal.value.trim());
                                             finalVal.value = '';
                                         }
-                                    }, 300);
+                                    }, 100);
                                 }
                             }}
                             onKeyDown={(e) => {
@@ -116,39 +117,19 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                         </div>
                     </div>
 
-                    {/* CONTROL DE MULTIPLICADOR DINÁMICO (BASADO EN TABLA ARTICULOS) */}
+                    {/* MODO DE PIQUEO AUTOMÁTICO */}
                     <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-amber-200 shadow-sm">
-                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest ml-2">Multiplicador:</span>
-                        <div className="flex items-center gap-1">
-                            {(() => {
-                                const factors = new Set<number>([1]);
-                                (invoice.items || []).forEach((it: any) => {
-                                    if (it.factorInter && Number(it.factorInter) > 1) factors.add(Number(it.factorInter));
-                                    if (it.factorStd && Number(it.factorStd) > 1) factors.add(Number(it.factorStd));
-                                });
-                                return Array.from(factors).sort((a, b) => a - b).map(m => (
-                                    <button 
-                                        key={m}
-                                        onClick={() => {
-                                            const input = document.getElementById('m7-dispatch-multiplier') as HTMLInputElement;
-                                            if (input) input.value = String(m);
-                                        }}
-                                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all border border-amber-100"
-                                    >
-                                        x{m}
-                                    </button>
-                                ));
-                            })()}
-                            <div className="relative ml-2">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">x</span>
-                                <input 
-                                    id="m7-dispatch-multiplier"
-                                    type="number" 
-                                    defaultValue={1}
-                                    min={1}
-                                    className="w-16 pl-5 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-slate-900 outline-none focus:border-emerald-500"
-                                />
-                            </div>
+                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest ml-2">Modo Auto:</span>
+                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                            {(['UND', 'CAJA', 'STD'] as const).map(m => (
+                                <button 
+                                    key={m}
+                                    onClick={() => setPickingMode(m)}
+                                    className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${pickingMode === m ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    {m === 'UND' ? 'UNIDAD' : m === 'CAJA' ? 'CAJA' : 'STD'}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
