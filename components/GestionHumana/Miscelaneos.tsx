@@ -85,7 +85,7 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
   const [loading, setLoading]   = useState(false);
   const [search, setSearch]     = useState('');
   const [page, setPage]         = useState(1);
-  const PAGE_SIZE = 10;
+  const [limit, setLimit]       = useState(20);
 
   // Modal
   const [isOpen, setIsOpen]     = useState(false);
@@ -126,8 +126,8 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
     [records, search]
   );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = limit === 0 ? 1 : Math.max(1, Math.ceil(filtered.length / limit));
+  const paginated  = limit === 0 ? filtered : filtered.slice((page - 1) * limit, page * limit);
 
   const openCreate = () => {
     setEditing(null);
@@ -355,29 +355,48 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
         </div>
 
         {/* Paginación */}
-        {totalPages > 1 && (
-          <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              {filtered.length} registros · Pág {page}/{totalPages}
-            </span>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all"
+        <div className="px-5 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase text-slate-400">Mostrar</span>
+              <select 
+                value={limit} 
+                onChange={e => { setLimit(Number(e.target.value)); setPage(1); }}
+                className="h-8 px-2 rounded-lg bg-slate-100 border-none text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-emerald-500/20"
               >
-                <Icons.ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all"
-              >
-                <Icons.ChevronRight className="w-3.5 h-3.5" />
-              </button>
+                <option value={5}>5</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={0}>TODOS</option>
+              </select>
             </div>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+              Total: <span className="text-emerald-600">{filtered.length}</span>
+            </span>
           </div>
-        )}
+
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all shadow-sm"
+            >
+              <Icons.ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="px-4 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center">
+              <span className="text-[10px] font-black text-slate-600 uppercase">
+                Página <span className="text-emerald-600">{page}</span> de {totalPages}
+              </span>
+            </div>
+            <button 
+              disabled={page === totalPages || limit === 0}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all shadow-sm"
+            >
+              <Icons.ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Modal crear / editar */}

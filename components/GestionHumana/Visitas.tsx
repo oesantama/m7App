@@ -38,7 +38,13 @@ interface Visita {
 
 const Visitas: React.FC<{ user: any }> = ({ user }) => {
     const [activeTab, setActiveTab] = useState<'registro' | 'consulta'>('registro');
+    const [filterSearch, setFilterSearch] = useState('');
+    const [filterArea, setFilterArea] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Paginación
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(20);
     const [visitas, setVisitas] = useState<Visita[]>([]);
     const [areas, setAreas] = useState<any[]>([]);
     
@@ -175,11 +181,21 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
     };
 
     const filteredVisitas = useMemo(() => {
-        return visitas.filter(v => 
-            v.nombre.toLowerCase().includes(filters.search.toLowerCase()) ||
-            v.cedula.includes(filters.search)
-        );
-    }, [visitas, filters.search]);
+        return visitas.filter(v => {
+            const matchesSearch = !filterSearch || 
+                v.nombre.toLowerCase().includes(filterSearch.toLowerCase()) ||
+                v.cedula.includes(filterSearch);
+            const matchesArea = !filterArea || String(v.area_id) === filterArea;
+            return matchesSearch && matchesArea;
+        });
+    }, [visitas, filterSearch, filterArea]);
+
+    const totalPages = limit === 0 ? 1 : Math.max(1, Math.ceil(filteredVisitas.length / limit));
+    const paginatedVisitas = useMemo(() => {
+        if (limit === 0) return filteredVisitas;
+        const start = (page - 1) * limit;
+        return filteredVisitas.slice(start, start + limit);
+    }, [filteredVisitas, page, limit]);
 
     return (
         <div className="flex flex-col bg-slate-50 p-6 md:p-8 animate-in fade-in duration-500">
@@ -477,7 +493,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {filteredVisitas.map(v => (
+                                    {paginatedVisitas.map(v => (
                                         <tr key={v.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-600">
                                                 {v.fecha_entrada ? new Date(v.fecha_entrada).toLocaleString('es-CO') : '—'}
@@ -544,6 +560,50 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Paginación */}
+                        <div className="px-8 py-4 border-t border-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/30">
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase text-slate-400">Mostrar</span>
+                                    <select 
+                                        value={limit} 
+                                        onChange={e => { setLimit(Number(e.target.value)); setPage(1); }}
+                                        className="h-8 px-2 rounded-lg bg-white border border-slate-200 text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-sm"
+                                    >
+                                        <option value={5}>5</option>
+                                        <option value={20}>20</option>
+                                        <option value={50}>50</option>
+                                        <option value={0}>TODOS</option>
+                                    </select>
+                                </div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    Total resultados: <span className="text-emerald-600">{filteredVisitas.length}</span>
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    disabled={page === 1}
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all shadow-sm"
+                                >
+                                    <Icons.ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <div className="px-4 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                                    <span className="text-[10px] font-black text-slate-600 uppercase">
+                                        Página <span className="text-emerald-600">{page}</span> de {totalPages}
+                                    </span>
+                                </div>
+                                <button 
+                                    disabled={page === totalPages || limit === 0}
+                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all shadow-sm"
+                                >
+                                    <Icons.ChevronRight className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

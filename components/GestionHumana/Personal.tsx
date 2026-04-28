@@ -49,17 +49,20 @@ const Personal: React.FC<Props> = ({ user }) => {
   const [personal, setPersonal] = useState<PersonalRecord[]>([]);
   const [encuestas, setEncuestas] = useState<EncuestaRecord[]>([]);
   const [resultados, setResultados] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  
-  // Maestros para selects
-  const [areas, setAreas] = useState<MiscRecord[]>([]);
-  const [jefes, setJefes] = useState<MiscRecord[]>([]);
-  const [cargos, setCargos] = useState<MiscRecord[]>([]);
-  const [epsList, setEpsList] = useState<MiscRecord[]>([]);
-  const [afpList, setAfpList] = useState<MiscRecord[]>([]);
-  const [estados, setEstados] = useState<{id: string, name: string}[]>([]);
   const [confirmDeactivate, setConfirmDeactivate] = useState<number | null>(null);
+  
+  // Paginación y Búsqueda
+  const [search, setSearch] = useState('');
+  const [encuestasSearch, setEncuestasSearch] = useState('');
+  
+  const [personalPage, setPersonalPage] = useState(1);
+  const [personalLimit, setPersonalLimit] = useState(20);
+  
+  const [encuestasPage, setEncuestasPage] = useState(1);
+  const [encuestasLimit, setEncuestasLimit] = useState(20);
+  
+  const [resultadosPage, setResultadosPage] = useState(1);
+  const [resultadosLimit, setResultadosLimit] = useState(20);
 
   // Filtros Consultar
   const [filterDates, setFilterDates] = useState({ from: '', to: '' });
@@ -153,6 +156,28 @@ const Personal: React.FC<Props> = ({ user }) => {
       p.cedula.includes(search)
     ), [personal, search]
   );
+
+  const filteredEncuestas = useMemo(() => 
+    encuestas.filter(e => 
+      e.cedula.includes(encuestasSearch) ||
+      (e.usuario_control || '').toLowerCase().includes(encuestasSearch.toLowerCase())
+    ), [encuestas, encuestasSearch]
+  );
+
+  // Lógica de Paginación Reutilizable
+  const paginate = (items: any[], page: number, limit: number) => {
+    if (limit === 0) return items; // TODOS
+    const start = (page - 1) * limit;
+    return items.slice(start, start + limit);
+  };
+
+  const paginatedPersonal = useMemo(() => paginate(filteredPersonal, personalPage, personalLimit), [filteredPersonal, personalPage, personalLimit]);
+  const paginatedEncuestas = useMemo(() => paginate(filteredEncuestas, encuestasPage, encuestasLimit), [filteredEncuestas, encuestasPage, encuestasLimit]);
+  const paginatedResultados = useMemo(() => paginate(resultados, resultadosPage, resultadosLimit), [resultados, resultadosPage, resultadosLimit]);
+
+  const totalPagesPersonal = Math.max(1, Math.ceil(filteredPersonal.length / personalLimit)) || 1;
+  const totalPagesEncuestas = Math.max(1, Math.ceil(filteredEncuestas.length / encuestasLimit)) || 1;
+  const totalPagesResultados = Math.max(1, Math.ceil(resultados.length / resultadosLimit)) || 1;
 
   const handleSave = async () => {
     if (!form.nombre || !form.cedula) {
@@ -285,7 +310,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     </tr>
                   </thead>
                   <tbody className="text-[11px] font-bold text-slate-600">
-                    {filteredPersonal.map(p => (
+                    {paginatedPersonal.map(p => (
                       <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3">
                           <p className="font-black text-slate-900 uppercase">{p.nombre}</p>
@@ -319,51 +344,74 @@ const Personal: React.FC<Props> = ({ user }) => {
                   </tbody>
                 </table>
               </div>
+
+              <Pagination 
+                total={filteredPersonal.length}
+                page={personalPage}
+                limit={personalLimit}
+                onPageChange={setPersonalPage}
+                onLimitChange={(l) => { setPersonalLimit(l); setPersonalPage(1); }}
+              />
             </div>
           ) : activeTab === 'encuestas' ? (
-            <div className="overflow-x-auto rounded-2xl border border-slate-100">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                    <th className="px-4 py-3">Cédula</th>
-                    <th className="px-4 py-3">Fecha Activación</th>
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3">Activado por</th>
-                    <th className="px-4 py-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="text-[11px] font-bold text-slate-600">
-                  {encuestas.map(e => (
-                    <tr key={e.id} className="border-b border-slate-50">
-                      <td className="px-4 py-3 font-black text-slate-900">{e.cedula}</td>
-                      <td className="px-4 py-3">{new Date(e.fecha_activacion).toLocaleString()}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${e.estado === 'EST-05' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : e.estado === 'EST-01' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
-                          {estados.find(est => est.id === e.estado)?.name || e.estado}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-1.5">
-                          {e.estado === 'EST-01' && (
-                            <button onClick={() => {
-                              navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
-                              toast.success('Link copiado');
-                            }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
-                              <Icons.Copy className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {e.estado === 'EST-01' && (
-                            <button onClick={() => setConfirmDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
-                              <Icons.X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+            <div className="space-y-4">
+              <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full sm:w-72 border border-slate-100">
+                <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
+                <input value={encuestasSearch} onChange={e => { setEncuestasSearch(e.target.value); setEncuestasPage(1); }} placeholder="BUSCAR POR CÉDULA O USUARIO..." className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 w-full" />
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                      <th className="px-4 py-3">Cédula</th>
+                      <th className="px-4 py-3">Fecha Activación</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3">Activado por</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="text-[11px] font-bold text-slate-600">
+                    {paginatedEncuestas.map(e => (
+                      <tr key={e.id} className="border-b border-slate-50">
+                        <td className="px-4 py-3 font-black text-slate-900">{e.cedula}</td>
+                        <td className="px-4 py-3">{new Date(e.fecha_activacion).toLocaleString()}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${e.estado === 'EST-05' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : e.estado === 'EST-01' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                            {estados.find(est => est.id === e.estado)?.name || e.estado}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-1.5">
+                            {e.estado === 'EST-01' && (
+                              <button onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
+                                toast.success('Link copiado');
+                              }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
+                                <Icons.Copy className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {e.estado === 'EST-01' && (
+                              <button onClick={() => setConfirmDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
+                                <Icons.X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination 
+                total={filteredEncuestas.length}
+                page={encuestasPage}
+                limit={encuestasLimit}
+                onPageChange={setEncuestasPage}
+                onLimitChange={(l) => { setEncuestasLimit(l); setEncuestasPage(1); }}
+              />
             </div>
           ) : activeTab === 'consultar' ? (
             <div className="space-y-4">
@@ -438,7 +486,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {resultados.map(r => (
+                    {paginatedResultados.map(r => (
                       <tr key={r.id} className="hover:bg-slate-50/50 transition-all">
                         <td className="px-4 py-4">
                           <p className="text-[11px] font-black text-slate-900 uppercase leading-none">{r.nombre}</p>
@@ -482,6 +530,14 @@ const Personal: React.FC<Props> = ({ user }) => {
                   </tbody>
                 </table>
               </div>
+
+              <Pagination 
+                total={resultados.length}
+                page={resultadosPage}
+                limit={resultadosLimit}
+                onPageChange={setResultadosPage}
+                onLimitChange={(l) => { setResultadosLimit(l); setResultadosPage(1); }}
+              />
             </div>
           ) : null}
         </div>
@@ -724,6 +780,61 @@ const Personal: React.FC<Props> = ({ user }) => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const Pagination: React.FC<{
+  total: number;
+  page: number;
+  limit: number;
+  onPageChange: (p: number) => void;
+  onLimitChange: (l: number) => void;
+}> = ({ total, page, limit, onPageChange, onLimitChange }) => {
+  const totalPages = limit === 0 ? 1 : Math.max(1, Math.ceil(total / limit));
+  
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 px-2">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-black uppercase text-slate-400">Mostrar</span>
+          <select 
+            value={limit} 
+            onChange={e => onLimitChange(Number(e.target.value))}
+            className="h-8 px-2 rounded-lg bg-slate-100 border-none text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500/20"
+          >
+            <option value={5}>5</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={0}>TODOS</option>
+          </select>
+        </div>
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+          Total: <span className="text-indigo-600">{total}</span>
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button 
+          disabled={page === 1}
+          onClick={() => onPageChange(page - 1)}
+          className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all shadow-sm"
+        >
+          <Icons.ChevronLeft className="w-4 h-4" />
+        </button>
+        <div className="px-4 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center">
+          <span className="text-[10px] font-black text-slate-600 uppercase">
+            Página <span className="text-indigo-600">{page}</span> de {totalPages}
+          </span>
+        </div>
+        <button 
+          disabled={page === totalPages || limit === 0}
+          onClick={() => onPageChange(page + 1)}
+          className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all shadow-sm"
+        >
+          <Icons.ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 };
