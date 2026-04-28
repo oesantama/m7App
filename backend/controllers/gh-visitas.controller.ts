@@ -18,11 +18,11 @@ export const getVisitas = async (req: Request, res: Response) => {
         let p = 1;
 
         if (from) {
-            query += ` AND v.fecha_entrada >= $${p++}`;
+            query += ` AND v.fecha_entrada::timestamp >= $${p++}::timestamp`;
             params.push(from);
         }
         if (to) {
-            query += ` AND v.fecha_entrada <= $${p++}`;
+            query += ` AND v.fecha_entrada::timestamp <= $${p++}::timestamp`;
             params.push(`${to} 23:59:59`);
         }
         if (search) {
@@ -31,8 +31,15 @@ export const getVisitas = async (req: Request, res: Response) => {
             p++;
         }
         if (area_id && area_id !== 'all') {
-            query += ` AND v.area_dependencia::text = $${p++}`;
+            // Buscamos coincidencia por ID (nuevo) o comparando el nombre del área (legacy)
+            query += ` 
+                AND (
+                    v.area_dependencia::text = $${p} 
+                    OR v.area_dependencia ILIKE (SELECT nombre FROM gh_areas WHERE id::text = $${p} LIMIT 1)
+                )
+            `;
             params.push(area_id);
+            p++;
         }
 
         query += ` ORDER BY v.fecha_entrada DESC`;
