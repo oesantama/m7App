@@ -41,7 +41,22 @@ export const getRoutes = async (req: Request, res: Response) => {
       LEFT JOIN vehicles v ON r.vehicle_id::text = v.id::text
       LEFT JOIN drivers d ON r.driver_id::text = d.id::text
       WHERE r.created_at >= CURRENT_DATE - INTERVAL '7 days'
-        AND r.status_id NOT IN ('EST-13', 'EST-16', 'COMPLETADO', 'FINALIZADO')
+        -- Solo excluir rutas canceladas/reasignadas; la visibilidad se basa en el estado de los ítems
+        AND r.status_id NOT IN ('EST-16', 'COMPLETADO', 'FINALIZADO')
+        -- Mostrar la ruta si tiene al menos una factura en estado activo (ASIGNADO, EN RUTA, REPICE)
+        -- o si no hay coincidencia en document_items (ruta nueva aún sin ítems actualizados)
+        AND EXISTS (
+          SELECT 1 FROM route_invoices ri
+          LEFT JOIN document_items di ON (
+            TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+            OR CONCAT(di.document_id::text, '_', COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+          )
+          WHERE ri.route_id::text = r.id::text
+            AND (
+              di.item_status IN ('EST-10','EST-11','EST-15','REPICE','ASIGNADO','EN_RUTA')
+              OR di.item_status IS NULL
+            )
+        )
 
       UNION ALL
 

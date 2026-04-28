@@ -262,6 +262,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             clearInterval(sigInterval);
         };
     }, []);
+
+    const updateMarkers = (locations: any[]) => {
         if (!mapRef.current) return;
 
         // Limpiar marcadores antiguos
