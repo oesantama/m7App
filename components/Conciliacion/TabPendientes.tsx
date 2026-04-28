@@ -250,13 +250,18 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         }
     };
 
-    const handleCloseCycle = async () => {
+    const handleCloseCycle = async (plate?: string) => {
         if (!selectedDoc) return;
-        if (!window.confirm(`¿Está seguro de cerrar administrativamente el documento ${selectedDoc.external_doc_id}? Las facturas restantes se marcarán como conciliadas.`)) return;
+        const targetDesc = plate ? `de la placa ${plate}` : `del documento ${selectedDoc.external_doc_id}`;
+        if (!window.confirm(`¿Está seguro de cerrar administrativamente las facturas ${targetDesc}? Las facturas restantes se marcarán como conciliadas.`)) return;
         
         setClosingCycle(true);
         try {
-            const res = await api.closeConciliationCycle({ documentId: selectedDoc.id, userId: user.id });
+            const res = await api.closeConciliationCycle({ 
+                documentId: selectedDoc.id, 
+                userId: user.id,
+                vehiclePlate: plate 
+            });
             toast.success(`Ciclo cerrado: ${res.closedCount} facturas conciliadas administrativamente.`);
             loadDocDetail(selectedDoc);
             onRefresh();
@@ -599,8 +604,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         const grupalRows      = groupPayments.filter(p => !p.invoice || p.invoice.trim() === '');
         const totalGrupal     = grupalRows.reduce((s, p) => s + (Number(p.valor) || 0), 0);
         
-        const approvedRows    = routeSurcharges.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02');
-        const approvedSurch   = approvedRows.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        const approvedSurch   = approvedRows.reduce((s, r) => s + (Number(r.valor) || 0), 0) + 
+                                efectivoInvoices.filter(i => (i.item_status === 'APROBADO' || i.item_status === 'EST-02')).reduce((s, i) => s + (Number(i.sobrecosto) || 0), 0);
         
         const pendingRows     = routeSurcharges.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id);
         const pendingSurch    = pendingRows.reduce((s, r) => s + (Number(r.valor) || 0), 0);
@@ -667,7 +672,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             grupalCount: grupalRows.length,
             approvedSurchCount: approvedRows.length,
             pendingSurchCount: pendingRows.length,
-            repiceCount, valorRepice
+            repiceCount, valorRepice,
+            pendiente: valorTotal - (individualLeg + totalGrupal + approvedSurch + valorDevuelto),
+            isSurplus: (valorTotal - (individualLeg + totalGrupal + approvedSurch + valorDevuelto)) < -1
         };
     }, [invoices, unassigned, groupPayments, routeSurcharges]);
 
@@ -945,10 +952,16 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
                                         <div onClick={() => setSummaryFilter('pendiente')}
                                             className={`flex flex-col px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
-                                                ${summaryFilter === 'pendiente' ? 'bg-amber-500 text-white border-amber-600 shadow-xl' : 'bg-white text-amber-600 border-amber-100 hover:border-amber-300 shadow-md'}`}>
-                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'pendiente' ? 'text-amber-100' : 'text-amber-500'}`}>Pendiente</span>
-                                            <span className="text-base font-black leading-none">{fmtCOP(Math.max(0, stats.valorTotal - (stats.valorLegalizado + stats.totalGrupal + stats.approvedSurch + stats.valorDevuelto)))}</span>
-                                            <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'pendiente' ? 'text-amber-100/70' : 'text-amber-400'}`}>{stats.total - stats.legalizadas} Por Cobrar</span>
+                                                ${summaryFilter === 'pendiente' 
+                                                    ? (stats.isSurplus ? 'bg-blue-700 text-white border-blue-800 shadow-xl' : 'bg-amber-600 text-white border-amber-700 shadow-xl')
+                                                    : (stats.isSurplus ? 'bg-blue-50 text-blue-600 border-blue-100 hover:border-blue-300 shadow-md' : 'bg-white text-amber-600 border-amber-100 hover:border-amber-300 shadow-md')}`}>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${summaryFilter === 'pendiente' ? 'text-blue-100' : (stats.isSurplus ? 'text-blue-500' : 'text-amber-500')}`}>
+                                                {stats.isSurplus ? '💎 Sobrante' : 'Pendiente'}
+                                            </span>
+                                            <span className="text-base font-black leading-none">{fmtCOP(Math.abs(stats.pendiente))}</span>
+                                            <span className={`text-[8px] font-bold mt-1 ${summaryFilter === 'pendiente' ? 'text-white/70' : (stats.isSurplus ? 'text-blue-400' : 'text-amber-400')}`}>
+                                                {stats.isSurplus ? 'Excedente' : `${stats.total - stats.legalizadas} Por Cobrar`}
+                                            </span>
                                         </div>
 
                                         <div onClick={() => setSummaryFilter('credito')}
@@ -1130,9 +1143,19 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                         <p className="text-base font-black text-slate-900 uppercase tracking-tight leading-none">
                                                                             🚛 {route.plate || 'S/P'}
                                                                         </p>
-                                                                        <p className="text-[9px] text-slate-500 font-bold mt-1">
-                                                                            👤 {route.driver_name || 'Sin conductor asignado'}
-                                                                        </p>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <p className="text-[9px] text-slate-500 font-bold">
+                                                                                👤 {route.driver_name || 'Sin conductor asignado'}
+                                                                            </p>
+                                                                            <button 
+                                                                                onClick={(e) => { e.stopPropagation(); handleCloseCycle(route.plate); }}
+                                                                                disabled={closingCycle}
+                                                                                className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[7px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-1"
+                                                                            >
+                                                                                <Icons.Lock className="w-2 h-2" />
+                                                                                Cerrar Facturación
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                     <div className="text-right shrink-0">
                                                                         <p className="text-xl font-black text-slate-900 leading-none">{route.invoice_count}</p>
@@ -1184,10 +1207,18 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                         <p className="text-[7px] font-black text-slate-500 uppercase tracking-wider mb-0.5">💳 Crédito</p>
                                                                         <p className="text-xs font-black text-slate-700">{fmtCOP(fin.valor_credito)}</p>
                                                                     </div>
-                                                                    <div className="bg-amber-500 border border-amber-600 rounded-xl px-2.5 py-2">
-                                                                        <p className="text-[7px] font-black text-amber-100 uppercase tracking-wider mb-0.5">⏳ Pendiente</p>
-                                                                        <p className="text-xs font-black text-white">{fmtCOP(Math.max(0, fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + fin.total_sobrecosto_aprobado)))}</p>
-                                                                    </div>
+                                                                    {(() => {
+                                                                        const pending = fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + fin.total_sobrecosto_aprobado);
+                                                                        const isSurplus = pending < -1;
+                                                                        return (
+                                                                            <div className={`border rounded-xl px-2.5 py-2 ${isSurplus ? 'bg-blue-600 border-blue-700' : 'bg-amber-500 border-amber-600'}`}>
+                                                                                <p className={`text-[7px] font-black uppercase tracking-wider mb-0.5 ${isSurplus ? 'text-blue-100' : 'text-amber-100'}`}>
+                                                                                    {isSurplus ? '💎 Sobrante' : '⏳ Pendiente'}
+                                                                                </p>
+                                                                                <p className="text-xs font-black text-white">{fmtCOP(Math.abs(pending))}</p>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
                                                                     {fin.valor_parcial > 0 && (
                                                                         <div className="bg-orange-50/50 border border-orange-100 rounded-xl px-2.5 py-2">
                                                                             <p className="text-[7px] font-black text-orange-600 uppercase tracking-wider mb-0.5">📦 Parcial</p>
@@ -1515,12 +1546,6 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
                             {/* Resumen financiero */}
                             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
-                                <div className="mb-2 flex items-center gap-2">
-                                    <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${legalPct}%` }} />
-                                    </div>
-                                    <span className="text-[9px] font-black text-emerald-700 shrink-0">{legalPct}% leg.</span>
-                                </div>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2">
                                     <div className="bg-white border border-slate-100 rounded-xl px-2 py-2 text-center cursor-default">
                                         <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5 leading-none">Total documento</p>
@@ -1545,10 +1570,18 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5 leading-none">Crédito</p>
                                         <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(fin.valor_credito)}</p>
                                     </div>
-                                    <div className="bg-amber-500 text-white border border-amber-600 rounded-xl px-2 py-2 text-center cursor-default shadow-md">
-                                        <p className="text-[7px] font-black text-amber-100 uppercase mb-0.5 leading-none">Pendiente</p>
-                                        <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.max(0, fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0))))}</p>
-                                    </div>
+                                    {(() => {
+                                        const pending = fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.valor_devuelto + routeSurcharges.filter(s => s.plate === detailRoute.plate && (s.status_id === 'APROBADO' || s.status_id === 'EST-02')).reduce((s, r) => s + (Number(r.valor) || 0), 0));
+                                        const isSurplus = pending < -1;
+                                        return (
+                                            <div className={`border rounded-xl px-2 py-2 text-center cursor-default shadow-md ${isSurplus ? 'bg-blue-600 border-blue-700 text-white' : 'bg-amber-500 border-amber-600 text-white'}`}>
+                                                <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${isSurplus ? 'text-blue-100' : 'text-amber-100'}`}>
+                                                    {isSurplus ? '💎 Sobrante' : '⏳ Pendiente'}
+                                                </p>
+                                                <p className="text-[11px] font-black leading-none mt-1">{fmtCOP(Math.abs(pending))}</p>
+                                            </div>
+                                        );
+                                    })()}
                                     <div className={`border rounded-xl px-2 py-2 text-center transition-all cursor-pointer ${activeDetailCard === 'dev' ? 'bg-amber-600 text-white border-amber-700 shadow-lg' : 'bg-amber-50 border-amber-100 hover:bg-amber-100'}`}
                                         onClick={() => setActiveDetailCard(activeDetailCard === 'dev' ? null : 'dev')}>
                                         <p className={`text-[7px] font-black uppercase mb-0.5 leading-none ${activeDetailCard === 'dev' ? 'text-amber-100' : 'text-amber-600'}`}>🔄 Devuelto</p>

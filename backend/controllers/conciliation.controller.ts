@@ -1046,22 +1046,39 @@ export const saveRouteGroupPayments = async (req: Request, res: Response) => {
 // --- POST /conciliation/close-cycle -------------------------------------------
 // Cierra administrativamente las facturas que faltan por conciliar
 export const closeConciliationCycle = async (req: Request, res: Response) => {
-    const { documentId, userId } = req.body;
+    const { documentId, userId, vehiclePlate } = req.body;
     const client = await pool.connect();
 
     try {
         await client.query('BEGIN');
 
         // 1. Buscar facturas del documento que NO están en invoice_conciliations
-        const pendingItemsRes = await client.query(`
+        // Si viene vehiclePlate, filtramos solo las de esa placa
+        let query = `
             SELECT di.invoice, di.item_status, di.vmetodo, di.un_code, di.metodo_pago
             FROM document_items di
             LEFT JOIN invoice_conciliations ic 
               ON ic.document_id::text = di.document_id::text 
              AND ic.invoice_number = di.invoice
+            LEFT JOIN LATERAL (
+                SELECT ri.vehicle_id, r.vehicle_id as route_v_id, v.plate
+                FROM route_invoices ri
+                JOIN routes r ON r.id::text = ri.route_id::text
+                LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+                WHERE ri.invoice_id = di.invoice OR ri.invoice_id = CONCAT($1, '_', di.invoice)
+                ORDER BY ri.id DESC LIMIT 1
+            ) plate_info ON true
             WHERE di.document_id = $1
               AND ic.id IS NULL
-        `, [documentId]);
+        `;
+        const params: any[] = [documentId];
+
+        if (vehiclePlate) {
+            query += ` AND plate_info.plate = $2 `;
+            params.push(vehiclePlate);
+        }
+
+        const pendingItemsRes = await client.query(query, params);
 
         if (pendingItemsRes.rows.length === 0) {
             await client.query('COMMIT');

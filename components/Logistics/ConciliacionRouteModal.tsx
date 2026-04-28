@@ -833,7 +833,10 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         const approvedCount = sobrecostos.filter(c => c.statusId === 'APROBADO' || c.statusId === 'EST-02').length;
         const pendingCount = sobrecostos.filter(c => c.statusId === 'PENDIENTE' || c.statusId === 'EST-01' || !c.statusId).length;
 
-        return { approved, pending, approvedCount, pendingCount };
+        // Sumar también los sobrecostos individuales de las facturas (si están aprobados)
+        const totalApproved = approved + invoices.filter(i => (i.item_status === 'APROBADO' || i.item_status === 'EST-02')).reduce((s, i) => s + (Number(i.sobrecosto) || 0), 0);
+
+        return { approved: totalApproved, pending, approvedCount, pendingCount };
     }, [sobrecostos]);
 
     const plateTotals = useMemo(() => {
@@ -889,7 +892,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         // PENDIENTE = TOTAL EF - (LEG INDIVIDUAL + LEG GRUPAL + DEVUELTO EF + SOBRECOSTO APROBADO)
         // Nota: legalizedIndividual ya contiene la parte cobrada de los parciales.
         // valorDevuelto contiene la parte NO cobrada de los parciales (si están legalizados) y el total de las devoluciones.
-        const pendingVal   = Math.max(0, totalValue - (legalizedIndividual + legalizedGrupal + surchargeStats.approved + valorDevuelto));
+        const pendingVal   = totalValue - (legalizedIndividual + legalizedGrupal + surchargeStats.approved + valorDevuelto);
         
         return { 
             totalValue, 
@@ -1004,12 +1007,23 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 <p className="text-[7px] font-black text-blue-600 uppercase tracking-widest mb-1 text-center">Total Leg.</p>
                                 <p className="text-[11px] font-black text-blue-800 leading-none text-center">{fmtCOP(plateTotals.legalizedVal)}</p>
                             </div>
-                            <div onClick={() => { setHeaderFilter(headerFilter === 'pendiente' ? null : 'pendiente'); setTab('individual'); }}
-                                className={`rounded-2xl px-3 py-2 shadow-lg border cursor-pointer transition-all ${headerFilter === 'pendiente' ? 'bg-amber-600 text-white border-amber-700 shadow-amber-500/40' : 'bg-amber-500 text-white border-amber-600 shadow-amber-500/20'}`}>
-                                <p className={`text-[7px] font-black uppercase tracking-widest mb-1 text-center ${headerFilter === 'pendiente' ? 'text-amber-100' : 'text-amber-100'}`}>Pendiente</p>
-                                <p className="text-[11px] font-black leading-none text-center">{fmtCOP(plateTotals.pendingVal)}</p>
-                                <p className={`text-[6px] font-bold mt-1 text-center ${headerFilter === 'pendiente' ? 'text-amber-100/70' : 'text-amber-100/60'}`}>Falta Cobrar</p>
-                            </div>
+                            {(() => {
+                                const isSurplus = plateTotals.pendingVal < -1;
+                                return (
+                                    <div onClick={() => { setHeaderFilter(headerFilter === 'pendiente' ? null : 'pendiente'); setTab('individual'); }}
+                                        className={`rounded-2xl px-3 py-2 shadow-lg border cursor-pointer transition-all ${isSurplus 
+                                            ? (headerFilter === 'pendiente' ? 'bg-blue-700 text-white border-blue-800' : 'bg-blue-600 text-white border-blue-700 shadow-blue-500/40')
+                                            : (headerFilter === 'pendiente' ? 'bg-amber-600 text-white border-amber-700 shadow-amber-500/40' : 'bg-amber-500 text-white border-amber-600 shadow-amber-500/20')}`}>
+                                        <p className={`text-[7px] font-black uppercase tracking-widest mb-1 text-center ${isSurplus ? 'text-blue-100' : 'text-amber-100'}`}>
+                                            {isSurplus ? '💎 Sobrante' : 'Pendiente'}
+                                        </p>
+                                        <p className="text-[11px] font-black leading-none text-center">{fmtCOP(Math.abs(plateTotals.pendingVal))}</p>
+                                        <p className={`text-[6px] font-bold mt-1 text-center ${isSurplus ? 'text-blue-100/70' : 'text-amber-100/70'}`}>
+                                            {isSurplus ? 'Excedente' : 'Falta Cobrar'}
+                                        </p>
+                                    </div>
+                                );
+                            })()}
                             {plateTotals.valorDevuelto > 0 && (
                                 <div onClick={() => { setHeaderFilter(headerFilter === 'devolucion' ? null : 'devolucion'); setTab('individual'); }}
                                     className={`rounded-2xl px-3 py-2 shadow-lg border cursor-pointer transition-all ${headerFilter === 'devolucion' ? 'bg-orange-600 text-white border-orange-700 shadow-orange-500/40' : 'bg-white border-orange-100/50 shadow-orange-500/10'}`}>
