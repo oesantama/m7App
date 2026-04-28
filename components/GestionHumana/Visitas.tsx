@@ -2,7 +2,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
-import { fmtDate, fmtTime } from '../../utils/formatters';
+import { formatDate } from '../../utils/formatting';
+
+const fmtDate = (d: string | undefined) => {
+    if (!d) return '—';
+    const date = new Date(d);
+    return date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+const fmtTime = (d: string | undefined) => {
+    if (!d) return '—';
+    const date = new Date(d);
+    return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+};
 
 interface Visita {
     id?: number;
