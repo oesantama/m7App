@@ -101,12 +101,18 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
         
         setIsLoading(true);
         try {
+            let combinedSalida = null;
+            if (form.hora_salida) {
+                // Tomar la fecha de entrada y ponerle la hora de salida especificada
+                const datePart = form.fecha_entrada.split('T')[0];
+                combinedSalida = `${datePart}T${form.hora_salida}:00`;
+            }
+
             const payload = {
                 ...form,
                 registrado_por_id: user.id,
                 registrado_por_nombre: user.name,
-                // Si se especificó hora de salida manual, usarla; de lo contrario null
-                hora_salida: form.hora_salida ? new Date(form.hora_salida).toISOString() : null
+                hora_salida: combinedSalida
             };
             await api.saveVisita(payload);
             toast.success('Visita registrada exitosamente');
@@ -221,13 +227,14 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Fecha y Hora de Salida (Opcional)</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Hora de Salida (Opcional)</label>
                                 <input 
-                                    type="datetime-local" 
+                                    type="time" 
                                     value={form.hora_salida}
                                     onChange={e => setForm({...form, hora_salida: e.target.value})}
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-slate-900 transition-all"
                                 />
+                                <p className="mt-1 text-[8px] font-bold text-slate-400 uppercase ml-1">Solo si la visita ya concluyó</p>
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Contacto de Emergencia</label>
