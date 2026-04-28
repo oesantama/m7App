@@ -73,7 +73,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
 
     const fetchAreas = async () => {
         try {
-            const res = await api.getGhMiscelaneos('gh_areas');
+            const res = await api.getGhMiscelaneos('areas');
             setAreas(res || []);
         } catch (error) {
             console.error('Error fetching areas:', error);
