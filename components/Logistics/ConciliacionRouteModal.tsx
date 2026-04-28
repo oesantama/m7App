@@ -169,7 +169,7 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
         metodo:           (inv.forma_pago as MetodoPago) || 'TRANSFERENCIA',
         fecha:            inv.fecha_pago
                             ? inv.fecha_pago.slice(0, 10)
-                            : new Date().toISOString().slice(0, 10),
+                            : getYesterday(),
         saving:           false,
         statusUnlocked:   false,
         items:            (inv.items || []).map(it => ({ ...it, returned_qty: it.returned_qty || 0 })),
@@ -308,7 +308,15 @@ const LegalizationDialog: React.FC<{
 
     const totalQtyItems = form.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
     const unitPrice     = totalQtyItems > 0 ? (invoiceVal / totalQtyItems) : 0;
-    const returnedVal   = form.items.reduce((s, it) => s + (it.returned_value ?? (Number(it.returned_qty || 0) * unitPrice)), 0);
+    
+    // M7 FIX: Usar lógica explícita para priorizar manual sobre prorrateo (incluyendo el 0)
+    const returnedVal   = form.items.reduce((s, it) => {
+        const val = (it.returned_value !== undefined) 
+            ? Number(it.returned_value) 
+            : (Number(it.returned_qty || 0) * unitPrice);
+        return s + val;
+    }, 0);
+
     const expectedVal   = form.estadoEntrega === 'parcial' ? (invoiceVal - returnedVal) : (form.estadoEntrega === 'repice' || form.estadoEntrega === 'devolucion' ? 0 : invoiceVal);
     const diff          = expectedVal - (Number(form.valor) || 0);
 
@@ -353,10 +361,10 @@ const LegalizationDialog: React.FC<{
                             </div>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
-                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!canEdit || !currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)), fecha: new Date().toISOString().slice(0, 10) })} />
+                            <EstadoPill value="entregado"  active={form.estadoEntrega} label="Entregado"  icon="✅" disabled={!canEdit || !currentAllowed.has('entregado')}  onClick={() => onUpdate({ estadoEntrega: 'entregado',  valor: String(Math.round(invoiceVal)), fecha: getYesterday() })} />
                             <EstadoPill value="parcial"    active={form.estadoEntrega} label="Parcial"    icon="📦" disabled={!canEdit || !currentAllowed.has('parcial')}    onClick={() => onUpdate({ estadoEntrega: 'parcial', fecha: getYesterday() })} />
-                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={!canEdit || !currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: '0', fecha: new Date().toISOString().slice(0, 10) })} />
-                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!canEdit || !currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0', fecha: new Date().toISOString().slice(0, 10) })} />
+                            <EstadoPill value="repice"     active={form.estadoEntrega} label="REPICE"     icon="📋" disabled={!canEdit || !currentAllowed.has('repice')}     onClick={() => onUpdate({ estadoEntrega: 'repice',    valor: '0', fecha: getYesterday() })} />
+                            <EstadoPill value="devolucion" active={form.estadoEntrega} label="Devolución" icon="🔄" disabled={!canEdit || !currentAllowed.has('devolucion')} onClick={() => onUpdate({ estadoEntrega: 'devolucion', valor: '0', fecha: getYesterday() })} />
                         </div>
                     </div>
 
@@ -1038,18 +1046,25 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 estadoEntrega:  form.estadoEntrega,
                 valorFactura:   invoiceVal || undefined,
                 itemsReturned:  (form.estadoEntrega === 'parcial' || form.estadoEntrega === 'devolucion')
-                                ? form.items.map(it => {
-                                    const qty = form.estadoEntrega === 'devolucion' ? it.qty : it.returned_qty;
-                                    // Calculamos el valor final (manual o proporcional) para que quede fijo en la DB
-                                    const val = it.returned_value ?? (Number(qty || 0) * unitPrice);
-                                    return {
-                                        ...it,
-                                        returned_qty: qty,
-                                        returned_value: Math.round(Number(val))
-                                    };
-                                  }).filter(it => (Number(it.returned_qty) || 0) > 0)
+                                ? (() => {
+                                    const totalItemsQty = form.items.reduce((s, x) => s + (Number(x.qty) || 0), 0);
+                                    const uPrice = totalItemsQty > 0 ? (invoiceVal / totalItemsQty) : 0;
+
+                                    return form.items.map(it => {
+                                        const qty = form.estadoEntrega === 'devolucion' ? it.qty : it.returned_qty;
+                                        const val = (it.returned_value !== undefined) 
+                                            ? Number(it.returned_value) 
+                                            : (Number(qty || 0) * uPrice);
+                                            
+                                        return {
+                                            ...it,
+                                            returned_qty: qty,
+                                            returned_value: Math.round(Number(val))
+                                        };
+                                    }).filter(it => (Number(it.returned_qty) || 0) > 0);
+                                })()
                                 : [],
-                targetRouteId:  form.targetRouteId, // Enviamos el destino de reasignación
+                targetRouteId:  form.targetRouteId,
             });
             toast.success(`✅ ${inv.invoice_number} legalizada`);
             updateForm(inv.invoice_number, { saving: false });
