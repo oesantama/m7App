@@ -227,8 +227,9 @@ const ItemRow: React.FC<{
 
     // Sincronizar si cambia desde afuera (ej: al resetear el formulario)
     useEffect(() => {
+        const currentVal = it.returned_value !== undefined ? it.returned_value : devVal;
         setLocalQty(String(it.returned_qty || 0));
-        setLocalVal(String(Math.round(it.returned_value ?? devVal)));
+        setLocalVal(String(Math.round(currentVal)));
     }, [it.returned_qty, it.returned_value, devVal]);
 
     const handleQtyChange = (val: string) => {
@@ -264,22 +265,24 @@ const ItemRow: React.FC<{
                 {form.estadoEntrega === 'parcial' ? (
                     <div className="flex flex-col items-end gap-1">
                         {!canEdit ? (
-                            <span className="font-black text-rose-500">{fmtCOP(it.returned_value ?? devVal)}</span>
-                        ) : (
-                            <div className="relative group/val">
-                                <span className="absolute -left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-300">$</span>
-                                <input type="number" 
-                                    value={localVal}
-                                    onChange={e => handleValChange(e.target.value)}
-                                    className="w-24 text-right bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 font-black text-rose-600 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-50 transition-all" />
-                            </div>
-                        )}
-                        <span className="text-[7px] font-bold text-slate-400 uppercase">Manual</span>
-                    </div>
-                ) : (
-                    <span className="text-emerald-600">Completo</span>
-                )}
-            </td>
+                        <span className="font-black text-rose-500">{fmtCOP(it.returned_value !== undefined ? it.returned_value : devVal)}</span>
+                    ) : (
+                        <div className="relative group/val">
+                            <span className="absolute -left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-300">$</span>
+                            <input type="number" 
+                                value={localVal}
+                                onChange={e => handleValChange(e.target.value)}
+                                className="w-24 text-right bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 font-black text-rose-600 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-50 transition-all" />
+                        </div>
+                    )}
+                    {it.returned_value !== undefined && (
+                        <span className="text-[7px] font-black text-amber-500 uppercase animate-pulse">✨ Manual</span>
+                    )}
+                </div>
+            ) : (
+                <span className="text-emerald-600">Completo</span>
+            )}
+        </td>
         </tr>
     );
 };
@@ -747,7 +750,8 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             const cur  = next.get(invoiceNum);
             if (cur) {
                 const nextItems = cur.items.map(it => {
-                    if (it.id === itemId) {
+                    // M7 FIX: Comparación flexible de IDs (String) para evitar fallos de tipo
+                    if (String(it.id) === String(itemId)) {
                         return { 
                             ...it, 
                             returned_qty: returnedQty,
