@@ -456,6 +456,11 @@ const healSchema = async (client: any) => {
       ON inventario_clientes (client_id, article_id, batch)
     `);
 
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_vehicle_locations_latest 
+      ON vehicle_locations (vehicle_id, updated_at DESC)
+    `);
+
     console.log('[M7-DB-IQ] Configurando restricciones de Aprendizaje Granular...');
     await client.query(`
       DROP INDEX IF EXISTS unq_routing_patterns_city_veh;
