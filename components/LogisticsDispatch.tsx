@@ -1269,41 +1269,56 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     }, [filteredRoutes, vehicleLocations]);
 
     // LOGICA DE NEGOCIO PARA DESPACHO (MOVIDA ANTES DEL RETURN)
-    const handleBarcodeScan = async (barcode: string) => {
+    const handleBarcodeScan = async (rawBarcode: string) => {
         if (!assigningInvoice) return;
-        const barcodeClean = cleanSkuM7(barcode);
         
-        // Buscar el ítem por SKU o Barcode de forma robusta
+        let sku = '';
+        let multiplier = 1;
+
+        // === LOGICA DE DESCOMPOSICIÓN INTELIGENTE (Ñ / PDF417) ===
+        if (rawBarcode.includes('Ñ')) {
+            const parts = rawBarcode.split('Ñ').map(p => p.trim());
+            sku = parts[0]; // Generalmente el SKU es la primera parte
+            // Intentamos detectar si la parte 2 o 3 es una cantidad numérica (ej. D702401LÑCJÑ10...)
+            const possibleQty = parts.find(p => !isNaN(Number(p)) && p.length > 0 && p.length <= 4);
+            multiplier = possibleQty ? Number(possibleQty) : 1;
+            
+            toast.info(`Detección Compuesta: ${sku} (Cant: ${multiplier})`, {
+                icon: '📦',
+                style: { background: '#0f172a', color: '#10b981', border: '1px solid #1e293b' }
+            });
+        } else {
+            sku = cleanSkuM7(rawBarcode);
+            const multInput = document.getElementById('m7-dispatch-multiplier') as HTMLInputElement;
+            multiplier = multInput ? (Number(multInput.value) || 1) : 1;
+        }
+
+        // Buscar el ítem por SKU o Barcode
         const item = (assigningInvoice.items || []).find((it: any) => 
-            String(it.sku || '').trim().toUpperCase() === barcodeClean || 
-            String(it.barcode || '').trim().toUpperCase() === barcodeClean
+            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() || 
+            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase() ||
+            String(it.articleId || '').trim().toUpperCase() === sku.toUpperCase()
         );
 
         if (!item) {
-            toast.error(`Artículo no encontrado: ${barcode}`);
+            toast.error(`Artículo no encontrado: ${sku}`);
             return;
         }
 
-        const sku = item.sku;
-        const currentCount = scannedItems[sku] || 0;
-        
-        // Detectar cantidad esperada con fallback robusto
+        const itemSku = item.sku || item.articleId;
+        const currentCount = scannedItems[itemSku] || 0;
         const expected = Number(item.qty || item.expectedQty || item.quantity || 0);
 
         if (currentCount >= expected) {
-            toast.error(`BLOQUEO: Ya se cumplió la cantidad máxima para ${item.articleName || sku} (${currentCount}/${expected})`, {
+            toast.error(`BLOQUEO: Cantidad máxima alcanzada para ${item.articleName || itemSku}`, {
                 style: { background: '#ef4444', color: '#fff' }
             });
             return;
         }
 
-        // Obtener el multiplicador desde el DOM (para evitar problemas de estado en escaneo rápido)
-        const multInput = document.getElementById('m7-dispatch-multiplier') as HTMLInputElement;
-        const multiplier = multInput ? (Number(multInput.value) || 1) : 1;
-
         const newScanned = {
             ...scannedItems,
-            [sku]: Math.min(expected, currentCount + multiplier)
+            [itemSku]: Math.min(expected, currentCount + multiplier)
         };
 
         setScannedItems(newScanned);
