@@ -1363,9 +1363,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             return;
         }
 
+        const itemSku = item.sku || item.articleId;
         let multiplier = 1;
 
-        // PRIORIDAD: Revisar qué unidad eligió el usuario para este artículo específico en la tabla
+        // PRIORIDAD: Revisar qué modo eligió el usuario para este artículo específico
         const preferredMode = itemPickingModes[itemSku] || 'UND';
 
         if (preferredMode === 'CAJA') {
@@ -1373,7 +1374,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         } else if (preferredMode === 'STD') {
             multiplier = Number(item.factorStd) || 1;
         } 
-        // Si está en modo unidad, pero el código trae una Ñ con cantidad, respetamos la Ñ
         else if (rawBarcode.includes('Ñ')) {
             const parts = rawBarcode.split('Ñ').map(p => p.trim());
             const possibleQty = parts.slice(1).find(p => !isNaN(Number(p)) && p.length > 0 && p.length <= 4);

@@ -148,39 +148,30 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                                 </div>
                                             </div>
 
-                                            {/* BOTONES DE DECISIÓN POR ARTÍCULO (DEFINEN EL MODO DE PIQUEO) */}
+                                            {/* SELECCIÓN DE MODO DE PIQUEO (DEFINE CÓMO SUMA AL PISTOLEAR) */}
                                             {!isDone && (
                                                 <div className="flex flex-row items-center gap-2 pt-3 border-t border-slate-100">
                                                     <button 
-                                                        onClick={() => {
-                                                            onAddQty(item.sku, 1);
-                                                            setItemPickingModes({...itemPickingModes, [item.sku]: 'UND'});
-                                                        }}
-                                                        className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm flex flex-col items-center leading-none gap-1 ${(!itemPickingModes[item.sku] || itemPickingModes[item.sku] === 'UND') ? 'bg-slate-900 text-white ring-2 ring-slate-900 ring-offset-2' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>
-                                                        <span>+1</span>
-                                                        <span className="text-[7px] opacity-70">{item.unit || 'UND'}</span>
+                                                        onClick={() => setItemPickingModes({...itemPickingModes, [item.sku]: 'UND'})}
+                                                        className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm flex flex-col items-center leading-none gap-1 ${(!itemPickingModes[item.sku] || itemPickingModes[item.sku] === 'UND') ? 'bg-slate-900 text-white ring-2 ring-slate-900 ring-offset-2' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 border border-slate-200'}`}>
+                                                        <span className="text-[11px]">x1</span>
+                                                        <span className="text-[7px] opacity-70">{item.unit || 'UNIDAD'}</span>
                                                     </button>
                                                     
                                                     {Number(item.factorInter || 0) > 1 && (
                                                         <button 
-                                                            onClick={() => {
-                                                                onAddQty(item.sku, Number(item.factorInter));
-                                                                setItemPickingModes({...itemPickingModes, [item.sku]: 'CAJA'});
-                                                            }}
-                                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-md flex flex-col items-center leading-none gap-1 ${itemPickingModes[item.sku] === 'CAJA' ? 'bg-indigo-600 text-white ring-2 ring-indigo-600 ring-offset-2' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100'}`}>
-                                                            <span>+{item.factorInter}</span>
+                                                            onClick={() => setItemPickingModes({...itemPickingModes, [item.sku]: 'CAJA'})}
+                                                            className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-md flex flex-col items-center leading-none gap-1 ${itemPickingModes[item.sku] === 'CAJA' ? 'bg-indigo-600 text-white ring-2 ring-indigo-600 ring-offset-2' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 border border-indigo-100'}`}>
+                                                            <span className="text-[11px]">x{item.factorInter}</span>
                                                             <span className="text-[7px] opacity-70">{item.uomInterName || 'CAJA'}</span>
                                                         </button>
                                                     )}
 
                                                     {Number(item.factorStd || 0) > 1 && Number(item.factorStd) !== Number(item.factorInter) && (
                                                         <button 
-                                                            onClick={() => {
-                                                                onAddQty(item.sku, Number(item.factorStd));
-                                                                setItemPickingModes({...itemPickingModes, [item.sku]: 'STD'});
-                                                            }}
-                                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-md flex flex-col items-center leading-none gap-1 ${itemPickingModes[item.sku] === 'STD' ? 'bg-amber-500 text-white ring-2 ring-amber-500 ring-offset-2' : 'bg-amber-50 text-amber-400 hover:bg-amber-100'}`}>
-                                                            <span>+{item.factorStd}</span>
+                                                            onClick={() => setItemPickingModes({...itemPickingModes, [item.sku]: 'STD'})}
+                                                            className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-md flex flex-col items-center leading-none gap-1 ${itemPickingModes[item.sku] === 'STD' ? 'bg-amber-500 text-white ring-2 ring-amber-500 ring-offset-2' : 'bg-amber-50 text-amber-400 hover:bg-amber-100 border border-amber-100'}`}>
+                                                            <span className="text-[11px]">x{item.factorStd}</span>
                                                             <span className="text-[7px] opacity-70">{item.uomStdName || 'STD'}</span>
                                                         </button>
                                                     )}

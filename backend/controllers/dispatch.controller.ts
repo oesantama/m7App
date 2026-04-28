@@ -537,12 +537,17 @@ export const confirmDelivery = async (req: Request, res: Response) => {
             if (routeRes.rows.length > 0) {
                 const routeId = routeRes.rows[0].route_id;
                 // Contar facturas de la ruta que NO están en estado final
+                // LEFT JOIN para no excluir route_invoices sin match en document_items
+                // (match fallido haría count=0 y auto-completaría la ruta incorrectamente)
                 const pendingInRoute = await pool.query(`
                     SELECT COUNT(*) FROM route_invoices ri
-                    JOIN document_items di ON TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
-                        OR CONCAT(di.document_id, '_', COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+                    LEFT JOIN document_items di ON (
+                        TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+                        OR CONCAT(di.document_id::text, '_', COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+                    )
                     WHERE ri.route_id = $1
-                      AND di.item_status NOT IN ('EST-12','EST-13','EST-14','EST-15','EST-16','EST-17')
+                      AND (di.item_status IS NULL
+                           OR di.item_status NOT IN ('EST-12','EST-13','EST-14','EST-15','EST-16','EST-17'))
                 `, [routeId]);
 
                 if (parseInt(pendingInRoute.rows[0].count) === 0) {
