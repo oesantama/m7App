@@ -603,7 +603,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         // Recaudos adicionales: Solo contamos los que NO tienen factura asociada (los que son realmente grupales)
         const grupalRows      = groupPayments.filter(p => !p.invoice || p.invoice.trim() === '');
         const totalGrupal     = grupalRows.reduce((s, p) => s + (Number(p.valor) || 0), 0);
-        
+
+        // FILTRO CRÍTICO: 'EF' -> TOTAL DOCUMENTO, '030D' -> TOTAL CREDITO
+        const efectivoInvoices = invoices.filter(i => {
+            const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+            return m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '';
+        });
+
+        const approvedRows    = routeSurcharges.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02');
         const approvedSurch   = approvedRows.reduce((s, r) => s + (Number(r.valor) || 0), 0) + 
                                 efectivoInvoices.filter(i => (i.item_status === 'APROBADO' || i.item_status === 'EST-02')).reduce((s, i) => s + (Number(i.sobrecosto) || 0), 0);
         
