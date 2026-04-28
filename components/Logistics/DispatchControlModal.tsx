@@ -26,6 +26,7 @@ interface DispatchControlModalProps {
     setShowPasswordMap: (map: Record<string, boolean>) => void;
     isValidating: boolean;
     handleConfirmDispatch: () => void;
+    onAddQty: (sku: string, qty: number) => void;
 }
 
 const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
@@ -153,17 +154,44 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                     const isDone = scanned >= expected;
                                     
                                     return (
-                                        <div key={i} className={`p-4 rounded-2xl border transition-all flex justify-between items-center ${isDone ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100 opacity-80'}`}>
-                                            <div>
-                                                <p className="text-sm font-black text-slate-900">{item.articleName || 'Artículo'}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku}</p>
+                                        <div key={i} className={`p-4 rounded-3xl border transition-all flex flex-col gap-3 ${isDone ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 shadow-sm'}`}>
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-black text-slate-900 leading-tight">{item.articleName || 'Artículo'}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">SKU: {item.sku}</p>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <p className={`text-xl font-black leading-none ${isDone ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                                        {scanned} <span className="text-[10px] text-slate-300">/</span> {expected}
+                                                    </p>
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mt-1">{item.unit || 'UND'}</p>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className={`text-xl font-black ${isDone ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                                    {scanned} / {expected}
-                                                </p>
-                                                <p className="text-[8px] font-bold text-slate-400 uppercase">{item.unit || 'UND'}</p>
-                                            </div>
+
+                                            {/* BOTONES DE ACCIÓN RÁPIDA POR ARTÍCULO */}
+                                            {!isDone && (
+                                                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-50">
+                                                    <button 
+                                                        onClick={() => onAddQty(item.sku, 1)}
+                                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[9px] font-black uppercase transition-all">
+                                                        +1 {item.unit || 'UND'}
+                                                    </button>
+                                                    {item.factorInter > 1 && (
+                                                        <button 
+                                                            onClick={() => onAddQty(item.sku, item.factorInter)}
+                                                            className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-xl text-[9px] font-black uppercase transition-all">
+                                                            +{item.factorInter} {item.uomInterName || 'CAJA'}
+                                                        </button>
+                                                    )}
+                                                    {item.factorStd > 1 && item.factorStd !== item.factorInter && (
+                                                        <button 
+                                                            onClick={() => onAddQty(item.sku, item.factorStd)}
+                                                            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-100 rounded-xl text-[9px] font-black uppercase transition-all">
+                                                            +{item.factorStd} {item.uomStdName || 'STD'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -248,12 +276,10 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                             <div className="flex bg-white/10 p-1 rounded-lg">
                                                 <button
                                                     onClick={() => setSignNowMap({...signNowMap, [user.id]: true})}
-                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] !== false ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20' : 'text-slate-400'}`}
-                                                >AHORA</button>
+                                                    className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all ${signNowMap[user.id] ? 'bg-emerald-500 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}>AHORA</button>
                                                 <button
                                                     onClick={() => setSignNowMap({...signNowMap, [user.id]: false})}
-                                                    className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[user.id] === false ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400'}`}
-                                                >DESPUÉS</button>
+                                                    className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all ${!signNowMap[user.id] ? 'bg-rose-500 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}>DESPUES</button>
                                             </div>
                                         </div>
                                         {signNowMap[user.id] !== false ? (
