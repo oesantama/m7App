@@ -289,8 +289,14 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                               AND dr.status <> 'CANCELLED'
                         ),
                         0
+                    ),
+                    'returned_value', (
+                        SELECT (elem->>'returned_value')::numeric
+                        FROM jsonb_array_elements(COALESCE(ic.items_returned, '[]')::jsonb) AS elem
+                        WHERE elem->>'id' = di2.id::text
+                        LIMIT 1
                     )
-                 )) FROM document_items di2 
+                 )) FROM document_items di2
                     LEFT JOIN articles a ON a.id = di2.article_id
                     WHERE di2.document_id = $1 AND di2.invoice = di.invoice
                 ) AS items`;
