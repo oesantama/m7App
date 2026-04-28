@@ -187,12 +187,18 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'return_reason',        // motivo de devolución
     'notes',                // observaciones
     'created_at'
+  ],
+  'gh_visitas': [
+    'fecha_entrada', 'nombre', 'cedula', 'area_dependencia', 'cuenta_arl', 'cuenta_eps',
+    'contacto_emergencia', 'acuerdo_requisitos', 'contiene_equipos', 'marca_dispositivo',
+    'numero_serie', 'hora_salida', 'registrado_por_id', 'registrado_por_nombre',
+    'fecha_registro', 'status_id'
   ]
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades', 'gh_visitas'];
   
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
@@ -736,6 +742,7 @@ export const restoreSystem = async () => {
       -- Gestión Humana (MOD-09)
       ('PAG-41', 'MISCELÁNEOS', 'gestion-humana-miscelaneos', 'MOD-09', 'MOD-09', 'EST-01'),
       ('PAG-43', 'PERSONAL', 'gestion-humana-personal', 'MOD-09', 'MOD-09', 'EST-01'),
+      ('PAG-44', 'REGISTRO DE VISITAS', 'gestion-humana-visitas', 'MOD-09', 'MOD-09', 'EST-01'),
 
       -- Configuración Maestros extra (MOD-01)
       ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01')

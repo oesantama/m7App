@@ -619,12 +619,6 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         
         const totalExtra      = totalGrupal + approvedSurch;
 
-        // FILTRO CRÍTICO: 'EF' -> TOTAL DOCUMENTO, '030D' -> TOTAL CREDITO
-        const efectivoInvoices = invoices.filter(i => {
-            const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
-            return m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '';
-        });
-
         const valorTotal      = efectivoInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0);
         const valorDevuelto   = efectivoInvoices.reduce((s, i) => {
             const status = (i.item_status || '').toUpperCase();

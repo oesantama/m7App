@@ -441,6 +441,17 @@ export const api = {
     body: JSON.stringify(data),
   }),
 
+  // Gestión Humana — Registro de Visitas
+  getVisitas: (params?: { from?: string, to?: string, search?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
+    return fetchJson(`${API_URL}/gh-visitas${qs}`);
+  },
+  saveVisita: (data: any) => fetchJson(`${API_URL}/gh-visitas`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  marcarSalidaVisita: (id: number | string) => fetchJson(`${API_URL}/gh-visitas/${id}/salida`, { method: 'PATCH' }),
+
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
   saveMarca: (data: any) => fetchJson(`${API_URL}/marcas`, {

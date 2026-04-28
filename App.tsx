@@ -66,6 +66,7 @@ const ConsultaInventario = lazyWithRetry(() => import('./components/ConsultaInve
 const SalidaProveedor = lazyWithRetry(() => import('./components/SalidaProveedor'));
 const GestionHumanaMiscelaneos = lazyWithRetry(() => import('./components/GestionHumana/Miscelaneos'));
 const GestionHumanaPersonal = lazyWithRetry(() => import('./components/GestionHumana/Personal'));
+const GestionHumanaVisitas = lazyWithRetry(() => import('./components/GestionHumana/Visitas'));
 const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/PublicSurvey'));
 const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/PublicTraining'));
 const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
@@ -953,6 +954,8 @@ const App: React.FC = () => {
         return <GestionHumanaMiscelaneos user={user!} />;
       case 'gestion-humana-personal':
         return <GestionHumanaPersonal user={user!} />;
+      case 'gestion-humana-visitas':
+        return <GestionHumanaVisitas user={user!} />;
       case 'cfg-ciudades':
         return <CfgCiudades user={user!} />;
       default:

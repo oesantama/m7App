@@ -46,6 +46,7 @@ import inventoryRoutes from './inventory.routes.js';
 import ghMiscelaneosRoutes from './gh-miscelaneos.routes.js';
 import ghPersonalRoutes from './gh-personal.routes.js';
 import cfgCiudadesRoutes from './cfg-ciudades.routes.js';
+import ghVisitasRoutes from './gh-visitas.routes.js';
 
 
 
@@ -97,6 +98,7 @@ router.use('/inventory', inventoryRoutes);
 router.use('/gh-miscelaneos', ghMiscelaneosRoutes);
 router.use('/gh-personal', ghPersonalRoutes);
 router.use('/cfg-ciudades', cfgCiudadesRoutes);
+router.use('/gh-visitas', ghVisitasRoutes);
 
 export default router;
 
