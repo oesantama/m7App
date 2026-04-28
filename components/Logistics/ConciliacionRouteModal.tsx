@@ -710,12 +710,13 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 id: String(p.id),
                 valor: p.valor ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Math.floor(Number(p.valor) || 0)) : '',
                 nroAprobacion: p.nroAprobacion || '',
-                fecha: p.fecha ? new Date(p.fecha).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                // M7 FIX: Usar slice(0,10) pero asegurar que si no hay fecha, use getYesterday
+                fecha: p.fecha ? (typeof p.fecha === 'string' ? p.fecha.slice(0, 10) : new Date(p.fecha).toISOString().slice(0, 10)) : getYesterday(),
                 observacion: p.observacion || '',
                 metodo: p.metodo as MetodoPago || 'CONSIGNACION'
             })));
         } else {
-            setConsignaciones([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), observacion: '', metodo: 'CONSIGNACION' }]);
+            setConsignaciones([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION' }]);
         }
 
         // Cargar sobrecostos previos si existen
@@ -800,20 +801,28 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
         setSavingGrupal(true);
         try {
-            await api.saveRouteGroupPayments({
-                documentId,
-                plate: route.plate,
-                payments: consignaciones.filter(c => Number(String(c.valor).replace(/\D/g, '')) > 0).map(c => ({
-                    id: c.id,
+            // M7 FIX: Asegurar que enviamos todos los datos, incluso los que tienen ID numérico (actualizaciones)
+            const payload = consignaciones
+                .filter(c => {
+                    const rawVal = String(c.valor || '').replace(/\D/g, '');
+                    return rawVal !== '' && Number(rawVal) > 0;
+                })
+                .map(c => ({
+                    id: String(c.id).startsWith('temp-') ? undefined : c.id,
                     valor: Math.floor(Number(String(c.valor).replace(/\D/g, '')) || 0),
                     referencia: c.nroAprobacion,
                     fecha: c.fecha,
                     metodo: c.metodo || 'CONSIGNACION',
                     observacion: c.observacion
-                })),
+                }));
+
+            await api.saveRouteGroupPayments({
+                documentId,
+                plate: route.plate,
+                payments: payload,
                 userId: currentUserId
             });
-            toast.success('✅ Pagos de ruta registrados correctamente');
+            toast.success('✅ Pagos de ruta actualizados correctamente');
             onSaved();
         } catch (err: any) {
             toast.error(err.message || 'Error al guardar consignación grupal');
