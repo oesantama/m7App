@@ -1118,6 +1118,26 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                             <div className="flex items-center gap-2 mt-0.5">
                                                 <span className="text-[9px] font-bold text-slate-600">Factura: {fmtCOP(invoiceVal)}</span>
                                                 {isLegalized && <span className="text-[9px] font-black text-emerald-600">Recaudado: {fmtCOP(inv.valor)}</span>}
+                                                {(() => {
+                                                    const status = (inv.item_status || '').toUpperCase();
+                                                    const isDev = inv.es_devolucion || DEVUELTO_STATUS.includes(status);
+                                                    const isPar = PARCIAL_STATUS.includes(status);
+                                                    if (!isDev && !isPar) return null;
+                                                    
+                                                    const vDevol = (() => {
+                                                        if (isDev) return invoiceVal;
+                                                        const totalQtyItems = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
+                                                        const unitPrice     = invoiceVal / (totalQtyItems || 1);
+                                                        const itemsDevVal   = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                                                        if (itemsDevVal > 0) return itemsDevVal;
+                                                        if (isLegalized) return Math.max(0, invoiceVal - (Number(inv.valor) || 0));
+                                                        return 0;
+                                                    })();
+
+                                                    return vDevol > 0 && (
+                                                        <span className="text-[9px] font-black text-amber-600">Devuelto: {fmtCOP(vDevol)}</span>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                         <button onClick={() => setActiveDialog(inv.invoice_number)} className={`shrink-0 px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all ${isLegalized ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-900/20'}`}>

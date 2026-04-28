@@ -1693,7 +1693,19 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                 ? (FORMA_COLOR[inv.forma_pago]?.label || inv.forma_pago) : '—';
                                             const vOriginal  = Number(inv.invoice_value) || 0;
                                             const vLegal     = legalizada ? (Number(inv.valor) || 0) : 0;
-                                            const vDevol     = isDevuelta  ? vOriginal : 0;
+                                            const vDevol = (() => {
+                                                if (isDevuelta) return vOriginal;
+                                                if (isParcial) {
+                                                    // Priorizar valor de ítems devueltos
+                                                    const totalQtyItems = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
+                                                    const unitPrice     = vOriginal / (totalQtyItems || 1);
+                                                    const itemsDevVal   = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                                                    
+                                                    if (itemsDevVal > 0) return itemsDevVal;
+                                                    if (inv.forma_pago) return Math.max(0, vOriginal - vLegal);
+                                                }
+                                                return 0;
+                                            })();
                                             const sc         = Number(inv.sobrecosto) || 0;
                                             return (
                                                 <tr key={inv.invoice_number} className={`hover:bg-slate-50/80 ${legalizada ? 'bg-emerald-50/20' : ''}`}>
