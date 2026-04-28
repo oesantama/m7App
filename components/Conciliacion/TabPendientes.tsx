@@ -314,7 +314,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const mapInvoices = (list: any[]) => list.map(i => {
                 const totalQty = i.items?.reduce((s, it: any) => s + (it.qty || 0), 0) || 1;
                 const unitPrice = (i.invoice_value || 0) / (totalQty || 1);
-                const devVal = i.items?.reduce((s, it) => s + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                const devVal = i.items?.reduce((s, it: any) => {
+                    const v = (it.returned_value !== undefined && it.returned_value !== null)
+                        ? Number(it.returned_value)
+                        : (Number(it.returned_qty || 0) * unitPrice);
+                    return s + v;
+                }, 0) || 0;
                 
                 return {
                     'FACTURA': i.invoice_number,
@@ -337,7 +342,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         if (isDev) return invVal;
                         
                         // Para parciales, PRIORIZAMOS el valor de los ítems devueltos registrados
-                        const itemsDev = i.items?.reduce((s: number, it: any) => s + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                        const itemsDev = i.items?.reduce((s: number, it: any) => {
+                            const v = (it.returned_value !== undefined && it.returned_value !== null)
+                                ? Number(it.returned_value)
+                                : (Number(it.returned_qty || 0) * unitPrice);
+                            return s + v;
+                        }, 0) || 0;
                         if (isPar && itemsDev > 0) return Math.round(itemsDev);
                         
                         // Si es parcial pero no hay ítems (o el valor es 0), usamos la diferencia como último recurso
@@ -536,7 +546,12 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     // Priorizar ítems
                     const totalQtyItems = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
                     const unitPrice     = invVal / (totalQtyItems || 1);
-                    const itemsDevVal   = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                    const itemsDevVal   = inv.items?.reduce((acc: number, it: any) => {
+                        const v = (it.returned_value !== undefined && it.returned_value !== null)
+                            ? Number(it.returned_value)
+                            : (Number(it.returned_qty || 0) * unitPrice);
+                        return acc + v;
+                    }, 0) || 0;
                     
                     if (itemsDevVal > 0) {
                         cur.valor_devuelto += itemsDevVal;
@@ -631,8 +646,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 // Priorizar valor de ítems devueltos
                 const totalQtyItems = i.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
                 const unitPrice     = (Number(i.invoice_value) || 0) / (totalQtyItems || 1);
-                const itemsDevVal   = i.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
-                
+                const itemsDevVal   = i.items?.reduce((acc: number, it: any) => {
+                    const v = (it.returned_value !== undefined && it.returned_value !== null)
+                        ? Number(it.returned_value)
+                        : (Number(it.returned_qty || 0) * unitPrice);
+                    return acc + v;
+                }, 0) || 0;
+
                 if (itemsDevVal > 0) return s + itemsDevVal;
                 
                 // Fallback a diferencia si ya está legalizado (forma_pago)

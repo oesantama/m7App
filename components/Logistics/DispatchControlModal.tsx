@@ -54,7 +54,10 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
     showPasswordMap,
     setShowPasswordMap,
     isValidating,
-    handleConfirmDispatch
+    handleConfirmDispatch,
+    onAddQty,
+    pickingMode,
+    setPickingMode
 }) => {
     if (!isOpen) return null;
 
