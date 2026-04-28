@@ -41,7 +41,7 @@ export const getRoutes = async (req: Request, res: Response) => {
       LEFT JOIN vehicles v ON r.vehicle_id::text = v.id::text
       LEFT JOIN drivers d ON r.driver_id::text = d.id::text
       WHERE r.created_at >= CURRENT_DATE - INTERVAL '7 days'
-        AND r.status_id NOT IN ('EST-12', 'EST-13', 'EST-16', 'COMPLETADO', 'FINALIZADO')
+        AND r.status_id NOT IN ('EST-13', 'EST-16', 'COMPLETADO', 'FINALIZADO')
 
       UNION ALL
 

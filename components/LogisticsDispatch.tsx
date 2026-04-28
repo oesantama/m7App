@@ -59,7 +59,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [isAccompanied, setIsAccompanied] = useState(false);
     const [helperCount, setHelperCount] = useState(1);
     const [selectedHelpers, setSelectedHelpers] = useState<string[]>([]);
-    const [pickingMode, setPickingMode] = useState<'UND' | 'CAJA' | 'STD'>('UND');
+    const [itemPickingModes, setItemPickingModes] = useState<Record<string, 'UND' | 'CAJA' | 'STD'>>({});
     const [pendingSignatures, setPendingSignatures] = useState<any[]>([]);
     // All unsigned signatures for each invoice (keyed by invoiceId) — used to block ENTREGAR
     const [invoiceAllPending, setInvoiceAllPending] = useState<Record<string, any[]>>({});
@@ -1263,6 +1263,42 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
     }, [activeRoutes, filteredRoutes]);
 
+    // AGRUPA rutas por placa + día calendario para mostrar una sola card por placa/día
+    const groupedRoutes = React.useMemo(() => {
+        const groups = new Map<string, any[]>();
+        for (const route of filteredRoutes) {
+            const raw = (route as any).created_at || (route as any).createdAt;
+            const d = raw ? new Date(raw) : new Date();
+            const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+            const key = `${route.plate}_${dayKey}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(route);
+        }
+        return Array.from(groups.entries()).map(([groupKey, routes]) => {
+            routes.sort((a, b) => {
+                const at = new Date((a as any).created_at || (a as any).createdAt || 0).getTime();
+                const bt = new Date((b as any).created_at || (b as any).createdAt || 0).getTime();
+                return at - bt;
+            });
+            const primary = routes[0];
+            const allIds = Array.from(new Set(
+                routes.flatMap((r: any) => r.invoice_ids || r.invoiceIds || [])
+            ));
+            const deliveredTotal = routes.reduce((s: number, r: any) => s + (Number(r.delivered_invoices) || 0), 0);
+            return {
+                ...primary,
+                id: groupKey,
+                invoice_ids: allIds,
+                total_invoices: allIds.length,
+                delivered_invoices: deliveredTotal,
+                _primaryId: primary.id,
+                _routeIds: routes.map((r: any) => r.id),
+                _isGroup: routes.length > 1,
+                _groupCount: routes.length,
+            };
+        });
+    }, [filteredRoutes]);
+
     // FILTRA UBICACIONES GPS BASADAS EN LAS RUTAS VISIBLES
     const filteredLocations = React.useMemo(() => {
         const visibleVehicleIds = new Set(filteredRoutes.map(r => r.vehicle_id));
@@ -1315,30 +1351,34 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const handleBarcodeScan = async (rawBarcode: string) => {
         if (!assigningInvoice) return;
         
-        // 1. Limpiar el SKU usando la nueva lógica que corta en 'Ñ' o ':'
         const sku = cleanSkuM7(rawBarcode);
+        const item = (assigningInvoice.items || []).find((it: any) => 
+            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() || 
+            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase() ||
+            String(it.articleId || '').trim().toUpperCase() === sku.toUpperCase()
+        );
+
+        if (!item) {
+            toast.error(`No se encontró el artículo: ${sku}`);
+            return;
+        }
+
         let multiplier = 1;
 
-        // 2. Si es un código compuesto (Ñ), intentar extraer la cantidad del resto de la cadena
-        if (rawBarcode.includes('Ñ')) {
+        // PRIORIDAD: Revisar qué unidad eligió el usuario para este artículo específico en la tabla
+        const preferredMode = itemPickingModes[itemSku] || 'UND';
+
+        if (preferredMode === 'CAJA') {
+            multiplier = Number(item.factorInter) || 1;
+        } else if (preferredMode === 'STD') {
+            multiplier = Number(item.factorStd) || 1;
+        } 
+        // Si está en modo unidad, pero el código trae una Ñ con cantidad, respetamos la Ñ
+        else if (rawBarcode.includes('Ñ')) {
             const parts = rawBarcode.split('Ñ').map(p => p.trim());
-            // Buscamos un número en las partes siguientes (posible cantidad)
             const possibleQty = parts.slice(1).find(p => !isNaN(Number(p)) && p.length > 0 && p.length <= 4);
             if (possibleQty) {
                 multiplier = Number(possibleQty);
-            }
-        } else {
-            // 3. MODO AUTO: Si no tiene cantidad interna, usamos el modo seleccionado (CAJA, STD, UND)
-            if (pickingMode !== 'UND') {
-                const item = (assigningInvoice.items || []).find((it: any) => 
-                    String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() || 
-                    String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase() ||
-                    String(it.articleId || '').trim().toUpperCase() === sku.toUpperCase()
-                );
-                if (item) {
-                    if (pickingMode === 'CAJA') multiplier = Number(item.factorInter) || 1;
-                    else if (pickingMode === 'STD') multiplier = Number(item.factorStd) || 1;
-                }
             }
         }
 
@@ -1675,9 +1715,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Unidades en Ruta</h3>
 
                         {/* ── RESUMEN TOTAL DE TODAS LAS RUTAS ── */}
-                        {filteredRoutes.length > 0 && (() => {
-                            const totalInvoices = filteredRoutes.reduce((s, r) => s + (r.invoice_ids?.length || 0), 0);
-                            const totalVol = filteredRoutes.reduce((s, r) => {
+                        {groupedRoutes.length > 0 && (() => {
+                            const totalInvoices = groupedRoutes.reduce((s: number, r: any) => s + ((r.invoice_ids?.length) || 0), 0);
+                            const totalVol = groupedRoutes.reduce((s: number, r: any) => {
                                 return s + (r.invoice_ids || []).reduce((sv: number, id: string) => {
                                     const inv = invoices.find(i => String(i.id).trim() === String(id).trim() || String(i.invoiceNumber).trim() === String(id).trim());
                                     return sv + Number(inv?.volumeM3 || 0);
@@ -1693,7 +1733,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Resumen Total de Despacho</p>
                                     <div className="grid grid-cols-3 gap-2">
                                         <div className="text-center">
-                                            <div className="text-lg font-black text-white">{filteredRoutes.length}</div>
+                                            <div className="text-lg font-black text-white">{groupedRoutes.length}</div>
                                             <div className="text-[7px] font-bold text-slate-500 uppercase">Rutas</div>
                                         </div>
                                         <div className="text-center">
@@ -1735,15 +1775,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {filteredRoutes
-                            .filter(route => {
+                            {groupedRoutes
+                            .filter((route: any) => {
                                 if (!routeSearch) return true;
                                 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
                                 const q = norm(routeSearch);
                                 return norm(route.plate || '').includes(q)
                                     || norm(route.driver_name || '').includes(q);
                             })
-                            .map((route) => {
+                            .map((route: any) => {
                                 const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
                                 const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
                                     const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
@@ -1790,10 +1830,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         const d = new Date(raw);
                                                         if (isNaN(d.getTime())) return null;
                                                         const fecha = d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
-                                                        const hora  = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
                                                         return (
                                                             <p className="text-[10px] font-black text-slate-600 mt-1 flex items-center gap-1">
-                                                                <span>📅</span>{fecha} · {hora}
+                                                                <span>📅</span>{fecha}
+                                                                {route._isGroup && (
+                                                                    <span className="ml-1 text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                                                                        {route._groupCount} asignaciones
+                                                                    </span>
+                                                                )}
                                                             </p>
                                                         );
                                                     })()}
@@ -1849,8 +1893,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             if (!isToday) return null;
 
                                             return (
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); setShowReassignModal({ isOpen: true, route }); }}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setShowReassignModal({ isOpen: true, route: { ...route, id: route._primaryId || route.id } }); }}
                                                     className="absolute -top-2 -right-2 w-8 h-8 bg-white border border-slate-200 text-slate-400 rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-600 hover:text-white hover:scale-110 transition-all z-10"
                                                     title="Editar Placa / Reasignar"
                                                 >
@@ -2251,8 +2295,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 isValidating={isValidating}
                 handleConfirmDispatch={handleConfirmDispatch}
                 onAddQty={handleManualAdd}
-                pickingMode={pickingMode}
-                setPickingMode={setPickingMode}
+                itemPickingModes={itemPickingModes}
+                setItemPickingModes={setItemPickingModes}
             />
 
             {/* MODAL: REASIGNAR PLACA / LIBERAR FACTURA */}
