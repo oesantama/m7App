@@ -1288,7 +1288,36 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                      ) : (
                        // TABLA PAGOS
                        <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-300">
-                          <h5 className="px-6 py-4 bg-indigo-50 text-[9px] font-black uppercase text-indigo-600 tracking-widest border-b border-indigo-100">Vista de Pagos (Recaudos)</h5>
+                          <div className="px-6 py-4 bg-indigo-50 flex items-center justify-between border-b border-indigo-100">
+                             <h5 className="text-[9px] font-black uppercase text-indigo-600 tracking-widest">Vista de Pagos (Recaudos)</h5>
+                             <button 
+                               onClick={() => {
+                                 const paymentData = selectedPendingDoc.items
+                                   .filter((it: any) => it.paymentValue > 0)
+                                   .map((it: any) => ({
+                                     'FACTURA': it.invoice,
+                                     'REFERENCIA': it.paymentRef || 'S/R',
+                                     'VALOR PAGADO': it.paymentValue,
+                                     'MÉTODO PAGO': it.paymentMethod || 'S/M',
+                                     'UN CODE': it.unCode || '-'
+                                   }));
+                                 
+                                 if (paymentData.length === 0) {
+                                   toast.error('No hay pagos registrados para exportar');
+                                   return;
+                                 }
+
+                                 const ws = XLSX.utils.json_to_sheet(paymentData);
+                                 const wb = XLSX.utils.book_new();
+                                 XLSX.utils.book_append_sheet(wb, ws, "Pagos");
+                                 XLSX.writeFile(wb, `Pagos_${selectedPendingDoc.externalDocId}_${new Date().getTime()}.xlsx`);
+                               }}
+                               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700 transition-all shadow-md"
+                             >
+                               <Icons.Download className="w-3 h-3" />
+                               Exportar Pagos
+                             </button>
+                          </div>
                           <div className="overflow-x-auto">
                              <table className="w-full text-left border-collapse">
                                <thead>

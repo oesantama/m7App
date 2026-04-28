@@ -1671,6 +1671,7 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
       LIMIT 10000
     `, [docParam, plateParam]);
 
+
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-MASTERSUITE-ERR]', err.message);

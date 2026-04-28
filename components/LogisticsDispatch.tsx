@@ -1123,6 +1123,17 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         requestWakeLock();
 
         const interval = setInterval(() => {
+            if (!navigator.geolocation) {
+                toast.error('El navegador no soporta Geolocation. Verifique su dispositivo.');
+                return;
+            }
+            
+            // Verificación de contexto seguro (HTTPS)
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                console.error('[GPS-ERROR] Geolocation requiere HTTPS.');
+                return;
+            }
+
             navigator.geolocation.getCurrentPosition(
                 async (pos) => {
                     const activeLink = assignments.find(a => a.driverId === user.id && a.isActive);
@@ -1140,7 +1151,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         } catch { /* GPS update failed silently */ }
                     }
                 },
-                () => { /* GPS permission denied */ },
+                (err) => { 
+                    console.error('[GPS-ERROR]', err.code, err.message);
+                    if (err.code === 1) { // Permission Denied
+                         toast.error('Permiso de GPS denegado. Active el GPS en su navegador.');
+                    }
+                },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }, 15000); // Reducción a 15 segundos para mayor precisión

@@ -40,7 +40,7 @@ export const saveVisita = async (req: Request, res: Response) => {
         nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
         contacto_emergencia, acuerdo_requisitos, contiene_equipos,
         marca_dispositivo, numero_serie, registrado_por_id, registrado_por_nombre,
-        fecha_entrada
+        fecha_entrada, hora_salida
     } = req.body;
 
     try {
@@ -49,14 +49,15 @@ export const saveVisita = async (req: Request, res: Response) => {
                 nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
                 contacto_emergencia, acuerdo_requisitos, contiene_equipos,
                 marca_dispositivo, numero_serie, registrado_por_id, registrado_por_nombre,
-                fecha_entrada, fecha_registro
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+                fecha_entrada, fecha_registro, hora_salida
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14)
             RETURNING *
         `, [
             nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
             contacto_emergencia, acuerdo_requisitos, contiene_equipos,
             marca_dispositivo, numero_serie, registrado_por_id, registrado_por_nombre,
-            fecha_entrada || new Date()
+            fecha_entrada || new Date(),
+            hora_salida || null
         ]);
         
         res.json({ success: true, data: result.rows[0] });

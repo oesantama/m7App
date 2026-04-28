@@ -38,6 +38,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
     const [activeTab, setActiveTab] = useState<'registro' | 'consulta'>('registro');
     const [isLoading, setIsLoading] = useState(false);
     const [visitas, setVisitas] = useState<Visita[]>([]);
+    const [areas, setAreas] = useState<any[]>([]);
     
     // Filtros de consulta
     const [filters, setFilters] = useState({
@@ -59,6 +60,7 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
         contiene_equipos: false,
         marca_dispositivo: '',
         numero_serie: '',
+        hora_salida: '',
     };
     const [form, setForm] = useState<Visita>(initialForm);
 
@@ -66,7 +68,17 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
         if (activeTab === 'consulta') {
             fetchVisitas();
         }
+        fetchAreas();
     }, [activeTab]);
+
+    const fetchAreas = async () => {
+        try {
+            const res = await api.getGhMiscelaneos('gh_areas');
+            setAreas(res || []);
+        } catch (error) {
+            console.error('Error fetching areas:', error);
+        }
+    };
 
     const fetchVisitas = async () => {
         setIsLoading(true);
@@ -92,7 +104,9 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
             const payload = {
                 ...form,
                 registrado_por_id: user.id,
-                registrado_por_nombre: user.name
+                registrado_por_nombre: user.name,
+                // Si se especificó hora de salida manual, usarla; de lo contrario null
+                hora_salida: form.hora_salida ? new Date(form.hora_salida).toISOString() : null
             };
             await api.saveVisita(payload);
             toast.success('Visita registrada exitosamente');
@@ -194,12 +208,24 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Área o Dependencia</label>
-                                <input 
-                                    type="text" 
+                                <select 
                                     required
-                                    placeholder="Ej: Contabilidad"
                                     value={form.area_dependencia}
                                     onChange={e => setForm({...form, area_dependencia: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-slate-900 transition-all appearance-none cursor-pointer"
+                                >
+                                    <option value="">Seleccione el área...</option>
+                                    {areas.map(area => (
+                                        <option key={area.id} value={area.nombre}>{area.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Fecha y Hora de Salida (Opcional)</label>
+                                <input 
+                                    type="datetime-local" 
+                                    value={form.hora_salida}
+                                    onChange={e => setForm({...form, hora_salida: e.target.value})}
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-slate-900 transition-all"
                                 />
                             </div>
