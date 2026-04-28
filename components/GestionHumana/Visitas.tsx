@@ -109,17 +109,21 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
         }
 
         const data = visitas.map(v => ({
+            'FECHA Y HORA DE ENTRADA': v.fecha_entrada ? new Date(v.fecha_entrada).toLocaleString('es-CO') : '—',
             'NOMBRE': v.nombre,
             'CÉDULA': v.cedula,
-            'DESTINO': v.area_nombre || v.area_dependencia,
-            'FECHA ENTRADA': v.fecha_entrada ? new Date(v.fecha_entrada).toLocaleString('es-CO') : '—',
-            'HORA SALIDA': v.hora_salida ? new Date(v.hora_salida).toLocaleString('es-CO') : 'Pendiente',
-            'CONTACTO EMERGENCIA': v.contacto_emergencia || '—',
-            'REGISTRADO POR': v.registrado_por_nombre || '—',
-            'FECHA REGISTRO': v.fecha_registro ? new Date(v.fecha_registro).toLocaleString('es-CO') : '—',
-            'ARL': v.cuenta_arl ? 'SÍ' : 'NO',
-            'EPS': v.cuenta_eps ? 'SÍ' : 'NO',
-            'EQUIPOS': v.contiene_equipos ? `SÍ (${v.marca_dispositivo || 'S/M'} - ${v.numero_serie || 'S/S'})` : 'NO'
+            'AREA O DEPENDENCIA PARA DONDE SE DIRIGE': v.area_nombre || v.area_dependencia,
+            'VISITA CUENTA CON ARL': v.cuenta_arl ? 'SÍ' : 'NO',
+            'VISITA CUENTA CON EPS': v.cuenta_eps ? 'SÍ' : 'NO',
+            'CONTACTO Y NUMERO DE EMERGENCIA': v.contacto_emergencia || '—',
+            'ESTA DE ACUERDO CON LOS REQUISITOS DE INGRESO DE MILLA 7': v.acuerdo_requisitos ? 'SÍ' : 'NO',
+            'DISPOSITIVO DE COMPUTO O HERRAMIENTAS': v.contiene_equipos ? 'SÍ' : 'NO',
+            'MARCA DE DISPOSITIVO O HERRAMIENTA': v.marca_dispositivo || '—',
+            'NUMERO DE SERIE': v.numero_serie || '—',
+            'HORA DE ENTRADA': v.fecha_entrada ? fmtTime(v.fecha_entrada) : '—',
+            'HORA DE SALIDA': v.hora_salida ? fmtTime(v.hora_salida) : 'Pendiente',
+            'USUARIO CONTROL': v.registrado_por_nombre || '—',
+            'FECHA CONTROL': v.fecha_registro ? fmtDate(v.fecha_registro) : '—'
         }));
 
         const ws = XLSX.utils.json_to_sheet(data);
@@ -455,70 +459,85 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 border-b border-slate-100">
                                     <tr>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Visitante</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ingreso</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Destino</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registrado Por</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Salud/ARL</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Equipos</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
+                                    <tr>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha y Hora de Entrada</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Nombre</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Cédula</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Area o Dependencia para donde se dirige</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-center">Visita cuenta con ARL</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-center">Visita cuenta con EPS</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Contacto y Número de Emergencia</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-center">Esta de acuerdo con los requisitos</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-center">Dispositivo de Computo</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Marca</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Número de Serie</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-center">Hora de Entrada</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-center">Hora de Salida</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Usuario Control</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Control</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
                                     {filteredVisitas.map(v => (
                                         <tr key={v.id} className="hover:bg-slate-50/50 transition-colors group">
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-black text-slate-900 uppercase leading-none mb-1">{v.nombre}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400">{v.cedula}</span>
-                                                </div>
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-600">
+                                                {v.fecha_entrada ? new Date(v.fecha_entrada).toLocaleString('es-CO') : '—'}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-slate-600">{fmtDate(v.fecha_entrada)}</span>
-                                                    <span className="text-[10px] font-medium text-slate-400">{fmtTime(v.fecha_entrada)}</span>
-                                                </div>
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-black text-slate-900 uppercase">
+                                                {v.nombre}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-xs font-black text-slate-600 uppercase">{v.area_nombre || v.area_dependencia}</span>
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-500">
+                                                {v.cedula}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-[9px] font-bold text-slate-400 uppercase">{v.registrado_por_nombre || '—'}</span>
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-black text-slate-700 uppercase">
+                                                {v.area_nombre || v.area_dependencia}
                                             </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex justify-center gap-1.5">
-                                                    <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${v.cuenta_arl ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>ARL</div>
-                                                    <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${v.cuenta_eps ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>EPS</div>
-                                                </div>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${v.cuenta_arl ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {v.cuenta_arl ? 'SÍ' : 'NO'}
+                                                </span>
                                             </td>
-                                            <td className="px-6 py-4 text-center">
-                                                {v.contiene_equipos ? (
-                                                    <div className="flex flex-col items-center">
-                                                        <Icons.Laptop className="w-4 h-4 text-blue-500 mb-1" />
-                                                        <span className="text-[8px] font-black text-blue-600 uppercase">{v.marca_dispositivo}</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-[9px] font-bold text-slate-300">—</span>
-                                                )}
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${v.cuenta_eps ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {v.cuenta_eps ? 'SÍ' : 'NO'}
+                                                </span>
                                             </td>
-                                            <td className="px-6 py-4 text-center">
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-600">
+                                                {v.contacto_emergencia || '—'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-[10px] font-black text-slate-600">
+                                                {v.acuerdo_requisitos ? 'SÍ' : 'NO'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-[10px] font-black text-slate-600">
+                                                {v.contiene_equipos ? 'SÍ' : 'NO'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-600 uppercase">
+                                                {v.marca_dispositivo || '—'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-600 uppercase">
+                                                {v.numero_serie || '—'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-[10px] font-bold text-slate-600">
+                                                {v.fecha_entrada ? fmtTime(v.fecha_entrada) : '—'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
                                                 {v.hora_salida ? (
-                                                    <div className="inline-flex flex-col items-center px-3 py-1 bg-slate-100 text-slate-500 rounded-xl">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest">Salida</span>
-                                                        <span className="text-[8px] font-bold">{fmtTime(v.hora_salida)}</span>
-                                                    </div>
+                                                    <span className="text-[10px] font-black text-slate-500">{fmtTime(v.hora_salida)}</span>
                                                 ) : (
-                                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-xl animate-pulse">
-                                                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                                                        <span className="text-[9px] font-black uppercase tracking-widest">En Planta</span>
-                                                    </div>
+                                                    <span className="text-[10px] font-black text-emerald-600 animate-pulse uppercase">En Planta</span>
                                                 )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-400 uppercase">
+                                                {v.registrado_por_nombre || '—'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-400">
+                                                {v.fecha_registro ? fmtDate(v.fecha_registro) : '—'}
                                             </td>
                                         </tr>
                                     ))}
                                     {filteredVisitas.length === 0 && !isLoading && (
                                         <tr>
-                                            <td colSpan={7} className="px-6 py-20 text-center">
+                                            <td colSpan={15} className="px-6 py-20 text-center">
                                                 <Icons.Inbox className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                                                 <p className="text-slate-400 font-black uppercase text-xs tracking-widest">No se encontraron visitas registradas</p>
                                             </td>
