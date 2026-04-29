@@ -1024,11 +1024,13 @@ export const saveRouteGroupPayments = async (req: Request, res: Response) => {
             
             if (isExisting) {
                 // Es un registro existente (ID numérico de DB) -> UPDATE
+                // M7 FIX: El ID es único, no necesitamos ser tan restrictivos con el document_id en el WHERE
+                // lo que evita errores de casteo o formatos.
                 await client.query(`
                     UPDATE route_group_payments
                     SET valor = $1, referencia = $2, fecha = $3, metodo_pago = $4, observacion = $5, user_id = $6
-                    WHERE id = $7 AND document_id = $8
-                `, [valNum, pay.referencia, pay.fecha, pay.metodo, pay.observacion, userId, pay.id, documentId]);
+                    WHERE id::text = $7::text
+                `, [valNum, pay.referencia, pay.fecha, pay.metodo, pay.observacion, userId, pay.id]);
             } else {
                 // Es un registro nuevo -> INSERT
                 await client.query(`
