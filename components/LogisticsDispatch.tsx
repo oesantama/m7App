@@ -240,6 +240,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 setVehicleLocations(res);
                 updateMarkers(res);
             }
+        } catch (error) {
+            console.error('[M7-GPS-FETCH-ERR]', error);
+            toast.error("Error al obtener ubicaciones GPS");
+        } finally {
+            setIsValidating(false);
+        }
+    };
+
     const fetchArticles = async () => {
         try {
             const res = await api.getArticles();
