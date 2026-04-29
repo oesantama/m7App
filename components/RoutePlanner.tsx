@@ -710,7 +710,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // ──────────────────────────────────────────────────────────────────────
 
       const CELL_SIZE = 0.022; // ~2.4km por celda
-      const MAX_CLUSTER_SPREAD_KM = 15; // distancia máxima del anchor
+      const MAX_CLUSTER_SPREAD_KM = 7;  // radio máximo del cluster (~7km = 1 corredor del valle)
+      const MIN_ANCHOR_SEPARATION_KM = 5; // anclas de distintos vehículos deben estar al menos 5km aparte
 
       interface GeoCell {
         key: string;
@@ -771,6 +772,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         .filter(v => !usedVehicleIds.has(v.id))
         .sort((a, b) => (Number(b.capacityM3) || 0) - (Number(a.capacityM3) || 0));
 
+      // Registra las coordenadas del ancla de cada vehículo para evitar solapamiento
+      const usedAnchors: { lat: number; lng: number }[] = [];
+
       // ── ZONA PRE-ASIGNACIÓN ────────────────────────────────────────────────
       // Fase 1: Agregar fuerza total por vehículo y determinar qué ciudades/zonas
       // ha operado más frecuentemente. Vehículos con más experiencia en una zona
@@ -824,12 +828,36 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
         const ownedCities = vehicleOwnedCities.get(vehicle.id) || new Set<string>();
 
-        // Encontrar celda ancla: priorizar celdas en ciudades propias del vehículo
-        const ownedAnchor = remainingCells.find(c =>
-          c.invoices.length > 0 && c.invoices.some(i => ownedCities.has((i as any).cityKey || ''))
+        // Helper: verificar que una celda está suficientemente lejos de anclas ya usadas
+        const isFarEnoughFromUsedAnchors = (c: GeoCell): boolean => {
+          if (c.centerLat === 0 || usedAnchors.length === 0) return true;
+          return usedAnchors.every(a =>
+            a.lat === 0 || getDistance(c.centerLat, c.centerLng, a.lat, a.lng) >= MIN_ANCHOR_SEPARATION_KM
+          );
+        };
+
+        // Encontrar celda ancla: ciudades propias + separada de anclas existentes
+        // Si no hay celda que cumpla separación, se relaja y toma la más lejana disponible
+        const candidateAnchors = remainingCells.filter(c => c.invoices.length > 0);
+        const ownedAndFar = candidateAnchors.find(c =>
+          c.invoices.some(i => ownedCities.has((i as any).cityKey || '')) && isFarEnoughFromUsedAnchors(c)
         );
-        const anchorCell = ownedAnchor || remainingCells.find(c => c.invoices.length > 0);
+        const anyFar = candidateAnchors.find(c => isFarEnoughFromUsedAnchors(c));
+        // Fallback: celda más lejana de todas las anclas usadas
+        const farthestFallback = candidateAnchors.length > 0
+          ? candidateAnchors.reduce((best, c) => {
+              if (usedAnchors.length === 0 || c.centerLat === 0) return best;
+              const dMin = Math.min(...usedAnchors.map(a => a.lat === 0 ? 999 : getDistance(c.centerLat, c.centerLng, a.lat, a.lng)));
+              const bestDMin = Math.min(...usedAnchors.map(a => a.lat === 0 ? 999 : getDistance(best.centerLat, best.centerLng, a.lat, a.lng)));
+              return dMin > bestDMin ? c : best;
+            }, candidateAnchors[0])
+          : null;
+
+        const anchorCell = ownedAndFar || anyFar || farthestFallback || candidateAnchors[0];
         if (!anchorCell) return;
+
+        // Registrar esta ancla para que vehículos siguientes respeten la separación
+        if (anchorCell.centerLat > 0) usedAnchors.push({ lat: anchorCell.centerLat, lng: anchorCell.centerLng });
 
         // Recopilar celdas candidatas: ciudades propias primero, luego zona + adyacentes
         const anchorZone = anchorCell.zone;
