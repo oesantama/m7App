@@ -62,12 +62,18 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
             )
         `);
 
-        // Garantizar que la columna user_id existe
+        // Garantizar columnas opcionales en route_surcharges
         await pool.query(`
-            DO $$ 
-            BEGIN 
+            DO $$
+            BEGIN
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='route_surcharges' AND column_name='user_id') THEN
                     ALTER TABLE route_surcharges ADD COLUMN user_id TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='route_surcharges' AND column_name='observaciones') THEN
+                    ALTER TABLE route_surcharges ADD COLUMN observaciones TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='route_surcharges' AND column_name='facturas') THEN
+                    ALTER TABLE route_surcharges ADD COLUMN facturas TEXT;
                 END IF;
             END $$;
         `);
@@ -973,27 +979,26 @@ export const saveSobrecostos = async (req: Request, res: Response) => {
             const isDbId = item.id && !isNaN(Number(item.id)) && String(item.id).length < 10;
 
             if (isDbId) {
-                // SOLO actualizar si el estado NO es aprobado (EST-02)
-                // Esto cumple con "el que este aprobado no se permita editar"
                 await client.query(`
-                    UPDATE route_surcharges 
-                    SET valor = $1, referencia = $2, fecha = $3, status_id = $4, user_id = $5
-                    WHERE id = $6 AND status_id != 'EST-02' AND status_id != 'APROBADO'
-                `, [item.valor, item.referencia, item.fecha, item.statusId, userId, item.id]);
+                    UPDATE route_surcharges
+                    SET valor = $1, referencia = $2, fecha = $3, status_id = $4, user_id = $5,
+                        observaciones = $6, facturas = $7
+                    WHERE id = $8 AND status_id != 'EST-02' AND status_id != 'APROBADO'
+                `, [item.valor, item.referencia, item.fecha, item.statusId, userId,
+                    item.observaciones || null, item.facturas || null, item.id]);
             } else {
-                // Para evitar duplicidad al dar clic varias veces en "Solicitar"
-                // verificamos si ya existe un registro idéntico pendiente para esta placa/documento
                 const existing = await client.query(`
-                    SELECT id FROM route_surcharges 
+                    SELECT id FROM route_surcharges
                     WHERE document_id = $1 AND plate = $2 AND valor = $3 AND referencia = $4 AND status_id = $5
                     LIMIT 1
                 `, [documentId, plate, item.valor, item.referencia, item.statusId || 'EST-01']);
 
                 if (existing.rows.length === 0) {
                     await client.query(`
-                        INSERT INTO route_surcharges (document_id, plate, valor, referencia, fecha, status_id, user_id)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    `, [documentId, plate, item.valor, item.referencia, item.fecha, item.statusId || 'EST-01', userId]);
+                        INSERT INTO route_surcharges (document_id, plate, valor, referencia, fecha, status_id, user_id, observaciones, facturas)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    `, [documentId, plate, item.valor, item.referencia, item.fecha,
+                        item.statusId || 'EST-01', userId, item.observaciones || null, item.facturas || null]);
                 }
             }
         }

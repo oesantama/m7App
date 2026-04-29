@@ -97,6 +97,8 @@ interface SobrecostoRow {
     fecha: string;
     statusId: string;
     plate?: string;
+    observaciones?: string;
+    facturas?: string;
 }
 
 interface Props {
@@ -694,7 +696,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [headerFilter, setHeaderFilter]     = useState<string | null>(null);
 
     // Estado sobrecostos
-    const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
+    const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01', observaciones: '', facturas: '' }]);
     const [savingSobrecosto, setSavingSobrecosto] = useState(false);
     const [isGrupalUnlocked, setIsGrupalUnlocked] = useState(false);
 
@@ -728,7 +730,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 valor: s.valor ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Math.floor(Number(s.valor) || 0)) : ''
             })));
         } else {
-            setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }]);
+            setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01', observaciones: '', facturas: '' }]);
         }
 
         setTab('individual');
@@ -857,10 +859,13 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 documentId,
                 plate: route.plate,
                 items: sobrecostos.map(s => ({
+                    id: s.id,
                     valor: Math.floor(Number(String(s.valor).replace(/\D/g, '')) || 0),
                     referencia: s.nroAprobacion,
                     fecha: s.fecha,
-                    statusId: s.statusId || 'PENDIENTE'
+                    statusId: s.statusId || 'PENDIENTE',
+                    observaciones: s.observaciones || null,
+                    facturas: s.facturas || null,
                 })),
                 userId: currentUserId
             });
@@ -893,7 +898,9 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     valor: Math.floor(Number(String(s.valor).replace(/\D/g, '')) || 0),
                     referencia: s.nroAprobacion,
                     fecha: s.fecha,
-                    statusId: 'APROBADO'
+                    statusId: 'APROBADO',
+                    observaciones: s.observaciones || null,
+                    facturas: s.facturas || null,
                 }],
                 userId: currentUserId
             });
@@ -1425,54 +1432,98 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                         const showDelete = isNew || (isPending && canDelete);
 
                                         return (
-                                            <div key={s.id} className={`grid grid-cols-12 gap-3 p-3 rounded-2xl border-2 shadow-sm relative group transition-all
+                                            <div key={s.id} className={`p-3 rounded-2xl border-2 shadow-sm relative group transition-all
                                                 ${isApproved ? 'bg-blue-50 border-blue-200' : isAnulado ? 'bg-slate-100 border-slate-200 opacity-60' : 'bg-white border-slate-100'}`}>
-                                                
-                                                <div className="col-span-3">
-                                                    <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Valor</p>
-                                                    <input type="text" value={s.valor} disabled={!isPending}
-                                                        onChange={e => {
-                                                            const val = e.target.value.replace(/\D/g, '');
-                                                            const fmt = val ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Number(val)) : '';
-                                                            const next = [...sobrecostos];
-                                                            next[idx].valor = fmt;
-                                                            setSobrecostos(next);
-                                                        }}
-                                                        placeholder="$ 0.00" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+
+                                                {/* Fila 1: Valor / Referencia / Fecha / Aprobar */}
+                                                <div className="grid grid-cols-12 gap-3 mb-3">
+                                                    <div className="col-span-3">
+                                                        <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Valor</p>
+                                                        <input type="text" value={s.valor} disabled={!isPending}
+                                                            onChange={e => {
+                                                                const val = e.target.value.replace(/\D/g, '');
+                                                                const fmt = val ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Number(val)) : '';
+                                                                const next = [...sobrecostos]; next[idx].valor = fmt; setSobrecostos(next);
+                                                            }}
+                                                            placeholder="$ 0.00" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
+                                                                ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                    </div>
+                                                    <div className="col-span-3">
+                                                        <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Referencia / NIT</p>
+                                                        <input type="text" value={s.nroAprobacion} disabled={!isPending}
+                                                            onChange={e => { const next = [...sobrecostos]; next[idx].nroAprobacion = e.target.value; setSobrecostos(next); }}
+                                                            placeholder="Obligatorio" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
+                                                                ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                    </div>
+                                                    <div className="col-span-3">
+                                                        <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Fecha</p>
+                                                        <input type="date" value={s.fecha} disabled={!isPending}
+                                                            onChange={e => { const next = [...sobrecostos]; next[idx].fecha = e.target.value; setSobrecostos(next); }}
+                                                            className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
+                                                                ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+                                                    </div>
+                                                    <div className="col-span-3 flex flex-col justify-end">
+                                                        {isApproved ? (
+                                                            <span className="bg-blue-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Aprobado</span>
+                                                        ) : isAnulado ? (
+                                                            <span className="bg-slate-400 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Anulado</span>
+                                                        ) : (
+                                                            <button onClick={() => handleApproveSurcharge(s.id)}
+                                                                className="bg-emerald-500 hover:bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest shadow-sm shadow-emerald-200">
+                                                                ✅ Aprobar
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="col-span-3">
-                                                    <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Referencia / NIT</p>
-                                                    <input type="text" value={s.nroAprobacion} disabled={!isPending}
-                                                        onChange={e => {
-                                                            const next = [...sobrecostos];
-                                                            next[idx].nroAprobacion = e.target.value;
-                                                            setSobrecostos(next);
-                                                        }}
-                                                        placeholder="Obligatorio" className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
+
+                                                {/* Fila 2: Observaciones */}
+                                                <div className="mb-3">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observaciones</p>
+                                                    <input type="text" value={s.observaciones || ''} disabled={!isPending}
+                                                        onChange={e => { const next = [...sobrecostos]; next[idx].observaciones = e.target.value; setSobrecostos(next); }}
+                                                        placeholder="Notas adicionales (opcional)"
+                                                        className={`w-full px-3 py-2 rounded-xl text-[11px] outline-none border border-transparent
+                                                            ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
                                                 </div>
-                                                <div className="col-span-3">
-                                                    <p className={`text-[8px] font-black text-slate-400 uppercase mb-1 ${isAnulado ? 'line-through' : ''}`}>Fecha</p>
-                                                    <input type="date" value={s.fecha} disabled={!isPending}
-                                                        onChange={e => {
-                                                            const next = [...sobrecostos];
-                                                            next[idx].fecha = e.target.value;
-                                                            setSobrecostos(next);
-                                                        }}
-                                                        className={`w-full px-3 py-2 rounded-xl text-[11px] font-black outline-none border border-transparent
-                                                            ${isApproved ? 'bg-transparent text-blue-900' : isAnulado ? 'bg-transparent text-slate-400 line-through' : 'bg-slate-50 text-slate-700 focus:border-orange-300'}`} />
-                                                </div>
-                                                <div className="col-span-3 flex flex-col justify-end">
-                                                    {isApproved ? (
-                                                        <span className="bg-blue-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Aprobado</span>
-                                                    ) : isAnulado ? (
-                                                        <span className="bg-slate-400 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest">Anulado</span>
+
+                                                {/* Fila 3: Facturas asociadas (multi-select) */}
+                                                <div>
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Facturas asociadas</p>
+                                                    {invoices.length === 0 ? (
+                                                        <p className="text-[9px] text-slate-400 italic">Sin facturas en esta placa</p>
                                                     ) : (
-                                                        <button onClick={() => handleApproveSurcharge(s.id)}
-                                                            className="bg-emerald-500 hover:bg-emerald-600 text-white text-[7px] font-black px-2 py-2 rounded-xl text-center uppercase tracking-widest shadow-sm shadow-emerald-200">
-                                                            ✅ Aprobar
-                                                        </button>
+                                                        <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto custom-scrollbar pr-1">
+                                                            {invoices.map(inv => {
+                                                                const selected = (s.facturas || '').split(',').map(f => f.trim()).filter(Boolean).includes(inv.invoice_number);
+                                                                const canToggle = isPending;
+                                                                return (
+                                                                    <button key={inv.invoice_number}
+                                                                        disabled={!canToggle}
+                                                                        onClick={() => {
+                                                                            if (!canToggle) return;
+                                                                            const current = (s.facturas || '').split(',').map(f => f.trim()).filter(Boolean);
+                                                                            const updated = selected
+                                                                                ? current.filter(f => f !== inv.invoice_number)
+                                                                                : [...current, inv.invoice_number];
+                                                                            const next = [...sobrecostos];
+                                                                            next[idx].facturas = updated.join(', ');
+                                                                            setSobrecostos(next);
+                                                                        }}
+                                                                        className={`px-2 py-0.5 rounded-lg text-[8px] font-black transition-all border
+                                                                            ${selected
+                                                                                ? 'bg-orange-500 text-white border-orange-600'
+                                                                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:border-orange-300 hover:text-orange-600'
+                                                                            } ${!canToggle ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}>
+                                                                        {inv.invoice_number}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    {(s.facturas || '').trim() && (
+                                                        <p className="text-[8px] text-orange-600 font-bold mt-1">
+                                                            Seleccionadas: {s.facturas}
+                                                        </p>
                                                     )}
                                                 </div>
 

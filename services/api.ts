@@ -168,7 +168,7 @@ export const api = {
   },
 
   // --- CONCILIACIÓN FACTURAS (PLAN R) ---
-  getConciliationPending: (params?: { clientId?: string; plate?: string; from?: string; to?: string }) => {
+  getConciliationPending: (params?: { clientId?: string; plate?: string; from?: string; to?: string; docId?: string }) => {
     const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
     return fetchJson(`${API_URL}/conciliation/pending${qs}`);
   },

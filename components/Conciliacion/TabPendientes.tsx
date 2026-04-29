@@ -178,6 +178,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     // ── Carga detalle del documento ───────────────────────────────────────────
     const loadDocDetail = useCallback(async (doc: DocSummary) => {
         setSelectedDoc(doc);
+        // En móvil (<640px) colapsar lista para mostrar el detalle automáticamente
+        if (window.innerWidth < 640) setCollapseDocs(true);
         setInvoices([]);
         setRoutes([]);
         setUnassigned(0);
@@ -454,6 +456,33 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             toast.error('Error al generar Excel: ' + err.message);
         }
     }, [selectedDoc, invoices, groupPayments, routeSurcharges]);
+
+    const handleExportSobrecostos = useCallback(() => {
+        if (!selectedDoc || routeSurcharges.length === 0) {
+            toast.error('No hay sobrecostos para exportar');
+            return;
+        }
+        try {
+            const wb = XLSX.utils.book_new();
+            const data = routeSurcharges.map(s => ({
+                'DOCUMENTO':     selectedDoc.external_doc_id,
+                'PLACA':         s.plate || '—',
+                'VALOR':         Number(s.valor) || 0,
+                'REFERENCIA':    s.referencia || '—',
+                'FECHA':         s.fecha ? String(s.fecha).slice(0, 10) : '—',
+                'ESTADO':        (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente',
+                'OBSERVACIONES': s.observaciones || '—',
+                'FACTURAS':      s.facturas || '—',
+                'REGISTRADO':    s.created_at ? String(s.created_at).slice(0, 16) : '—',
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, 'Sobrecostos');
+            XLSX.writeFile(wb, `SOBRECOSTOS-${selectedDoc.external_doc_id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Sobrecostos exportados correctamente');
+        } catch (err: any) {
+            toast.error('Error al exportar: ' + err.message);
+        }
+    }, [selectedDoc, routeSurcharges]);
 
     // ── Filtros ───────────────────────────────────────────────────────────────
     const filteredDocs = useMemo(() =>
@@ -852,12 +881,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             <div className="flex items-center justify-between gap-3 flex-wrap">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <button onClick={() => setCollapseDocs(!collapseDocs)}
-                                        className={`p-2 rounded-xl transition-all shadow-md flex items-center justify-center border-2
-                                            ${collapseDocs 
-                                                ? 'bg-slate-900 text-white hover:bg-slate-800 border-slate-900 w-12 h-12' 
-                                                : 'bg-white text-emerald-600 border-emerald-500 hover:bg-emerald-50 w-10 h-10'}`}
+                                        className={`rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 border-2 px-3 py-2
+                                            ${collapseDocs
+                                                ? 'bg-slate-900 text-white hover:bg-slate-800 border-slate-900'
+                                                : 'bg-white text-emerald-600 border-emerald-500 hover:bg-emerald-50'}`}
                                         title={collapseDocs ? "Mostrar lista de documentos" : "Ocultar lista de documentos"}>
-                                        {collapseDocs ? <Icons.ChevronRight className="w-6 h-6" /> : <Icons.ChevronLeft className="w-5 h-5" />}
+                                        {collapseDocs
+                                            ? <><Icons.ChevronLeft className="w-4 h-4" /><span className="text-[10px] font-black uppercase tracking-wider sm:hidden">Lista</span></>
+                                            : <Icons.ChevronLeft className="w-5 h-5" />}
                                     </button>
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
                                         {selectedDoc.external_doc_id}
@@ -902,6 +933,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm">
                                         <Icons.Download className="w-3 h-3" />
                                         Exportar Excel
+                                    </button>
+                                    <button
+                                        onClick={handleExportSobrecostos}
+                                        title="Exportar tabla de sobrecostos con observaciones y facturas"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm">
+                                        <Icons.Download className="w-3 h-3" />
+                                        Exportar Sobrecostos
                                     </button>
                                     <button
                                         onClick={() => msFileRef.current?.click()}
@@ -1689,16 +1727,20 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                     </div>
                                                 ))}
                                                   {activeDetailCard === 'sc' && routeSurcharges.filter(s => s.plate === detailRoute.plate).map((s, idx) => {
-                                                      const statusName = (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente';
+                                                      const approved = s.status_id === 'APROBADO' || s.status_id === 'EST-02';
                                                       return (
-                                                          <div key={idx} className={`flex items-center justify-between p-2.5 rounded-xl border ${statusName === 'Aprobado' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-                                                              <div>
-                                                                  <p className={`text-[10px] font-black ${statusName === 'Aprobado' ? 'text-emerald-900' : 'text-rose-900'}`}>Surcharge / Gasto</p>
-                                                                  <p className={`text-[8px] font-bold uppercase ${statusName === 'Aprobado' ? 'text-emerald-600' : 'text-rose-600'}`}>{s.referencia || 'S/R'} · {statusName}</p>
-                                                              </div>
-                                                              <div className="text-right">
-                                                                  <p className={`text-[11px] font-black ${statusName === 'Aprobado' ? 'text-emerald-700' : 'text-rose-700'}`}>{fmtCOP(s.valor)}</p>
-                                                                  <p className="text-[8px] text-slate-400">{s.fecha ? String(s.fecha).slice(0, 10) : '—'}</p>
+                                                          <div key={idx} className={`p-2.5 rounded-xl border ${approved ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+                                                              <div className="flex items-start justify-between gap-2">
+                                                                  <div className="min-w-0">
+                                                                      <p className={`text-[10px] font-black ${approved ? 'text-emerald-900' : 'text-rose-900'}`}>Surcharge / Gasto</p>
+                                                                      <p className={`text-[8px] font-bold uppercase ${approved ? 'text-emerald-600' : 'text-rose-600'}`}>{s.referencia || 'S/R'} · {approved ? 'Aprobado' : 'Pendiente'}</p>
+                                                                      {s.observaciones && <p className="text-[8px] text-slate-500 mt-0.5 italic">{s.observaciones}</p>}
+                                                                      {s.facturas && <p className="text-[7px] font-bold text-slate-400 mt-0.5">Facturas: {s.facturas}</p>}
+                                                                  </div>
+                                                                  <div className="text-right shrink-0">
+                                                                      <p className={`text-[11px] font-black ${approved ? 'text-emerald-700' : 'text-rose-700'}`}>{fmtCOP(s.valor)}</p>
+                                                                      <p className="text-[8px] text-slate-400">{s.fecha ? String(s.fecha).slice(0, 10) : '—'}</p>
+                                                                  </div>
                                                               </div>
                                                           </div>
                                                       );
@@ -1824,7 +1866,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         valor: String(s.valor),
                         nroAprobacion: s.referencia,
                         fecha: s.fecha ? s.fecha.slice(0, 10) : '',
-                        statusId: s.status_id
+                        statusId: s.status_id,
+                        observaciones: s.observaciones || '',
+                        facturas: s.facturas || '',
                     }))}
                     initialGroupPayments={groupPayments
                         .filter(p => p.plate === modalRoute.plate)
