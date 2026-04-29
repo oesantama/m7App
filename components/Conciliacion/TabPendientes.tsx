@@ -150,6 +150,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [summaryFilter, setSummaryFilter]     = useState<string | null>(null);
     const [showMsPreview, setShowMsPreview]     = useState(false);
     const [closingCycle, setClosingCycle]       = useState(false);
+    const [confirmClose, setConfirmClose]       = useState<{ plate?: string } | null>(null);
 
     // ASIGNACIÓN
     const [vehicles, setVehicles]           = useState<any[]>([]);
@@ -254,15 +255,19 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
     const handleCloseCycle = async (plate?: string) => {
         if (!selectedDoc) return;
-        const targetDesc = plate ? `de la placa ${plate}` : `del documento ${selectedDoc.external_doc_id}`;
-        if (!window.confirm(`¿Está seguro de cerrar administrativamente las facturas ${targetDesc}? Las facturas restantes se marcarán como conciliadas.`)) return;
-        
+        setConfirmClose({ plate });
+    };
+
+    const handleConfirmClose = async () => {
+        if (!selectedDoc || !confirmClose) return;
+        const plate = confirmClose.plate;
+        setConfirmClose(null);
         setClosingCycle(true);
         try {
-            const res = await api.closeConciliationCycle({ 
-                documentId: selectedDoc.id, 
+            const res = await api.closeConciliationCycle({
+                documentId: selectedDoc.id,
                 userId: user.id,
-                vehiclePlate: plate 
+                vehiclePlate: plate
             });
             toast.success(`Ciclo cerrado: ${res.closedCount} facturas conciliadas administrativamente.`);
             loadDocDetail(selectedDoc);
@@ -917,7 +922,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     />
                                     {/* Cerrar Facturación */}
                                     <button
-                                        onClick={handleCloseCycle}
+                                        onClick={() => handleCloseCycle()}
                                         disabled={closingCycle || Math.abs(stats.pendiente ?? 0) > 1500}
                                         title="Cerrar administrativamente las facturas restantes (solo si el pendiente es +/- 1500)"
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm
@@ -1885,6 +1890,44 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             )}
 
             {/* Modal de asignación de factura a placa */}
+            {/* Modal confirmación Cerrar Facturación */}
+            {confirmClose && selectedDoc && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
+                                <Icons.Lock className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <h3 className="text-base font-black text-slate-900">Cerrar Facturación</h3>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-2">
+                            ¿Está seguro de cerrar administrativamente las facturas{' '}
+                            {confirmClose.plate
+                                ? <><span className="font-black text-slate-900">de la placa {confirmClose.plate}</span></>
+                                : <><span className="font-black text-slate-900">del documento {selectedDoc.external_doc_id}</span></>
+                            }?
+                        </p>
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-6">
+                            ⚠️ Las facturas restantes se marcarán como conciliadas. Esta acción no se puede deshacer.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setConfirmClose(null)}
+                                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleConfirmClose}
+                                disabled={closingCycle}
+                                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95 flex items-center gap-2">
+                                {closingCycle && <Icons.Loader className="w-3 h-3 animate-spin" />}
+                                Confirmar Cierre
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {assigningInvoice && selectedDoc && (
                 <AssignmentModal
                     isOpen={!!assigningInvoice}
