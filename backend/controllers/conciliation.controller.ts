@@ -976,7 +976,7 @@ export const saveSobrecostos = async (req: Request, res: Response) => {
         for (const item of items) {
             // Un ID de base de datos es un número secuencial. 
             // Un ID temporal del frontend (Date.now()) es un número largo (> 10^10).
-            const isDbId = item.id && !isNaN(Number(item.id)) && String(item.id).length < 10;
+            const isDbId = item.id && !String(item.id).startsWith('temp-') && !isNaN(Number(item.id));
 
             if (isDbId) {
                 await client.query(`

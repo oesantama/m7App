@@ -696,7 +696,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [headerFilter, setHeaderFilter]     = useState<string | null>(null);
 
     // Estado sobrecostos
-    const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01', observaciones: '', facturas: '' }]);
+    const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), statusId: 'EST-01', observaciones: '', facturas: '' }]);
     const [savingSobrecosto, setSavingSobrecosto] = useState(false);
     const [isGrupalUnlocked, setIsGrupalUnlocked] = useState(false);
 
@@ -730,7 +730,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 valor: s.valor ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Math.floor(Number(s.valor) || 0)) : ''
             })));
         } else {
-            setSobrecostos([{ id: '1', valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01', observaciones: '', facturas: '' }]);
+            setSobrecostos([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), statusId: 'EST-01', observaciones: '', facturas: '' }]);
         }
 
         setTab('individual');
@@ -1546,7 +1546,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     })}
                                 </div>
 
-                                <button onClick={() => setSobrecostos([...sobrecostos, { id: String(Date.now()), valor: '', nroAprobacion: '', fecha: new Date().toISOString().slice(0, 10), statusId: 'EST-01' }])}
+                                <button onClick={() => setSobrecostos([...sobrecostos, { id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), statusId: 'EST-01', observaciones: '', facturas: '' }])}
                                     className="mt-4 w-full py-2.5 border-2 border-dashed border-slate-300 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest hover:border-orange-400 hover:text-orange-600 transition-all">
                                     + Agregar otro sobrecosto
                                 </button>
