@@ -93,6 +93,26 @@ const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO', 'DEVUELT'];
 const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL', 'PARCIAL'];
 const REPICE_STATUS    = ['EST-15', 'REPICE'];
 
+const STATUS_NAMES: Record<string, string> = {
+    'EST-10': 'Asignado',        'ASIGNADO': 'Asignado',
+    'EST-11': 'En Ruta',         'EN_RUTA': 'En Ruta',
+    'EST-12': 'Entregado',       'ENTREGADO': 'Entregado',
+    'EST-13': 'Devuelto',        'DEVUELTO': 'Devuelto',
+    'EST-14': 'Entrega Parcial', 'PARCIAL': 'Entrega Parcial',
+    'EST-15': 'Repice',          'REPICE': 'Repice',
+    'EST-16': 'Cancelado/Reasignado',
+    'EST-17': 'Cancelado',
+};
+const getStatusName = (code?: string) => {
+    if (!code) return '—';
+    return STATUS_NAMES[code.toUpperCase()] || STATUS_NAMES[code] || code;
+};
+
+const fmtDateExcel = (d?: string | null) => {
+    if (!d) return '—';
+    return String(d).replace('T', ' ').slice(0, 16);
+};
+
 const Metric: React.FC<{ label: string; value: string | number; color: string }> = ({ label, value, color }) => (
     <div className={`flex flex-col items-center px-3 py-2 rounded-xl ${color}`}>
         <span className="text-[9px] font-black uppercase tracking-widest opacity-70 leading-none mb-0.5">{label}</span>
@@ -360,12 +380,12 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                 'CLIENTE':         i.customer_name || '—',
                 'CIUDAD':          i.city || '—',
                 'PLACA':           i.route_vehicle_plate || '—',
-                'ESTADO':          i.item_status || '—',
+                'ESTADO':          getStatusName(i.item_status),
                 'VALOR FACTURA':   i.invoice_value || 0,
                 'VALOR RECAUDADO': i.valor || 0,
                 'METODO':          i.forma_pago || '—',
                 'COMPROBANTE':     i.comprobante || '—',
-                'FECHA PAGO':      i.fecha_pago ? i.fecha_pago.slice(0, 10) : '—',
+                'FECHA PAGO':      fmtDateExcel(i.fecha_pago),
             }));
 
             const wsMain = XLSX.utils.aoa_to_sheet([[`REPORTE CONCILIACIÓN - ${selectedDoc.external_doc_id}`]]);
@@ -405,6 +425,28 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
             toast.success('Excel generado correctamente');
         } catch (err: any) { toast.error('Error al generar Excel: ' + err.message); }
     }, [selectedDoc, invoices, groupPayments, routeSurcharges]);
+
+    const handleExportSobrecostos = useCallback(() => {
+        if (!selectedDoc) return;
+        try {
+            const wb = XLSX.utils.book_new();
+            const data = routeSurcharges.map(s => ({
+                'DOCUMENTO':    selectedDoc.external_doc_id,
+                'PLACA':        s.plate || '—',
+                'VALOR':        Number(s.valor) || 0,
+                'REFERENCIA':   s.referencia || '—',
+                'FECHA':        fmtDateExcel(s.fecha),
+                'ESTADO':       (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente',
+                'OBSERVACIONES': s.observaciones || '—',
+                'FACTURAS':     s.facturas || '—',
+                'REGISTRADO':   fmtDateExcel(s.created_at),
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, 'Sobrecostos');
+            XLSX.writeFile(wb, `SOBRECOSTOS-${selectedDoc.external_doc_id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success('Sobrecostos exportados correctamente');
+        } catch (err: any) { toast.error('Error al exportar sobrecostos: ' + err.message); }
+    }, [selectedDoc, routeSurcharges]);
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -470,6 +512,13 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm">
                                     <Icons.Download className="w-3 h-3" />
                                     Exportar Excel
+                                </button>
+                                <button
+                                    onClick={handleExportSobrecostos}
+                                    disabled={routeSurcharges.length === 0}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm disabled:opacity-40">
+                                    <Icons.Download className="w-3 h-3" />
+                                    Exportar Sobrecostos
                                 </button>
                             </div>
                         </div>

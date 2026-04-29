@@ -473,7 +473,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 'ESTADO':        (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente',
                 'OBSERVACIONES': s.observaciones || '—',
                 'FACTURAS':      s.facturas || '—',
-                'REGISTRADO':    s.created_at ? String(s.created_at).slice(0, 16) : '—',
+                'REGISTRADO':    s.created_at ? String(s.created_at).replace('T', ' ').slice(0, 16) : '—',
             }));
             const ws = XLSX.utils.json_to_sheet(data);
             XLSX.utils.book_append_sheet(wb, ws, 'Sobrecostos');
