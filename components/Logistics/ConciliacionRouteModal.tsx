@@ -787,29 +787,36 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     }, [invoices]);
 
     const handleSaveGrupal = async () => {
-        const activePayments = consignaciones.filter(c => Number(String(c.valor).replace(/\D/g, '')) > 0);
-        if (activePayments.length === 0) {
+        // Registros existentes (con ID real de DB) siempre se incluyen — pueden editarse a 0
+        const existingRecords = consignaciones.filter(c => c.id && !String(c.id).startsWith('temp-'));
+        // Registros nuevos solo si tienen valor > 0
+        const newNonZero = consignaciones.filter(c => {
+            if (c.id && !String(c.id).startsWith('temp-')) return false;
+            const rawVal = String(c.valor || '').replace(/\D/g, '');
+            return rawVal !== '' && Number(rawVal) > 0;
+        });
+        const allToSave = [...existingRecords, ...newNonZero];
+
+        if (allToSave.length === 0) {
             toast.error('Ingrese al menos un valor de consignación válido.');
             return;
         }
 
-        const hasMissingRef = activePayments.some(c => !c.nroAprobacion || c.nroAprobacion.trim() === '');
-        if (hasMissingRef) {
+        // Referencia obligatoria solo para pagos con valor > 0
+        const nonZeroWithMissingRef = allToSave.filter(c => {
+            const val = Number(String(c.valor || '').replace(/\D/g, ''));
+            return val > 0 && (!c.nroAprobacion || c.nroAprobacion.trim() === '');
+        });
+        if (nonZeroWithMissingRef.length > 0) {
             toast.error('La Referencia es obligatoria para cada pago registrado.');
             return;
         }
 
         setSavingGrupal(true);
         try {
-            // M7 FIX: Asegurar que enviamos todos los datos, incluso los que tienen ID numérico (actualizaciones)
-            const payload = consignaciones
-                .filter(c => {
-                    const rawVal = String(c.valor || '').replace(/\D/g, '');
-                    return rawVal !== '' && Number(rawVal) > 0;
-                })
-                .map(c => ({
+            const payload = allToSave.map(c => ({
                     id: String(c.id).startsWith('temp-') ? undefined : c.id,
-                    valor: Math.floor(Number(String(c.valor).replace(/\D/g, '')) || 0),
+                    valor: Math.floor(Number(String(c.valor || '').replace(/\D/g, '')) || 0),
                     referencia: c.nroAprobacion,
                     fecha: c.fecha,
                     metodo: c.metodo || 'CONSIGNACION',
