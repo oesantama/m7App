@@ -771,6 +771,48 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         .filter(v => !usedVehicleIds.has(v.id))
         .sort((a, b) => (Number(b.capacityM3) || 0) - (Number(a.capacityM3) || 0));
 
+      // ── ZONA PRE-ASIGNACIÓN ────────────────────────────────────────────────
+      // Fase 1: Agregar fuerza total por vehículo y determinar qué ciudades/zonas
+      // ha operado más frecuentemente. Vehículos con más experiencia en una zona
+      // la "reclaman" primero en competencia greedy. Así cada vehículo arranca
+      // en su área histórica determinista en vez de solo usar un hint débil.
+      // ──────────────────────────────────────────────────────────────────────
+
+      // Mapa: vehicle_id → Map<cityKey, strength>
+      const vehicleCityStrength = new Map<string, Map<string, number>>();
+      for (const p of learningPatterns) {
+        if (!p.vehicle_id || !p.city) continue;
+        if (!vehicleCityStrength.has(p.vehicle_id)) vehicleCityStrength.set(p.vehicle_id, new Map());
+        const cMap = vehicleCityStrength.get(p.vehicle_id)!;
+        cMap.set(p.city, (cMap.get(p.city) || 0) + (p.strength || 0));
+      }
+
+      // Ordenar vehículos por fuerza total desc (más experimentados reclaman primero)
+      const vehiclesByExperience = [...prioritizedFleet].sort((a, b) => {
+        const totalA = [...(vehicleCityStrength.get(a.id)?.values() || [])].reduce((s, v) => s + v, 0);
+        const totalB = [...(vehicleCityStrength.get(b.id)?.values() || [])].reduce((s, v) => s + v, 0);
+        return totalB - totalA;
+      });
+
+      // Competencia greedy: cada vehículo reclama sus top ciudades no reclamadas
+      const claimedCities = new Map<string, string>(); // cityKey → vehicle_id
+      const vehicleOwnedCities = new Map<string, Set<string>>(); // vehicle_id → Set<cityKey>
+
+      for (const vehicle of vehiclesByExperience) {
+        const cityMap = vehicleCityStrength.get(vehicle.id);
+        if (!cityMap) continue;
+        // Top ciudades de este vehículo ordenadas por fuerza desc
+        const sortedCities = [...cityMap.entries()].sort((a, b) => b[1] - a[1]);
+        for (const [city] of sortedCities) {
+          if (!claimedCities.has(city)) {
+            claimedCities.set(city, vehicle.id);
+            if (!vehicleOwnedCities.has(vehicle.id)) vehicleOwnedCities.set(vehicle.id, new Set());
+            vehicleOwnedCities.get(vehicle.id)!.add(city);
+          }
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
       prioritizedFleet.forEach(vehicle => {
         if (remainingCells.every(c => c.invoices.length === 0)) return;
         if (usedVehicleIds.has(vehicle.id)) return;
@@ -780,31 +822,36 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const absoluteMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION;
         const isLargeVehicle = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
 
-        const affinity = [...learningPatterns]
-          .filter(p => p.vehicle_id === vehicle.id)
-          .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
-        const targetCity = affinity ? affinity.city : null;
+        const ownedCities = vehicleOwnedCities.get(vehicle.id) || new Set<string>();
 
-        // Encontrar celda ancla: primera celda no vacía con mayor densidad
-        const anchorCell = remainingCells.find(c => c.invoices.length > 0);
+        // Encontrar celda ancla: priorizar celdas en ciudades propias del vehículo
+        const ownedAnchor = remainingCells.find(c =>
+          c.invoices.length > 0 && c.invoices.some(i => ownedCities.has((i as any).cityKey || ''))
+        );
+        const anchorCell = ownedAnchor || remainingCells.find(c => c.invoices.length > 0);
         if (!anchorCell) return;
 
-        // Recopilar celdas candidatas: mismo zona + adyacentes + dentro de MAX_CLUSTER_SPREAD_KM
+        // Recopilar celdas candidatas: ciudades propias primero, luego zona + adyacentes
         const anchorZone = anchorCell.zone;
         const adjacentZones = GEO_ZONES_ADJACENT[anchorZone] || [];
         const allowedZones = new Set([anchorZone, ...adjacentZones]);
 
         const candidateCells = remainingCells.filter(c => {
           if (c.invoices.length === 0) return false;
-          if (!allowedZones.has(c.zone)) return false;
+          // Celdas en ciudades propias siempre son candidatas (dentro del radio)
+          const hasOwnedInvoice = c.invoices.some(i => ownedCities.has((i as any).cityKey || ''));
+          if (!hasOwnedInvoice && !allowedZones.has(c.zone)) return false;
           if (anchorCell.centerLat > 0 && c.centerLat > 0) {
             return getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng) <= MAX_CLUSTER_SPREAD_KM;
           }
-          return allowedZones.has(c.zone);
+          return hasOwnedInvoice || allowedZones.has(c.zone);
         });
 
-        // Ordenar celdas candidatas por distancia al ancla
+        // Ordenar celdas candidatas: ciudades propias primero, luego por distancia al ancla
         candidateCells.sort((a, b) => {
+          const aOwned = a.invoices.some(i => ownedCities.has((i as any).cityKey || '')) ? 0 : 1;
+          const bOwned = b.invoices.some(i => ownedCities.has((i as any).cityKey || '')) ? 0 : 1;
+          if (aOwned !== bOwned) return aOwned - bOwned;
           if (anchorCell.centerLat === 0) return 0;
           const dA = a.centerLat > 0 ? getDistance(anchorCell.centerLat, anchorCell.centerLng, a.centerLat, a.centerLng) : 999;
           const dB = b.centerLat > 0 ? getDistance(anchorCell.centerLat, anchorCell.centerLng, b.centerLat, b.centerLng) : 999;
@@ -825,11 +872,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             const aT = (a as any).timeWindowMinutes ?? Infinity;
             const bT = (b as any).timeWindowMinutes ?? Infinity;
             if (aT !== bT) return aT - bT;
-            if (targetCity) {
-              const aCity = ((a as any).cityKey || '') === targetCity ? -1 : 0;
-              const bCity = ((b as any).cityKey || '') === targetCity ? -1 : 0;
-              if (aCity !== bCity) return aCity - bCity;
-            }
+            const aOwn = ownedCities.has((a as any).cityKey || '') ? -1 : 0;
+            const bOwn = ownedCities.has((b as any).cityKey || '') ? -1 : 0;
+            if (aOwn !== bOwn) return aOwn - bOwn;
             return Number(a.lat) - Number(b.lat);
           });
 
