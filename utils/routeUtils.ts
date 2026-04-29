@@ -247,7 +247,9 @@ export const OPTIMIZATION_CONSTANTS = {
     CRITICAL_THRESHOLD: 0.92,  // 92% — bloqueo crítico de sobrecarga
     WARN_THRESHOLD: 0.85,      // 85% — umbral de advertencia amarilla
     DEFAULT_CAPACITY: 30,      // m³ por defecto si el vehículo no tiene capacidad definida
-    OPTIMIZATION_DELAY: 1200   // ms de delay para la animación de optimización
+    OPTIMIZATION_DELAY: 1200,  // ms de delay para la animación de optimización
+    TARGET_INVOICES: 23,       // promedio objetivo de facturas por ruta
+    MAX_INVOICES: 28,          // máximo absoluto de facturas por ruta (no se puede superar)
 };
 
 // ─── MEJORA 1: Haversine ─────────────────────────────────────────────────────

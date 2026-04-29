@@ -864,6 +864,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
         for (const cell of candidateCells) {
           if (currentLoadVolume >= absoluteMaxCapacity) break;
+          if (load.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) break;
 
           const toAdd: Invoice[] = [];
           // Ordenar facturas dentro de la celda por prioridad → horario → lat/lng
@@ -879,6 +880,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           });
 
           for (const inv of cellInvs) {
+            if (load.length + toAdd.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) break;
             const invVol = Number(inv.volumeM3 || (inv as any).volume_m3 || 0);
             const nKey = (inv as any).neighborhoodKey || '';
             if (isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(nKey)) continue;
@@ -901,7 +903,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
         // Optimización 2-opt post-cluster
         if (load.length >= 4) {
-          const optimized = twoOptImprove(load, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
+          const optimized = twoOptImprove(load, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
           load.length = 0;
           load.push(...optimized);
         }
@@ -1479,13 +1481,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const totX = ML + bankW + 3;
 
     autoTable(pdf, {
-      startY: y, margin: { left: ML }, tableWidth: bankW,
+      startY: y, margin: { left: ML, bottom: 28 }, tableWidth: bankW,
       head: [['BANCO', 'VALOR', 'COMPROBANTE', 'FECHA']],
       body: [['', '', '', ''], ['', '', '', ''], ['', '', '', '']],
       styles: { fontSize: 6, cellPadding: 1.5, minCellHeight: 5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0] },
       headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 6, lineWidth: 0.1, lineColor: [0, 0, 0] },
-      theme: 'grid',
-      margin: { bottom: 28 }
+      theme: 'grid'
     });
     const bankEndY = (pdf as any).lastAutoTable.finalY;
 
@@ -2325,7 +2326,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       <p className="text-[10px] font-bold text-slate-500 uppercase">{addInvoiceModal.tab === 'plan' ? 'Seleccione una factura pendiente' : 'Factura de repice (no está en el plan)'}</p>
                     </div>
                   </div>
-                  <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null }); setModalSearchTerm(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                  <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null, tab: 'plan' }); setModalSearchTerm(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
                     <Icons.X className="w-5 h-5 text-slate-400" />
                   </button>
                 </div>
