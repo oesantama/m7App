@@ -604,7 +604,8 @@ export const api = {
     body: JSON.stringify(data)
   }),
   getRoutingPatterns: () => fetchJson(`${API_URL}/routes/patterns`),
-  learnFromCompletedRoute: (data: { vehicleId: string; stops: Array<{ city: string; neighborhood: string }> }) =>
+  getDeliveryPatterns: () => fetchJson(`${API_URL}/routes/delivery-patterns`),
+  learnFromCompletedRoute: (data: { vehicleId: string; stops: Array<{ city: string; neighborhood: string; address?: string; clientId?: string }> }) =>
     fetchJson(`${API_URL}/routes/learn`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

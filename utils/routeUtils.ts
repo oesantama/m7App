@@ -301,12 +301,13 @@ export function twoOptImprove(
     const getLat = (s: typeof stops[0]) => Number(s.lat || hubLat);
     const getLng = (s: typeof stops[0]) => Number(s.lng || hubLng);
 
-    // Distancia total de una secuencia (incluyendo tramo hub→primera parada)
+    // Distancia total de una secuencia (hub→primera, inter-paradas, última→hub)
     const totalDist = (seq: typeof stops): number => {
         let d = haversineKm(hubLat, hubLng, getLat(seq[0]), getLng(seq[0]));
         for (let i = 0; i < seq.length - 1; i++) {
             d += haversineKm(getLat(seq[i]), getLng(seq[i]), getLat(seq[i + 1]), getLng(seq[i + 1]));
         }
+        d += haversineKm(getLat(seq[seq.length - 1]), getLng(seq[seq.length - 1]), hubLat, hubLng);
         return d;
     };
 

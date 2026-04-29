@@ -38,6 +38,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'delivery_returns': ['confirmation_id', 'invoice_id', 'driver_id', 'vehicle_id', 'return_reason', 'notes', 'status', 'created_at'],
   'delivery_return_items': ['return_id', 'sku', 'article_name', 'quantity_returned', 'quantity_delivered', 'unit', 'notes'],
   'routing_patterns': ['city', 'vehicle_id', 'neighborhood', 'strength', 'last_used'],
+  'delivery_patterns': ['address_key', 'vehicle_id', 'client_id', 'strength', 'last_used'],
   'deletion_logs': ['table_name', 'record_id', 'record_data', 'deleted_by', 'deleted_at'],
   'vehicle_locations': ['vehicle_id', 'driver_id', 'latitude', 'longitude', 'accuracy', 'speed', 'heading', 'updated_at', 'timestamp'],
   'document_consolidated_items': ['document_id', 'article_id', 'count_1', 'count_2', 'inventory_user', 'inventory_observation', 'expected_qty', 'picked_qty', 'dispatched_qty'],
@@ -461,6 +462,25 @@ const healSchema = async (client: any) => {
       DROP INDEX IF EXISTS unq_routing_patterns_city_veh;
       CREATE UNIQUE INDEX IF NOT EXISTS unq_routing_patterns_granular
       ON routing_patterns (city, vehicle_id, neighborhood);
+    `);
+
+    // ── delivery_patterns: memoria de clientes recurrentes ────────────────────
+    // Registra qué vehículo entregó en cada dirección (address_key = address|city en lower).
+    // Strength sube con cada confirmación; se usa para pre-asignar facturas de ese
+    // cliente al mismo vehículo antes del clustering geográfico.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS delivery_patterns (
+        id         BIGSERIAL PRIMARY KEY,
+        address_key TEXT NOT NULL,
+        vehicle_id  TEXT NOT NULL,
+        client_id   TEXT,
+        strength    INT NOT NULL DEFAULT 1,
+        last_used   TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS unq_delivery_patterns
+        ON delivery_patterns (address_key, vehicle_id);
+      CREATE INDEX IF NOT EXISTS idx_delivery_patterns_addr
+        ON delivery_patterns (address_key);
     `);
 
     // ── FIX: routing_patterns.id debe ser SERIAL (no TEXT) para que el INSERT sin id funcione ──

@@ -1,11 +1,12 @@
 
 import { Router } from 'express';
-import { getRoutes, saveRoute, logRouteMovement, getRoutingPatterns, updateLocation, getLatestLocations, learnFromCompletedRoute, geocodeAddress, getRoadRoute, reassignRouteVehicle, unassignRouteInvoice, repiceRouteInvoice, getRouteInvoices } from '../controllers/route.controller.js';
+import { getRoutes, saveRoute, logRouteMovement, getRoutingPatterns, getDeliveryPatterns, updateLocation, getLatestLocations, learnFromCompletedRoute, geocodeAddress, getRoadRoute, reassignRouteVehicle, unassignRouteInvoice, repiceRouteInvoice, getRouteInvoices } from '../controllers/route.controller.js';
 
 const router = Router();
 
 router.get('/', getRoutes);
 router.get('/patterns', getRoutingPatterns);
+router.get('/delivery-patterns', getDeliveryPatterns);
 router.post('/', saveRoute);
 router.post('/log', logRouteMovement);
 router.post('/location', updateLocation);

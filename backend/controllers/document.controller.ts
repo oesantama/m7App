@@ -620,6 +620,11 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
             [doc.id, artId, invoice]
           );
 
+          const itemNeighborhood = (item as any).neighborhood || null;
+          const itemCustomerName = (item as any).customerName || null;
+          const itemLat = (item as any).lat ?? null;
+          const itemLng = (item as any).lng ?? null;
+
           if (existingItem.rowCount && existingItem.rowCount > 0) {
             // Acumular cantidad si ya existe
             await client.query(`
@@ -628,8 +633,9 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
                 unit = $2, volume = $3, unit_volume = $4,
                 city = $5, address = $6, observation = $7,
                 batch = $8, peso = $9, un_code = $10, client_ref = $11,
-                customer_name = $12, item_status = COALESCE(item_status, 'EST-03')
-              WHERE document_id = $13 AND article_id = $14 AND invoice = $15
+                customer_name = $12, neighborhood = COALESCE($13, neighborhood),
+                item_status = COALESCE(item_status, 'EST-03')
+              WHERE document_id = $14 AND article_id = $15 AND invoice = $16
             `, [
               item.expectedQty || 0,
               item.unit || 'und',
@@ -642,13 +648,14 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.peso || 0,
               item.unCode || null,
               item.clientRef || null,
-              (item as any).customerName || null,
+              itemCustomerName,
+              itemNeighborhood,
               doc.id, artId, invoice
             ]);
           } else {
             await client.query(`
-              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name, item_status)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'EST-03')
+              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name, neighborhood, item_status)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'EST-03')
             `, [
               doc.id,
               artId,
@@ -666,8 +673,19 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.peso || 0,
               item.unCode || null,
               item.clientRef || null,
-              (item as any).customerName || null
+              itemCustomerName,
+              itemNeighborhood
             ]);
+          }
+
+          // Plan R: guardar coordenadas directas en geocoding_cache
+          if (itemLat !== null && itemLng !== null && item.address) {
+            const addrKey = (item.address + '|' + (item.city || '')).toLowerCase().trim();
+            await client.query(`
+              INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
+              VALUES ($1, $2, $3, $4, $5)
+              ON CONFLICT (address_key) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng
+            `, [addrKey, item.address, item.city || '', itemLat, itemLng]);
           }
         }
       }

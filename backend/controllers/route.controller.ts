@@ -107,6 +107,22 @@ export const getRoutingPatterns = async (req: Request, res: Response) => {
   }
 };
 
+export const getDeliveryPatterns = async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT dp.address_key, dp.vehicle_id, v.plate, dp.strength, dp.last_used
+       FROM delivery_patterns dp
+       LEFT JOIN vehicles v ON v.id = dp.vehicle_id
+       WHERE dp.strength > 0
+       ORDER BY dp.strength DESC`
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[M7-GET-DELIVERY-PATTERNS-ERR]', err.message);
+    res.status(500).json({ error: "Error al obtener patrones de entrega" });
+  }
+};
+
 export const saveRoute = async (req: Request, res: Response) => {
   const { id, vehicleId, driverId, clientId, invoiceIds, createdBy, totalVolume, utilization, capacityM3 } = req.body;
   const client = await pool.connect();
@@ -237,6 +253,7 @@ export const learnFromCompletedRoute = async (req: Request, res: Response) => {
       const neighborhood = String(stop.neighborhood || '').toUpperCase().trim();
       if (!city) continue;
 
+      // Aprendizaje ciudad+barrio → vehículo (routing_patterns)
       await client.query(`
         INSERT INTO routing_patterns (city, vehicle_id, neighborhood, strength, last_used)
         VALUES ($1, $2, $3, 2, NOW())
@@ -244,6 +261,20 @@ export const learnFromCompletedRoute = async (req: Request, res: Response) => {
           strength = routing_patterns.strength + 2,
           last_used = NOW()
       `, [city, vehicleId, neighborhood]);
+
+      // Aprendizaje dirección exacta → vehículo (delivery_patterns)
+      const address = String(stop.address || '').trim();
+      if (address && address !== 'S/D') {
+        const addrKey = `${address}|${city}`.toLowerCase();
+        const clientId = String(stop.clientId || stop.client_id || '').trim() || null;
+        await client.query(`
+          INSERT INTO delivery_patterns (address_key, vehicle_id, client_id, strength, last_used)
+          VALUES ($1, $2, $3, 2, NOW())
+          ON CONFLICT (address_key, vehicle_id) DO UPDATE SET
+            strength = delivery_patterns.strength + 2,
+            last_used = NOW()
+        `, [addrKey, vehicleId, clientId]);
+      }
     }
 
     await client.query('COMMIT');

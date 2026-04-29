@@ -279,8 +279,19 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
         const iFactura = findIdx(['remision', 'factura', 'documento', 'invoice']);
         const iCity = findIdx(['destino', 'ciudad', 'city']);
-        const iDir = findIdx(['dirección', 'direccion', 'address']);
+        const iDir = findIdx(['dirección', 'direccion', 'address', 'dir']);
         const iVol = findIdx(isPlanR ? ['volumen'] : ['vol. total', 'total volume']);
+        const iBarrio = findIdx(['barrio', 'neighborhood', 'sector']);
+        const iCustomer = findIdx(['nombre destinatario', 'destinatario', 'cliente destino', 'nombre cliente', 'empresa', 'razon social', 'customer']);
+        // Solo Plan R: coordenadas vienen en el archivo
+        const iLat = isPlanR ? findIdx(['latitud', 'lat', 'coordinada y']) : -1;
+        const iLng = isPlanR ? findIdx(['longitud', 'lon', 'lng', 'coordinada x']) : -1;
+
+        // Extrae barrio del texto de la dirección cuando no hay columna dedicada
+        const extractBarrioFromAddress = (addr: string): string => {
+          const m = addr.match(/\b(?:BARRIO|BRR\.?|BO\.?)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,30}?)(?:\s*[-,#]|$)/i);
+          return m ? m[1].trim().toUpperCase() : '';
+        };
 
         if (iArt === -1 || iCant === -1) {
           toast.error(`Faltan columnas críticas en ${finalType}.`);
@@ -310,6 +321,14 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           // Corrección de unidades de volumen
           if (!isPlanR && volVal > 1000) volVal = volVal / 1000000;
 
+          const rawAddr = iDir !== -1 ? String(row[iDir] || '').trim() : '';
+          const neighborhood = iBarrio !== -1
+            ? (String(row[iBarrio] || '').trim() || extractBarrioFromAddress(rawAddr))
+            : extractBarrioFromAddress(rawAddr);
+          const customerName = iCustomer !== -1 ? String(row[iCustomer] || '').trim() : '';
+          const latVal = iLat !== -1 ? parseFloat(String(row[iLat] || '')) : NaN;
+          const lngVal = iLng !== -1 ? parseFloat(String(row[iLng] || '')) : NaN;
+
           items.push({
             articleId: sku,
             expectedQty: qty,
@@ -319,10 +338,14 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
             unit: iUnd !== -1 ? String(row[iUnd]) : 'UND',
             invoice: iFactura !== -1 ? String(row[iFactura]) : '',
             city: iCity !== -1 ? String(row[iCity]) : '',
-            address: iDir !== -1 ? String(row[iDir]) : '',
+            address: rawAddr,
             volume: String(volVal),
             unCode: iUn !== -1 ? String(row[iUn]) : '',
-            clientRef: iRef !== -1 ? String(row[iRef]) : ''
+            clientRef: iRef !== -1 ? String(row[iRef]) : '',
+            neighborhood,
+            customerName,
+            lat: !isNaN(latVal) ? latVal : null,
+            lng: !isNaN(lngVal) ? lngVal : null,
           });
 
           consolidatedItems.push({

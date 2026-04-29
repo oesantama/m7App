@@ -50,6 +50,73 @@ const BARRIOS_ORIENTE = [
 ];
 
 /**
+ * Coordenadas centroid por barrio de Medellín.
+ * Usadas para asignar una ubicación aproximada real a facturas sin geocodificar
+ * cuando conocemos el barrio por el texto de la dirección.
+ */
+const BARRIO_CENTROIDS: Record<string, { lat: number; lng: number }> = {
+  // ── Occidente ──────────────────────────────────────────────────────────────
+  'LAURELES':             { lat: 6.2448, lng: -75.5927 },
+  'ESTADIO':              { lat: 6.2523, lng: -75.5883 },
+  'SAN JAVIER':           { lat: 6.2629, lng: -75.6035 },
+  'BELÉN':                { lat: 6.2260, lng: -75.6050 },
+  'BELEN':                { lat: 6.2260, lng: -75.6050 },
+  'ROBLEDO':              { lat: 6.2840, lng: -75.6020 },
+  'FLORESTA':             { lat: 6.2532, lng: -75.6002 },
+  'LA AMERICA':           { lat: 6.2479, lng: -75.5993 },
+  'GUAYABAL':             { lat: 6.2060, lng: -75.5940 },
+  'CARLOS E RESTREPO':    { lat: 6.2553, lng: -75.5921 },
+  'CALASANZ':             { lat: 6.2577, lng: -75.5989 },
+  'CONQUISTADORES':       { lat: 6.2508, lng: -75.5950 },
+  'LA COLINA':            { lat: 6.2590, lng: -75.5970 },
+  'SANTA MONICA':         { lat: 6.2415, lng: -75.5975 },
+  'SANTA LUCIA':          { lat: 6.2350, lng: -75.6020 },
+  'LAS VIOLETAS':         { lat: 6.2290, lng: -75.6060 },
+  'LA MOTA':              { lat: 6.2260, lng: -75.6100 },
+  'EL VELODROMO':         { lat: 6.2492, lng: -75.5862 },
+  'NUEVA VILLA DE ABURRÁ':{ lat: 6.2310, lng: -75.6000 },
+  'TRINIDAD':             { lat: 6.2680, lng: -75.6030 },
+  'SAN FERNANDO':         { lat: 6.2352, lng: -75.5930 },
+  // ── Oriente / Centro ───────────────────────────────────────────────────────
+  'MANRIQUE':             { lat: 6.2878, lng: -75.5510 },
+  'ARANJUEZ':             { lat: 6.2934, lng: -75.5575 },
+  'POPULAR':              { lat: 6.3111, lng: -75.5555 },
+  'BUENOS AIRES':         { lat: 6.2360, lng: -75.5620 },
+  'VILLA HERMOSA':        { lat: 6.2440, lng: -75.5600 },
+  'CAMPO NUÑEZ':          { lat: 6.2610, lng: -75.5570 },
+  'PRADO':                { lat: 6.2682, lng: -75.5631 },
+  'SEVILLA':              { lat: 6.2630, lng: -75.5645 },
+  'BOSTON':               { lat: 6.2512, lng: -75.5620 },
+  'LORETO':               { lat: 6.2475, lng: -75.5585 },
+  'MANILA':               { lat: 6.2450, lng: -75.5610 },
+  'MIAMI':                { lat: 6.2430, lng: -75.5555 },
+  'EL POBLADO':           { lat: 6.2104, lng: -75.5700 },
+  'POBLADO':              { lat: 6.2104, lng: -75.5700 },
+  'LA CANDELARIA':        { lat: 6.2518, lng: -75.5636 },
+  'ALPUJARRA':            { lat: 6.2478, lng: -75.5679 },
+  'EL CHAGUALO':          { lat: 6.2618, lng: -75.5680 },
+  'JESUS NAZARENO':       { lat: 6.2545, lng: -75.5710 },
+  'SAN BENITO':           { lat: 6.2476, lng: -75.5730 },
+  'LA CRUZ':              { lat: 6.3080, lng: -75.5480 },
+  'MORAVIA':              { lat: 6.2850, lng: -75.5617 },
+  'CASTILLA':             { lat: 6.2975, lng: -75.5740 },
+  'DOCE DE OCTUBRE':      { lat: 6.3003, lng: -75.5717 },
+  'EL PESEBRE':           { lat: 6.2750, lng: -75.5810 },
+  'PESEBRE':              { lat: 6.2750, lng: -75.5810 },
+  'EL TRIUNFO':           { lat: 6.2810, lng: -75.5760 },
+  'TRIUNFO':              { lat: 6.2810, lng: -75.5760 },
+  'CALVO SUR':            { lat: 6.2620, lng: -75.5695 },
+  'NARANJAL':             { lat: 6.2658, lng: -75.5735 },
+  'INDUSTRIALES':         { lat: 6.2550, lng: -75.5780 },
+};
+
+/** Devuelve las coordenadas del centroide de un barrio, o null si no está en la tabla. */
+function getBarrioCentroid(neighborhoodKey: string): { lat: number; lng: number } | null {
+  const k = neighborhoodKey.toUpperCase().trim();
+  return BARRIO_CENTROIDS[k] ?? null;
+}
+
+/**
  * Infiere el lado del río desde el texto de una dirección cuando no hay barrio/coordenadas.
  * Usa keywords de barrios conocidos y luego número de carrera (río ~ CR 57-58 en Medellín).
  */
@@ -217,6 +284,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   const [auditLogs, setAuditLogs] = useState<RouteLog[]>([]);
   const [learningPatterns, setLearningPatterns] = useState<RoutingPattern[]>([]);
+  const [deliveryPatterns, setDeliveryPatterns] = useState<Array<{ address_key: string; vehicle_id: string; plate: string; strength: number }>>([]);
   const [learningExemptions, setLearningExemptions] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [auditModal, setAuditModal] = useState<{ isOpen: boolean; action: any; data: any } | null>(null);
@@ -539,11 +607,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   // Carga inicial de patrones de aprendizaje
   useEffect(() => {
     api.getRoutingPatterns().then(data => {
-      if (Array.isArray(data)) {
-        // console.log(`[ORBIT-INTELLIGENCE] Cargados ${data.length} patrones de aprendizaje regenerativo.`);
-        setLearningPatterns(data);
-      }
+      if (Array.isArray(data)) setLearningPatterns(data);
     }).catch(err => { if (import.meta.env.DEV) console.error('[M7-IA-PATTERNS]', err); });
+
+    api.getDeliveryPatterns().then((data: any) => {
+      if (Array.isArray(data)) setDeliveryPatterns(data);
+    }).catch(err => { if (import.meta.env.DEV) console.error('[M7-DELIVERY-PATTERNS]', err); });
   }, [onRefresh]);
 
 
@@ -625,6 +694,42 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   const onManualSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
+  };
+
+  /**
+   * Geocodifica en batch las facturas que tienen coordenadas default (sin geocodificar).
+   * Respeta el rate-limit de Nominatim (1 req/s) y actualiza in-place.
+   * Máximo GEOCODE_BATCH_LIMIT facturas para no bloquear la UI.
+   */
+  const GEOCODE_BATCH_LIMIT = 40;
+  const enrichInvoicesWithGeocode = async (invoices: Invoice[]): Promise<Invoice[]> => {
+    const DEFAULT_LAT = 6.2518, DEFAULT_LNG = -75.5636;
+    const needsGeocode = invoices.filter(inv => {
+      const lat = Number(inv.lat || 0), lng = Number(inv.lng || 0);
+      return (lat === 0 && lng === 0) ||
+        (Math.abs(lat - DEFAULT_LAT) < 0.001 && Math.abs(lng - DEFAULT_LNG) < 0.001);
+    }).slice(0, GEOCODE_BATCH_LIMIT);
+
+    if (needsGeocode.length === 0) return invoices;
+
+    const geocoded = new Map<string, { lat: number; lng: number }>();
+    for (const inv of needsGeocode) {
+      if (!inv.address || !inv.city) continue;
+      try {
+        const geo = await api.geocodeAddress({ address: inv.address, city: inv.city });
+        if (geo?.lat && geo?.lng && !geo.fallback) {
+          geocoded.set(inv.id, { lat: geo.lat, lng: geo.lng });
+        }
+      } catch { /* ignorar errores individuales */ }
+    }
+
+    if (geocoded.size === 0) return invoices;
+
+    return invoices.map(inv => {
+      const coords = geocoded.get(inv.id);
+      if (coords) return { ...inv, lat: coords.lat, lng: coords.lng };
+      return inv;
+    });
   };
 
   const runOrbitOptimization = (specificInvoices?: Invoice[]) => {
@@ -732,13 +837,25 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             if (foundBarrioOcc) (inv as any).neighborhoodKey = foundBarrioOcc;
             else if (foundBarrioOri) (inv as any).neighborhoodKey = foundBarrioOri;
           }
-          // Si aún sin coords, inferir lado del río para corregir geoZone
+          // Si aún sin coords, intentar centroide de barrio antes de inferir por lado del río
           if ((inv as any).hasDefaultCoords || (lat === 0 && lng === 0)) {
-            const side = inferMedellínSide(rawAddr + ' ' + ((inv as any).neighborhoodKey || ''));
-            if (side === 'OCCIDENTE') (inv as any).geoZone = 'CENTRO_OCC';
-            else if (side === 'ORIENTE') (inv as any).geoZone = 'CENTRO';
-            // @ts-ignore — marcar que la zona fue inferida (no tiene coords reales)
-            (inv as any).zoneInferred = true;
+            const nKey = (inv as any).neighborhoodKey || '';
+            const centroid = getBarrioCentroid(nKey);
+            if (centroid) {
+              // Asignar coordenadas del centroide del barrio
+              (inv as any).lat = centroid.lat;
+              (inv as any).lng = centroid.lng;
+              (inv as any).hasDefaultCoords = false;
+              (inv as any).geoZone = classifyGeoZone(centroid.lat, centroid.lng, cUpper);
+              (inv as any).zoneInferred = false;
+            } else {
+              // Fallback: inferir lado del río por texto de dirección
+              const side = inferMedellínSide(rawAddr + ' ' + nKey);
+              if (side === 'OCCIDENTE') (inv as any).geoZone = 'CENTRO_OCC';
+              else if (side === 'ORIENTE') (inv as any).geoZone = 'CENTRO';
+              // @ts-ignore — marcar que la zona fue inferida (no tiene coords reales)
+              (inv as any).zoneInferred = true;
+            }
           }
         }
       });
@@ -763,6 +880,39 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         if (Number(a.lat) !== Number(b.lat)) return Number(a.lat) - Number(b.lat);
         return Number(a.lng) - Number(b.lng);
       });
+
+      // ── PRE-PASO: Agrupación por dirección/cliente ────────────────────────
+      // Facturas con el mismo cliente+ciudad no pueden quedar en rutas distintas.
+      // Construir un mapa addressGroupKey → [invoices] y propagar coordenadas
+      // de la primera factura geocodificada al resto del grupo.
+      {
+        const addrGroups = new Map<string, Invoice[]>();
+        availableInvoices.forEach(inv => {
+          const aKey = (
+            (inv.address || '').toUpperCase().trim().replace(/\s+/g, ' ') +
+            '|' + ((inv as any).cityKey || '')
+          );
+          (inv as any).addressGroupKey = aKey;
+          if (!addrGroups.has(aKey)) addrGroups.set(aKey, []);
+          addrGroups.get(aKey)!.push(inv);
+        });
+
+        // Propagar coords y zone desde la mejor factura del grupo
+        addrGroups.forEach(group => {
+          if (group.length < 2) return;
+          const withCoords = group.find(i => Number(i.lat) > 0 && !(i as any).hasDefaultCoords);
+          if (!withCoords) return;
+          group.forEach(inv => {
+            if ((inv as any).hasDefaultCoords || Number(inv.lat) === 0) {
+              (inv as any).lat = withCoords.lat;
+              (inv as any).lng = withCoords.lng;
+              (inv as any).hasDefaultCoords = false;
+              (inv as any).geoZone = (withCoords as any).geoZone;
+            }
+          });
+        });
+      }
+      // ──────────────────────────────────────────────────────────────────────
 
       // ── ALGORITMO CLUSTER-FIRST ────────────────────────────────────────────
       // 1. Agrupar todas las facturas en celdas de ~2.4km (0.022° × 0.022°)
@@ -844,6 +994,80 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // ──────────────────────────────────────────────────────────────────────
 
       // Mapa: vehicle_id → Map<"CIUDAD|BARRIO", strength>
+      // ── FASE 0: Pre-asignación por cliente recurrente (delivery_patterns) ────
+      // Facturas cuya dirección exacta tiene un patrón fuerte (≥3) se anclan al
+      // vehículo que históricamente las entrega, sacándolas del pool general.
+      if (deliveryPatterns.length > 0) {
+        // Construir mapa addressKey → vehicleId (el patrón más fuerte gana)
+        const addrToVehicle = new Map<string, string>();
+        const addrStrength = new Map<string, number>();
+        for (const dp of deliveryPatterns) {
+          if ((dp.strength || 0) < 3) continue; // solo patrones consolidados
+          const existing = addrStrength.get(dp.address_key) || 0;
+          if ((dp.strength || 0) > existing) {
+            addrToVehicle.set(dp.address_key, dp.vehicle_id);
+            addrStrength.set(dp.address_key, dp.strength);
+          }
+        }
+
+        if (addrToVehicle.size > 0) {
+          // Agrupar facturas pre-asignadas por vehículo
+          const preAssigned = new Map<string, Invoice[]>();
+          const preAssignedIds = new Set<string>();
+
+          availableInvoices.forEach(inv => {
+            const addrKey = (
+              (inv.address || '').trim().toLowerCase() + '|' + ((inv as any).cityKey || '').toLowerCase()
+            );
+            const vehicleId = addrToVehicle.get(addrKey);
+            if (!vehicleId) return;
+            const vehicle = prioritizedFleet.find(v => v.id === vehicleId);
+            if (!vehicle) return;
+            if (!preAssigned.has(vehicleId)) preAssigned.set(vehicleId, []);
+            preAssigned.get(vehicleId)!.push(inv);
+            preAssignedIds.add(inv.id);
+          });
+
+          // Para cada vehículo con facturas pre-asignadas, crear ruta si supera umbral mínimo
+          preAssigned.forEach((invoices, vehicleId) => {
+            const vehicle = prioritizedFleet.find(v => v.id === vehicleId);
+            if (!vehicle || usedVehicleIds.has(vehicleId)) return;
+
+            const cap = Number(vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+            const totalVol = invoices.reduce((s, i) => s + (Number(i.volumeM3) || 0), 0);
+            if (totalVol > cap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) return; // no caben
+
+            const cityCounts: Record<string, number> = {};
+            invoices.forEach(inv => {
+              const c = (inv as any).cityKey || 'SIN_CIUDAD';
+              cityCounts[c] = (cityCounts[c] || 0) + 1;
+            });
+            const dominantCity = Object.keys(cityCounts).reduce((a, b) => cityCounts[a] > cityCounts[b] ? a : b, 'LOGÍSTICA');
+
+            const optimizedLoad = invoices.length >= 4
+              ? twoOptImprove(invoices, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[]
+              : invoices;
+
+            suggestions.push({
+              id: `route-dp-${Date.now()}-${vehicle.plate}`,
+              vehicle,
+              assignedInvoices: optimizedLoad,
+              totalVolume: Number(totalVol.toFixed(4)),
+              utilization: Math.round((totalVol / cap) * 100),
+              city: dominantCity,
+            });
+            usedVehicleIds.add(vehicleId);
+          });
+
+          // Quitar del pool las que fueron pre-asignadas exitosamente
+          const confirmedPreAssignedIds = new Set(
+            suggestions.filter(r => r.id.startsWith('route-dp-')).flatMap(r => r.assignedInvoices.map(i => i.id))
+          );
+          availableInvoices = availableInvoices.filter(i => !confirmedPreAssignedIds.has(i.id));
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────────
+
       // Usar ciudad+barrio como territorio porque múltiples vehículos sirven la misma ciudad
       const vehicleTerritoryStrength = new Map<string, Map<string, number>>();
       for (const p of learningPatterns) {
@@ -1050,6 +1274,92 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         remainingCells = remainingCells.filter(c => c.invoices.length > 0);
       });
 
+      // ── Balance post-clustering ────────────────────────────────────────────────
+      // Mueve facturas de rutas con muy pocas paradas hacia rutas livianas de la
+      // misma zona geográfica, respetando capacidad de volumen y MAX_INVOICES.
+      if (suggestions.length >= 2) {
+        const MIN_INVOICES_THRESHOLD = Math.round(OPTIMIZATION_CONSTANTS.TARGET_INVOICES * 0.55); // ~13 facturas
+        let balanced = true;
+        let balanceIterations = 0;
+        while (balanced && balanceIterations < 10) {
+          balanced = false;
+          balanceIterations++;
+          for (let i = 0; i < suggestions.length; i++) {
+            const donor = suggestions[i];
+            if (donor.assignedInvoices.length <= MIN_INVOICES_THRESHOLD) continue;
+
+            const donorZone = (donor.assignedInvoices[0] as any)?.geoZone || donor.city;
+            const donorAdj = [donorZone, ...(GEO_ZONES_ADJACENT[donorZone] || [])];
+            const donorCap = Number(donor.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+
+            for (let j = 0; j < suggestions.length; j++) {
+              if (i === j) continue;
+              const receiver = suggestions[j];
+              if (receiver.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) continue;
+              const receiverCap = Number(receiver.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+              if (receiver.totalVolume >= receiverCap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
+
+              const receiverZone = (receiver.assignedInvoices[0] as any)?.geoZone || receiver.city;
+              if (!donorAdj.includes(receiverZone)) continue;
+
+              // Intentar mover la última factura del donor (más cerca del receiver geográficamente)
+              const movable = [...donor.assignedInvoices].sort((a, b) => {
+                const rLat = receiver.assignedInvoices.length > 0 ? Number(receiver.assignedInvoices[receiver.assignedInvoices.length - 1].lat || 0) : 0;
+                const rLng = receiver.assignedInvoices.length > 0 ? Number(receiver.assignedInvoices[receiver.assignedInvoices.length - 1].lng || 0) : 0;
+                const dA = Math.pow(Number(a.lat || 0) - rLat, 2) + Math.pow(Number(a.lng || 0) - rLng, 2);
+                const dB = Math.pow(Number(b.lat || 0) - rLat, 2) + Math.pow(Number(b.lng || 0) - rLng, 2);
+                return dA - dB;
+              });
+
+              for (const inv of movable) {
+                const vol = Number(inv.volumeM3) || 0;
+                if (receiver.totalVolume + vol > receiverCap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
+                if (donor.assignedInvoices.length - 1 < 1) break;
+
+                // No mover si hay otras facturas del mismo grupo de dirección en el donor
+                const addrKey = (inv as any).addressGroupKey;
+                if (addrKey) {
+                  const siblingsInDonor = donor.assignedInvoices.filter(
+                    x => x.id !== inv.id && (x as any).addressGroupKey === addrKey
+                  );
+                  if (siblingsInDonor.length > 0) continue;
+                }
+
+                // Mover factura: quitar del donor, agregar al receiver
+                const newDonorInvoices = donor.assignedInvoices.filter(x => x.id !== inv.id);
+                const newReceiverInvoices = [...receiver.assignedInvoices, inv];
+
+                suggestions[i] = {
+                  ...donor,
+                  assignedInvoices: newDonorInvoices,
+                  totalVolume: Number((donor.totalVolume - vol).toFixed(4)),
+                  utilization: Math.round(((donor.totalVolume - vol) / donorCap) * 100),
+                };
+                suggestions[j] = {
+                  ...receiver,
+                  assignedInvoices: newReceiverInvoices,
+                  totalVolume: Number((receiver.totalVolume + vol).toFixed(4)),
+                  utilization: Math.round(((receiver.totalVolume + vol) / receiverCap) * 100),
+                };
+                balanced = true;
+                break;
+              }
+            }
+          }
+        }
+        // Eliminar rutas que quedaron vacías tras el balance
+        suggestions.splice(0, suggestions.length, ...suggestions.filter(r => r.assignedInvoices.length > 0));
+
+        // Re-aplicar 2-opt a rutas modificadas
+        suggestions.forEach((r, idx) => {
+          if (r.assignedInvoices.length >= 4) {
+            const optimized = twoOptImprove(r.assignedInvoices, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
+            suggestions[idx] = { ...r, assignedInvoices: optimized };
+          }
+        });
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
       if (suggestions.length === 0) {
         if (availableVehicles.length === 0) {
           toast.error(`NO HAY TRIPULACIONES DISPONIBLES.`);
@@ -1057,7 +1367,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           toast.info("No se hallaron rutas factibles.");
         }
       } else {
-        toast.success(`Algoritmo OrbitM7 (IQ 90%): ${suggestions.length} rutas generadas.`);
+        toast.success(`Algoritmo OrbitM7 (IQ 95%): ${suggestions.length} rutas generadas.`);
       }
 
       setSuggestedRoutes(suggestions);
@@ -1285,7 +1595,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // M7 IQ: aprender de la ruta confirmada (señal más fuerte que adición manual)
         const stops = route.assignedInvoices.map(inv => ({
           city: String(inv.city || 'SIN_CIUDAD').toUpperCase().trim(),
-          neighborhood: String((inv as any).neighborhoodKey || '').toUpperCase().trim()
+          neighborhood: String((inv as any).neighborhoodKey || '').toUpperCase().trim(),
+          address: String(inv.address || '').trim(),
+          clientId: String(inv.clientId || (inv as any).docLId || '').trim(),
         }));
         api.learnFromCompletedRoute({ vehicleId: route.vehicle.id, stops })
           .catch(() => { /* route learning failed — non-critical */ });
@@ -1565,7 +1877,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           // M7 IQ: aprender de cada ruta confirmada en despacho masivo
           const stops = route.assignedInvoices.map(inv => ({
             city: String(inv.city || 'SIN_CIUDAD').toUpperCase().trim(),
-            neighborhood: String((inv as any).neighborhoodKey || '').toUpperCase().trim()
+            neighborhood: String((inv as any).neighborhoodKey || '').toUpperCase().trim(),
+            address: String(inv.address || '').trim(),
+            clientId: String(inv.clientId || (inv as any).docLId || '').trim(),
           }));
           api.learnFromCompletedRoute({ vehicleId: route.vehicle.id, stops })
             .catch(() => { /* non-critical */ });
@@ -2093,7 +2407,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           </div>
 
           <button
-            onClick={() => runOrbitOptimization(undefined)}
+            onClick={async () => {
+              setIsOptimizing(true);
+              const enriched = await enrichInvoicesWithGeocode([...validInvoices]);
+              runOrbitOptimization(enriched.length > 0 ? enriched : undefined);
+            }}
             disabled={isOptimizing || validInvoices.length === 0}
             className="shrink-0 bg-slate-900 text-emerald-500 px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-[0.15em] shadow-xl hover:bg-emerald-500 hover:text-slate-900 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 whitespace-nowrap"
           >
