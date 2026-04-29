@@ -617,7 +617,7 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
   const [liberarObs, setLiberarObs]       = useState('');
   const inputRef                          = useRef<HTMLInputElement>(null);
 
-  const canDelete = hasPermission(user, 'consulta-facturas', 'delete');
+  const canDelete = hasPermission(user, 'CONSULTA_FACTURAS', 'delete');
 
   const [liberarTab, setLiberarTab] = useState<'liberacion' | 'repice'>('liberacion');
 
