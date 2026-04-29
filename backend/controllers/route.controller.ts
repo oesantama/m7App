@@ -452,6 +452,69 @@ export const unassignRouteInvoice = async (req: Request, res: Response) => {
     }
 };
 
+export const repiceRouteInvoice = async (req: Request, res: Response) => {
+    const { routeId, invoiceId, observations, userId } = req.body;
+    if (!routeId || !invoiceId) {
+        return res.status(400).json({ success: false, error: 'routeId e invoiceId son requeridos' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Verificar que la factura pertenece a esta ruta
+        const check = await client.query(
+            `SELECT 1 FROM route_invoices WHERE route_id::text = $1::text AND invoice_id = $2`,
+            [routeId, invoiceId]
+        );
+        if (!check.rowCount) {
+            throw new Error('La factura no pertenece a esta ruta');
+        }
+
+        // 2. Actualizar item_status a EST-15 (REPICE) y fecha asignación al momento actual
+        await client.query(
+            `UPDATE document_items SET item_status = 'EST-15'
+             WHERE CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $1
+                OR TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $1`,
+            [invoiceId]
+        );
+
+        await client.query(
+            `UPDATE route_invoices SET assigned_at = NOW()
+             WHERE route_id::text = $1::text AND invoice_id = $2`,
+            [routeId, invoiceId]
+        );
+
+        // 3. Registrar en log con acción REPICE_INVOICE
+        const plateRes = await client.query(
+            `SELECT v.plate, r.driver_id, d.name AS driver_name
+             FROM routes r
+             LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+             LEFT JOIN drivers d ON d.id::text = r.driver_id::text
+             WHERE r.id::text = $1::text LIMIT 1`,
+            [routeId]
+        );
+        const prevPlate  = plateRes.rows[0]?.plate      || null;
+        const driverName = plateRes.rows[0]?.driver_name || null;
+        const obs        = `repice: ${observations || ''}`;
+        await client.query(
+            `INSERT INTO route_modifications_log (route_id, invoice_id, action, user_id, previous_plate, details)
+             VALUES ($1, $2, 'REPICE_INVOICE', $3, $4, $5)`,
+            [routeId, invoiceId, userId || null, prevPlate,
+             JSON.stringify({ observations: obs, driver_name: driverName, timestamp: new Date().toISOString() })]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[M7-REPICE-INVOICE]', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
+
 export const reassignRouteVehicle = async (req: Request, res: Response) => {
   const { routeId, newVehicleId, observations, userId } = req.body;
   const client = await pool.connect();

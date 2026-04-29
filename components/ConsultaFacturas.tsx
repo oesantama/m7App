@@ -586,7 +586,9 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
   const [liberarObs, setLiberarObs]       = useState('');
   const inputRef                          = useRef<HTMLInputElement>(null);
 
-  const canEdit = hasPermission(user, 'consulta-facturas', 'edit');
+  const canDelete = hasPermission(user, 'consulta-facturas', 'delete');
+
+  const [liberarTab, setLiberarTab] = useState<'liberacion' | 'repice'>('liberacion');
 
   const handleLiberar = async () => {
     if (!liberarObs.trim()) return;
@@ -595,18 +597,32 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
     setLiberadoMsg(null);
     try {
       const invoiceId = data.route.ri_invoice_id || data.invoice.invoice_number;
-      await api.unassignRouteInvoice({
-        routeId: data.route.route_id,
-        invoiceId,
-        observations: liberarObs.trim(),
-        userId: user?.id,
-      });
-      setLiberadoMsg({ ok: true, text: 'Factura liberada de la ruta correctamente.' });
-      setData(prev => prev ? { ...prev, route: null } : prev);
+      if (liberarTab === 'liberacion') {
+        await api.unassignRouteInvoice({
+          routeId: data.route.route_id,
+          invoiceId,
+          observations: `liberacion total: ${liberarObs.trim()}`,
+          userId: user?.id,
+        });
+        setLiberadoMsg({ ok: true, text: 'Factura liberada de la ruta correctamente.' });
+        setData(prev => prev ? { ...prev, route: null } : prev);
+      } else {
+        await api.repiceRouteInvoice({
+          routeId: data.route.route_id,
+          invoiceId,
+          observations: liberarObs.trim(),
+          userId: user?.id,
+        });
+        setLiberadoMsg({ ok: true, text: 'Factura marcada como REPICE correctamente.' });
+        setData(prev => prev ? {
+          ...prev,
+          invoice: { ...prev.invoice, item_status: 'EST-15', item_status_name: 'REPICE' },
+        } : prev);
+      }
       setShowLiberarModal(false);
       setLiberarObs('');
     } catch (err: any) {
-      setLiberadoMsg({ ok: false, text: err.message || 'No se pudo liberar la factura' });
+      setLiberadoMsg({ ok: false, text: err.message || 'No se pudo completar la acción' });
       setShowLiberarModal(false);
     } finally {
       setLiberando(false);
@@ -694,27 +710,59 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
         </div>
       )}
 
-      {/* Modal Liberar Factura */}
+      {/* Modal Liberar / Repice */}
       {showLiberarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4">
-            <h3 className="text-lg font-black text-slate-900 mb-1">Liberar Factura de Ruta</h3>
-            <p className="text-sm text-slate-500 mb-5">
-              La factura <span className="font-black text-slate-800">{data?.invoice.invoice_number}</span> será desvinculada de la ruta{data?.route?.plate ? ` (${data.route.plate})` : ''}. Esta acción queda registrada en el historial.
-            </p>
+            <h3 className="text-lg font-black text-slate-900 mb-4">Acción sobre Factura</h3>
+
+            {/* Tabs */}
+            <div className="flex gap-1 bg-slate-100 rounded-2xl p-1 mb-5">
+              <button
+                onClick={() => setLiberarTab('liberacion')}
+                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  liberarTab === 'liberacion' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                🔓 Liberación Total
+              </button>
+              <button
+                onClick={() => setLiberarTab('repice')}
+                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  liberarTab === 'repice' ? 'bg-violet-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                🔃 Repice
+              </button>
+            </div>
+
+            {liberarTab === 'liberacion' ? (
+              <p className="text-sm text-slate-500 mb-4">
+                La factura <span className="font-black text-slate-800">{data?.invoice.invoice_number}</span> será <span className="font-bold text-rose-600">desvinculada de la ruta</span>{data?.route?.plate ? ` (${data.route.plate})` : ''} y quedará disponible para reasignar. Se registra en el historial.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500 mb-4">
+                La factura <span className="font-black text-slate-800">{data?.invoice.invoice_number}</span> quedará en estado <span className="font-bold text-violet-600">REPICE</span> en la ruta{data?.route?.plate ? ` (${data.route.plate})` : ''}. La fecha de asignación se actualiza al momento actual. Se registra en el historial.
+              </p>
+            )}
+
             <div className="flex flex-col gap-2 mb-6">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Observación <span className="text-rose-500">*</span></label>
               <textarea
                 value={liberarObs}
                 onChange={e => setLiberarObs(e.target.value)}
-                placeholder="Motivo por el cual se libera la factura..."
+                placeholder={liberarTab === 'liberacion' ? 'Motivo de la liberación...' : 'Motivo del repice...'}
                 rows={3}
-                className="px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-800 text-sm font-semibold placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400/30 focus:border-rose-400 resize-none"
+                className={`px-4 py-3 rounded-2xl border bg-slate-50 text-slate-800 text-sm font-semibold placeholder:font-normal placeholder:text-slate-400 focus:outline-none resize-none transition-all ${
+                  liberarTab === 'liberacion'
+                    ? 'border-slate-200 focus:ring-2 focus:ring-rose-400/30 focus:border-rose-400'
+                    : 'border-slate-200 focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400'
+                }`}
               />
             </div>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => { setShowLiberarModal(false); setLiberarObs(''); }}
+                onClick={() => { setShowLiberarModal(false); setLiberarObs(''); setLiberarTab('liberacion'); }}
                 className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
               >
                 Cancelar
@@ -722,9 +770,11 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
               <button
                 onClick={handleLiberar}
                 disabled={liberando || !liberarObs.trim()}
-                className="px-6 py-2.5 bg-rose-500 hover:bg-rose-400 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95"
+                className={`px-6 py-2.5 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95 ${
+                  liberarTab === 'liberacion' ? 'bg-rose-500 hover:bg-rose-400' : 'bg-violet-500 hover:bg-violet-400'
+                }`}
               >
-                {liberando ? 'Liberando...' : 'Confirmar Liberación'}
+                {liberando ? 'Procesando...' : liberarTab === 'liberacion' ? 'Confirmar Liberación' : 'Confirmar Repice'}
               </button>
             </div>
           </div>
@@ -748,17 +798,22 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                 </div>
                 <div className="flex flex-col items-start md:items-end gap-2">
                   {deliveryBadge(data.invoice.item_status_name || data.invoice.item_status)}
+                  {(data.invoice.item_status === 'EST-15' || (data.invoice.item_status_name || '').toUpperCase() === 'REPICE') && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black border bg-violet-500 text-white border-violet-600 uppercase tracking-wide animate-pulse">
+                      🔃 En Repice
+                    </span>
+                  )}
                   {data.invoice.plan_type && (
                     <span className="text-[10px] font-bold bg-white/10 px-2.5 py-1 rounded-full uppercase tracking-wide">
                       {data.invoice.plan_type}
                     </span>
                   )}
-                  {canEdit && data.route?.route_id && (
+                  {canDelete && data.route?.route_id && (
                     <button
-                      onClick={() => setShowLiberarModal(true)}
+                      onClick={() => { setLiberarTab('liberacion'); setShowLiberarModal(true); }}
                       className="mt-1 px-4 py-1.5 bg-rose-500 hover:bg-rose-400 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95 whitespace-nowrap"
                     >
-                      Liberar Factura
+                      Liberar / Repice
                     </button>
                   )}
                 </div>
@@ -982,23 +1037,28 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
               <div className="flex flex-col gap-2">
                 {data.modifications.map((log, i) => {
                   const isUnassign   = log.action === 'UNASSIGN_INVOICE';
+                  const isRepice     = log.action === 'REPICE_INVOICE';
                   const isReassign   = log.action === 'REASSIGN_PLATE' || log.action === 'REASSIGN_VEHICLE' || log.action === 'REASSIGN';
                   const isAdd        = log.action === 'ADD';
                   let parsedDetails: any = null;
                   try {
                     parsedDetails = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
                   } catch { parsedDetails = null; }
-                  const obs = parsedDetails?.observations || null;
+                  const obs        = parsedDetails?.observations || null;
+                  const driverName = parsedDetails?.driver_name  || null;
                   const accentBg    = isUnassign ? 'bg-rose-50 border-rose-200'
+                                    : isRepice   ? 'bg-violet-50 border-violet-200'
                                     : isReassign ? 'bg-amber-50 border-amber-200'
                                     : isAdd      ? 'bg-emerald-50 border-emerald-200'
                                     : 'bg-slate-50 border-slate-200';
                   const accentText  = isUnassign ? 'text-rose-700'
+                                    : isRepice   ? 'text-violet-700'
                                     : isReassign ? 'text-amber-700'
                                     : isAdd      ? 'text-emerald-700'
                                     : 'text-slate-600';
-                  const icon        = isUnassign ? '🔓' : isReassign ? '🔄' : isAdd ? '➕' : '📝';
-                  const actionLabel = isUnassign ? 'Liberación de Ruta'
+                  const icon        = isUnassign ? '🔓' : isRepice ? '🔃' : isReassign ? '🔄' : isAdd ? '➕' : '📝';
+                  const actionLabel = isUnassign ? 'Liberación Total'
+                                    : isRepice   ? 'Repice'
                                     : isReassign ? 'Cambio de Placa / Reasignación'
                                     : isAdd      ? 'Asignada a Ruta'
                                     : log.action;
@@ -1032,6 +1092,12 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                           <div>
                             <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Ruta ID</div>
                             <div className="font-mono text-slate-500">{log.route_id}</div>
+                          </div>
+                        )}
+                        {driverName && (
+                          <div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Conductor</div>
+                            <div className="font-semibold text-slate-700">{driverName}</div>
                           </div>
                         )}
                         {obs && (

@@ -635,6 +635,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  repiceRouteInvoice: (data: { routeId: string; invoiceId: string; observations?: string; userId?: string }) =>
+    fetchJson(`${API_URL}/routes/repice-invoice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
   getMastersuiteReport: (params?: { document?: string; plate?: string }) => {
     const qs = new URLSearchParams();
     if (params?.document) qs.set('document', params.document);
