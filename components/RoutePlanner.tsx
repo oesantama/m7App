@@ -435,8 +435,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const validInvoices = useMemo(() => {
     // REGLA ORBIT: Solo planificar items en estado 'Pendiente' o 'Auditado'
     const filtered = invoices.filter(inv => {
-      if (learningExemptions.includes(inv.id)) return false;
-
       // FILTRO 1: Debe pertenecer al cliente seleccionado
       const invClientId = inv.clientId || (inv as any).client_id;
       const clientMatch = selectedClient === 'GLOBAL' || invClientId === selectedClient;
@@ -450,7 +448,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     });
 
     return filtered;
-  }, [invoices, learningExemptions, selectedClient]);
+  }, [invoices, selectedClient]);
 
   // Facturas que NO están en ninguna ruta sugerida NI en rutas activas ya confirmadas
   const unassignedInvoices = useMemo(() => {
