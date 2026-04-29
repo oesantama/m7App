@@ -258,7 +258,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     };
 
     useEffect(() => {
-        fetchData();
         fetchLocations();
         fetchPendingSignatures();
         fetchArticles();
