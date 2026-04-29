@@ -323,7 +323,7 @@ export const approveConciliationHeader = async (req: Request, res: Response) => 
 
 // ─── STOCK ACTUAL (Consulta de Inventario) ────────────────────────────────────
 export const getInventoryStock = async (req: Request, res: Response) => {
-  const { clientId, articleId, location = 'all' } = req.query as Record<string, string>;
+  const { clientId, articleId, location = 'all', dateFrom, dateTo } = req.query as Record<string, string>;
   try {
     const results: { bodega: any[]; vehiculos: any[] } = { bodega: [], vehiculos: [] };
 
@@ -332,11 +332,17 @@ export const getInventoryStock = async (req: Request, res: Response) => {
       const params: any[] = [];
       if (clientId)  { params.push(clientId);         conds.push(`ic.client_id = $${params.length}`); }
       if (articleId) { params.push(`%${articleId}%`); conds.push(`ic.article_id ILIKE $${params.length}`); }
+      if (dateFrom)  { params.push(dateFrom);          conds.push(`ic.last_updated >= $${params.length}`); }
+      if (dateTo)    { params.push(dateTo);             conds.push(`ic.last_updated < ($${params.length}::date + INTERVAL '1 day')`); }
       const r = await pool.query(`
-        SELECT ic.client_id, ic.article_id, a.name AS article_name, ic.batch,
-               ic.quantity::numeric AS quantity, ic.last_updated, ic.last_user
+        SELECT ic.client_id, c.name AS client_name,
+               ic.article_id, COALESCE(a.name, ic.article_id) AS article_name, ic.batch,
+               ic.quantity::numeric AS quantity, ic.last_updated, ic.last_user,
+               u.name AS last_user_name
         FROM inventario_clientes ic
-        LEFT JOIN articles a ON a.id = ic.article_id
+        LEFT JOIN articles a  ON a.id  = ic.article_id
+        LEFT JOIN clients  c  ON c.id  = ic.client_id
+        LEFT JOIN users    u  ON u.id  = ic.last_user
         WHERE ${conds.join(' AND ')}
         ORDER BY ic.article_id
       `, params);
@@ -348,10 +354,14 @@ export const getInventoryStock = async (req: Request, res: Response) => {
       const params: any[] = [];
       if (clientId)  { params.push(clientId);         conds.push(`vi.client_id = $${params.length}`); }
       if (articleId) { params.push(`%${articleId}%`); conds.push(`vi.article_id ILIKE $${params.length}`); }
+      if (dateFrom)  { params.push(dateFrom);          conds.push(`vi.last_updated >= $${params.length}`); }
+      if (dateTo)    { params.push(dateTo);             conds.push(`vi.last_updated < ($${params.length}::date + INTERVAL '1 day')`); }
       const r = await pool.query(`
-        SELECT vi.vehicle_plate, vi.driver_name, vi.client_id,
-               vi.article_id, vi.article_name, vi.batch, vi.quantity, vi.last_updated
+        SELECT vi.vehicle_plate, vi.driver_name, vi.client_id, c.name AS client_name,
+               vi.article_id, COALESCE(vi.article_name, vi.article_id) AS article_name,
+               vi.batch, vi.quantity, vi.last_updated
         FROM vehicle_inventory vi
+        LEFT JOIN clients c ON c.id = vi.client_id
         WHERE ${conds.join(' AND ')}
         ORDER BY vi.vehicle_plate, vi.article_id
       `, params);
@@ -379,14 +389,22 @@ export const getInventoryMovements = async (req: Request, res: Response) => {
     if (vehiclePlate) { params.push(vehiclePlate);     conds.push(`m.vehicle_plate = $${params.length}`); }
     if (invoice)      { params.push(`%${invoice}%`);   conds.push(`m.invoice ILIKE $${params.length}`); }
     if (dateFrom)     { params.push(dateFrom);         conds.push(`m.created_at >= $${params.length}`); }
-    if (dateTo)       { params.push(dateTo);           conds.push(`m.created_at <= $${params.length}`); }
+    if (dateTo)       { params.push(dateTo);           conds.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`); }
 
     const where  = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const [dataRes, countRes] = await Promise.all([
       pool.query(`
-        SELECT m.* FROM inventory_movements m ${where}
+        SELECT m.*,
+               u.name  AS user_name,
+               d.name  AS driver_name_lookup,
+               c.name  AS client_name
+        FROM inventory_movements m
+        LEFT JOIN users   u ON u.id         = m.user_id
+        LEFT JOIN drivers d ON d.id::text   = m.driver_id::text
+        LEFT JOIN clients c ON c.id         = m.client_id
+        ${where}
         ORDER BY m.created_at DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `, [...params, parseInt(limit), offset]),

@@ -218,11 +218,13 @@ export const api = {
     }),
 
   // ── Consulta de Inventario / Kardex ───────────────────────────────────────
-  getInventoryStock: (params?: { clientId?: string; articleId?: string; location?: string }) => {
+  getInventoryStock: (params?: { clientId?: string; articleId?: string; location?: string; dateFrom?: string; dateTo?: string }) => {
     const qs = new URLSearchParams();
     if (params?.clientId)   qs.set('clientId',   params.clientId);
     if (params?.articleId)  qs.set('articleId',  params.articleId);
     if (params?.location)   qs.set('location',   params.location);
+    if (params?.dateFrom)   qs.set('dateFrom',   params.dateFrom);
+    if (params?.dateTo)     qs.set('dateTo',     params.dateTo);
     return fetchJson(`${API_URL}/inventory/stock?${qs}`);
   },
   getInventoryMovements: (params?: {

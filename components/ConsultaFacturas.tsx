@@ -210,6 +210,7 @@ const SectionCard: React.FC<{ title: string; icon: React.ReactNode; accent: stri
 interface Movement {
   id: number;
   client_id: string | null;
+  client_name: string | null;
   article_id: string;
   article_name: string | null;
   batch: string | null;
@@ -222,7 +223,9 @@ interface Movement {
   invoice: string | null;
   vehicle_plate: string | null;
   driver_id: string | null;
+  driver_name_lookup: string | null;
   user_id: string | null;
+  user_name: string | null;
   notes: string | null;
   created_at: string;
 }
@@ -236,7 +239,10 @@ interface StockRow {
   vehicle_plate: string | null;
   driver_name: string | null;
   client_id: string | null;
+  client_name: string | null;
   last_updated: string | null;
+  last_user: string | null;
+  last_user_name: string | null;
 }
 
 const MOVEMENT_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
@@ -301,7 +307,12 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
     setError(null);
     try {
       const [stockRes, movRes] = await Promise.all([
-        api.getInventoryStock({ articleId: term, clientId: selectedClientId || undefined }),
+        api.getInventoryStock({
+          articleId: term,
+          clientId: selectedClientId || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        }),
         api.getInventoryMovements({
           articleId: term,
           clientId: selectedClientId || undefined,
@@ -500,13 +511,20 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
                               </span>
                             </td>
                             <td className="px-4 py-2.5 text-slate-600">
-                              {s.vehicle_plate ? <span className="font-mono font-black text-slate-800">{s.vehicle_plate}</span> : '—'}
-                              {s.driver_name && <span className="text-slate-400 ml-1">· {s.driver_name}</span>}
+                              {s.vehicle_plate
+                                ? <span className="font-mono font-black text-slate-800">{s.vehicle_plate}</span>
+                                : <span className="text-slate-300">—</span>}
+                              {s.driver_name && <span className="text-slate-500 ml-1.5 text-[11px]">· {s.driver_name}</span>}
                             </td>
-                            <td className="px-4 py-2.5 text-slate-500 font-mono">{s.batch || 'S/L'}</td>
-                            <td className="px-4 py-2.5 text-slate-500">{s.client_id || '—'}</td>
+                            <td className="px-4 py-2.5 text-slate-500 font-mono text-[10px]">{s.batch || 'S/L'}</td>
+                            <td className="px-4 py-2.5 text-slate-700 font-semibold text-[11px]">
+                              {s.client_name || s.client_id || '—'}
+                            </td>
                             <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{Number(s.quantity)}</td>
-                            <td className="px-4 py-2.5 text-slate-400">{fmtDateTime(s.last_updated)}</td>
+                            <td className="px-4 py-2.5 text-slate-400 text-[10px]">
+                              <div>{fmtDateTime(s.last_updated)}</div>
+                              {s.last_user_name && <div className="text-slate-300 text-[9px]">{s.last_user_name}</div>}
+                            </td>
                           </tr>
                         );
                       })}
@@ -536,29 +554,42 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
                         <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Fecha</th>
                         <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Tipo</th>
                         <th className="text-right px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Cant.</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Lote</th>
                         <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Factura</th>
+                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Placa / Conductor</th>
                         <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Desde → Hacia</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Placa</th>
+                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Registrado por</th>
                         <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Notas</th>
                       </tr>
                     </thead>
                     <tbody>
                       {movements.map((m, i) => (
                         <tr key={m.id || i} className="border-b border-slate-50 hover:bg-slate-50">
-                          <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">{fmtDateTime(m.created_at)}</td>
+                          <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap text-[10px]">{fmtDateTime(m.created_at)}</td>
                           <td className="px-4 py-2.5">{movBadge(m.movement_type)}</td>
                           <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{Number(m.quantity)}</td>
-                          <td className="px-4 py-2.5 text-slate-500 font-mono">{m.batch || 'S/L'}</td>
-                          <td className="px-4 py-2.5 font-mono text-slate-700 text-[10px]">{m.invoice || '—'}</td>
-                          <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">
+                          <td className="px-4 py-2.5 font-mono text-slate-700 text-[10px]">{m.invoice || <span className="text-slate-300">—</span>}</td>
+                          <td className="px-4 py-2.5 text-[11px]">
+                            {m.vehicle_plate
+                              ? <span className="font-mono font-black text-slate-800">{m.vehicle_plate}</span>
+                              : <span className="text-slate-300">—</span>}
+                            {(m.driver_name_lookup) && (
+                              <span className="text-slate-400 ml-1.5">· {m.driver_name_lookup}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-[10px] text-slate-500 whitespace-nowrap">
                             {m.location_from && <span className="text-slate-400">{m.location_from}</span>}
                             {m.location_from && m.location_to && <span className="text-slate-300 mx-1">→</span>}
                             {m.location_to && <span className="font-semibold text-slate-700">{m.location_to}</span>}
                             {!m.location_from && !m.location_to && <span className="text-slate-300">—</span>}
                           </td>
-                          <td className="px-4 py-2.5 font-mono font-bold text-slate-700">{m.vehicle_plate || '—'}</td>
-                          <td className="px-4 py-2.5 text-slate-400 max-w-[160px] truncate">{m.notes || '—'}</td>
+                          <td className="px-4 py-2.5 text-[11px]">
+                            <span className="text-slate-700 font-semibold">
+                              {m.user_name || m.user_id || <span className="text-slate-300">—</span>}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-400 text-[10px] max-w-[180px] truncate" title={m.notes || ''}>
+                            {m.notes || <span className="text-slate-200">—</span>}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
