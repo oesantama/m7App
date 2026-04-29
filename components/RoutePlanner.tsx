@@ -30,31 +30,40 @@ import * as XLSX from 'xlsx';
 // ── Zonas geográficas Valle de Aburrá (7 corredores) ─────────────────────────
 // Cada zona define un corredor de reparto. Las zonas adyacentes pueden mezclarse
 // solo si la carga está muy vacía; zonas no adyacentes se excluyen completamente.
+// Longitud aproximada del Río Medellín (eje norte-sur del Valle de Aburrá)
+// Separa Occidente (Laureles, Belén, San Javier, Robledo) del Oriente (Centro, Buenos Aires, Poblado)
+const RIVER_LNG = -75.578;
+
 const GEO_ZONES_ADJACENT: Record<string, string[]> = {
   'NORTE_LEJANO': ['NORTE'],
   'NORTE': ['NORTE_LEJANO', 'CENTRO_NORTE'],
-  'CENTRO_NORTE': ['NORTE', 'CENTRO', 'CENTRO_OCC'],
-  'CENTRO': ['CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO_SUR'],
-  'CENTRO_OCC': ['CENTRO_NORTE', 'CENTRO', 'CENTRO_SUR'],
-  'CENTRO_SUR': ['CENTRO', 'CENTRO_OCC', 'SUR'],
+  // CENTRO_NORTE (oriente) y CENTRO_OCC NO son adyacentes — los separa el río
+  'CENTRO_NORTE': ['NORTE', 'CENTRO'],
+  'CENTRO': ['CENTRO_NORTE', 'CENTRO_SUR'],
+  // CENTRO_OCC (occidente) se mueve solo por el corredor occidental
+  'CENTRO_OCC': ['SUR_OCC'],
+  'CENTRO_SUR': ['CENTRO', 'SUR'],
   'SUR': ['CENTRO_SUR', 'SUR_LEJANO'],
-  'SUR_LEJANO': ['SUR'],
+  'SUR_OCC': ['CENTRO_OCC', 'SUR_LEJANO'],
+  'SUR_LEJANO': ['SUR', 'SUR_OCC'],
 };
 
 function classifyGeoZone(lat: number, lng: number, cityUpper: string): string {
   // Norte lejano: Girardota, Barbosa, Don Matías, Santo Domingo (+)
   const nFar = ['GIRARDOTA', 'BARBOSA', 'DON MATÍAS', 'DONMATÍAS', 'SANTO DOMINGO'];
   if (nFar.some(c => cityUpper.includes(c)) || lat > 6.42) return 'NORTE_LEJANO';
-  // Norte: Bello, Copacabana
+  // Norte: Bello, Copacabana (principalmente oriente del río)
   if (['BELLO', 'COPACABANA'].some(c => cityUpper.includes(c)) || lat > 6.31) return 'NORTE';
-  // Centro-norte Medellín (Castilla, Aranjuez, Robledo norte)
-  if (lat > 6.265) return 'CENTRO_NORTE';
-  // Centro Medellín: split por corredor occidente (San Javier, Laureles, Belén)
-  if (lat > 6.205) return lng < -75.595 ? 'CENTRO_OCC' : 'CENTRO';
-  // Sur: Envigado, Itagüí, Sabaneta
-  const sCities = ['ITAGÜÍ', 'ITAGUI', 'SABANETA', 'ENVIGADO'];
-  if (sCities.some(c => cityUpper.includes(c)) || lat > 6.135) return 'SUR';
-  // Sur lejano: Caldas, La Estrella, El Retiro
+  // Centro-norte Medellín (Castilla/Robledo al oeste, Aranjuez/Manrique al este)
+  if (lat > 6.265) return lng < RIVER_LNG ? 'CENTRO_OCC' : 'CENTRO_NORTE';
+  // Centro Medellín: Laureles/Estadio/San Javier (occidente) vs Centro/Buenos Aires/Poblado (oriente)
+  if (lat > 6.205) return lng < RIVER_LNG ? 'CENTRO_OCC' : 'CENTRO';
+  // Sur: dividir Itagüí/La Estrella (occidente) de Envigado/Sabaneta (oriente)
+  const sOcc = ['ITAGÜÍ', 'ITAGUI', 'LA ESTRELLA', 'ESTRELLA'];
+  if (sOcc.some(c => cityUpper.includes(c))) return 'SUR_OCC';
+  const sOri = ['SABANETA', 'ENVIGADO'];
+  if (sOri.some(c => cityUpper.includes(c)) || lat > 6.135) return 'SUR';
+  // Sur lejano: Caldas, El Retiro
   return 'SUR_LEJANO';
 }
 
@@ -684,7 +693,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       // 3. Ordenamiento Global — prioridad → ventana horaria → ZONA GEOGRÁFICA → ciudad → barrio
-      const ZONE_ORDER = ['NORTE_LEJANO', 'NORTE', 'CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO', 'CENTRO_SUR', 'SUR', 'SUR_LEJANO'];
+      const ZONE_ORDER = ['NORTE_LEJANO', 'NORTE', 'CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO', 'CENTRO_SUR', 'SUR', 'SUR_OCC', 'SUR_LEJANO'];
       availableInvoices.sort((a, b) => {
         // @ts-ignore
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
@@ -761,7 +770,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       // Ordenar celdas: primero por zona (ZONE_ORDER), luego por densidad desc
-      const ZONE_ORDER_CLUSTER = ['NORTE_LEJANO', 'NORTE', 'CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO', 'CENTRO_SUR', 'SUR', 'SUR_LEJANO'];
+      const ZONE_ORDER_CLUSTER = ['NORTE_LEJANO', 'NORTE', 'CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO', 'CENTRO_SUR', 'SUR', 'SUR_OCC', 'SUR_LEJANO'];
       let remainingCells = Array.from(cellMap.values()).sort((a, b) => {
         const zA = ZONE_ORDER_CLUSTER.indexOf(a.zone);
         const zB = ZONE_ORDER_CLUSTER.indexOf(b.zone);
@@ -871,11 +880,20 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const adjacentZones = GEO_ZONES_ADJACENT[anchorZone] || [];
         const allowedZones = new Set([anchorZone, ...adjacentZones]);
 
+        // Determinar lado del río del ancla (aplica solo en zona urbana central: lat 6.19-6.32)
+        const anchorInUrban = anchorCell.centerLat > 6.19 && anchorCell.centerLat < 6.32 && anchorCell.centerLng !== 0;
+        const anchorIsWest = anchorInUrban && anchorCell.centerLng < RIVER_LNG;
+
         const candidateCells = remainingCells.filter(c => {
           if (c.invoices.length === 0) return false;
-          // Celdas en ciudades propias siempre son candidatas (dentro del radio)
+          // Celdas en barrios propios siempre son candidatas (dentro del radio)
           const hasOwnedInvoice = c.invoices.some(i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || ''));
           if (!hasOwnedInvoice && !allowedZones.has(c.zone)) return false;
+          // Barrera del Río Medellín: no mezclar oriente y occidente en la misma ruta
+          if (anchorInUrban && c.centerLat > 6.19 && c.centerLat < 6.32 && c.centerLng !== 0) {
+            const cellIsWest = c.centerLng < RIVER_LNG;
+            if (anchorIsWest !== cellIsWest) return false;
+          }
           if (anchorCell.centerLat > 0 && c.centerLat > 0) {
             return getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng) <= MAX_CLUSTER_SPREAD_KM;
           }
@@ -1413,7 +1431,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const link = assignments.find(a => a.vehicleId === r.vehicle.id && a.isActive);
         if (!link) return 'SIN ASIGNAR';
         const drv = drivers.find(d => d.id === link.driverId);
-        return drv ? `${drv.name || ''} ${drv.lastName || ''}`.trim() : link.driverId;
+        return drv ? drv.name || link.driverId : link.driverId;
       })(),
       'CIUDAD DOMINANTE': r.city,
       'FACTURAS': r.assignedInvoices.length,
