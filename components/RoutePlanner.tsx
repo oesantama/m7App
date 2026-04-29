@@ -31,8 +31,41 @@ import * as XLSX from 'xlsx';
 // Cada zona define un corredor de reparto. Las zonas adyacentes pueden mezclarse
 // solo si la carga está muy vacía; zonas no adyacentes se excluyen completamente.
 // Longitud aproximada del Río Medellín (eje norte-sur del Valle de Aburrá)
-// Separa Occidente (Laureles, Belén, San Javier, Robledo) del Oriente (Centro, Buenos Aires, Poblado)
 const RIVER_LNG = -75.578;
+
+// Barrios conocidos por lado del río — para inferir zona desde la dirección cuando faltan coords/barrio
+const BARRIOS_OCCIDENTE = [
+  'LAURELES','ESTADIO','SAN JAVIER','BELÉN','BELEN','ROBLEDO','FLORESTA',
+  'LA AMERICA','GUAYABAL','CARLOS E RESTREPO','CALASANZ','CONQUISTADORES',
+  'LA COLINA','SANTA MONICA','SANTA LUCIA','LAS VIOLETAS','LA MOTA',
+  'EL VELODROMO','NUEVA VILLA DE ABURRÁ','TRINIDAD','SAN FERNANDO',
+];
+const BARRIOS_ORIENTE = [
+  'MANRIQUE','ARANJUEZ','POPULAR','BUENOS AIRES','VILLA HERMOSA',
+  'CAMPO NUÑEZ','PRADO','SEVILLA','BOSTON','LORETO','MANILA','MIAMI',
+  'EL POBLADO','POBLADO','LA CANDELARIA','ALPUJARRA','EL CHAGUALO',
+  'JESUS NAZARENO','SAN BENITO','LA CRUZ','MORAVIA','CASTILLA',
+  'DOCE DE OCTUBRE','EL PESEBRE','PESEBRE','EL TRIUNFO','TRIUNFO',
+  'CALVO SUR','NARANJAL','INDUSTRIALES',
+];
+
+/**
+ * Infiere el lado del río desde el texto de una dirección cuando no hay barrio/coordenadas.
+ * Usa keywords de barrios conocidos y luego número de carrera (río ~ CR 57-58 en Medellín).
+ */
+function inferMedellínSide(address: string): 'OCCIDENTE' | 'ORIENTE' | null {
+  const a = address.toUpperCase();
+  if (BARRIOS_OCCIDENTE.some(b => a.includes(b))) return 'OCCIDENTE';
+  if (BARRIOS_ORIENTE.some(b => a.includes(b))) return 'ORIENTE';
+  // Número de carrera como último recurso (río ≈ CR 57)
+  const m = a.match(/\b(?:CR|CRA|CARRERA|K\.?)\s*\.?\s*(\d+)/);
+  if (m) {
+    const num = parseInt(m[1], 10);
+    if (num > 59) return 'OCCIDENTE';
+    if (num < 56) return 'ORIENTE';
+  }
+  return null;
+}
 
 const GEO_ZONES_ADJACENT: Record<string, string[]> = {
   'NORTE_LEJANO': ['NORTE'],
@@ -678,7 +711,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // @ts-ignore
         inv.startAddressForSort = rawAddr.replace(/\d+/g, num => num.padStart(5, '0')).replace(/[^0-9A-Z]/g, '');
         // @ts-ignore
-        inv.neighborhoodKey = (String(inv.neighborhood || 'SIN_BARRIO')).toUpperCase().trim();
+        inv.neighborhoodKey = (String(inv.neighborhood || '')).toUpperCase().trim() || 'SIN_BARRIO';
 
         // MEJORA 2: Detectar coordenadas default (sin geocodificar)
         const lat = Number(inv.lat || 0);
@@ -690,6 +723,26 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const cUpper = (inv as any).cityKey || '';
         // @ts-ignore
         inv.geoZone = classifyGeoZone(lat, lng, cUpper);
+
+        // Enriquecimiento desde dirección cuando falta barrio o coordenadas (Medellín)
+        if (cUpper.includes('MEDELLÍN') || cUpper.includes('MEDELLIN')) {
+          const nKey = (inv as any).neighborhoodKey;
+          // Si no hay barrio, buscar en la dirección
+          if (nKey === 'SIN_BARRIO' || !nKey) {
+            const foundBarrioOcc = BARRIOS_OCCIDENTE.find(b => rawAddr.includes(b));
+            const foundBarrioOri = BARRIOS_ORIENTE.find(b => rawAddr.includes(b));
+            if (foundBarrioOcc) (inv as any).neighborhoodKey = foundBarrioOcc;
+            else if (foundBarrioOri) (inv as any).neighborhoodKey = foundBarrioOri;
+          }
+          // Si aún sin coords, inferir lado del río para corregir geoZone
+          if ((inv as any).hasDefaultCoords || (lat === 0 && lng === 0)) {
+            const side = inferMedellínSide(rawAddr + ' ' + ((inv as any).neighborhoodKey || ''));
+            if (side === 'OCCIDENTE') (inv as any).geoZone = 'CENTRO_OCC';
+            else if (side === 'ORIENTE') (inv as any).geoZone = 'CENTRO';
+            // @ts-ignore — marcar que la zona fue inferida (no tiene coords reales)
+            (inv as any).zoneInferred = true;
+          }
+        }
       });
 
       // 3. Ordenamiento Global — prioridad → ventana horaria → ZONA GEOGRÁFICA → ciudad → barrio
@@ -740,9 +793,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const lng = Number(inv.lng || 0);
         const hasDefCoords = (inv as any).hasDefaultCoords;
 
-        // Facturas sin coordenadas → celda especial por ciudad/barrio
+        // Facturas sin coordenadas → celda por zona inferida (nunca una sola celda gigante por ciudad)
         const cellKey = hasDefCoords || (lat === 0 && lng === 0)
-          ? `nogeo_${(inv as any).cityKey || 'SIN_CIUDAD'}_${(inv as any).neighborhoodKey || ''}`
+          ? `nogeo_${(inv as any).geoZone || (inv as any).cityKey || 'SIN_CIUDAD'}_${(inv as any).neighborhoodKey || 'SIN_BARRIO'}`
           : `${Math.floor(lat / CELL_SIZE)}_${Math.floor(lng / CELL_SIZE)}`;
 
         if (!cellMap.has(cellKey)) {
@@ -914,10 +967,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // Llenar vehículo celda por celda
         const load: Invoice[] = [];
         let currentLoadVolume = 0;
+        // Centroide dinámico de la ruta (se recalcula con cada celda agregada)
+        let clusterCenterLat = anchorCell.centerLat;
+        let clusterCenterLng = anchorCell.centerLng;
 
         for (const cell of candidateCells) {
           if (currentLoadVolume >= absoluteMaxCapacity) break;
           if (load.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) break;
+          // Chequeo de cohesión: la celda candidata no debe alejar el centroide más allá del radio
+          if (clusterCenterLat > 0 && cell.centerLat > 0) {
+            const distToCluster = getDistance(clusterCenterLat, clusterCenterLng, cell.centerLat, cell.centerLng);
+            if (distToCluster > MAX_CLUSTER_SPREAD_KM) break;
+          }
 
           const toAdd: Invoice[] = [];
           // Ordenar facturas dentro de la celda por prioridad → horario → lat/lng
@@ -948,6 +1009,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           cell.invoices = cell.invoices.filter(i => !addedIds.has(i.id));
           cell.totalVolume = cell.invoices.reduce((s, i) => s + Number(i.volumeM3 || (i as any).volume_m3 || 0), 0);
           load.push(...toAdd);
+
+          // Recalcular centroide real de la ruta con las facturas geocodificadas ya agregadas
+          const geocodedLoad = load.filter(i => Number(i.lat) > 0 && !(i as any).hasDefaultCoords && !(i as any).zoneInferred);
+          if (geocodedLoad.length > 0) {
+            clusterCenterLat = geocodedLoad.reduce((s, i) => s + Number(i.lat), 0) / geocodedLoad.length;
+            clusterCenterLng = geocodedLoad.reduce((s, i) => s + Number(i.lng), 0) / geocodedLoad.length;
+          }
         }
 
         // También quitar las facturas usadas de availableInvoices (para consistencia)
