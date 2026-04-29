@@ -128,6 +128,7 @@ interface RoutingPattern {
   city: string;
   vehicle_id: string;
   strength: number;
+  neighborhood?: string;
 }
 
 interface SuggestedRoute {
@@ -782,36 +783,39 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // en su área histórica determinista en vez de solo usar un hint débil.
       // ──────────────────────────────────────────────────────────────────────
 
-      // Mapa: vehicle_id → Map<cityKey, strength>
-      const vehicleCityStrength = new Map<string, Map<string, number>>();
+      // Mapa: vehicle_id → Map<"CIUDAD|BARRIO", strength>
+      // Usar ciudad+barrio como territorio porque múltiples vehículos sirven la misma ciudad
+      const vehicleTerritoryStrength = new Map<string, Map<string, number>>();
       for (const p of learningPatterns) {
         if (!p.vehicle_id || !p.city) continue;
-        if (!vehicleCityStrength.has(p.vehicle_id)) vehicleCityStrength.set(p.vehicle_id, new Map());
-        const cMap = vehicleCityStrength.get(p.vehicle_id)!;
-        cMap.set(p.city, (cMap.get(p.city) || 0) + (p.strength || 0));
+        if (!vehicleTerritoryStrength.has(p.vehicle_id)) vehicleTerritoryStrength.set(p.vehicle_id, new Map());
+        const tMap = vehicleTerritoryStrength.get(p.vehicle_id)!;
+        const tKey = p.neighborhood ? `${p.city}|${p.neighborhood}` : p.city;
+        tMap.set(tKey, (tMap.get(tKey) || 0) + (p.strength || 0));
       }
 
       // Ordenar vehículos por fuerza total desc (más experimentados reclaman primero)
       const vehiclesByExperience = [...prioritizedFleet].sort((a, b) => {
-        const totalA = [...(vehicleCityStrength.get(a.id)?.values() || [])].reduce((s, v) => s + v, 0);
-        const totalB = [...(vehicleCityStrength.get(b.id)?.values() || [])].reduce((s, v) => s + v, 0);
+        const totalA = [...(vehicleTerritoryStrength.get(a.id)?.values() || [])].reduce((s, v) => s + v, 0);
+        const totalB = [...(vehicleTerritoryStrength.get(b.id)?.values() || [])].reduce((s, v) => s + v, 0);
         return totalB - totalA;
       });
 
-      // Competencia greedy: cada vehículo reclama sus top ciudades no reclamadas
-      const claimedCities = new Map<string, string>(); // cityKey → vehicle_id
-      const vehicleOwnedCities = new Map<string, Set<string>>(); // vehicle_id → Set<cityKey>
+      // Competencia greedy: cada vehículo reclama sus top territorios (ciudad+barrio) no reclamados
+      const claimedTerritories = new Map<string, string>(); // territoryKey → vehicle_id
+      const vehicleOwnedNeighborhoods = new Map<string, Set<string>>(); // vehicle_id → Set<neighborhoodKey>
 
       for (const vehicle of vehiclesByExperience) {
-        const cityMap = vehicleCityStrength.get(vehicle.id);
-        if (!cityMap) continue;
-        // Top ciudades de este vehículo ordenadas por fuerza desc
-        const sortedCities = [...cityMap.entries()].sort((a, b) => b[1] - a[1]);
-        for (const [city] of sortedCities) {
-          if (!claimedCities.has(city)) {
-            claimedCities.set(city, vehicle.id);
-            if (!vehicleOwnedCities.has(vehicle.id)) vehicleOwnedCities.set(vehicle.id, new Set());
-            vehicleOwnedCities.get(vehicle.id)!.add(city);
+        const tMap = vehicleTerritoryStrength.get(vehicle.id);
+        if (!tMap) continue;
+        const sortedTerritories = [...tMap.entries()].sort((a, b) => b[1] - a[1]);
+        for (const [tKey] of sortedTerritories) {
+          if (!claimedTerritories.has(tKey)) {
+            claimedTerritories.set(tKey, vehicle.id);
+            if (!vehicleOwnedNeighborhoods.has(vehicle.id)) vehicleOwnedNeighborhoods.set(vehicle.id, new Set());
+            // Guardar solo la parte del barrio (o ciudad si no hay barrio) para match con invoices
+            const parts = tKey.split('|');
+            vehicleOwnedNeighborhoods.get(vehicle.id)!.add(parts[1] || parts[0]);
           }
         }
       }
@@ -826,7 +830,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const absoluteMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION;
         const isLargeVehicle = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
 
-        const ownedCities = vehicleOwnedCities.get(vehicle.id) || new Set<string>();
+        // Territorios propios: barrios históricos de este vehículo
+        const ownedNeighborhoods = vehicleOwnedNeighborhoods.get(vehicle.id) || new Set<string>();
+        // Compatibilidad con código de candidatos que usa ownedCities (ahora = barrios propios)
+        const ownedCities = ownedNeighborhoods;
 
         // Helper: verificar que una celda está suficientemente lejos de anclas ya usadas
         const isFarEnoughFromUsedAnchors = (c: GeoCell): boolean => {
@@ -840,7 +847,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // Si no hay celda que cumpla separación, se relaja y toma la más lejana disponible
         const candidateAnchors = remainingCells.filter(c => c.invoices.length > 0);
         const ownedAndFar = candidateAnchors.find(c =>
-          c.invoices.some(i => ownedCities.has((i as any).cityKey || '')) && isFarEnoughFromUsedAnchors(c)
+          c.invoices.some(i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || '')) && isFarEnoughFromUsedAnchors(c)
         );
         const anyFar = candidateAnchors.find(c => isFarEnoughFromUsedAnchors(c));
         // Fallback: celda más lejana de todas las anclas usadas
@@ -867,7 +874,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const candidateCells = remainingCells.filter(c => {
           if (c.invoices.length === 0) return false;
           // Celdas en ciudades propias siempre son candidatas (dentro del radio)
-          const hasOwnedInvoice = c.invoices.some(i => ownedCities.has((i as any).cityKey || ''));
+          const hasOwnedInvoice = c.invoices.some(i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || ''));
           if (!hasOwnedInvoice && !allowedZones.has(c.zone)) return false;
           if (anchorCell.centerLat > 0 && c.centerLat > 0) {
             return getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng) <= MAX_CLUSTER_SPREAD_KM;
@@ -901,8 +908,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             const aT = (a as any).timeWindowMinutes ?? Infinity;
             const bT = (b as any).timeWindowMinutes ?? Infinity;
             if (aT !== bT) return aT - bT;
-            const aOwn = ownedCities.has((a as any).cityKey || '') ? -1 : 0;
-            const bOwn = ownedCities.has((b as any).cityKey || '') ? -1 : 0;
+            const aOwn = ownedCities.has((a as any).neighborhoodKey || (a as any).cityKey || '') ? -1 : 0;
+            const bOwn = ownedCities.has((b as any).neighborhoodKey || (b as any).cityKey || '') ? -1 : 0;
             if (aOwn !== bOwn) return aOwn - bOwn;
             return Number(a.lat) - Number(b.lat);
           });
@@ -1392,6 +1399,50 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [suggestedRoutes, viewMode, searchTerm]);
+
+  const handleExportRoutesExcel = () => {
+    if (suggestedRoutes.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const wb = XLSX.utils.book_new();
+
+    // Hoja resumen: una fila por ruta
+    const summaryRows = suggestedRoutes.map((r, idx) => ({
+      '#': idx + 1,
+      'PLACA': r.vehicle.plate,
+      'CONDUCTOR': (() => {
+        const link = assignments.find(a => a.vehicleId === r.vehicle.id && a.isActive);
+        if (!link) return 'SIN ASIGNAR';
+        const drv = drivers.find(d => d.id === link.driverId);
+        return drv ? `${drv.name || ''} ${drv.lastName || ''}`.trim() : link.driverId;
+      })(),
+      'CIUDAD DOMINANTE': r.city,
+      'FACTURAS': r.assignedInvoices.length,
+      'VOLUMEN M3': Number(r.totalVolume.toFixed(3)),
+      'UTILIZACION %': r.utilization,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'RESUMEN');
+
+    // Una hoja por ruta con detalle de facturas
+    suggestedRoutes.forEach((r, idx) => {
+      const rows = r.assignedInvoices.map((inv, pos) => ({
+        'ORDEN': pos + 1,
+        'FACTURA': inv.invoiceNumber || inv.id,
+        'CLIENTE': inv.customerName || '',
+        'CIUDAD': inv.city || '',
+        'BARRIO': (inv as any).neighborhoodKey || '',
+        'DIRECCIÓN': inv.address || '',
+        'VOLUMEN M3': Number(inv.volumeM3 || (inv as any).volume_m3 || 0),
+        'VALOR': inv.invoiceValue || '',
+        'PAGO': (inv as any).paymentMethod || '',
+        'LAT': inv.lat || '',
+        'LNG': inv.lng || '',
+      }));
+      const sheetName = `${idx + 1}_${r.vehicle.plate}`.slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
+    });
+
+    XLSX.writeFile(wb, `RUTAS-PLANIFICADAS_${today}.xlsx`);
+  };
 
   const handleMassAssign = () => {
     if (suggestedRoutes.length === 0) return;
@@ -1964,6 +2015,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           >
             {isOptimizing ? <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent animate-spin rounded-full"></div> : <Icons.Scan className="w-3.5 h-3.5" />}
             {isOptimizing ? '...' : (suggestedRoutes.length > 0 ? 'RECALCULAR' : 'GENERAR')}
+          </button>
+
+          <button
+            onClick={handleExportRoutesExcel}
+            disabled={suggestedRoutes.length === 0}
+            className="shrink-0 px-4 py-2.5 bg-teal-50 text-teal-700 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-teal-600 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap flex items-center gap-1.5"
+          >
+            <Icons.Download className="w-3 h-3" />
+            EXPORTAR
           </button>
 
           <button
