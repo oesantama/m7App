@@ -1936,7 +1936,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                         const isNational = clientRes.rows[0]?.client_type === 'NACIONAL';
 
                         await pool.query(
-                            `INSERT INTO document_logs (user_id, client_id, file_name, drive_path, drive_link, category)
+                            `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category)
                              VALUES ($1, $2, $3, $4, $5, $6)`,
                             [userId, clientId, fileName, drivePath, driveLink, 'CUMPLIDOS']
                         );
@@ -1993,7 +1993,7 @@ export const getDocumentStats = async (req: Request, res: Response) => {
                 c.name as client_name,
                 COUNT(d.id) as total_uploads,
                 MAX(d.upload_date) as last_upload
-            FROM document_logs d
+            FROM document_drive_logs d
             JOIN clients c ON d.client_id = c.id
             GROUP BY c.name
             ORDER BY total_uploads DESC

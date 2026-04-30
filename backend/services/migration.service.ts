@@ -503,7 +503,7 @@ const healSchema = async (client: any) => {
           ALTER TABLE routing_patterns ALTER COLUMN id SET DEFAULT nextval('routing_patterns_id_seq');
           SELECT setval('routing_patterns_id_seq', COALESCE((SELECT MAX(id::BIGINT) FROM routing_patterns), 0) + 1);
         -- Tabla para gestión documental y trazabilidad de Drive
-        CREATE TABLE IF NOT EXISTS document_logs (
+        CREATE TABLE IF NOT EXISTS document_drive_logs (
             id SERIAL PRIMARY KEY,
             user_id INTEGER REFERENCES users(id),
             client_id VARCHAR(50),
@@ -523,11 +523,11 @@ const healSchema = async (client: any) => {
 
         -- Registro del nuevo Módulo y Página en el menú
         INSERT INTO modules (id, name, icon_class, status_id)
-        SELECT 'MOD-10', 'GESTIÓN DOCUMENTAL', 'FileText', 'EST-01'
+        SELECT 'MOD-10', 'GESTIÓN DOCUMENTOS DRIVE', 'FileText', 'EST-01'
         WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-10');
 
-        INSERT INTO pages (id, name, icon, path, module_id, status_id)
-        SELECT 'PAG-45', 'CUMPLIDOS DRIVE', 'UploadCloud', '/cumplidos', 'MOD-10', 'EST-01'
+        INSERT INTO pages (id, name, route, module_id, status_id)
+        SELECT 'PAG-45', 'CUMPLIDOS DRIVE', 'cumplidos', 'MOD-10', 'EST-01'
         WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-45');
 
         COMMIT;
