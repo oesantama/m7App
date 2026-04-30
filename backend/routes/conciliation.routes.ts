@@ -13,6 +13,7 @@ import {
     generateAndSendReport,
     importMasterSuite,
     getInvoiceStatusHistory,
+    closeConciliationCycle,
 } from '../controllers/conciliation.controller.js';
 
 const router = Router();
@@ -33,5 +34,6 @@ router.post('/sobrecostos',               saveSobrecostos);
 router.post('/group-payments',            saveRouteGroupPayments);
 router.post('/report',                    generateAndSendReport);
 router.post('/import-mastersuite',        upload.single('file'), importMasterSuite);
+router.post('/close-cycle',               closeConciliationCycle);
 
 export default router;
