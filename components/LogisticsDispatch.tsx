@@ -2100,6 +2100,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         {effectiveStatus === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
                                                         {pendingBodega && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black rounded-full animate-pulse">FIRMA BODEGA</span>}
                                                         {pendingConductor && <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-[8px] font-black rounded-full animate-pulse">FIRMA CONDUCTOR</span>}
+                                                        {String(inv.planType || '').toUpperCase() === 'PLAN R'
+                                                            ? <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-black rounded-full">PLAN R</span>
+                                                            : <span className="px-2 py-0.5 bg-sky-100 text-sky-700 text-[8px] font-black rounded-full">PLAN NORMAL</span>
+                                                        }
                                                     </div>
                                                     <p className="text-[10px] font-bold text-slate-500 uppercase leading-none">{inv.customerName || 'S/N'}</p>
                                                 </div>
@@ -2114,8 +2118,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     <Icons.Eye className="w-4 h-4" />
                                                 </button>
 
-                                                {/* DESPACHAR — solo Plan Normal, solo si NO está en ruta y no tiene firma pendiente */}
-                                                {!['EST-11','EST-12','EST-13','EST-14'].includes(effectiveStatus) && !hasPendingSignature && String(inv.planType || '').toUpperCase() !== 'PLAN R' && (
+                                                {/* DESPACHAR — todos los planes, solo si NO está en ruta y no tiene firma pendiente */}
+                                                {!['EST-11','EST-12','EST-13','EST-14'].includes(effectiveStatus) && !hasPendingSignature && (
                                                     <button
                                                         onClick={() => {
                                                             // M7-FIX: Enriquecer items con el maestro para tener los factores de conversión (CAJA, STD)
