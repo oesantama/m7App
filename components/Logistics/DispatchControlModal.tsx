@@ -18,14 +18,6 @@ interface DispatchControlModalProps {
     setSelectedHelpers: (helpers: string[]) => void;
     allUsers: any[];
     user: any;
-    drivers: any[];
-    activeRoutes: any[];
-    signNowMap: Record<string, boolean>;
-    setSignNowMap: (map: Record<string, boolean>) => void;
-    signatureKeys: Record<string, string>;
-    setSignatureKeys: (map: Record<string, string>) => void;
-    showPasswordMap: Record<string, boolean>;
-    setShowPasswordMap: (map: Record<string, boolean>) => void;
     isValidating: boolean;
     handleConfirmDispatch: () => void;
     onAddQty: (sku: string, qty: number) => void;
@@ -45,14 +37,6 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
     setSelectedHelpers,
     allUsers,
     user,
-    drivers,
-    activeRoutes,
-    signNowMap,
-    setSignNowMap,
-    signatureKeys,
-    setSignatureKeys,
-    showPasswordMap,
-    setShowPasswordMap,
     isValidating,
     handleConfirmDispatch,
     onAddQty,
@@ -61,8 +45,6 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
 }) => {
     if (!isOpen) return null;
 
-    const route = activeRoutes.find((r: any) => r.id === (invoice.route_id || invoice.routeId));
-    const actualDriver = drivers.find((d: any) => d.id === route?.driver_id || d.id === route?.driverId);
 
     return (
         <div className="fixed inset-0 z-[700] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -239,149 +221,7 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                                 )}
                             </div>
 
-                            {/* Panel de Validación de Firmas */}
-                            <div className="bg-slate-900 p-6 rounded-[2rem] shadow-2xl space-y-4 border border-white/5">
-                                <h4 className="text-xs font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                                    <Icons.Shield className="w-4 h-4" />
-                                    PROTOCOLOS DE SEGURIDAD M7
-                                </h4>
-                                <div className="space-y-3">
-                                    {/* Firma del Despachador (BODEGA) */}
-                                    <div className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg shadow-black/20">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-7 h-7 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                                                    <Icons.Shield className="w-3.5 h-3.5 text-emerald-400" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[9px] font-black text-emerald-400 uppercase tracking-wider leading-none">FIRMA BODEGA</p>
-                                                    <p className="text-[11px] font-black text-white uppercase leading-none mt-0.5">{user.name}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex bg-white/10 p-1 rounded-lg">
-                                                <button
-                                                    onClick={() => setSignNowMap({...signNowMap, [user.id]: true})}
-                                                    className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all ${signNowMap[user.id] ? 'bg-emerald-500 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}>AHORA</button>
-                                                <button
-                                                    onClick={() => setSignNowMap({...signNowMap, [user.id]: false})}
-                                                    className={`px-3 py-1 rounded-md text-[8px] font-black uppercase transition-all ${!signNowMap[user.id] ? 'bg-rose-500 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}>DESPUES</button>
-                                            </div>
-                                        </div>
-                                        {signNowMap[user.id] !== false ? (
-                                            <div className="relative">
-                                                <input 
-                                                    type={showPasswordMap[user.id] ? "text" : "password"}
-                                                    placeholder="SU CLAVE DE FIRMA..."
-                                                    autoComplete="new-password"
-                                                    className="w-full bg-slate-950 border border-white/5 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500/50 pr-10 shadow-inner"
-                                                    onChange={(e) => setSignatureKeys({...signatureKeys, [user.id]: e.target.value})}
-                                                />
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => setShowPasswordMap({...showPasswordMap, [user.id]: !showPasswordMap[user.id]})}
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                                >
-                                                    {showPasswordMap[user.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <p className="text-[9px] font-bold text-amber-400/70 uppercase tracking-widest">El personal de bodega firmará luego desde el monitor de despacho</p>
-                                        )}
-                                    </div>
-
-                                    {/* Firma del Conductor */}
-                                    {actualDriver ? (
-                                        <div className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg shadow-black/20">
-                                            <div className="flex justify-between items-center mb-3">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-7 h-7 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                                        <Icons.Truck className="w-3.5 h-3.5 text-blue-400" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-wider leading-none">FIRMA CONDUCTOR</p>
-                                                        <p className="text-[11px] font-black text-white uppercase leading-none mt-0.5">{actualDriver.name}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex bg-white/10 p-1 rounded-lg">
-                                                    <button
-                                                        onClick={() => setSignNowMap({...signNowMap, [actualDriver.id]: true})}
-                                                        className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] !== false ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400'}`}
-                                                    >AHORA</button>
-                                                    <button
-                                                        onClick={() => setSignNowMap({...signNowMap, [actualDriver.id]: false})}
-                                                        className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[actualDriver.id] === false ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400'}`}
-                                                    >DESPUÉS</button>
-                                                </div>
-                                            </div>
-                                            {signNowMap[actualDriver.id] !== false ? (
-                                                <div className="relative">
-                                                    <input
-                                                        type={showPasswordMap[actualDriver.id] ? "text" : "password"}
-                                                        placeholder="CLAVE DEL CONDUCTOR..."
-                                                        autoComplete="new-password"
-                                                        className="w-full bg-slate-950 border border-white/5 p-3 rounded-xl text-xs font-black text-blue-400 outline-none focus:border-blue-500/50 pr-10 shadow-inner"
-                                                        onChange={(e) => setSignatureKeys({...signatureKeys, [actualDriver.id]: e.target.value})}
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowPasswordMap({...showPasswordMap, [actualDriver.id]: !showPasswordMap[actualDriver.id]})}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                                    >
-                                                        {showPasswordMap[actualDriver.id] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <p className="text-[9px] font-bold text-amber-400/70 uppercase tracking-widest">El conductor firmará por separado con el botón "Firma Pend."</p>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20">
-                                            <p className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Sin conductor asignado a esta ruta — la firma del conductor no aplica</p>
-                                        </div>
-                                    )}
-
-                                    {/* Firmas de Auxiliares */}
-                                    {isAccompanied && selectedHelpers.slice(0, helperCount).map((hid) => {
-                                        const helper = drivers.find((d: any) => d.id === hid);
-                                        if (!helper) return null;
-                                        return (
-                                            <div key={hid} className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <p className="text-[9px] font-black text-white uppercase">{helper.name} (AUXILIAR)</p>
-                                                    <div className="flex bg-white/10 p-1 rounded-lg">
-                                                        <button 
-                                                            onClick={() => setSignNowMap({...signNowMap, [hid]: true})}
-                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[hid] !== false ? 'bg-emerald-500 text-slate-900' : 'text-slate-400'}`}
-                                                        >AHORA</button>
-                                                        <button 
-                                                            onClick={() => setSignNowMap({...signNowMap, [hid]: false})}
-                                                            className={`px-3 py-1 rounded-md text-[8px] font-black transition-all ${signNowMap[hid] === false ? 'bg-rose-500 text-white' : 'text-slate-400'}`}
-                                                        >DESPUÉS</button>
-                                                    </div>
-                                                </div>
-                                                {signNowMap[hid] !== false && (
-                                                    <div className="relative">
-                                                        <input 
-                                                            type={showPasswordMap[hid] ? "text" : "password"}
-                                                            placeholder="CLAVE DE FIRMA AUXILIAR..."
-                                                            autoComplete="new-password"
-                                                            className="w-full bg-white/10 border border-white/20 p-3 rounded-xl text-xs font-black text-emerald-400 outline-none focus:border-emerald-500 pr-10"
-                                                            onChange={(e) => setSignatureKeys({...signatureKeys, [hid]: e.target.value})}
-                                                        />
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => setShowPasswordMap({...showPasswordMap, [hid]: !showPasswordMap[hid]})}
-                                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                                                        >
-                                                            {showPasswordMap[hid] ? <Icons.EyeOff className="w-4 h-4" /> : <Icons.Eye className="w-4 h-4" />}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            {/* Sesión activa = garantía de despacho — sin firma adicional requerida */}
                         </div>
                     </div>
                 </div>

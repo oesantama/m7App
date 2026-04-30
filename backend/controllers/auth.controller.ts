@@ -10,7 +10,7 @@ export const login = async (req: Request, res: Response) => {
     const identifier = email?.trim().toLowerCase();
 
     const result = await pool.query(
-      `SELECT id, email, password, name, role_id, client_ids, document_number, two_factor_enabled, two_factor_secret
+      `SELECT id, email, password, name, role_id, client_ids, document_number, two_factor_enabled, two_factor_secret, permissions as user_level_permissions
        FROM users
        WHERE (LOWER(TRIM(email)) = $1 OR LOWER(TRIM(document_number)) = $1 OR LOWER(TRIM(phone)) = $1)`,
       [identifier]
@@ -30,7 +30,7 @@ export const login = async (req: Request, res: Response) => {
 
     // FETCH PERMISSIONS
     const permResult = await pool.query('SELECT permissions FROM user_permissions WHERE user_id = $1', [user.id]);
-    let permissions: any[] = [];
+    let permissions: any[] = user.user_level_permissions || [];
     
     if (permResult.rows.length > 0) {
         const rawPerms = permResult.rows[0].permissions || {};
@@ -51,10 +51,13 @@ export const login = async (req: Request, res: Response) => {
             }
         });
 
-        permissions = Array.from(permMap.entries()).map(([module, actions]) => ({
+        const granularPerms = Array.from(permMap.entries()).map(([module, actions]) => ({
             module,
             actions: Array.from(actions)
         }));
+
+        // Combinar permisos si existen ambos
+        permissions = [...permissions, ...granularPerms];
     }
 
     if (user.two_factor_enabled) {

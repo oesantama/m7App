@@ -78,6 +78,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [filteredClients, setFilteredClients] = useState<any[]>([]);
     const [clientsReady, setClientsReady] = useState(false);
 
+    const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().slice(0, 10));
+
     const [vehicleLocations, setVehicleLocations] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
@@ -1237,6 +1239,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             });
         }
 
+        // Filtro por fecha
+        if (filterDate) {
+            routes = routes.filter(route => {
+                const raw = (route as any).created_at || (route as any).createdAt;
+                if (!raw) return true;
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? true : d.toISOString().slice(0, 10) === filterDate;
+            });
+        }
+
         // Si es CONDUCTOR (ROL-03), solo mostrar sus rutas
         const userRoleId = user.role_id || user.roleId || '';
         if (userRoleId === 'ROL-03' || userRoleId === 'CONDUCTOR') {
@@ -1270,7 +1282,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
         // Admin u otros roles ven todo (filtrado por cliente)
         return routes;
-    }, [activeRoutes, user, assignments, drivers, internalClientId]);
+    }, [activeRoutes, user, assignments, drivers, internalClientId, filterDate]);
 
     // DIAGNÓSTICO DE DATOS (M7-DEBUG)
     useEffect(() => {
@@ -1404,31 +1416,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         const route = activeRoutes.find(r => r.id === (assigningInvoice.route_id || assigningInvoice.routeId));
         const actualDriver = drivers.find(d => d.id === route?.driver_id || d.id === route?.driverId);
 
-        // Solo requerir firma del despachador. El conductor firma con FIRMAR (paso separado).
-        if (signNowMap[user.id] !== false && !signatureKeys[user.id]) {
-            toast.error(`Falta su firma de despachador`); return;
-        }
-
         setIsValidating(true);
         try {
-            const signatures = [];
-            signatures.push({ userId: user.id, role: 'DISPATCHER', signNow: signNowMap[user.id] !== false, password: signatureKeys[user.id] });
-            if (actualDriver) {
-                const driverSignNow = signNowMap[actualDriver.id] !== false;
-                // Si el conductor firma ahora, validar que haya ingresado su clave
-                if (driverSignNow && !signatureKeys[actualDriver.id]) {
-                    toast.error('Falta la clave del conductor — seleccione "DESPUÉS" si firmará luego');
-                    setIsValidating(false);
-                    return;
-                }
-                signatures.push({ userId: actualDriver.id, role: 'DRIVER', signNow: driverSignNow, password: signatureKeys[actualDriver.id] || '' });
-            }
-
-            if (isAccompanied) {
-                selectedHelpers.slice(0, helperCount).forEach(hid => {
-                    if (hid) signatures.push({ userId: hid, role: 'HELPER', signNow: false, password: '' });
-                });
-            }
+            // La sesión activa del despachador es garantía — sin firma adicional requerida
+            const signatures: any[] = [];
 
             const res = await api.initDispatch({
                 invoiceId: assigningInvoice.invoiceNumber || assigningInvoice.id,
@@ -1701,6 +1692,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             </div>
                         )}
 
+                        {/* Date filter */}
+                        <div className="mb-3">
+                            <input
+                                type="date"
+                                value={filterDate}
+                                onChange={e => setFilterDate(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-emerald-500 transition-all"
+                            />
+                        </div>
+
                         {/* Guard: require client selection when multiple clients exist */}
                         {clientsReady && filteredClients.length > 1 && !internalClientId && (
                             <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 mt-2">
@@ -1846,11 +1847,37 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 </div>
                                             </div>
 
-                                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-5">
-                                                <div 
+                                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-4">
+                                                <div
                                                     className="h-full bg-emerald-400 rounded-full transition-all duration-1000"
                                                     style={{ width: `${percent}%` }}
                                                 />
+                                            </div>
+
+                                            {/* Facturas + m³ */}
+                                            <div className="mb-4 space-y-2">
+                                                {/* m³ badge */}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-xl px-2.5 py-1">
+                                                        <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">📦 {totalVolume.toFixed(2)} m³</span>
+                                                        {vehicleData?.capacityM3 > 0 && (
+                                                            <span className="text-[8px] font-bold text-amber-400">/ {vehicleData.capacityM3} m³ · {Math.round(utilizationPercent)}%</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {/* Invoice chips */}
+                                                {routeInvList.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {routeInvList.slice(0, 6).map((inv: any) => (
+                                                            <span key={inv.id} className="text-[8px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded-lg tracking-tight">
+                                                                {inv.invoiceNumber || inv.id}
+                                                            </span>
+                                                        ))}
+                                                        {routeInvList.length > 6 && (
+                                                            <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg">+{routeInvList.length - 6}</span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="flex gap-2">
@@ -2299,14 +2326,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 setSelectedHelpers={setSelectedHelpers}
                 allUsers={allUsers}
                 user={user}
-                drivers={drivers}
-                activeRoutes={activeRoutes}
-                signNowMap={signNowMap}
-                setSignNowMap={setSignNowMap}
-                signatureKeys={signatureKeys}
-                setSignatureKeys={setSignatureKeys}
-                showPasswordMap={showPasswordMap}
-                setShowPasswordMap={setShowPasswordMap}
                 isValidating={isValidating}
                 handleConfirmDispatch={handleConfirmDispatch}
                 onAddQty={handleManualAdd}

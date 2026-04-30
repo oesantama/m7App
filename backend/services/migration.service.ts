@@ -623,25 +623,33 @@ export const restoreSystem = async () => {
     console.log(`[M7-DB-HEAL] Curación de esquema completada en ${healEnd - start}ms`);
 
     await client.query('BEGIN');
-    
-    // SEMILLAS DE DATOS LOCALHOST (Resumen de paridad)
-    await client.query(`
-      INSERT INTO vehicles (id, plate, brand, owner, capacity_m3, client_id, status_id, model_year, color, vehicle_type) VALUES
-      ('VEH-001', 'VEJ509', 'MAR-022', NULL, 14, 'CLI-02', 'EST-01', '2024', 'gri', 'TV-01'),
-      ('VEH-002', 'SXI118', 'MAR-022', NULL, 23, 'CLI-02', 'EST-01', '2024', 'blanco', 'TVH-001'),
-      ('VEH-003', 'JYO631', 'MAR-022', NULL, 19, 'CLI-04', 'EST-01', '2026', 'blanco', 'TV-02'),
-      ('VEH-004', 'WDY031', 'MAR-022', NULL, 22, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02'),
-      ('VEH-005', 'NNN500', 'MAR-022', NULL, 19, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02')
-      ON CONFLICT (id) DO NOTHING;
-    `);
 
-    await client.query(`
-      INSERT INTO drivers (id, name, document_type, document_number, phone, client_id, status_id, license_category) VALUES
-      ('DRV-001', 'WILLIAM GIL', 'DOC-01', '71578229', '2343234', 'CLI-02', 'EST-01', 'C1'),
-      ('DRV-002', 'JAMES SALGADO', 'DOC-01', '94252356', '53324', 'CLI-02', 'EST-01', 'C2'),
-      ('DRV-003', 'JAIRO ALVAREZ', 'DOC-01', '1128450159', '323333333', 'CLI-04', 'EST-01', 'C2')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-    `);
+    // SEMILLAS DE DATOS BOOTSTRAP — solo se ejecutan en entornos NO-producción
+    // En producción, los datos maestros se gestionan desde la UI y nunca se sobreescriben aquí.
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'production-dev';
+    
+    if (!isProduction) {
+      console.log('[M7-SYSTEM] Entorno de desarrollo detectado. Verificando semillas de ejemplo...');
+      await client.query(`
+        INSERT INTO vehicles (id, plate, brand, owner, capacity_m3, client_id, status_id, model_year, color, vehicle_type) VALUES
+        ('VEH-001', 'VEJ509', 'MAR-022', NULL, 14, 'CLI-02', 'EST-01', '2024', 'gri', 'TV-01'),
+        ('VEH-002', 'SXI118', 'MAR-022', NULL, 23, 'CLI-02', 'EST-01', '2024', 'blanco', 'TVH-001'),
+        ('VEH-003', 'JYO631', 'MAR-022', NULL, 19, 'CLI-04', 'EST-01', '2026', 'blanco', 'TV-02'),
+        ('VEH-004', 'WDY031', 'MAR-022', NULL, 22, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02'),
+        ('VEH-005', 'NNN500', 'MAR-022', NULL, 19, 'CLI-01', 'EST-01', '2026', 'gris', 'TV-02')
+        ON CONFLICT (id) DO NOTHING;
+      `);
+
+      await client.query(`
+        INSERT INTO drivers (id, name, document_type, document_number, phone, client_id, status_id, license_category) VALUES
+        ('DRV-001', 'WILLIAM GIL', 'DOC-01', '71578229', '2343234', 'CLI-02', 'EST-01', 'C1'),
+        ('DRV-002', 'JAMES SALGADO', 'DOC-01', '94252356', '53324', 'CLI-02', 'EST-01', 'C2'),
+        ('DRV-003', 'JAIRO ALVAREZ', 'DOC-01', '1128450159', '323333333', 'CLI-04', 'EST-01', 'C2')
+        ON CONFLICT (id) DO NOTHING;
+      `);
+    } else {
+      console.log('[M7-SYSTEM] Entorno de PRODUCCIÓN: Omitiendo semillas de ejemplo (Data Protection Active).');
+    }
 
     await client.query(`
       INSERT INTO estados (id, name, status_id) VALUES
@@ -662,13 +670,13 @@ export const restoreSystem = async () => {
       ('EST-15', 'REPICE',         'EST-01'),
       ('EST-16', 'ELIMINADO',       'EST-01'),
       ('EST-17', 'RECHAZADO',       'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+      ON CONFLICT (id) DO NOTHING;
     `);
 
     await client.query(`
       INSERT INTO roles (id, name, status_id) VALUES
       ('ROL-01', 'Super Admin', 'EST-01'), ('ROL-02', 'ADMIN', 'EST-01'), ('ROL-03', 'CONDUCTORES', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+      ON CONFLICT (id) DO NOTHING;
     `);
 
     // ── LIMPIAR Y RECONSTRUIR MÓDULOS (Pizarra Limpia = Réplica Exacta) ──────
@@ -777,21 +785,14 @@ export const restoreSystem = async () => {
 
 
     const adminHash = await bcrypt.hash('admin123', 10);
-    // Limpiar usuarios duplicados del servidor (réplica exacta local)
-    // [M7-FIX] Borrar permisos primero para respetar FK user_permissions_user_id_fkey
-    await client.query(`DELETE FROM user_permissions WHERE user_id IN ('USR-DEMO', 'USR-02', 'USR-03')`);
-    await client.query(`DELETE FROM users WHERE id IN ('USR-DEMO', 'USR-02', 'USR-03') OR (email = 'oscar@millasiete.com' AND id != 'USR-01')`);
-
+    // [M7-SAFETY] Eliminados borrados automáticos de usuarios USR-02, USR-03 y USR-DEMO.
+    // Esto garantiza que los registros vinculados (pagos, logs, etc) no desaparezcan en cada deploy.
+    
     await client.query(`
       INSERT INTO users (id, email, password, name, role_id, status_id, permissions)
       VALUES 
       ('USR-01', 'admin@millasiete.com', $1, 'OSCAR SANTAMARIA', 'ROL-01', 'EST-01', '[{"module": "all", "actions": ["view", "edit", "delete", "create"]}]'::jsonb)
-      ON CONFLICT (id) DO UPDATE SET 
-        password = $1, 
-        permissions = EXCLUDED.permissions,
-        name = EXCLUDED.name,
-        email = EXCLUDED.email,
-        role_id = EXCLUDED.role_id;
+      ON CONFLICT (id) DO NOTHING;
     `, [adminHash]);
 
     await client.query('COMMIT');
@@ -863,7 +864,7 @@ async function seedGhMiscelaneos(client: any) {
     for (const item of items) {
       await client.query(`
         INSERT INTO gh_miscelaneos (categoria, nombre)
-        SELECT $1, $2
+        SELECT $1::TEXT, $2::TEXT
         WHERE NOT EXISTS (SELECT 1 FROM gh_miscelaneos WHERE categoria = $1 AND nombre = $2)
       `, [cat, item]);
     }
@@ -885,7 +886,7 @@ async function seedGhMiscelaneos(client: any) {
     for (const item of items) {
       await client.query(`
         INSERT INTO ${table} (nombre)
-        SELECT $1 WHERE NOT EXISTS (SELECT 1 FROM ${table} WHERE nombre = $1)
+        SELECT $1::TEXT WHERE NOT EXISTS (SELECT 1 FROM ${table} WHERE nombre = $1)
       `, [item]);
     }
   }
