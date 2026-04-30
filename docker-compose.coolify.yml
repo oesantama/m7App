@@ -73,18 +73,32 @@ services:
         condition: service_healthy
     entrypoint: >
       sh -c "
+        set -x;
         apk add --no-cache rclone;
+        echo '[DEBUG] Iniciando script de backup...';
+        
         do_backup() {
+          echo \"[DEBUG] 1. Creando backup local en /backups/...\";
           BACKUP_FILE=/backups/m7_logistica_$$(date +%Y%m%d_%H%M%S).sql.gz;
           pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} | gzip > $$BACKUP_FILE;
+          
           if [ -f /config/rclone.conf ]; then
-            rclone --config /config/rclone.conf copy $$BACKUP_FILE gdrive:m7_backups;
+            echo \"[DEBUG] 2. rclone.conf encontrado. Iniciando subida a Drive...\";
+            rclone --config /config/rclone.conf copy $$BACKUP_FILE gdrive:m7_backups -v;
+            echo \"[DEBUG] 3. Proceso de subida finalizado.\";
+          else
+            echo \"[DEBUG] ERROR: /config/rclone.conf NO EXISTE en el contenedor.\";
           fi
+          find /backups -name '*.sql.gz' -mtime +3 -delete;
         }
+
         do_backup;
+        echo '[DEBUG] Backup inicial completado. Entrando en modo espera (3PM/1AM).';
+
         while true; do
           CURRENT_HOUR=$$(date +%H);
           if [ \"$$CURRENT_HOUR\" = \"01\" ] || [ \"$$CURRENT_HOUR\" = \"15\" ]; then
+            echo \"[DEBUG] Ejecutando backup programado para las $$CURRENT_HOUR:00\";
             do_backup;
             sleep 3000;
           fi
