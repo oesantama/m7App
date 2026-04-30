@@ -1329,10 +1329,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                     className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
                                                                     Ver detalle
                                                                 </button>
-                                                                <button
+                                                                 <button
                                                                     onClick={() => setModalRoute(route)}
-                                                                    className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
-                                                                        ${pct === 100 && !hasPendingSurcharge ? 'hidden' : 'bg-slate-900 text-white hover:bg-emerald-600'}`}>
+                                                                    className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-emerald-600 transition-all">
                                                                     Conciliar →
                                                                 </button>
                                                             </div>
