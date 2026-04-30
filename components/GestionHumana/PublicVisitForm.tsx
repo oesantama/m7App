@@ -41,7 +41,7 @@ const PublicVisitForm: React.FC = () => {
     });
 
     useEffect(() => {
-        fetch(`${API_URL}/gh-visitas/public/areas`)
+        fetch(`${API_URL}/gh-miscelaneos/areas`)
             .then(r => r.json())
             .then(data => setAreas(Array.isArray(data) ? data : []))
             .catch(() => {});
