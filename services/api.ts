@@ -569,7 +569,13 @@ export const api = {
   }),
   deleteDriver: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/drivers/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
-  getDocuments: (clientId?: string) => fetchJson(`${API_URL}/documents${clientId ? `?clientId=${clientId}` : ''}`),
+  getDocuments: (clientId?: string, statuses?: string[]) => {
+    const params = new URLSearchParams();
+    if (clientId) params.set('clientId', clientId);
+    if (statuses?.length) params.set('statuses', statuses.join(','));
+    const qs = params.toString();
+    return fetchJson(`${API_URL}/documents${qs ? `?${qs}` : ''}`);
+  },
   bulkCreateDocuments: (data: any) => fetchJson(`${API_URL}/documents/bulk`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

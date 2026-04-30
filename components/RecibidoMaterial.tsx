@@ -94,41 +94,47 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  const isPendingOrCounting = (s: string) =>
-    s === DocStatus.PENDING || s === DocStatus.COUNTING ||
-    s === 'PENDIENTE' || s === 'EN CONTEO';
+  // ── Lista filtrada por backend según vista activa ──────────────────────────
+  const [localReciboList, setLocalReciboList] = useState<DocumentL[]>([]);
+  const [isLoadingRecibo, setIsLoadingRecibo] = useState(false);
 
-  const isInventored = (s: string) =>
-    s === DocStatus.INVENTORED || s === 'INVENTARIADO';
+  const STATUSES_PENDING  = [DocStatus.PENDING, DocStatus.COUNTING];   // EST-03, EST-04
+  const STATUSES_HISTORY  = [DocStatus.INVENTORED];                     // EST-08
 
-  const pendingRecibo = useMemo(() =>
-    filteredDocuments.filter(d => isPendingOrCounting(d.status || '')),
-    [filteredDocuments]
-  );
+  const loadReciboList = React.useCallback(async (clientId: string, history: boolean) => {
+    setIsLoadingRecibo(true);
+    try {
+      const statuses = history ? STATUSES_HISTORY : STATUSES_PENDING;
+      const data = await api.getDocuments(clientId || undefined, statuses);
+      setLocalReciboList(data || []);
+    } catch {
+      toast.error('Error al cargar documentos');
+    } finally {
+      setIsLoadingRecibo(false);
+    }
+  }, []);
 
-  const completedRecibo = useMemo(() =>
-    filteredDocuments.filter(d => isInventored(d.status || '')),
-    [filteredDocuments]
-  );
+  useEffect(() => {
+    if (!clientsReady) return;
+    loadReciboList(selectedClientId, showHistory);
+  }, [clientsReady, selectedClientId, showHistory, loadReciboList]);
 
-  const activeList = showHistory ? completedRecibo : pendingRecibo;
-
-  const filteredList = useMemo(() => {
-    if (!searchRecibo.trim()) return activeList;
+  const activeList = useMemo(() => {
+    if (!searchRecibo.trim()) return localReciboList;
     const term = searchRecibo.toLowerCase();
-    return activeList.filter(d =>
+    return localReciboList.filter(d =>
       (d.externalDocId || '').toLowerCase().includes(term) ||
       (d.vehicleData || '').toLowerCase().includes(term) ||
       (d.inventoryUser || '').toLowerCase().includes(term) ||
       (d.planType || '').toLowerCase().includes(term)
     );
-  }, [activeList, searchRecibo]);
+  }, [localReciboList, searchRecibo]);
 
   const paginatedDocs = useMemo(() => {
-    if (rowsPerPage === 'all') return filteredList;
+    if (rowsPerPage === 'all') return activeList;
     const start = (currentPage - 1) * rowsPerPage;
-    return filteredList.slice(start, start + rowsPerPage);
-  }, [filteredList, currentPage, rowsPerPage]);
+    return activeList.slice(start, start + rowsPerPage);
+  }, [activeList, currentPage, rowsPerPage]);
 
   // Métricas por documento (volume total, progreso, novedades)
   const getDocMetrics = (doc: DocumentL) => {
@@ -141,7 +147,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
     return { totalItems, countedItems, novedades, totalVol, progress };
   };
 
-  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(filteredList.length / rowsPerPage);
+  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(activeList.length / rowsPerPage);
 
   const handleStartCount = async (doc: DocumentL) => {
     try {
@@ -512,7 +518,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">{showHistory ? 'Historial de Auditoría' : 'Planes en Espera'}</h3>
                     <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase shadow-sm ${showHistory ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-slate-950'}`}>
-                      {filteredList.length}{searchRecibo ? ` / ${activeList.length}` : ''} {showHistory ? 'FINALIZADOS' : 'ACTIVOS'}
+                      {activeList.length} {showHistory ? 'FINALIZADOS' : 'ACTIVOS'}
                     </span>
                     <button
                       onClick={() => { setShowHistory(!showHistory); setCurrentPage(1); setSearchRecibo(''); }}
@@ -549,8 +555,13 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
               <div className="p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar bg-slate-50/5">
                 {/* ... (Contenido de Recibo existente) ... */}
+            {isLoadingRecibo && (
+              <div className="flex items-center justify-center py-16 text-slate-400 text-xs font-black uppercase tracking-widest gap-3">
+                <Icons.RefreshCw className="w-4 h-4 animate-spin" /> Cargando...
+              </div>
+            )}
             <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
-              {paginatedDocs.map(doc => {
+              {!isLoadingRecibo && paginatedDocs.map(doc => {
                 const metrics = getDocMetrics(doc);
                 const isCountingStatus = doc.status === DocStatus.COUNTING || doc.status === 'EN CONTEO';
                 const isInventoredStatus = doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO';
@@ -731,7 +742,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                   <Icons.ChevronRight className="rotate-180 w-4 h-4" />
                 </button>
                 <span className="text-[10px] font-black uppercase text-slate-700 tracking-widest">
-                  Pág {currentPage} / {totalPages} &nbsp;·&nbsp; {filteredList.length} docs
+                  Pág {currentPage} / {totalPages} &nbsp;·&nbsp; {activeList.length} docs
                 </span>
                 <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 disabled:opacity-20 hover:text-emerald-500 transition-all shadow-sm">
                   <Icons.ChevronRight className="w-4 h-4" />

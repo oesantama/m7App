@@ -61,8 +61,8 @@ export const getDocuments = async (req: Request, res: Response) => {
         LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND TRIM(UPPER(i.invoice)) = TRIM(UPPER(p.invoice))
         LEFT JOIN document_consolidated_items c ON i.document_id = c.document_id AND TRIM(UPPER(i.article_id)) = TRIM(UPPER(c.article_id))
         LEFT JOIN articles a ON TRIM(UPPER(a.id)) = TRIM(UPPER(i.article_id))
-        LEFT JOIN unidad_medida u_i ON u_i.id = a.uom_inter_id
-        LEFT JOIN unidad_medida u_s ON u_s.id = a.uom_std
+        LEFT JOIN unidades_medida u_i ON u_i.id = a.uom_inter_id
+        LEFT JOIN unidades_medida u_s ON u_s.id = a.uom_std
         WHERE i.document_id = d.id
       ) item_with_payment) as items,
       (SELECT COUNT(*) FROM inventory_news n WHERE n.document_id = d.id AND n.created_at >= NOW() - INTERVAL '30 hours') as "newsCount",
@@ -76,13 +76,21 @@ export const getDocuments = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
-    const { clientId, docL } = req.query;
+    const { clientId, docL, statuses } = req.query;
     const user = (req as any).user;
     const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
 
     if (clientId) {
       queryParams.push(clientId);
       query += ` AND d.client_id = $${queryParams.length}`;
+    }
+
+    if (statuses) {
+      const statusList = String(statuses).split(',').map(s => s.trim()).filter(Boolean);
+      if (statusList.length > 0) {
+        queryParams.push(statusList);
+        query += ` AND d.status = ANY($${queryParams.length}::text[])`;
+      }
     }
 
     if (docL) {
