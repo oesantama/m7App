@@ -1915,9 +1915,6 @@ export const uploadCumplido = async (req: Request, res: Response) => {
         const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
 
         const rcloneConfig = '/config/rclone.conf';
-        
-        console.log(`[CUMPLIDOS] Iniciando subida a: ${drivePath}/${fileName}`);
-
         const uploadCmd = `rclone --config ${rcloneConfig} copyto "${file.path}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
 
         exec(uploadCmd, async (error, stdout, stderr) => {
@@ -1927,12 +1924,8 @@ export const uploadCumplido = async (req: Request, res: Response) => {
             }
 
             const linkCmd = `rclone --config ${rcloneConfig} link "gdrive_cumplidos:${drivePath}/${fileName}"`;
-
-            exec(linkCmd, async (linkErr, linkStdout, linkStderr) => {
-                let driveLink = '';
-                if (!linkErr) {
-                    driveLink = linkStdout.trim();
-                }
+            exec(linkCmd, async (linkErr, linkStdout) => {
+                let driveLink = linkErr ? '' : linkStdout.trim();
 
                 const countCmd = `rclone --config ${rcloneConfig} lsf "gdrive_cumplidos:${drivePath}" | wc -l`;
                 exec(countCmd, async (countErr, countStdout) => {
@@ -1968,11 +1961,11 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                                         <p style="font-size: 12px; color: #666;">Este es un mensaje automático generado por el núcleo de inteligencia Orbit M7.</p>
                                     </div>
                                 `;
-                                await sendEmail(emails, subject, html).catch(err => console.error('[CUMPLIDOS] Error enviando mail:', err));
+                                await sendEmail(emails, subject, html).catch(() => {});
                             }
                         }
 
-                        fs.unlinkSync(file.path);
+                        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 
                         res.json({
                             message: 'Cumplido subido y registrado exitosamente',
@@ -1982,14 +1975,13 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                         });
                     } catch (dbErr) {
                         console.error('[CUMPLIDOS] Error DB:', dbErr);
-                        res.status(500).json({ error: 'Error al procesar el registro y notificaciones' });
+                        res.status(500).json({ error: 'Error al procesar el registro' });
                     }
                 });
             });
         });
 
     } catch (err) {
-        console.error('[CUMPLIDOS] Error general:', err);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };

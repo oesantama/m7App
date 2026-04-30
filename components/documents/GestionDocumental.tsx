@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { INITIAL_CLIENTS } from '../../constants';
 import { useAppStore } from '../../stores/useAppStore';
-import { Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, Search } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, Search, UploadCloud } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -33,7 +33,7 @@ const GestionDocumental: React.FC = () => {
             // En una implementación real, esto traería el historial detallado. 
             // Por ahora simularemos con los datos de la tabla logs que creamos.
         } catch (error) {
-            console.error('Error fetching history:', error);
+            // Error silencioso en producción para no ensuciar consola
         }
     };
 
