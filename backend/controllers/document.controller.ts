@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { exec } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import pool from '../config/db.js';
+import pool from '../config/database.js';
 import { sendEmail } from '../services/notification.service.js';
 
 const MESES = [
