@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { INITIAL_CLIENTS } from '../../constants';
-import { useAuthStore } from '../../store/authStore';
+import { useAppStore } from '../../stores/useAppStore';
 import { Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, Search } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -15,7 +15,7 @@ interface DocumentLog {
 }
 
 const GestionDocumental: React.FC = () => {
-    const { user } = useAuthStore();
+    const { user } = useAppStore();
     const [selectedClient, setSelectedClient] = useState<string>('');
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
