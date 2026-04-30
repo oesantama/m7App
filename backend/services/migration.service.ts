@@ -522,13 +522,13 @@ const healSchema = async (client: any) => {
         UPDATE master_records SET parent_id = 'TGN-002' WHERE parent_id = 'TGN-100' AND category = 'NOTIFICACIONES';
 
         -- Registro del nuevo Módulo y Página en el menú
-        INSERT INTO pages (id, name, icon, path, module_id, status_id)
-        SELECT 'MOD-DOC', 'GESTIÓN DOCUMENTAL', 'FileText', '/documentos', NULL, 'EST-01'
-        WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'MOD-DOC');
+        INSERT INTO modules (id, name, icon_class, status_id)
+        SELECT 'MOD-10', 'GESTIÓN DOCUMENTAL', 'FileText', 'EST-01'
+        WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-10');
 
         INSERT INTO pages (id, name, icon, path, module_id, status_id)
-        SELECT 'PAG-DOC-01', 'CUMPLIDOS DRIVE', 'UploadCloud', '/cumplidos', 'MOD-DOC', 'EST-01'
-        WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-DOC-01');
+        SELECT 'PAG-45', 'CUMPLIDOS DRIVE', 'UploadCloud', '/cumplidos', 'MOD-10', 'EST-01'
+        WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-45');
 
         COMMIT;
       END$$;
