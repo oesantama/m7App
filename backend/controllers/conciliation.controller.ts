@@ -1079,7 +1079,7 @@ export const closeConciliationCycle = async (req: Request, res: Response) => {
                 FROM route_invoices ri
                 JOIN routes r ON r.id::text = ri.route_id::text
                 LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
-                WHERE ri.invoice_id = di.invoice OR ri.invoice_id = CONCAT($1, '_', di.invoice)
+                WHERE ri.invoice_id = di.invoice OR ri.invoice_id = CONCAT($1::text, '_', di.invoice)
                 ORDER BY ri.id DESC LIMIT 1
             ) plate_info ON true
             WHERE di.document_id = $1
