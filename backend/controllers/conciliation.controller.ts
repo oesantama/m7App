@@ -1074,7 +1074,7 @@ export const closeConciliationCycle = async (req: Request, res: Response) => {
               ON ic.document_id::text = di.document_id::text 
              AND ic.invoice_number = di.invoice
             LEFT JOIN LATERAL (
-                SELECT ri.vehicle_id, r.vehicle_id as route_v_id, v.plate
+                SELECT r.vehicle_id as route_v_id, v.plate
                 FROM route_invoices ri
                 JOIN routes r ON r.id::text = ri.route_id::text
                 LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
