@@ -1286,41 +1286,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
     }, [activeRoutes, filteredRoutes]);
 
-    // AGRUPA rutas por placa + día calendario para mostrar una sola card por placa/día
-    const groupedRoutes = React.useMemo(() => {
-        const groups = new Map<string, any[]>();
-        for (const route of filteredRoutes) {
-            const raw = (route as any).created_at || (route as any).createdAt;
-            const d = raw ? new Date(raw) : new Date();
-            const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-            const key = `${route.plate}_${dayKey}`;
-            if (!groups.has(key)) groups.set(key, []);
-            groups.get(key)!.push(route);
-        }
-        return Array.from(groups.entries()).map(([groupKey, routes]) => {
-            routes.sort((a, b) => {
-                const at = new Date((a as any).created_at || (a as any).createdAt || 0).getTime();
-                const bt = new Date((b as any).created_at || (b as any).createdAt || 0).getTime();
-                return at - bt;
-            });
-            const primary = routes[0];
-            const allIds = Array.from(new Set(
-                routes.flatMap((r: any) => r.invoice_ids || r.invoiceIds || [])
-            ));
-            const deliveredTotal = routes.reduce((s: number, r: any) => s + (Number(r.delivered_invoices) || 0), 0);
-            return {
-                ...primary,
-                id: groupKey,
-                invoice_ids: allIds,
-                total_invoices: allIds.length,
-                delivered_invoices: deliveredTotal,
-                _primaryId: primary.id,
-                _routeIds: routes.map((r: any) => r.id),
-                _isGroup: routes.length > 1,
-                _groupCount: routes.length,
-            };
-        });
-    }, [filteredRoutes]);
+    // Una card por ruta asignada, sin agrupación
+    const groupedRoutes = React.useMemo(() =>
+        filteredRoutes.map((route: any) => ({
+            ...route,
+            _primaryId: route.id,
+            _routeIds: [route.id],
+            _isGroup: false,
+            _groupCount: 1,
+        }))
+    , [filteredRoutes]);
 
     // FILTRA UBICACIONES GPS BASADAS EN LAS RUTAS VISIBLES
     const filteredLocations = React.useMemo(() => {
@@ -1853,14 +1828,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         const d = new Date(raw);
                                                         if (isNaN(d.getTime())) return null;
                                                         const fecha = d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+                                                        const hora  = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
                                                         return (
-                                                            <p className="text-[10px] font-black text-slate-600 mt-1 flex items-center gap-1">
+                                                            <p className="text-[10px] font-black text-slate-600 mt-1 flex items-center gap-1 flex-wrap">
                                                                 <span>📅</span>{fecha}
-                                                                {route._isGroup && (
-                                                                    <span className="ml-1 text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
-                                                                        {route._groupCount} asignaciones
-                                                                    </span>
-                                                                )}
+                                                                <span className="text-slate-300">·</span>
+                                                                <span className="text-indigo-500">🕐 {hora}</span>
                                                             </p>
                                                         );
                                                     })()}
