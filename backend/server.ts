@@ -38,13 +38,19 @@ const allowedOrigins = [
   'http://localhost:5173',
 ];
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? (origin, callback) => {
-        // Permitir requests sin origin (mobile apps, Postman, server-to-server)
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-        callback(new Error(`CORS: Origen no permitido — ${origin}`));
-      }
-    : true,
+  origin: (origin, callback) => {
+    // Permitir siempre localhost y requests sin origin para desarrollo/testing
+    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+    // En producción, validar contra la whitelist
+    if (process.env.NODE_ENV === 'production') {
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS: Origen no permitido — ${origin}`));
+    }
+    // En otros entornos permitimos todo
+    callback(null, true);
+  },
   credentials: true,
 }));
 
@@ -120,7 +126,8 @@ app.use('/api', (req, res, next) => {
     '/gh-personal/public/survey/save',
     '/cfg-ciudades/departamentos',
     '/cfg-ciudades/ciudades',
-    '/gh-miscelaneos'
+    '/gh-miscelaneos',
+    '/gh-visitas/public'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {

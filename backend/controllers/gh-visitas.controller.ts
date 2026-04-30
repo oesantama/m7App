@@ -84,6 +84,48 @@ export const saveVisita = async (req: Request, res: Response) => {
     }
 };
 
+export const getAreas = async (_req: Request, res: Response) => {
+    try {
+        const result = await pool.query(`SELECT id, nombre FROM gh_areas WHERE estado = 'ACTIVO' OR estado IS NULL ORDER BY nombre ASC`);
+        res.json(result.rows);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const saveVisitaPublic = async (req: Request, res: Response) => {
+    const {
+        nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
+        contacto_emergencia, acuerdo_requisitos, contiene_equipos,
+        marca_dispositivo, numero_serie, fecha_entrada
+    } = req.body;
+
+    try {
+        const result = await pool.query(`
+            INSERT INTO gh_visitas (
+                nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
+                contacto_emergencia, acuerdo_requisitos, contiene_equipos,
+                marca_dispositivo, numero_serie, registrado_por_id,
+                fecha_entrada, fecha_registro
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'AUTOREGISTRO', $11, NOW())
+            RETURNING id
+        `, [
+            nombre, cedula, area_dependencia,
+            cuenta_arl === true || cuenta_arl === 'true',
+            cuenta_eps === true || cuenta_eps === 'true',
+            contacto_emergencia,
+            acuerdo_requisitos === true || acuerdo_requisitos === 'true',
+            contiene_equipos === true || contiene_equipos === 'true',
+            marca_dispositivo || null, numero_serie || null,
+            fecha_entrada || new Date()
+        ]);
+        res.json({ success: true, id: result.rows[0].id });
+    } catch (err: any) {
+        console.error('[GH-VISITAS-PUBLIC] Save Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 export const marcarSalida = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {

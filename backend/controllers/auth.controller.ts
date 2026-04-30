@@ -60,7 +60,7 @@ export const login = async (req: Request, res: Response) => {
         permissions = [...permissions, ...granularPerms];
     }
 
-    if (user.two_factor_enabled) {
+    if (String(user.two_factor_enabled) === '1' || user.two_factor_enabled === true) {
         return res.json({ 
             success: true, 
             require2FA: true, 
