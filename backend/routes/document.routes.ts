@@ -11,7 +11,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 // Middleware flexible para permitir Auditoría tanto a Admins como a Auxiliares (PAG-17/PAG-30)
 const requireAuditEdit = (req: any, res: any, next: any) => {
   const user = req.user;
-  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) => 
     (p.module === 'PAG-16' || p.module === 'DOCUMENTOS_L' || p.module === 'PAG-17' || p.module === 'PAG-30') && 
     (p.actions.includes('edit') || p.actions.includes('create'))
@@ -23,7 +23,7 @@ const requireAuditEdit = (req: any, res: any, next: any) => {
 
 router.get('/', (req, res, next) => {
   const user = (req as any).user;
-  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
   const hasDocsPerm = user?.permissions?.some((p: any) => p.module === 'PAG-16' && p.actions.includes('view'));
   const hasRutasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-15' && p.actions.includes('view'));
   const hasRecibidoPerm = user?.permissions?.some((p: any) => p.module === 'PAG-17' && p.actions.includes('view'));
@@ -42,7 +42,7 @@ router.post('/resend-notification', requireAuditEdit, resendInventoryNotificatio
 // Log de Existencias — inventario_clientes acumulado por cliente/artículo
 router.get('/inventory-log', (req, res, next) => {
   const user = (req as any).user;
-  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) =>
     (p.module === 'PAG-16' || p.module === 'PAG-17' || p.module === 'PAG-01') &&
     p.actions.includes('view')
@@ -52,7 +52,7 @@ router.get('/inventory-log', (req, res, next) => {
 }, getInventoryLog);
 router.get('/invoices', (req, res, next) => {
   const user = (req as any).user;
-  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
   const hasDocsPerm = user?.permissions?.some((p: any) => p.module === 'PAG-16' && p.actions.includes('view'));
   const hasRutasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-15' && p.actions.includes('view'));
   const hasRecibidoPerm = user?.permissions?.some((p: any) => p.module === 'PAG-17' && p.actions.includes('view'));
@@ -64,7 +64,7 @@ router.get('/invoices', (req, res, next) => {
 router.post('/payments-l', requirePermission('DOCUMENTOS_L', 'edit'), processDocumentLPayment);
 router.get('/mastersuite-report', (req, res, next) => {
   const user = (req as any).user;
-  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) => (p.module === 'PAG-34' || p.module === 'PAG-16' || p.module === 'PAG-15') && p.actions.includes('view'));
   if (isSuper || hasPerm) return next();
   res.status(403).json({ success: false, error: 'Permiso insuficiente' });
@@ -78,7 +78,7 @@ router.get('/conciliations/:docId/:articleId', requireAuditEdit, getConciliation
 // Trazabilidad completa de una factura por número
 router.get('/invoice-traceability', (req, res, next) => {
   const user = (req as any).user;
-  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) =>
     ['PAG-16', 'PAG-15', 'PAG-17', 'PAG-30', 'PAG-01'].includes(p.module) && p.actions.includes('view')
   );
