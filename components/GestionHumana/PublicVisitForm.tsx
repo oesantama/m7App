@@ -38,6 +38,7 @@ const PublicVisitForm: React.FC = () => {
         marca_dispositivo: '',
         numero_serie: '',
         fecha_entrada: getLocalISO(),
+        hora_salida: '',
     });
 
     useEffect(() => {
@@ -94,7 +95,7 @@ const PublicVisitForm: React.FC = () => {
                     <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-6">Su ingreso ha sido registrado correctamente</p>
                     <p className="text-slate-400 text-[11px]">Bienvenido/a a las instalaciones. Por favor diríjase al área indicada.</p>
                     <button
-                        onClick={() => { setSubmitted(false); setForm({ nombre: '', cedula: '', area_dependencia: '', cuenta_arl: false, cuenta_eps: false, contacto_emergencia: '', acuerdo_requisitos: false, contiene_equipos: false, marca_dispositivo: '', numero_serie: '', fecha_entrada: getLocalISO() }); }}
+                        onClick={() => { setSubmitted(false); setForm({ nombre: '', cedula: '', area_dependencia: '', cuenta_arl: false, cuenta_eps: false, contacto_emergencia: '', acuerdo_requisitos: false, contiene_equipos: false, marca_dispositivo: '', numero_serie: '', fecha_entrada: getLocalISO(), hora_salida: '' }); }}
                         className="mt-8 px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all"
                     >
                         Nuevo Registro
@@ -219,6 +220,17 @@ const PublicVisitForm: React.FC = () => {
                                     />
                                 </div>
                             )}
+                        </div>
+
+                        {/* Hora de salida (opcional) */}
+                        <div>
+                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Hora de Salida <span className="text-slate-300 font-bold normal-case">(opcional)</span></label>
+                            <input
+                                type="time"
+                                value={form.hora_salida}
+                                onChange={e => set('hora_salida', e.target.value)}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-400 outline-none transition-all"
+                            />
                         </div>
 
                         {/* Acuerdo */}

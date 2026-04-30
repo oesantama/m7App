@@ -452,7 +452,10 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  marcarSalidaVisita: (id: number | string) => fetchJson(`${API_URL}/gh-visitas/${id}/salida`, { method: 'PATCH' }),
+  marcarSalidaVisita: (id: number | string, hora?: string) => fetchJson(`${API_URL}/gh-visitas/${id}/salida`, {
+    method: 'PATCH',
+    body: JSON.stringify({ hora: hora || null }),
+  }),
 
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),

@@ -33,6 +33,7 @@ interface Visita {
     marca_dispositivo?: string;
     numero_serie?: string;
     hora_salida?: string;
+    registrado_por_id?: string;
     registrado_por_nombre?: string;
     fecha_registro?: string;
 }
@@ -41,6 +42,8 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
     const [activeTab, setActiveTab] = useState<'registro' | 'consulta'>('registro');
     const [showQR, setShowQR] = useState(false);
     const PUBLIC_URL = `${window.location.origin}/publico/visitas`;
+    const [editingSalidaId, setEditingSalidaId] = useState<number | null>(null);
+    const [editingSalidaHora, setEditingSalidaHora] = useState('');
     const [filterSearch, setFilterSearch] = useState('');
     const [filterArea, setFilterArea] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
@@ -582,14 +585,63 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                                 {v.fecha_entrada ? fmtTime(v.fecha_entrada) : '—'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                {v.hora_salida ? (
-                                                    <span className="text-[10px] font-black text-slate-500">{fmtTime(v.hora_salida)}</span>
+                                                {editingSalidaId === v.id ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="time"
+                                                            value={editingSalidaHora}
+                                                            onChange={e => setEditingSalidaHora(e.target.value)}
+                                                            className="px-2 py-1 text-[10px] font-bold border border-emerald-300 rounded-lg outline-none focus:border-emerald-500 w-24"
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!editingSalidaHora) return;
+                                                                await api.marcarSalidaVisita(v.id!, editingSalidaHora);
+                                                                toast.success('Hora de salida registrada');
+                                                                setEditingSalidaId(null);
+                                                                setEditingSalidaHora('');
+                                                                fetchVisitas();
+                                                            }}
+                                                            className="w-6 h-6 bg-emerald-500 text-white rounded-lg flex items-center justify-center hover:bg-emerald-600 transition-all flex-shrink-0"
+                                                        >
+                                                            <Icons.Check className="w-3 h-3" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { setEditingSalidaId(null); setEditingSalidaHora(''); }}
+                                                            className="w-6 h-6 bg-slate-200 text-slate-500 rounded-lg flex items-center justify-center hover:bg-slate-300 transition-all flex-shrink-0"
+                                                        >
+                                                            <Icons.X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                ) : v.hora_salida ? (
+                                                    <div className="flex items-center gap-1 justify-center group">
+                                                        <span className="text-[10px] font-black text-slate-500">{fmtTime(v.hora_salida)}</span>
+                                                        <button
+                                                            onClick={() => { setEditingSalidaId(v.id!); setEditingSalidaHora(new Date(v.hora_salida!).toTimeString().slice(0,5)); }}
+                                                            className="opacity-0 group-hover:opacity-100 w-5 h-5 bg-slate-100 rounded flex items-center justify-center transition-all"
+                                                        >
+                                                            <Icons.Edit className="w-2.5 h-2.5 text-slate-400" />
+                                                        </button>
+                                                    </div>
                                                 ) : (
-                                                    <span className="text-[10px] font-black text-emerald-600 animate-pulse uppercase">En Planta</span>
+                                                    <button
+                                                        onClick={() => { setEditingSalidaId(v.id!); setEditingSalidaHora(''); }}
+                                                        className="text-[10px] font-black text-emerald-600 animate-pulse uppercase hover:animate-none hover:bg-emerald-50 px-2 py-1 rounded-lg transition-all"
+                                                    >
+                                                        En Planta
+                                                    </button>
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-400 uppercase">
-                                                {v.registrado_por_nombre || '—'}
+                                                {v.registrado_por_id === 'AUTOREGISTRO' ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-wide">
+                                                        <Icons.Link className="w-2.5 h-2.5" />
+                                                        Link Público
+                                                    </span>
+                                                ) : (
+                                                    v.registrado_por_nombre || '—'
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-400">
                                                 {v.fecha_registro ? fmtDate(v.fecha_registro) : '—'}

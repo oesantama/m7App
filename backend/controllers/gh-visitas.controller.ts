@@ -97,17 +97,23 @@ export const saveVisitaPublic = async (req: Request, res: Response) => {
     const {
         nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
         contacto_emergencia, acuerdo_requisitos, contiene_equipos,
-        marca_dispositivo, numero_serie, fecha_entrada
+        marca_dispositivo, numero_serie, fecha_entrada, hora_salida
     } = req.body;
 
     try {
+        let salidaVal: string | null = null;
+        if (hora_salida) {
+            const fechaPart = (fecha_entrada ? new Date(fecha_entrada) : new Date()).toISOString().split('T')[0];
+            salidaVal = `${fechaPart}T${hora_salida}:00`;
+        }
+
         const result = await pool.query(`
             INSERT INTO gh_visitas (
                 nombre, cedula, area_dependencia, cuenta_arl, cuenta_eps,
                 contacto_emergencia, acuerdo_requisitos, contiene_equipos,
                 marca_dispositivo, numero_serie, registrado_por_id,
-                fecha_entrada, fecha_registro
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'AUTOREGISTRO', $11, NOW())
+                fecha_entrada, fecha_registro, hora_salida
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'AUTOREGISTRO', $11, NOW(), $12)
             RETURNING id
         `, [
             nombre, cedula, area_dependencia,
@@ -117,7 +123,8 @@ export const saveVisitaPublic = async (req: Request, res: Response) => {
             acuerdo_requisitos === true || acuerdo_requisitos === 'true',
             contiene_equipos === true || contiene_equipos === 'true',
             marca_dispositivo || null, numero_serie || null,
-            fecha_entrada || new Date()
+            fecha_entrada || new Date(),
+            salidaVal
         ]);
         res.json({ success: true, id: result.rows[0].id });
     } catch (err: any) {
@@ -128,12 +135,21 @@ export const saveVisitaPublic = async (req: Request, res: Response) => {
 
 export const marcarSalida = async (req: Request, res: Response) => {
     const { id } = req.params;
+    const { hora } = req.body; // opcional: HH:MM — si no viene, usa NOW()
     try {
-        await pool.query(`
-            UPDATE gh_visitas 
-            SET hora_salida = NOW() 
-            WHERE id = $1
-        `, [id]);
+        let salidaVal: string | null = null;
+        if (hora) {
+            // Combinar la fecha de entrada con la hora indicada para mantener consistencia
+            const entradaRes = await pool.query(`SELECT fecha_entrada FROM gh_visitas WHERE id = $1`, [id]);
+            if (entradaRes.rows.length > 0) {
+                const fechaPart = new Date(entradaRes.rows[0].fecha_entrada).toISOString().split('T')[0];
+                salidaVal = `${fechaPart}T${hora}:00`;
+            }
+        }
+        await pool.query(
+            `UPDATE gh_visitas SET hora_salida = $1 WHERE id = $2`,
+            [salidaVal || new Date().toISOString(), id]
+        );
         res.json({ success: true });
     } catch (err: any) {
         console.error('[GH-VISITAS] Salida Error:', err.message);
