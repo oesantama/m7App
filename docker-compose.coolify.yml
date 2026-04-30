@@ -67,7 +67,6 @@ services:
       - TZ=America/Bogota
     volumes:
       - 'm7_backups:/backups'
-      - './rclone.conf:/config/rclone.conf:ro'
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,6 +74,7 @@ services:
       sh -c "
         apk add --no-cache rclone;
         mkdir -p /config;
+        rm -rf /config/rclone.conf;
         echo '[gdrive]' > /config/rclone.conf;
         echo 'type = drive' >> /config/rclone.conf;
         echo 'scope = drive' >> /config/rclone.conf;
