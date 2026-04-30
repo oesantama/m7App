@@ -1068,10 +1068,11 @@ export const closeConciliationCycle = async (req: Request, res: Response) => {
         // 1. Buscar facturas del documento que NO están en invoice_conciliations
         // Si viene vehiclePlate, filtramos solo las de esa placa
         let query = `
-            SELECT di.invoice, di.item_status, di.vmetodo, di.un_code, di.metodo_pago
+            SELECT di.invoice, di.item_status
             FROM document_items di
-            LEFT JOIN invoice_conciliations ic 
-              ON ic.document_id::text = di.document_id::text 
+            JOIN documents_l dl ON dl.id::text = di.document_id::text
+            LEFT JOIN invoice_conciliations ic
+              ON ic.document_id::text = di.document_id::text
              AND ic.invoice_number = di.invoice
             LEFT JOIN LATERAL (
                 SELECT r.vehicle_id as route_v_id, v.plate
@@ -1083,6 +1084,7 @@ export const closeConciliationCycle = async (req: Request, res: Response) => {
             ) plate_info ON true
             WHERE di.document_id = $1
               AND ic.id IS NULL
+              AND dl.plan_type = 'Plan R'
         `;
         const params: any[] = [documentId];
 

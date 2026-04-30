@@ -62,6 +62,8 @@ services:
     restart: always
     environment:
       - 'PGPASSWORD=${POSTGRES_PASSWORD}'
+      - 'POSTGRES_USER=${POSTGRES_USER}'
+      - 'POSTGRES_DB=${POSTGRES_DB}'
       - TZ=America/Bogota
     volumes:
       - 'm7_backups:/backups'

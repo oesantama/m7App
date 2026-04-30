@@ -2114,8 +2114,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     <Icons.Eye className="w-4 h-4" />
                                                 </button>
 
-                                                {/* DESPACHAR — solo si NO está en ruta y no tiene firma pendiente */}
-                                                {!['EST-11','EST-12','EST-13','EST-14'].includes(effectiveStatus) && !hasPendingSignature && (
+                                                {/* DESPACHAR — solo Plan Normal, solo si NO está en ruta y no tiene firma pendiente */}
+                                                {!['EST-11','EST-12','EST-13','EST-14'].includes(effectiveStatus) && !hasPendingSignature && String(inv.planType || '').toUpperCase() !== 'PLAN R' && (
                                                     <button
                                                         onClick={() => {
                                                             // M7-FIX: Enriquecer items con el maestro para tener los factores de conversión (CAJA, STD)
@@ -2148,8 +2148,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     </button>
                                                 )}
 
-                                                {/* ENTREGAR — EN RUTA + el usuario actual no tiene firma propia pendiente */}
-                                                {effectiveStatus === 'EST-11' && !hasPendingSignature && (
+                                                {/* ENTREGAR — solo Plan Normal, EN RUTA + el usuario actual no tiene firma propia pendiente */}
+                                                {effectiveStatus === 'EST-11' && !hasPendingSignature && String(inv.planType || '').toUpperCase() !== 'PLAN R' && (
                                                     <button
                                                         onClick={() => {
                                                             const items = (inv.items || []).map((it: any) => ({
@@ -2171,8 +2171,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     </button>
                                                 )}
 
-                                                {/* SUBIR SOPORTE — cuando ya fue entregado */}
-                                                {(['EST-12','EST-13','EST-14'].includes(effectiveStatus)) && (
+                                                {/* SUBIR SOPORTE — deshabilitado temporalmente */}
+                                                {/* {(['EST-12','EST-13','EST-14'].includes(effectiveStatus)) && (
                                                     <button
                                                         onClick={() => setVoucherModal({ isOpen: true, invoice: inv })}
                                                         className="px-4 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all flex items-center gap-2"
@@ -2180,7 +2180,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                         <Icons.Upload className="w-4 h-4" />
                                                         Soporte
                                                     </button>
-                                                )}
+                                                )} */}
 
                                                 {/* FIRMAR — firma pendiente */}
                                                 {hasPendingSignature && (
@@ -2512,15 +2512,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 </div>
             )}
 
-            {/* MODAL: SOPORTE DE PAGO */}
-            {voucherModal?.isOpen && (
+            {/* MODAL: SOPORTE DE PAGO — deshabilitado temporalmente */}
+            {/* {voucherModal?.isOpen && (
                 <PaymentVoucherModal
                     isOpen={voucherModal.isOpen}
                     onClose={() => setVoucherModal(null)}
                     invoice={voucherModal.invoice}
                     user={user}
                 />
-            )}
+            )} */}
 
             {/* MODAL: CONTROL DE DEVOLUCIONES */}
             <ReturnsControlModal
