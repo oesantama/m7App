@@ -327,6 +327,27 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
+
+        // EXPANDIR CELDAS COMBINADAS (merged cells):
+        // MasterSuite y Plan R fusionan "Remision/Transferencia", "Placa", "Carga" etc.
+        // XLSX solo devuelve el valor en la primera celda del rango; las demás quedan vacías.
+        // Aquí propagamos el valor de cada celda maestra a todas las celdas del rango.
+        if (ws['!merges']) {
+          ws['!merges'].forEach((merge: any) => {
+            const masterAddr = XLSX.utils.encode_cell({ r: merge.s.r, c: merge.s.c });
+            const masterCell = ws[masterAddr];
+            if (!masterCell) return;
+            for (let r = merge.s.r; r <= merge.e.r; r++) {
+              for (let c = merge.s.c; c <= merge.e.c; c++) {
+                const addr = XLSX.utils.encode_cell({ r, c });
+                if (addr !== masterAddr) {
+                  ws[addr] = { ...masterCell };
+                }
+              }
+            }
+          });
+        }
+
         // USO DE raw: false PARA OBTENER EL TEXTO FORMATEADO (Crucial para "86.000" -> "86.000")
         const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false }) as any[][];
         
@@ -455,7 +476,14 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iVolUnidad = findIdx(['volumen unitario']); 
         
         const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
-        const iFactura = findIdx(['remision/transferencia', 'factura', 'remision', 'documento', 'invoice']);
+        const iFactura = findIdx([
+          'remision/transferencia', 'remision / transferencia',
+          'no. factura', 'nro. factura', 'nro factura', 'no factura', 'num factura', 'numero factura', 'número factura',
+          'factura no', 'factura no.', 'factura #', '# factura',
+          'no. remision', 'nro. remision', 'no remision', 'num remision', 'numero remision', 'número remisión',
+          'ref. factura', 'ref factura', 'referencia factura',
+          'factura', 'remision', 'remisión', 'invoice', 'bill', 'order ref'
+        ]);
         const iCiudad = findIdx(['destino', 'ciudad', 'city']);
         const iDir = findIdx(['dirección 1', 'dirección', 'dirección1', 'direccion 1', 'direccion', 'direccion1', 'dir 1', 'dir1', 'address', 'f_dirección', 'f_direccion', 'dirección 1', 'dirección']);
         const iPed = findIdx(['nº ped', 'pedido', 'order']);
