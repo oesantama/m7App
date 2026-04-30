@@ -144,21 +144,26 @@ services:
         apk add --no-cache rclone;
         echo '[M7-BACKUP] Servicio iniciado (Ciclo: 12h | Retención Local: 3d)';
         while true; do
-          BACKUP_FILE=/backups/m7_logistica_$$(date +%Y%m%d_%H%M%S).sql.gz;
-          pg_dump -h postgres -U m7_admin -d m7_logistica | gzip > $$BACKUP_FILE;
-          echo \"[M7-BACKUP] Backup local creado: $$BACKUP_FILE\";
-          
-          if [ -f /config/rclone.conf ]; then
-            echo \"[M7-BACKUP] Sincronizando con Google Drive...\";
-            rclone --config /config/rclone.conf copy $$BACKUP_FILE gdrive:m7_backups;
-            echo \"[M7-BACKUP] Sincronización completada exitosamente\";
-          else
-            echo \"[M7-BACKUP] ERROR: rclone.conf no encontrado en /config/\";
-          fi
+          CURRENT_HOUR=$(date +%H);
+          # Ejecutar a las 01:00 y a las 15:00
+          if [ "$$CURRENT_HOUR" = "01" ] || [ "$$CURRENT_HOUR" = "15" ]; then
+            BACKUP_FILE=/backups/m7_logistica_$$(date +%Y%m%d_%H%M%S).sql.gz;
+            pg_dump -h postgres -U m7_admin -d m7_logistica | gzip > $$BACKUP_FILE;
+            echo \"[M7-BACKUP] Backup local creado: $$BACKUP_FILE\";
+            
+            if [ -f /config/rclone.conf ]; then
+              echo \"[M7-BACKUP] Sincronizando con Google Drive...\";
+              rclone --config /config/rclone.conf copy $$BACKUP_FILE gdrive:m7_backups;
+              echo \"[M7-BACKUP] Sincronización completada exitosamente\";
+            else
+              echo \"[M7-BACKUP] ERROR: rclone.conf no encontrado en /config/\";
+            fi
 
-          find /backups -name '*.sql.gz' -mtime +3 -delete;
-          echo '[M7-BACKUP] Limpieza de backups antiguos realizada. Próximo backup en 12h.';
-          sleep 43200;
+            find /backups -name '*.sql.gz' -mtime +3 -delete;
+            echo '[M7-BACKUP] Limpieza realizada. Durmiendo 50 min para evitar duplicados.';
+            sleep 3000;
+          fi
+          sleep 60;
         done
       "
   # ─────────────────────────────────────────────────────────────────────────────

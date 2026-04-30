@@ -923,11 +923,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                     {/* Cerrar Facturación */}
                                     <button
                                         onClick={() => handleCloseCycle()}
-                                        disabled={closingCycle || Math.abs(stats.pendiente ?? 0) > 1500}
-                                        title="Cerrar administrativamente las facturas restantes (solo si el pendiente es +/- 1500)"
+                                        disabled={closingCycle}
+                                        title="Cerrar administrativamente las facturas restantes"
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm
-                                            ${Math.abs(stats.pendiente ?? 0) <= 1500 
-                                                ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse' 
+                                            ${!closingCycle 
+                                                ? 'bg-amber-500 hover:bg-amber-600 text-white' 
                                                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                                         {closingCycle ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.Lock className="w-3 h-3" />}
                                         Cerrar Facturación
