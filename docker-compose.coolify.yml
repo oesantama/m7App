@@ -1,73 +1,101 @@
 services:
-  # Backend
   m7app-backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     restart: always
     expose:
-      - "8080"
+      - '8080'
     environment:
       - PORT=8080
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASS=${POSTGRES_PASSWORD}
-      - DB_NAME=${POSTGRES_DB}
+      - 'DB_USER=${POSTGRES_USER}'
+      - 'DB_PASS=${POSTGRES_PASSWORD}'
+      - 'DB_NAME=${POSTGRES_DB}'
       - NODE_ENV=production
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - AI_MODEL=${AI_MODEL}
+      - 'GEMINI_API_KEY=${GEMINI_API_KEY}'
+      - 'GOOGLE_API_KEY=${GOOGLE_API_KEY}'
+      - 'AI_MODEL=${AI_MODEL}'
     depends_on:
       postgres:
         condition: service_healthy
     mem_limit: 1g
     memswap_limit: 1g
 
-  # Frontend — imagen pre-construida desde GitHub Actions (GHCR)
   frontend:
-    image: ghcr.io/oesantama/m7-frontend:latest
+    image: 'ghcr.io/oesantama/m7-frontend:latest'
     pull_policy: always
     restart: always
     expose:
-      - "80"
+      - '80'
     depends_on:
       m7app-backend:
         condition: service_started
     mem_limit: 128m
     memswap_limit: 128m
 
-  # Database
   postgres:
-    image: postgres:15-alpine
+    image: 'postgres:15-alpine'
     restart: always
-    command: >
-      postgres
-      -c shared_buffers=512MB
-      -c work_mem=8MB
-      -c maintenance_work_mem=128MB
-      -c max_connections=100
-      -c effective_cache_size=2GB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
-      -c synchronous_commit=off
-      -c max_parallel_workers_per_gather=2
+    command: "postgres -c shared_buffers=512MB -c work_mem=8MB -c maintenance_work_mem=128MB -c max_connections=100 -c effective_cache_size=2GB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB -c synchronous_commit=off -c max_parallel_workers_per_gather=2\n"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - 'POSTGRES_USER=${POSTGRES_USER}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
+      - 'POSTGRES_DB=${POSTGRES_DB}'
     volumes:
-      - m7_logistica_data:/var/lib/postgresql/data
-      - ./database/seed:/docker-entrypoint-initdb.d
+      - 'm7_logistica_data:/var/lib/postgresql/data'
+      - './database/seed:/docker-entrypoint-initdb.d'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}'
       interval: 5s
       timeout: 5s
       retries: 5
     mem_limit: 1500m
     memswap_limit: 1500m
 
+  db-backup:
+    image: 'postgres:15-alpine'
+    container_name: m7-backup
+    restart: always
+    environment:
+      - 'PGPASSWORD=${POSTGRES_PASSWORD}'
+      - TZ=America/Bogota
+    volumes:
+      - 'm7_backups:/backups'
+      - './rclone.conf:/config/rclone.conf:ro'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        apk add --no-cache rclone;
+        do_backup() {
+          BACKUP_FILE=/backups/m7_logistica_$$(date +%Y%m%d_%H%M%S).sql.gz;
+          pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} | gzip > $$BACKUP_FILE;
+          if [ -f /config/rclone.conf ]; then
+            rclone --config /config/rclone.conf copy $$BACKUP_FILE gdrive:m7_backups;
+          fi
+        }
+        do_backup;
+        while true; do
+          CURRENT_HOUR=$$(date +%H);
+          if [ \"$$CURRENT_HOUR\" = \"01\" ] || [ \"$$CURRENT_HOUR\" = \"15\" ]; then
+            do_backup;
+            sleep 3000;
+          fi
+          sleep 60;
+        done
+      "
+
+networks:
+  m7-network:
+    driver: bridge
+
 volumes:
-  m7_logistica_data:
-  evolution_instances:
-  evolution_store:
+  m7_logistica_data: null
+  evolution_instances: null
+  evolution_store: null
+  m7_backups: null
