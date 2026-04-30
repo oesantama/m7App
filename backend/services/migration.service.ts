@@ -502,7 +502,26 @@ const healSchema = async (client: any) => {
           );
           ALTER TABLE routing_patterns ALTER COLUMN id SET DEFAULT nextval('routing_patterns_id_seq');
           SELECT setval('routing_patterns_id_seq', COALESCE((SELECT MAX(id::BIGINT) FROM routing_patterns), 0) + 1);
-        END IF;
+        -- Tabla para gestión documental y trazabilidad de Drive
+        CREATE TABLE IF NOT EXISTS document_logs (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            client_id VARCHAR(50),
+            file_name TEXT NOT NULL,
+            file_type VARCHAR(20) DEFAULT 'PDF',
+            category VARCHAR(50) DEFAULT 'CUMPLIDOS',
+            drive_path TEXT,
+            drive_link TEXT,
+            upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(20) DEFAULT 'SUCCESS'
+        );
+
+        -- Curación de esquema para Clientes Nacionales y IDs de Notificación
+        ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type VARCHAR(20) DEFAULT 'MUNICIPAL';
+        UPDATE master_records SET id = 'TGN-002' WHERE id = 'TGN-100' AND category = 'TIPOS_NOTIFICACION';
+        UPDATE master_records SET parent_id = 'TGN-002' WHERE parent_id = 'TGN-100' AND category = 'NOTIFICACIONES';
+
+        COMMIT;
       END$$;
     `);
 

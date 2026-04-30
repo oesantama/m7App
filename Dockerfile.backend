@@ -22,7 +22,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Instalación minimalista de sistema
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata rclone
 
 ENV NODE_ENV=production \
     TZ=America/Bogota

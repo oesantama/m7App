@@ -71,6 +71,7 @@ const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/Publ
 const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/PublicTraining'));
 const PublicVisitForm = lazyWithRetry(() => import('./components/GestionHumana/PublicVisitForm'));
 const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
+const GestionDocumental = lazyWithRetry(() => import('./components/documents/GestionDocumental'));
 
 
 // Import Admin Module
@@ -663,6 +664,8 @@ const App: React.FC = () => {
             onRefresh={() => refreshAppData()}
           />
         );
+      case 'cumplidos':
+        return <GestionDocumental />;
       case 'rutas':
         return (
           <RoutePlanner
