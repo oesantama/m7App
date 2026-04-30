@@ -41,5 +41,175 @@ export const RETAIL_CHAIN_MIN_VOLUME_M3 = 8;
 /** Hora de salida del hub en formato 24h (8 = 8:00 AM) */
 export const DISPATCH_DEPARTURE_HOUR = 8;
 
-/** Minutos promedio por parada (tránsito + servicio) para estimación de tiempos */
+/** Minutos promedio por parada (tránsito + servicio) — se ajusta por zona de congestión */
 export const AVG_MINUTES_PER_STOP = 25;
+
+/** Jornada máxima de trabajo en minutos (8 horas) */
+export const MAX_ROUTE_MINUTES = 8 * 60; // 480 min
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MACRO-REGIONES — primera capa de separación
+// Facturas de macro-regiones distintas NUNCA van en la misma ruta.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Ciudades del Oriente Antioqueño.
+ * Se accede por Túnel de Oriente (~25 min fijo) o Vía Las Palmas (~35 min).
+ * Son geográficamente separadas del Valle de Aburrá — ruta propia siempre.
+ */
+export const ORIENTE_ANTIOQUEÑO_CITIES = new Set([
+  'RIONEGRO', 'MARINILLA', 'EL CARMEN DE VIBORAL', 'EL CARMEN',
+  'GUARNE', 'LA CEJA', 'EL RETIRO', 'EL SANTUARIO', 'LA UNION',
+  'COCORNA', 'SAN VICENTE', 'GRANADA', 'SONSÓN', 'SONSON',
+  'ABEJORRAL', 'ARGELIA', 'NARIÑO', 'ALEJANDRIA',
+]);
+
+/**
+ * Ciudades del Occidente Antioqueño.
+ * Se accede por Autopista al Mar (Túnel de Occidente).
+ * Ruta propia, nunca mezclar con Valle de Aburrá.
+ */
+export const OCCIDENTE_ANTIOQUEÑO_CITIES = new Set([
+  'SANTA FE DE ANTIOQUIA', 'SANTA FE', 'SOPETRAN', 'SOPETRÁN',
+  'SAN JERONIMO', 'SAN JERÓNIMO', 'OLAYA', 'LIBORINA',
+  'EBEJICO', 'HELICONIA', 'ARMENIA MANTEQUILLA',
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CORREDORES VIALES — segunda capa dentro del Valle de Aburrá
+// Un corredor = conjunto de municipios conectados por la misma vía principal.
+// Facturas de corredores distintos solo se mezclan si el volumen es muy bajo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ViaCorridor =
+  | 'NORTE'          // Autopista Norte: Bello, Copacabana, Girardota, Barbosa
+  | 'NORTE_LEJANO'   // Más allá de Girardota
+  | 'MED_OCC'        // Medellín Occidente: Laureles, Belén, San Javier, Robledo, Castilla
+  | 'MED_CENTRO'     // Medellín Centro: La Candelaria, Alpujarra, Buenos Aires
+  | 'MED_ORI'        // Medellín Oriente: Poblado, Aranjuez, Manrique, Villa Hermosa
+  | 'ENVIGADO'       // Envigado (puede fusionarse con SUR o MED_ORI según volumen)
+  | 'SUR'            // Autopista Sur: Itagüí, Sabaneta, La Estrella
+  | 'SUR_LEJANO'     // Caldas, más allá de La Estrella
+  | 'ORIENTE_ANT'    // Macro-región Oriente Antioqueño (siempre separado)
+  | 'OCCIDENTE_ANT'; // Macro-región Occidente Antioqueño (siempre separado)
+
+/** Ciudades/municipios → corredor. Los municipios del Valle de Aburrá no en esta lista
+ *  se clasifican por coordenadas GPS.
+ */
+export const CITY_TO_CORRIDOR: Record<string, ViaCorridor> = {
+  // Norte
+  'BELLO': 'NORTE',
+  'COPACABANA': 'NORTE',
+  'GIRARDOTA': 'NORTE_LEJANO',
+  'BARBOSA': 'NORTE_LEJANO',
+  'DON MATIAS': 'NORTE_LEJANO',
+  'DON MATÍAS': 'NORTE_LEJANO',
+  // Sur
+  'ITAGUI': 'SUR',
+  'ITAGÜÍ': 'SUR',
+  'SABANETA': 'SUR',
+  'LA ESTRELLA': 'SUR',
+  'CALDAS': 'SUR_LEJANO',
+  // Envigado — puede ir con SUR o MED_ORI; se maneja como propio
+  'ENVIGADO': 'ENVIGADO',
+  // Oriente Antioqueño
+  'RIONEGRO': 'ORIENTE_ANT',
+  'MARINILLA': 'ORIENTE_ANT',
+  'EL CARMEN DE VIBORAL': 'ORIENTE_ANT',
+  'EL CARMEN': 'ORIENTE_ANT',
+  'GUARNE': 'ORIENTE_ANT',
+  'LA CEJA': 'ORIENTE_ANT',
+  'EL RETIRO': 'ORIENTE_ANT',
+  'EL SANTUARIO': 'ORIENTE_ANT',
+  'LA UNION': 'ORIENTE_ANT',
+  'LA UNIÓN': 'ORIENTE_ANT',
+  'COCORNA': 'ORIENTE_ANT',
+  'COCORNÁ': 'ORIENTE_ANT',
+  'SAN VICENTE': 'ORIENTE_ANT',
+  'GRANADA': 'ORIENTE_ANT',
+  'SONSON': 'ORIENTE_ANT',
+  'SONSÓN': 'ORIENTE_ANT',
+  // Occidente Antioqueño
+  'SANTA FE DE ANTIOQUIA': 'OCCIDENTE_ANT',
+  'SOPETRAN': 'OCCIDENTE_ANT',
+  'SOPETRÁN': 'OCCIDENTE_ANT',
+  'SAN JERONIMO': 'OCCIDENTE_ANT',
+  'SAN JERÓNIMO': 'OCCIDENTE_ANT',
+  'HELICONIA': 'OCCIDENTE_ANT',
+};
+
+/**
+ * Corredores que pueden fusionarse cuando el volumen individual es bajo.
+ * Un corredor A puede mezclarse con B si B está en la lista de adyacentes de A.
+ * ORIENTE_ANT y OCCIDENTE_ANT NUNCA tienen adyacentes (son macro-regiones duras).
+ */
+export const CORRIDOR_ADJACENT: Record<ViaCorridor, ViaCorridor[]> = {
+  'NORTE_LEJANO':  ['NORTE'],
+  'NORTE':         ['NORTE_LEJANO', 'MED_OCC', 'MED_CENTRO', 'MED_ORI'],
+  'MED_OCC':       ['NORTE', 'MED_CENTRO', 'SUR'],
+  'MED_CENTRO':    ['NORTE', 'MED_OCC', 'MED_ORI', 'SUR'],
+  'MED_ORI':       ['NORTE', 'MED_CENTRO', 'ENVIGADO'],
+  'ENVIGADO':      ['MED_ORI', 'SUR'],
+  'SUR':           ['MED_OCC', 'MED_CENTRO', 'ENVIGADO', 'SUR_LEJANO'],
+  'SUR_LEJANO':    ['SUR'],
+  'ORIENTE_ANT':   [], // nunca mezclar
+  'OCCIDENTE_ANT': [], // nunca mezclar
+};
+
+/** Orden de prioridad de corredores para el sort global (norte→sur, luego oriente) */
+export const CORRIDOR_ORDER: ViaCorridor[] = [
+  'NORTE_LEJANO', 'NORTE',
+  'MED_OCC', 'MED_CENTRO', 'MED_ORI',
+  'ENVIGADO', 'SUR', 'SUR_LEJANO',
+  'ORIENTE_ANT', 'OCCIDENTE_ANT',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ZONAS DE CONGESTIÓN — multiplicadores de tiempo por zona
+// Se aplican durante estimación de duración de ruta.
+// Pico AM: 7-9 AM  |  Pico PM: 5-7 PM
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CongestionZone {
+  name: string;
+  multiplierPeak: number;    // factor de tiempo en hora pico (ej. 1.6 = 60% más lento)
+  multiplierOffPeak: number; // factor fuera de pico
+  /** Bbox aproximado: [minLat, maxLat, minLng, maxLng] */
+  bbox: [number, number, number, number];
+}
+
+export const CONGESTION_ZONES: CongestionZone[] = [
+  {
+    name: 'CENTRO_MEDELLIN',
+    multiplierPeak: 1.65,
+    multiplierOffPeak: 1.20,
+    bbox: [6.235, 6.275, -75.580, -75.550],
+  },
+  {
+    name: 'AUTOPISTA_NORTE_PICO',
+    multiplierPeak: 1.40,
+    multiplierOffPeak: 1.10,
+    bbox: [6.275, 6.370, -75.600, -75.540],
+  },
+  {
+    name: 'AUTOPISTA_SUR_PICO',
+    multiplierPeak: 1.45,
+    multiplierOffPeak: 1.10,
+    bbox: [6.130, 6.220, -75.620, -75.570],
+  },
+  {
+    name: 'ITAGUI_INDUSTRIAL',
+    multiplierPeak: 1.35,
+    multiplierOffPeak: 1.10,
+    bbox: [6.160, 6.200, -75.640, -75.600],
+  },
+  {
+    name: 'TUNEL_ORIENTE_ACCESO',
+    multiplierPeak: 1.50,
+    multiplierOffPeak: 1.15,
+    bbox: [6.200, 6.260, -75.540, -75.490],
+  },
+];
+
+/** Tiempo fijo adicional (min) por cruzar el Túnel de Oriente (ida) */
+export const TUNEL_ORIENTE_FIXED_MIN = 30;

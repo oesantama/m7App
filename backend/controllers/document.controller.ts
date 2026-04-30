@@ -642,7 +642,9 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
                 city = $5, address = $6, observation = $7,
                 batch = $8, peso = $9, un_code = $10, client_ref = $11,
                 customer_name = $12, neighborhood = COALESCE($13, neighborhood),
-                item_status = COALESCE(item_status, 'EST-03')
+                item_status = COALESCE(item_status, 'EST-03'),
+                latitude = COALESCE($17, latitude),
+                longitude = COALESCE($18, longitude)
               WHERE document_id = $14 AND article_id = $15 AND invoice = $16
             `, [
               item.expectedQty || 0,
@@ -658,12 +660,14 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.clientRef || null,
               itemCustomerName,
               itemNeighborhood,
-              doc.id, artId, invoice
+              doc.id, artId, invoice,
+              itemLat,
+              itemLng
             ]);
           } else {
             await client.query(`
-              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name, neighborhood, item_status)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'EST-03')
+              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name, neighborhood, item_status, latitude, longitude)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'EST-03', $19, $20)
             `, [
               doc.id,
               artId,
@@ -682,7 +686,9 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.unCode || null,
               item.clientRef || null,
               itemCustomerName,
-              itemNeighborhood
+              itemNeighborhood,
+              itemLat,
+              itemLng
             ]);
           }
 
@@ -833,8 +839,8 @@ export const getInvoices = async (req: Request, res: Response) => {
             GROUP BY items_sub.article_id
           ) grouped_items
         ) as "items",
-        MIN(COALESCE(gc.lat, 6.2518)) as lat,
-        MIN(COALESCE(gc.lng, -75.5636)) as lng
+        COALESCE(MIN(NULLIF(document_items.latitude, 0)), MIN(gc.lat), 6.2518) as lat,
+        COALESCE(MIN(NULLIF(document_items.longitude, 0)), MIN(gc.lng), -75.5636) as lng
       FROM document_items
       LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(TRIM(CONCAT(document_items.address, '|', document_items.city)))
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id

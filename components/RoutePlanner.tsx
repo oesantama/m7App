@@ -10,30 +10,36 @@ import {
   OPTIMIZATION_CONSTANTS,
   estimateStopArrival,
   estimateRouteReturn,
+  estimateRouteTotalMinutes,
   parseDetectedTimeToMinutes,
   rebalanceSingleRoute,
   haversineKm,
   hasDefaultCoords,
-  twoOptImprove
+  twoOptImprove,
+  classifyCorridor,
+  corridorsCompatible,
 } from '../utils/routeUtils';
 import {
   ORBIT_HUB_ORIGIN,
   RESTRICTED_NEIGHBORHOODS,
   LARGE_VEHICLE_THRESHOLD_M3,
   RETAIL_CHAIN_KEYWORDS,
-  RETAIL_CHAIN_MIN_VOLUME_M3
+  RETAIL_CHAIN_MIN_VOLUME_M3,
+  CORRIDOR_ORDER,
+  MAX_ROUTE_MINUTES,
+  type ViaCorridor,
 } from '../config/routeConfig';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
-// ── Zonas geográficas Valle de Aburrá (7 corredores) ─────────────────────────
-// Cada zona define un corredor de reparto. Las zonas adyacentes pueden mezclarse
-// solo si la carga está muy vacía; zonas no adyacentes se excluyen completamente.
-// Longitud aproximada del Río Medellín (eje norte-sur del Valle de Aburrá)
-const RIVER_LNG = -75.578;
+// ── Sistema de Corredores Viales M7 ──────────────────────────────────────────
+// Primera capa: macro-región (Oriente/Occidente Antioqueño nunca se mezclan)
+// Segunda capa: corredor vial (Autopista Norte, Sur, Medellín O/Centro/E, etc.)
+// La función classifyCorridor y corridorsCompatible viven en routeUtils.ts
 
-// Barrios conocidos por lado del río — para inferir zona desde la dirección cuando faltan coords/barrio
+// Barrios conocidos por lado del río — para inferir corredor desde dirección
+// cuando no hay coordenadas GPS en la factura
 const BARRIOS_OCCIDENTE = [
   'LAURELES','ESTADIO','SAN JAVIER','BELÉN','BELEN','ROBLEDO','FLORESTA',
   'LA AMERICA','GUAYABAL','CARLOS E RESTREPO','CALASANZ','CONQUISTADORES',
@@ -134,41 +140,7 @@ function inferMedellínSide(address: string): 'OCCIDENTE' | 'ORIENTE' | null {
   return null;
 }
 
-const GEO_ZONES_ADJACENT: Record<string, string[]> = {
-  'NORTE_LEJANO': ['NORTE'],
-  'NORTE': ['NORTE_LEJANO', 'CENTRO_NORTE'],
-  // CENTRO_NORTE (oriente) y CENTRO_OCC NO son adyacentes — los separa el río
-  'CENTRO_NORTE': ['NORTE', 'CENTRO'],
-  'CENTRO': ['CENTRO_NORTE', 'CENTRO_SUR'],
-  // CENTRO_OCC (occidente) se mueve solo por el corredor occidental
-  'CENTRO_OCC': ['SUR_OCC'],
-  'CENTRO_SUR': ['CENTRO', 'SUR'],
-  'SUR': ['CENTRO_SUR', 'SUR_LEJANO'],
-  'SUR_OCC': ['CENTRO_OCC', 'SUR_LEJANO'],
-  'SUR_LEJANO': ['SUR', 'SUR_OCC'],
-};
-
-function classifyGeoZone(lat: number, lng: number, cityUpper: string): string {
-  // Norte lejano: Girardota, Barbosa, Don Matías, Santo Domingo (+)
-  const nFar = ['GIRARDOTA', 'BARBOSA', 'DON MATÍAS', 'DONMATÍAS', 'SANTO DOMINGO'];
-  if (nFar.some(c => cityUpper.includes(c)) || lat > 6.42) return 'NORTE_LEJANO';
-  // Norte: Bello, Copacabana (principalmente oriente del río)
-  if (['BELLO', 'COPACABANA'].some(c => cityUpper.includes(c)) || lat > 6.31) return 'NORTE';
-  // Centro-norte Medellín (Castilla/Robledo al oeste, Aranjuez/Manrique al este)
-  if (lat > 6.265) return lng < RIVER_LNG ? 'CENTRO_OCC' : 'CENTRO_NORTE';
-  // Centro Medellín: Laureles/Estadio/San Javier (occidente) vs Centro/Buenos Aires/Poblado (oriente)
-  if (lat > 6.205) return lng < RIVER_LNG ? 'CENTRO_OCC' : 'CENTRO';
-  // Sur: dividir Itagüí/La Estrella (occidente) de Envigado/Sabaneta (oriente)
-  const sOcc = ['ITAGÜÍ', 'ITAGUI', 'LA ESTRELLA', 'ESTRELLA'];
-  if (sOcc.some(c => cityUpper.includes(c))) return 'SUR_OCC';
-  const sOri = ['SABANETA', 'ENVIGADO'];
-  if (sOri.some(c => cityUpper.includes(c)) || lat > 6.135) return 'SUR';
-  // Sur lejano: Caldas, El Retiro
-  return 'SUR_LEJANO';
-}
-
-// Radio máximo de dispersión geográfica por ruta (km)
-// Una ruta no debería cubrir más de este radio desde su centroide
+// Radio máximo de dispersión geográfica por ruta (km) — se mantiene para cohesión intra-corredor
 const MAX_ROUTE_RADIUS_KM = 18;
 
 // ── Helpers de visualización ──────────────────────────────────────────────────
@@ -822,69 +794,60 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // @ts-ignore
         inv.hasDefaultCoords = (lat === 0 && lng === 0) || hasDefaultCoords(lat, lng);
 
-        // MEJORA 7 v2: Zona geográfica granular (7 corredores Valle de Aburrá)
+        // Clasificar corredor vial (nueva lógica jerárquica)
         const cUpper = (inv as any).cityKey || '';
-        // @ts-ignore
-        inv.geoZone = classifyGeoZone(lat, lng, cUpper);
 
-        // Enriquecimiento desde dirección cuando falta barrio o coordenadas (Medellín)
-        if (cUpper.includes('MEDELLÍN') || cUpper.includes('MEDELLIN')) {
+        // Enriquecimiento de barrio desde dirección cuando no hay datos (Medellín)
+        if (cUpper.includes('MEDELL')) {
           const nKey = (inv as any).neighborhoodKey;
-          // Si no hay barrio, buscar en la dirección
           if (nKey === 'SIN_BARRIO' || !nKey) {
-            const foundBarrioOcc = BARRIOS_OCCIDENTE.find(b => rawAddr.includes(b));
-            const foundBarrioOri = BARRIOS_ORIENTE.find(b => rawAddr.includes(b));
-            if (foundBarrioOcc) (inv as any).neighborhoodKey = foundBarrioOcc;
-            else if (foundBarrioOri) (inv as any).neighborhoodKey = foundBarrioOri;
+            const foundOcc = BARRIOS_OCCIDENTE.find(b => rawAddr.includes(b));
+            const foundOri = BARRIOS_ORIENTE.find(b => rawAddr.includes(b));
+            if (foundOcc) (inv as any).neighborhoodKey = foundOcc;
+            else if (foundOri) (inv as any).neighborhoodKey = foundOri;
           }
-          // Si aún sin coords, intentar centroide de barrio antes de inferir por lado del río
+          // Sin coords: asignar centroide de barrio si existe
           if ((inv as any).hasDefaultCoords || (lat === 0 && lng === 0)) {
-            const nKey = (inv as any).neighborhoodKey || '';
-            const centroid = getBarrioCentroid(nKey);
+            const nk = (inv as any).neighborhoodKey || '';
+            const centroid = getBarrioCentroid(nk);
             if (centroid) {
-              // Asignar coordenadas del centroide del barrio
               (inv as any).lat = centroid.lat;
               (inv as any).lng = centroid.lng;
               (inv as any).hasDefaultCoords = false;
-              (inv as any).geoZone = classifyGeoZone(centroid.lat, centroid.lng, cUpper);
-              (inv as any).zoneInferred = false;
             } else {
-              // Fallback: inferir lado del río por texto de dirección
-              const side = inferMedellínSide(rawAddr + ' ' + nKey);
-              if (side === 'OCCIDENTE') (inv as any).geoZone = 'CENTRO_OCC';
-              else if (side === 'ORIENTE') (inv as any).geoZone = 'CENTRO';
-              // @ts-ignore — marcar que la zona fue inferida (no tiene coords reales)
+              const side = inferMedellínSide(rawAddr + ' ' + nk);
+              if (side === 'OCCIDENTE') { (inv as any).lat = 6.248; (inv as any).lng = -75.598; }
+              else if (side === 'ORIENTE') { (inv as any).lat = 6.252; (inv as any).lng = -75.558; }
               (inv as any).zoneInferred = true;
             }
           }
         }
+
+        // Asignar corredor usando lat/lng definitivos
+        const finalLat = Number((inv as any).lat || 0);
+        const finalLng = Number((inv as any).lng || 0);
+        (inv as any).corridor = classifyCorridor(finalLat, finalLng, cUpper) as ViaCorridor;
       });
 
-      // 3. Ordenamiento Global — prioridad → ventana horaria → ZONA GEOGRÁFICA → ciudad → barrio
-      const ZONE_ORDER = ['NORTE_LEJANO', 'NORTE', 'CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO', 'CENTRO_SUR', 'SUR', 'SUR_OCC', 'SUR_LEJANO'];
+      // 3. Ordenamiento Global — prioridad → ventana horaria → CORREDOR → ciudad → barrio
       availableInvoices.sort((a, b) => {
         // @ts-ignore
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
         const aTime = (a as any).timeWindowMinutes ?? Infinity;
         const bTime = (b as any).timeWindowMinutes ?? Infinity;
         if (aTime !== bTime) return aTime - bTime;
-        // Zona geográfica primero (agrupa corredores)
-        const zA = ZONE_ORDER.indexOf((a as any).geoZone || 'CENTRO');
-        const zB = ZONE_ORDER.indexOf((b as any).geoZone || 'CENTRO');
-        if (zA !== zB) return zA - zB;
+        const cA = CORRIDOR_ORDER.indexOf((a as any).corridor || 'MED_CENTRO');
+        const cB = CORRIDOR_ORDER.indexOf((b as any).corridor || 'MED_CENTRO');
+        if (cA !== cB) return cA - cB;
         // @ts-ignore
         if (a.cityKey !== b.cityKey) return (a.cityKey || '').localeCompare(b.cityKey || '');
         // @ts-ignore
         if (a.neighborhoodKey !== b.neighborhoodKey) return (a.neighborhoodKey || '').localeCompare(b.neighborhoodKey || '');
-        // Dentro del mismo barrio, ordenar por lat/lng (nearest-neighbor natural)
         if (Number(a.lat) !== Number(b.lat)) return Number(a.lat) - Number(b.lat);
         return Number(a.lng) - Number(b.lng);
       });
 
       // ── PRE-PASO: Agrupación por dirección/cliente ────────────────────────
-      // Facturas con el mismo cliente+ciudad no pueden quedar en rutas distintas.
-      // Construir un mapa addressGroupKey → [invoices] y propagar coordenadas
-      // de la primera factura geocodificada al resto del grupo.
       {
         const addrGroups = new Map<string, Invoice[]>();
         availableInvoices.forEach(inv => {
@@ -897,7 +860,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           addrGroups.get(aKey)!.push(inv);
         });
 
-        // Propagar coords y zone desde la mejor factura del grupo
+        // Propagar coords y corredor desde la mejor factura del grupo
         addrGroups.forEach(group => {
           if (group.length < 2) return;
           const withCoords = group.find(i => Number(i.lat) > 0 && !(i as any).hasDefaultCoords);
@@ -907,7 +870,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               (inv as any).lat = withCoords.lat;
               (inv as any).lng = withCoords.lng;
               (inv as any).hasDefaultCoords = false;
-              (inv as any).geoZone = (withCoords as any).geoZone;
+              (inv as any).corridor = (withCoords as any).corridor;
             }
           });
         });
@@ -933,27 +896,26 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         totalVolume: number;
       }
 
-      // Construir mapa de celdas
+      // Construir mapa de celdas usando corredor como clave de fallback
       const cellMap = new Map<string, GeoCell>();
       availableInvoices.forEach(inv => {
         const invVol = Number(inv.volumeM3 || (inv as any).volume_m3 || 0);
         const lat = Number(inv.lat || 0);
         const lng = Number(inv.lng || 0);
         const hasDefCoords = (inv as any).hasDefaultCoords;
+        const corridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
 
-        // Facturas sin coordenadas → celda por zona inferida (nunca una sola celda gigante por ciudad)
+        // Sin coords → celda separada por corredor+barrio para no mezclar macro-regiones
         const cellKey = hasDefCoords || (lat === 0 && lng === 0)
-          ? `nogeo_${(inv as any).geoZone || (inv as any).cityKey || 'SIN_CIUDAD'}_${(inv as any).neighborhoodKey || 'SIN_BARRIO'}`
+          ? `nogeo_${corridor}_${(inv as any).neighborhoodKey || 'SIN_BARRIO'}`
           : `${Math.floor(lat / CELL_SIZE)}_${Math.floor(lng / CELL_SIZE)}`;
 
         if (!cellMap.has(cellKey)) {
-          const cLat = hasDefCoords ? 0 : lat;
-          const cLng = hasDefCoords ? 0 : lng;
           cellMap.set(cellKey, {
             key: cellKey,
-            zone: (inv as any).geoZone || 'CENTRO',
-            centerLat: cLat,
-            centerLng: cLng,
+            zone: corridor, // reutilizamos el campo zone con el corredor
+            centerLat: hasDefCoords ? 0 : lat,
+            centerLng: hasDefCoords ? 0 : lng,
             invoices: [],
             totalVolume: 0,
           });
@@ -970,11 +932,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         }
       });
 
-      // Ordenar celdas: primero por zona (ZONE_ORDER), luego por densidad desc
-      const ZONE_ORDER_CLUSTER = ['NORTE_LEJANO', 'NORTE', 'CENTRO_NORTE', 'CENTRO_OCC', 'CENTRO', 'CENTRO_SUR', 'SUR', 'SUR_OCC', 'SUR_LEJANO'];
+      // Ordenar celdas por CORRIDOR_ORDER (norte → sur → oriente), luego densidad desc
       let remainingCells = Array.from(cellMap.values()).sort((a, b) => {
-        const zA = ZONE_ORDER_CLUSTER.indexOf(a.zone);
-        const zB = ZONE_ORDER_CLUSTER.indexOf(b.zone);
+        const zA = CORRIDOR_ORDER.indexOf(a.zone as ViaCorridor);
+        const zB = CORRIDOR_ORDER.indexOf(b.zone as ViaCorridor);
         if (zA !== zB) return zA - zB;
         return b.invoices.length - a.invoices.length;
       });
@@ -1150,29 +1111,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // Registrar esta ancla para que vehículos siguientes respeten la separación
         if (anchorCell.centerLat > 0) usedAnchors.push({ lat: anchorCell.centerLat, lng: anchorCell.centerLng });
 
-        // Recopilar celdas candidatas: ciudades propias primero, luego zona + adyacentes
-        const anchorZone = anchorCell.zone;
-        const adjacentZones = GEO_ZONES_ADJACENT[anchorZone] || [];
-        const allowedZones = new Set([anchorZone, ...adjacentZones]);
-
-        // Determinar lado del río del ancla (aplica solo en zona urbana central: lat 6.19-6.32)
-        const anchorInUrban = anchorCell.centerLat > 6.19 && anchorCell.centerLat < 6.32 && anchorCell.centerLng !== 0;
-        const anchorIsWest = anchorInUrban && anchorCell.centerLng < RIVER_LNG;
+        // Corredor del ancla — es la restricción dura de compatibilidad
+        const anchorCorridor = anchorCell.zone as ViaCorridor;
 
         const candidateCells = remainingCells.filter(c => {
           if (c.invoices.length === 0) return false;
-          // Celdas en barrios propios siempre son candidatas (dentro del radio)
+          const cellCorridor = c.zone as ViaCorridor;
+          // Regla dura: macro-regiones nunca se mezclan con nada más
+          if (!corridorsCompatible(anchorCorridor, cellCorridor)) return false;
+          // Celdas en barrios propios siempre candidatas (dentro del radio)
           const hasOwnedInvoice = c.invoices.some(i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || ''));
-          if (!hasOwnedInvoice && !allowedZones.has(c.zone)) return false;
-          // Barrera del Río Medellín: no mezclar oriente y occidente en la misma ruta
-          if (anchorInUrban && c.centerLat > 6.19 && c.centerLat < 6.32 && c.centerLng !== 0) {
-            const cellIsWest = c.centerLng < RIVER_LNG;
-            if (anchorIsWest !== cellIsWest) return false;
-          }
           if (anchorCell.centerLat > 0 && c.centerLat > 0) {
-            return getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng) <= MAX_CLUSTER_SPREAD_KM;
+            if (getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng) > MAX_CLUSTER_SPREAD_KM) {
+              return hasOwnedInvoice; // fuera del radio solo si es territorio propio
+            }
           }
-          return hasOwnedInvoice || allowedZones.has(c.zone);
+          return true;
         });
 
         // Ordenar celdas candidatas: ciudades propias primero, luego por distancia al ancla
@@ -1196,6 +1150,14 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         for (const cell of candidateCells) {
           if (currentLoadVolume >= absoluteMaxCapacity) break;
           if (load.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) break;
+
+          // P4: Restricción de 8 horas — estimar duración si se agrega esta celda
+          if (load.length > 0) {
+            const preview = [...load, ...cell.invoices.slice(0, 1)];
+            const estimatedMin = estimateRouteTotalMinutes(preview, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
+            if (estimatedMin >= MAX_ROUTE_MINUTES) break;
+          }
+
           // Chequeo de cohesión: la celda candidata no debe alejar el centroide más allá del radio
           if (clusterCenterLat > 0 && cell.centerLat > 0) {
             const distToCluster = getDistance(clusterCenterLat, clusterCenterLng, cell.centerLat, cell.centerLng);
@@ -1221,6 +1183,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             const nKey = (inv as any).neighborhoodKey || '';
             if (isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(nKey)) continue;
             if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
+              // P4: verificar que agregar esta parada no supera 8h
+              const withInv = [...load, ...toAdd, inv];
+              const testMin = estimateRouteTotalMinutes(withInv, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
+              if (testMin >= MAX_ROUTE_MINUTES) continue; // saltar esta factura, no break
               toAdd.push(inv);
               currentLoadVolume += invVol;
             }
@@ -1288,8 +1254,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             const donor = suggestions[i];
             if (donor.assignedInvoices.length <= MIN_INVOICES_THRESHOLD) continue;
 
-            const donorZone = (donor.assignedInvoices[0] as any)?.geoZone || donor.city;
-            const donorAdj = [donorZone, ...(GEO_ZONES_ADJACENT[donorZone] || [])];
+            const donorCorridor: ViaCorridor = (donor.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
             const donorCap = Number(donor.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
 
             for (let j = 0; j < suggestions.length; j++) {
@@ -1299,8 +1264,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               const receiverCap = Number(receiver.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
               if (receiver.totalVolume >= receiverCap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
 
-              const receiverZone = (receiver.assignedInvoices[0] as any)?.geoZone || receiver.city;
-              if (!donorAdj.includes(receiverZone)) continue;
+              const receiverCorridor: ViaCorridor = (receiver.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+              // Solo balance entre corredores compatibles
+              if (!corridorsCompatible(donorCorridor, receiverCorridor)) continue;
 
               // Intentar mover la última factura del donor (más cerca del receiver geográficamente)
               const movable = [...donor.assignedInvoices].sort((a, b) => {

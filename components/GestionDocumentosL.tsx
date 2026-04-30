@@ -504,6 +504,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           ? findIdx(['nombre', 'nombre cliente', 'razon social', 'razon'])
           : findIdx(['clnt envio', 'clnt env', 'cliente envio', 'nombre envio', 'nombre cliente', 'razon social']);
 
+        // Plan R: coordenadas GPS directas (fuente primaria para el planificador de rutas)
+        const iLat = isPlanR ? findIdx(['latitud', 'lat', 'latitude', 'coord y', 'coordenada y', 'y_coord', 'coord_y']) : -1;
+        const iLng = isPlanR ? findIdx(['longitud', 'lng', 'longitude', 'coord x', 'coordenada x', 'x_coord', 'coord_x']) : -1;
+
         if (import.meta.env.DEV) {
           const dataRowsDebug = rawData.slice(headerRowIndex + 1).filter(r => r && r.length > 0).slice(0, 3);
           const sampleCustomerNames = dataRowsDebug.map(r => iCustomerName !== -1 ? String(r[iCustomerName] || '') : 'IDX=-1');
@@ -605,7 +609,9 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               unCode: val(iUnCodeDetail),
               clientRef: val(iClientRefDetail),
               customerName: val(iCustomerName), // nombre destinatario para deteccion de cadenas
-              itemStatus: 'EST-03'
+              itemStatus: 'EST-03',
+              lat: iLat !== -1 ? (parseFloat(val(iLat).replace(',', '.')) || null) : null,
+              lng: iLng !== -1 ? (parseFloat(val(iLng).replace(',', '.')) || null) : null,
             });
 
             // 2. Mapeo para AUDITORÃA (Consolidado Inventario)

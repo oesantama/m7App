@@ -3,7 +3,12 @@ import {
   DISPATCH_DEPARTURE_HOUR,
   AVG_MINUTES_PER_STOP,
   LARGE_VEHICLE_THRESHOLD_M3,
-  RESTRICTED_NEIGHBORHOODS
+  RESTRICTED_NEIGHBORHOODS,
+  CITY_TO_CORRIDOR,
+  CORRIDOR_ADJACENT,
+  CONGESTION_ZONES,
+  TUNEL_ORIENTE_FIXED_MIN,
+  type ViaCorridor,
 } from '../config/routeConfig';
 
 export interface SuggestedRoute {
@@ -291,6 +296,126 @@ export function hasDefaultCoords(lat: number, lng: number): boolean {
  * @param hubLng  Longitud del hub de origen
  * @returns       Nueva lista de facturas reordenadas (o la original si no mejora)
  */
+// ─── CORREDOR VIAL ────────────────────────────────────────────────────────────
+/**
+ * Clasifica una factura en su corredor vial.
+ * Jerarquía: macro-región por nombre de ciudad → corredor por coords GPS → fallback.
+ */
+export function classifyCorridor(lat: number, lng: number, cityStr: string): ViaCorridor {
+  const city = cityStr.toUpperCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  // Buscar en el mapa de ciudades (normalizado sin tildes)
+  for (const [key, corridor] of Object.entries(CITY_TO_CORRIDOR)) {
+    const keyNorm = key.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (city === keyNorm || city.includes(keyNorm)) return corridor as ViaCorridor;
+  }
+
+  // Si no hay coincidencia por nombre de ciudad, clasificar por coordenadas GPS
+  if (lat === 0 || lng === 0) return 'MED_CENTRO';
+
+  const RIVER_LNG = -75.578;
+
+  if (lat > 6.42) return 'NORTE_LEJANO';
+  if (lat > 6.31) return 'NORTE';
+  if (lat > 6.265) return lng < RIVER_LNG ? 'MED_OCC' : 'MED_ORI';
+  if (lat > 6.205) return lng < RIVER_LNG ? 'MED_OCC' : 'MED_CENTRO';
+  if (lat > 6.155) return lng < RIVER_LNG ? 'SUR' : 'ENVIGADO';
+  if (lat > 6.100) return 'SUR';
+  return 'SUR_LEJANO';
+}
+
+/**
+ * Verifica si dos corredores pueden ir en la misma ruta.
+ * Las macro-regiones ORIENTE_ANT y OCCIDENTE_ANT nunca se mezclan con nada.
+ */
+export function corridorsCompatible(a: ViaCorridor, b: ViaCorridor): boolean {
+  if (a === b) return true;
+  if (a === 'ORIENTE_ANT' || b === 'ORIENTE_ANT') return false;
+  if (a === 'OCCIDENTE_ANT' || b === 'OCCIDENTE_ANT') return false;
+  return CORRIDOR_ADJACENT[a]?.includes(b) ?? false;
+}
+
+// ─── CONGESTIÓN Y DURACIÓN DE RUTA ───────────────────────────────────────────
+/**
+ * Retorna el multiplicador de tiempo para una coordenada y hora de salida dada.
+ * Si la coords caen en una zona de congestión, aplica el factor pico o fuera de pico.
+ */
+export function getCongestionMultiplier(lat: number, lng: number, departureHourLocal: number): number {
+  const isPeak = (departureHourLocal >= 7 && departureHourLocal <= 9)
+              || (departureHourLocal >= 17 && departureHourLocal <= 19);
+  let maxMultiplier = 1.0;
+  for (const zone of CONGESTION_ZONES) {
+    const [minLat, maxLat, minLng, maxLng] = zone.bbox;
+    if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+      const m = isPeak ? zone.multiplierPeak : zone.multiplierOffPeak;
+      if (m > maxMultiplier) maxMultiplier = m;
+    }
+  }
+  return maxMultiplier;
+}
+
+/**
+ * Estima la duración total de una ruta en minutos.
+ * Usa Haversine para distancia + velocidad promedio + tiempo de entrega + congestión.
+ * Agrega TUNEL_ORIENTE_FIXED_MIN si el corredor es ORIENTE_ANT.
+ *
+ * Modelo: velocidad promedio urbana 22 km/h, suburbana 45 km/h.
+ * Tiempo de entrega por parada: AVG_MINUTES_PER_STOP (configurable).
+ */
+export function estimateRouteTotalMinutes(
+  stops: Array<{ lat?: number | null; lng?: number | null; corridor?: ViaCorridor; [key: string]: any }>,
+  hubLat: number,
+  hubLng: number,
+  departureHour: number = DISPATCH_DEPARTURE_HOUR
+): number {
+  if (stops.length === 0) return 0;
+
+  const URBAN_SPEED_KMH = 22;
+  const SUBURBAN_SPEED_KMH = 40;
+  const DELIVERY_MIN_PER_STOP = AVG_MINUTES_PER_STOP;
+
+  const isOriente = stops.some(s => (s as any).corridor === 'ORIENTE_ANT');
+
+  const getLat = (s: typeof stops[0]) => Number(s.lat || hubLat);
+  const getLng = (s: typeof stops[0]) => Number(s.lng || hubLng);
+
+  let totalMinutes = isOriente ? TUNEL_ORIENTE_FIXED_MIN : 0;
+
+  // Hub → primera parada
+  const firstLat = getLat(stops[0]);
+  const firstLng = getLng(stops[0]);
+  const distFirst = haversineKm(hubLat, hubLng, firstLat, firstLng);
+  const speedFirst = distFirst > 15 ? SUBURBAN_SPEED_KMH : URBAN_SPEED_KMH;
+  const congFirst = getCongestionMultiplier(firstLat, firstLng, departureHour);
+  totalMinutes += (distFirst / speedFirst) * 60 * congFirst;
+
+  // Entre paradas consecutivas + tiempo de entrega por parada
+  for (let i = 0; i < stops.length; i++) {
+    totalMinutes += DELIVERY_MIN_PER_STOP;
+    if (i < stops.length - 1) {
+      const aLat = getLat(stops[i]);
+      const aLng = getLng(stops[i]);
+      const bLat = getLat(stops[i + 1]);
+      const bLng = getLng(stops[i + 1]);
+      const dist = haversineKm(aLat, aLng, bLat, bLng);
+      const speed = dist > 10 ? SUBURBAN_SPEED_KMH : URBAN_SPEED_KMH;
+      const cong = getCongestionMultiplier(bLat, bLng, departureHour);
+      totalMinutes += (dist / speed) * 60 * cong;
+    }
+  }
+
+  // Última parada → hub
+  const lastLat = getLat(stops[stops.length - 1]);
+  const lastLng = getLng(stops[stops.length - 1]);
+  const distReturn = haversineKm(lastLat, lastLng, hubLat, hubLng);
+  const speedReturn = distReturn > 15 ? SUBURBAN_SPEED_KMH : URBAN_SPEED_KMH;
+  totalMinutes += (distReturn / speedReturn) * 60;
+  if (isOriente) totalMinutes += TUNEL_ORIENTE_FIXED_MIN; // regreso
+
+  return Math.round(totalMinutes);
+}
+
 export function twoOptImprove(
     stops: Array<{ lat?: number | null; lng?: number | null; [key: string]: any }>,
     hubLat: number,
