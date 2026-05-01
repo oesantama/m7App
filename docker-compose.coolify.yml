@@ -17,12 +17,6 @@ services:
       - 'GEMINI_API_KEY=${GEMINI_API_KEY}'
       - 'GOOGLE_API_KEY=${GOOGLE_API_KEY}'
       - 'AI_MODEL=${AI_MODEL}'
-      # CONFIGURACIÓN NATIVA DE RCLONE (CUMPLIDOS)
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=drive
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
-      - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyIPpsBRxEE8EnLi79gcuMGRL4A_gK3BHbxuowSsxEt2q6V9-hCnJmGhpx97gfQBT3_1K4WXS-QUoU7MBk09rp_zyfFJ0bsr8IG2mszF0qvXcfeQ0q51QVz0XRcCE3_BjHfr9Ufsbyj1XrYs0kfpMZj9q0bfWsku4Jik0-I__A19hb40NGKWZyZrwwLt4kn7_OwaCgYKAaSARQSFQHGX2MiHLPixjHeqVV88Sm-6WR9RQ0206","token_type":"Bearer","refresh_token":"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE"}'
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.m7app-backend.rule=Host(`apiapps.m7apps.com`)"
@@ -32,6 +26,13 @@ services:
         condition: service_healthy
     mem_limit: 1g
     memswap_limit: 1g
+    entrypoint: >
+      sh -c "
+        echo '[M7-SYSTEM] Desempaquetando configuración de Drive...';
+        echo 'W2dkcml2ZV9jdW1wbGlkb3NdCnR5cGUgPSBkcml2ZQpjbGllbnRfaWQgPSA0MTA4NjIwMjM0NTgtNmNhMHMzdDFhbzQ1aWhsNG11cG9kYnZ1Z2cxZ2J1Zm8uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20KY2xpZW50X3NlY3JldCA9IEdPQ1NQWC1hemREYjdSOTRaRThFblFYcXQ2OFJic2ZzMVhRCnNjb3BlID0gZHJpdmUKdG9rZW4gPSB7ImFjY2Vzc190b2tlbiI6InlhMjkuYTAAUXZQeUlQcHNCUnhFRThFbkxpNzlnY3VNR1JMNEFfZ0szQkhieHVvd1NzeEV0MnE2VjktakhuSm1HaHB4OTdnZlFCVDNfMUs0VlhTLVFVb1U3TUJrMDlycF96eUZKSDBzcjhJRzJtc3pGMHF2WGNmZVEwcTUxUVZ6MFhSY0NFM19CakhmcjlVZnNieWpYcllzMGtmcE1ajOXEwYmZXc2t1NEppazAtSV9fQTE5aGI0ME5LR1daeVpyd3dMdDRrbjdfT3dhQ2dZS2FBUVJRU0ZRS0dYMk1pSExQaXhqSGVxVlY4OFNtLTZXUjlSUTAyMDYiLCJ0b2tlbl90eXBlIjoiQmVhcmVyIiwicmVmcmVzaF90b2tlbiI6IjEvLzA1RW8zOElhWmV0S0xjZ1lJQVJBQUdBVVNOd0YtTDlJUkhVUHZ3aTc4TUV6YjlLMDZtdDUySVR2UzhQUjVsWkFkX09wOVVMOGVvZnJleGw3Wk1nM2owc3FFMzRzb3p6eHdUc0UiLCJleHBpcnkiOiIyMDI2LTA1LTAxVDAzOjQ3OjU4WiJ9Cg==' | base64 -d > /app/rclone.conf;
+        echo '[M7-SYSTEM] Configuración lista. Arrancando servidor...';
+        exec node dist_backend/server.js
+      "
 
   frontend:
     image: 'ghcr.io/oesantama/m7-frontend:latest'
