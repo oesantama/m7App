@@ -28,8 +28,15 @@ services:
     memswap_limit: 1g
     entrypoint: >
       sh -c "
-        echo '[M7-SYSTEM] Desempaquetando configuración de Drive...';
-        echo 'W2dkcml2ZV9jdW1wbGlkb3NdCnR5cGUgPSBkcml2ZQpjbGllbnRfaWQgPSA0MTA4NjIwMjM0NTgtNmNhMHMzdDFhbzQ1aWhsNG11cG9kYnZ1Z2cxZ2J1Zm8uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20KY2xpZW50X3NlY3JldCA9IEdPQ1NQWC1hemREYjdSOTRaRThFblFYcXQ2OFJic2ZzMVhRCnNjb3BlID0gZHJpdmUKdG9rZW4gPSB7ImFjY2Vzc190b2tlbiI6InlhMjkuYTAAUXZQeUlQcHNCUnhFRThFbkxpNzlnY3VNR1JMNEFfZ0szQkhieHVvd1NzeEV0MnE2VjktakhuSm1HaHB4OTdnZlFCVDNfMUs0VlhTLVFVb1U3TUJrMDlycF96eUZKSDBzcjhJRzJtc3pGMHF2WGNmZVEwcTUxUVZ6MFhSY0NFM19CakhmcjlVZnNieWpYcllzMGtmcE1ajOXEwYmZXc2t1NEppazAtSV9fQTE5aGI0ME5LR1daeVpyd3dMdDRrbjdfT3dhQ2dZS2FBUVJRU0ZRS0dYMk1pSExQaXhqSGVxVlY4OFNtLTZXUjlSUTAyMDYiLCJ0b2tlbl90eXBlIjoiQmVhcmVyIiwicmVmcmVzaF90b2tlbiI6IjEvLzA1RW8zOElhWmV0S0xjZ1lJQVJBQUdBVVNOd0YtTDlJUkhVUHZ3aTc4TUV6YjlLMDZtdDUySVR2UzhQUjVsWkFkX09wOVVMOGVvZnJleGw3Wk1nM2owc3FFMzRzb3p6eHdUc0UiLCJleHBpcnkiOiIyMDI2LTA1LTAxVDAzOjQ3OjU4WiJ9Cg==' | base64 -d > /app/rclone.conf;
+        echo '[M7-SYSTEM] Configurando remotos de Drive...';
+        cat << 'EOF' > /app/rclone.conf
+        [gdrive_cumplidos]
+        type = drive
+        client_id = 410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
+        client_secret = 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
+        scope = drive
+        token = {\"refresh_token\":\"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE\",\"token_type\":\"Bearer\"}
+        EOF
         echo '[M7-SYSTEM] Configuración lista. Arrancando servidor...';
         exec node dist_backend/server.js
       "
