@@ -30,8 +30,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 1g
-    memswap_limit: 1g
 
   frontend:
     image: 'ghcr.io/oesantama/m7-frontend:latest'
@@ -41,11 +39,13 @@ services:
       - '80'
     networks:
       - m7-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.m7-frontend.rule=Host(`orbitm7.m7apps.com`)"
+      - "traefik.http.services.m7-frontend.loadbalancer.server.port=80"
     depends_on:
       m7app-backend:
         condition: service_started
-    mem_limit: 128m
-    memswap_limit: 128m
 
   postgres:
     image: 'postgres:15-alpine'
@@ -66,8 +66,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    mem_limit: 1500m
-    memswap_limit: 1500m
 
   db-backup:
     image: 'postgres:15-alpine'
