@@ -1961,26 +1961,62 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                         );
 
                         if (isNational) {
-                            const notifRes = await pool.query(
-                                "SELECT notification_email FROM notificaciones WHERE tipo_notificacion_id = 'TGN-002' AND status_id = 'EST-01'"
-                            );
-                            
-                            const emails = notifRes.rows.map(r => r.notification_email).filter(e => e).join(',');
-                            if (emails) {
-                                const subject = `[M7 DRIVE] Nuevo Cumplido - ${clientRes.rows[0].name}`;
+                            const [notifRes, userRes] = await Promise.all([
+                                pool.query(
+                                    `SELECT notification_email FROM notificaciones
+                                     WHERE tipo_notificacion_id IN ('TGN-002', 'TGN-100') AND status_id = 'EST-01'`
+                                ),
+                                pool.query('SELECT name FROM users WHERE id = $1', [userId]),
+                            ]);
+
+                            const emailList = notifRes.rows.map((r: any) => r.notification_email).filter(Boolean);
+                            if (emailList.length > 0) {
+                                const clientName = clientRes.rows[0].name;
+                                const uploaderName = userRes.rows[0]?.name || userId;
+                                const colombiaTime = new Date().toLocaleString('es-CO', {
+                                    timeZone: 'America/Bogota',
+                                    dateStyle: 'full',
+                                    timeStyle: 'short',
+                                });
+
+                                const subject = `[M7 CUMPLIDOS] ${clientName} — Nuevo soporte cargado`;
                                 const html = `
-                                    <div style="font-family: sans-serif; padding: 20px; color: #333;">
-                                        <h2 style="color: #4f46e5;">Notificación de Carga - Orbit M7 IQ</h2>
-                                        <p>Se ha subido un nuevo documento de cumplimiento para el cliente: <b>${clientRes.rows[0].name}</b></p>
-                                        <hr style="border: 0; border-top: 1px solid #eee;" />
-                                        <p><b>Archivo:</b> ${fileName}</p>
-                                        <p><b>Ruta en Drive:</b> ${drivePath}</p>
-                                        <p><b>Link de Acceso:</b> <a href="${driveLink}" style="color: #4f46e5;">Ver Documento en Drive</a></p>
-                                        <br />
-                                        <p style="font-size: 12px; color: #666;">Este es un mensaje automático generado por el núcleo de inteligencia Orbit M7.</p>
+                                    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
+                                        <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:24px 32px;border-radius:12px 12px 0 0;">
+                                            <h2 style="color:white;margin:0;font-size:20px;">&#128196; Nuevo Cumplido Cargado</h2>
+                                            <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">Orbit M7 &middot; Gestión Documental</p>
+                                        </div>
+                                        <div style="background:#f8fafc;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+                                            <table style="width:100%;border-collapse:collapse;">
+                                                <tr>
+                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;width:130px;">Cliente</td>
+                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;font-weight:700;color:#1e293b;">${clientName}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;">Usuario</td>
+                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">${uploaderName}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;">Fecha y Hora</td>
+                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">${colombiaTime}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;">Archivo</td>
+                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">${fileName}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:10px 0;font-size:13px;color:#64748b;vertical-align:top;">Ruta en Drive</td>
+                                                    <td style="padding:10px 0;font-size:12px;color:#475569;word-break:break-all;">${drivePath}</td>
+                                                </tr>
+                                            </table>
+                                            <div style="margin-top:24px;text-align:center;">
+                                                <a href="${driveLink}" style="display:inline-block;background:#4f46e5;color:white;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;">Ver Documento en Drive &rarr;</a>
+                                            </div>
+                                            <p style="margin-top:24px;font-size:11px;color:#94a3b8;text-align:center;">Mensaje autom&aacute;tico &middot; Orbit M7 Intelligence &middot; No responder</p>
+                                        </div>
                                     </div>
                                 `;
-                                await sendEmail(emails, subject, html).catch(() => {});
+                                await sendEmail(emailList, subject, html).catch(() => {});
                             }
                         }
 
