@@ -373,7 +373,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                      <th className="px-4 py-3">Cédula</th>
+                      <th className="px-4 py-3">Personal</th>
                       <th className="px-4 py-3">Fecha Activación</th>
                       <th className="px-4 py-3">Estado</th>
                       <th className="px-4 py-3">Activado por</th>
@@ -381,35 +381,41 @@ const Personal: React.FC<Props> = ({ user }) => {
                     </tr>
                   </thead>
                   <tbody className="text-[11px] font-bold text-slate-600">
-                    {paginatedEncuestas.map(e => (
-                      <tr key={e.id} className="border-b border-slate-50">
-                        <td className="px-4 py-3 font-black text-slate-900">{e.cedula}</td>
-                        <td className="px-4 py-3">{new Date(e.fecha_activacion).toLocaleString()}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${e.estado === 'EST-05' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : e.estado === 'EST-01' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
-                            {estados.find(est => est.id === e.estado)?.name || e.estado}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1.5">
-                            {e.estado === 'EST-01' && (
-                              <button onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
-                                toast.success('Link copiado');
-                              }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
-                                <Icons.Copy className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            {e.estado === 'EST-01' && (
-                              <button onClick={() => setConfirmDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
-                                <Icons.X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {paginatedEncuestas.map(e => {
+                      const persona = personal.find(p => p.cedula === e.cedula);
+                      return (
+                        <tr key={e.id} className="border-b border-slate-50">
+                          <td className="px-4 py-3">
+                            {persona && <p className="font-black text-slate-900 uppercase text-[11px]">{persona.nombre}</p>}
+                            <p className={`text-[9px] font-bold ${persona ? 'text-slate-400' : 'font-black text-slate-900'}`}>CC: {e.cedula}</p>
+                          </td>
+                          <td className="px-4 py-3">{new Date(e.fecha_activacion).toLocaleString()}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${e.estado === 'EST-05' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : e.estado === 'EST-01' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                              {estados.find(est => est.id === e.estado)?.name || e.estado}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              {e.estado === 'EST-01' && (
+                                <button onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
+                                  toast.success('Link copiado');
+                                }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
+                                  <Icons.Copy className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {e.estado === 'EST-01' && (
+                                <button onClick={() => setConfirmDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
+                                  <Icons.X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
