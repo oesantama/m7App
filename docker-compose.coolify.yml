@@ -28,14 +28,14 @@ services:
         echo '[gdrive]' > /app/rclone.conf;
         echo 'type = drive' >> /app/rclone.conf;
         echo 'scope = drive' >> /app/rclone.conf;
-        echo 'token = {\"access_token\":\"ya29.a0AQvPyIOIpamab25CgGR9UxbuM22-EaKsOP148hP3wgsckvJm5AVXeE1ptPaO9_hUfxYvY1YH1nnGIze97vb4dRAFml7teZgNBuKeMa6GdJG98AEmY3rxQPS3J3jRVBp0_B2ioYbPzOJtlIBZHiqc8ozwF0gv2BWXJB50TdrnROINdGFRYnYxdggEnzSH2VU9-b_MAHUaCgYKAdISARcSFQHGX2MimFgoUmzftA5K3tCXwV3jdg0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05NEocypqb9wgCgYIARAAGAUSNwF-L9IrHzvKSUxrxbkccgx-9MegtC6VH084gqRiNcy18hH_pVLLRU0UVu-B8Pcx6eREnIqrL7M\",\"expiry\":\"2026-04-30T08:37:58.726474705-05:00\",\"expires_in\":3599}' >> /app/rclone.conf;
+        echo 'token = {"access_token":"ya29.a0AQvPyIOIpamab25CgGR9UxbuM22-EaKsOP148hP3wgsckvJm5AVXeE1ptPaO9_hUfxYvY1YH1nnGIze97vb4dRAFml7teZgNBuKeMa6GdJG98AEmY3rxQPS3J3jRVBp0_B2ioYbPzOJtlIBZHiqc8ozwF0gv2BWXJB50TdrnROINdGFRYnYxdggEnzSH2VU9-b_MAHUaCgYKAdISARcSFQHGX2MimFgoUmzftA5K3tCXwV3jdg0206","token_type":"Bearer","refresh_token":"1//05NEocypqb9wgCgYIARAAGAUSNwF-L9IrHzvKSUxrxbkccgx-9MegtC6VH084gqRiNcy18hH_pVLLRU0UVu-B8Pcx6eREnIqrL7M","expiry":"2026-04-30T08:37:58.726474705-05:00","expires_in":3599}' >> /app/rclone.conf;
         echo '' >> /app/rclone.conf;
         echo '[gdrive_cumplidos]' >> /app/rclone.conf;
         echo 'type = drive' >> /app/rclone.conf;
         echo 'client_id = 410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com' >> /app/rclone.conf;
         echo 'client_secret = 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' >> /app/rclone.conf;
         echo 'scope = drive' >> /app/rclone.conf;
-        echo 'token = {\"access_token\":\"ya29.a0AQvPyIPpsBRxEE8EnLi79gcuMGRL4A_gK3BHbxuowSsxEt2q6V9-hCnJmGhpx97gfQBT3_1K4WXS-QUoU7MBk09rp_zyfFJ0bsr8IG2mszF0qvXcfeQ0q51QVz0XRcCE3_BjHfr9Ufsbyj1XrYs0kfpMZj9q0bfWsku4Jik0-I__A19hb40NGKWZyZrwwLt4kn7_OwaCgYKAaSARQSFQHGX2MiHLPixjHeqVV88Sm-6WR9RQ0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE\"}' >> /app/rclone.conf;
+        echo 'token = {"access_token":"ya29.a0AQvPyIPpsBRxEE8EnLi79gcuMGRL4A_gK3BHbxuowSsxEt2q6V9-hCnJmGhpx97gfQBT3_1K4WXS-QUoU7MBk09rp_zyfFJ0bsr8IG2mszF0qvXcfeQ0q51QVz0XRcCE3_BjHfr9Ufsbyj1XrYs0kfpMZj9q0bfWsku4Jik0-I__A19hb40NGKWZyZrwwLt4kn7_OwaCgYKAaSARQSFQHGX2MiHLPixjHeqVV88Sm-6WR9RQ0206","token_type":"Bearer","refresh_token":"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE"}' >> /app/rclone.conf;
         echo '[M7-BACKEND] rclone.conf generado exitosamente.';
         exec node dist_backend/server.js
       "
