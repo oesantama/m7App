@@ -139,23 +139,31 @@ const GestionDocumental: React.FC = () => {
     };
 
     const calculateSLA = (uploadStr: string, folderStr: string, type: string) => {
-        const upload = new Date(uploadStr);
-        const folder = new Date(`${folderStr}T00:00:00`);
-        const diffMs = upload.getTime() - folder.getTime();
+        const upload = uploadStr ? new Date(uploadStr) : new Date();
+        const folder = folderStr ? new Date(`${folderStr}T00:00:00`) : upload;
+        
+        const uploadMs = isNaN(upload.getTime()) ? Date.now() : upload.getTime();
+        const folderMs = isNaN(folder.getTime()) ? uploadMs : folder.getTime();
+        
+        const diffMs = uploadMs - folderMs;
         const diffHours = diffMs / (1000 * 60 * 60);
         
         const limit = type === 'NACIONAL' ? 72 : 24;
         return {
-            diffHours,
+            diffHours: isNaN(diffHours) ? 0 : diffHours,
             status: diffHours <= limit ? 'SUCCESS' : 'LATE',
             limit
         };
     };
 
     const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    const refDate = uploadDate ? new Date(`${uploadDate}T12:00:00`) : new Date();
+    const refDate = (uploadDate && !isNaN(new Date(uploadDate).getTime())) ? new Date(`${uploadDate}T12:00:00`) : new Date();
+    
+    const selectedClientName = authorizedClients.find(c => c.id === selectedClient)?.name || '';
+    const cleanClientName = selectedClientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
+
     const currentPathPreview = selectedClient
-        ? `CUMPLIDOS MILLA 7/${refDate.getFullYear()}/${authorizedClients.find(c => c.id === selectedClient)?.name?.replace(/[^a-zA-Z0-9 ()-]/g, '').trim()}/${MESES_ES[refDate.getMonth()].toUpperCase()}/DIA ${refDate.getDate()}`
+        ? `CUMPLIDOS MILLA 7/${refDate.getFullYear()}/${cleanClientName}/${(MESES_ES[refDate.getMonth()] || 'MES').toUpperCase()}/DIA ${refDate.getDate()}`
         : 'Seleccione un cliente para ver la ruta';
 
     return (
@@ -291,7 +299,7 @@ const GestionDocumental: React.FC = () => {
                                     onChange={e => setSelectedUserFilter(e.target.value)}
                                 >
                                     <option value="">Todos</option>
-                                    {usersList.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                    {usersList.map((u, i) => <option key={u.id || i} value={u.id}>{u.name || 'Sin Nombre'}</option>)}
                                 </select>
                             </div>
                             <div className="space-y-1">
