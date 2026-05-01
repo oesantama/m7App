@@ -240,6 +240,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       Object.assign(defaults, {
         email: '',
         logoUrl: '',
+        clientType: 'MUNICIPAL',
       });
     } else if (category === 'masterRol') {
       Object.assign(defaults, {
@@ -656,7 +657,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               factorInter: getVal('factorInter', 'factor_inter'),
               factorStd: getVal('factorStd', 'factor_std'),
               imageUrl: getVal('imageUrl', 'image_url'),
-              clientId: getVal('clientId', 'client_id')
+              clientId: getVal('clientId', 'client_id'),
+              clientType: getVal('clientType', 'client_type'),
             };
           });
 
@@ -915,7 +917,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
 
   // Force load users when managing permissions to ensure names are available
   React.useEffect(() => {
-    const loadUsersIfNeeded = async () => {
+    const loadOnEntry = async () => {
         if (activeMaster === 'masterPermisosUsuario' && (!allMasterData.masterUsuarios || allMasterData.masterUsuarios.length === 0)) {
             try {
                 const { api } = await import('../services/api');
@@ -925,8 +927,30 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 console.error("Error loading users for permissions view", e);
             }
         }
+        if (activeMaster === 'masterClientes') {
+            try {
+                const { api } = await import('../services/api');
+                const rawData = await api.getClients();
+                const normalized = (rawData || []).map((item: any) => {
+                    const keys = Object.keys(item);
+                    const findKey = (k: string) => keys.find(key => key.toLowerCase() === k.toLowerCase());
+                    const getVal = (p: string, s: string) => {
+                        const key = findKey(p) || findKey(s) || p;
+                        return (item[key] !== undefined && item[key] !== null) ? item[key] : undefined;
+                    };
+                    return {
+                        ...item,
+                        statusId: getVal('statusId', 'status_id'),
+                        clientType: getVal('clientType', 'client_type'),
+                    };
+                });
+                updateMasterCategory('masterClientes', normalized);
+            } catch (e) {
+                console.error("Error refreshing clients on entry", e);
+            }
+        }
     };
-    loadUsersIfNeeded();
+    loadOnEntry();
   }, [activeMaster]);
 
 
@@ -1439,6 +1463,16 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             </div>
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Cliente</label>
               <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
+            </div>
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo de Cliente</label>
+              <div className="relative">
+                <select value={formData.clientType || 'MUNICIPAL'} onChange={e => setFormData({ ...formData, clientType: e.target.value })} className={commonInputStyle}>
+                  <option value="MUNICIPAL">MUNICIPAL</option>
+                  <option value="NACIONAL">NACIONAL</option>
+                </select>
+                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400"><Icons.ChevronRight className="rotate-90 w-3 h-3" /></div>
+              </div>
             </div>
             {renderStatusField()}
           </div>

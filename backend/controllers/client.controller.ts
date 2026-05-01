@@ -30,11 +30,11 @@ export const saveClient = async (req: Request, res: Response) => {
   const c = req.body;
   try {
     await pool.query(`
-      INSERT INTO clients (id, name, logo_url, status_id, created_by, updated_by, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO clients (id, name, logo_url, status_id, client_type, created_by, updated_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
-      name = $2, logo_url = $3, status_id = $4, updated_by = $5, updated_at = CURRENT_TIMESTAMP
-    `, [c.id, c.name, c.logoUrl, c.statusId, c.createdBy || c.updatedBy || 'System']);
+      name = $2, logo_url = $3, status_id = $4, client_type = $5, updated_by = $6, updated_at = CURRENT_TIMESTAMP
+    `, [c.id, c.name, c.logoUrl, c.statusId, c.clientType || 'MUNICIPAL', c.createdBy || c.updatedBy || 'System']);
     res.json({ success: true, message: 'Cliente guardado' });
   } catch (err: any) {
     res.status(500).json({ error: "No se pudo guardar el cliente" });
