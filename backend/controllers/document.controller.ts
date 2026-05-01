@@ -1904,7 +1904,6 @@ export const uploadCumplido = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Faltan datos obligatorios (archivo, cliente)' });
     }
 
-    // Escribir buffer a archivo temporal (multer usa memoryStorage)
     const tmpPath = path.join('/tmp', `cumplido_${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`);
     fs.writeFileSync(tmpPath, file.buffer);
 
@@ -1918,23 +1917,38 @@ export const uploadCumplido = async (req: Request, res: Response) => {
         const drivePath = `CUMPLIDOS MILLA 7/${year}/${cleanClientName}/${month}/${day}`;
         const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
 
-        const rcloneConfig = './rclone.conf';
-        const uploadCmd = `rclone --config ${rcloneConfig} copyto "${tmpPath}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
+        const rcloneConfig = '/app/rclone.conf';
+        const compressedPath = `${tmpPath}_compressed.pdf`;
 
-        exec(uploadCmd, async (error, stdout, stderr) => {
-            if (error) {
-                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                console.error(`[CUMPLIDOS] Error rclone copy: ${stderr}`);
-                return res.status(500).json({ error: 'Error al subir a Google Drive' });
-            }
+        // 1. Comprimir PDF con Ghostscript (Máxima compresión /screen)
+        const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
 
-            const linkCmd = `rclone --config ${rcloneConfig} link "gdrive_cumplidos:${drivePath}/${fileName}"`;
-            exec(linkCmd, async (linkErr, linkStdout) => {
-                let driveLink = linkErr ? '' : linkStdout.trim();
+        exec(compressCmd, (compressErr) => {
+            const finalFile = compressErr ? tmpPath : compressedPath;
+            if (compressErr) console.error(`[CUMPLIDOS] Error compression: ${compressErr}`);
 
-                const countCmd = `rclone --config ${rcloneConfig} lsf "gdrive_cumplidos:${drivePath}" | wc -l`;
-                exec(countCmd, async (countErr, countStdout) => {
-                    const fileCount = parseInt(countStdout.trim()) || 1;
+            // 2. Subir al Drive
+            const uploadCmd = `rclone --config ${rcloneConfig} copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
+
+            exec(uploadCmd, async (uploadErr, stdout, stderr) => {
+                if (uploadErr) {
+                    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+                    if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
+                    console.error(`[CUMPLIDOS] Error rclone copy: ${stderr}`);
+                    return res.status(500).json({ error: 'Error al subir a Google Drive' });
+                }
+
+                // 3. Obtener Link y continuar
+                const linkCmd = `rclone --config ${rcloneConfig} link "gdrive_cumplidos:${drivePath}/${fileName}"`;
+                exec(linkCmd, async (linkErr, linkStdout) => {
+                    const driveLink = linkStdout ? linkStdout.trim() : '';
+
+                    const countCmd = `rclone --config ${rcloneConfig} lsf "gdrive_cumplidos:${drivePath}" | wc -l`;
+                    exec(countCmd, async (countErr, countStdout) => {
+                        const fileCount = parseInt(countStdout.trim()) || 1;
+                        
+                        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+                        if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
 
                     try {
                         const clientRes = await pool.query('SELECT name, client_type FROM clients WHERE id = $1', [clientId]);
