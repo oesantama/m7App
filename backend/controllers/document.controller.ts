@@ -1928,8 +1928,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
             if (compressErr) console.error(`[CUMPLIDOS] Error compression: ${compressErr}`);
 
         // 2. Subir al Drive
-        const rcloneConfig = '/app/rclone.conf';
-        const uploadCmd = `rclone --config ${rcloneConfig} copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
+        const uploadCmd = `rclone copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
 
         exec(uploadCmd, async (uploadErr, stdout, stderr) => {
             if (uploadErr) {
@@ -1940,11 +1939,11 @@ export const uploadCumplido = async (req: Request, res: Response) => {
             }
 
             // 3. Obtener Link y continuar
-            const linkCmd = `rclone --config ${rcloneConfig} link "gdrive_cumplidos:${drivePath}/${fileName}"`;
+            const linkCmd = `rclone link "gdrive_cumplidos:${drivePath}/${fileName}"`;
             exec(linkCmd, async (linkErr, linkStdout) => {
                 const driveLink = linkStdout ? linkStdout.trim() : '';
 
-                const countCmd = `rclone --config ${rcloneConfig} lsf "gdrive_cumplidos:${drivePath}" | wc -l`;
+                const countCmd = `rclone lsf "gdrive_cumplidos:${drivePath}" | wc -l`;
                 exec(countCmd, async (countErr, countStdout) => {
                         const fileCount = parseInt(countStdout.trim()) || 1;
                         

@@ -17,6 +17,14 @@ services:
       - 'GEMINI_API_KEY=${GEMINI_API_KEY}'
       - 'GOOGLE_API_KEY=${GOOGLE_API_KEY}'
       - 'AI_MODEL=${AI_MODEL}'
+      # CONFIGURACIÓN NATIVA DE RCLONE (SIN ACCESS TOKEN PARA EVITAR ERRORES)
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=drive
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
+      - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"refresh_token":"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE"}'
+    networks:
+      - m7-network
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.m7app-backend.rule=Host(`apiapps.m7apps.com`)"
@@ -26,20 +34,6 @@ services:
         condition: service_healthy
     mem_limit: 1g
     memswap_limit: 1g
-    entrypoint: >
-      sh -c "
-        echo '[M7-SYSTEM] Configurando remotos de Drive...';
-        cat << 'EOF' > /app/rclone.conf
-        [gdrive_cumplidos]
-        type = drive
-        client_id = 410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
-        client_secret = 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
-        scope = drive
-        token = {\"refresh_token\":\"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE\",\"token_type\":\"Bearer\"}
-        EOF
-        echo '[M7-SYSTEM] Configuración lista. Arrancando servidor...';
-        exec node dist_backend/server.js
-      "
 
   frontend:
     image: 'ghcr.io/oesantama/m7-frontend:latest'
@@ -47,6 +41,8 @@ services:
     restart: always
     expose:
       - '80'
+    networks:
+      - m7-network
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.m7app-frontend.rule=Host(`orbitm7.m7apps.com`)"
@@ -70,6 +66,8 @@ services:
     volumes:
       - 'm7_logistica_data:/var/lib/postgresql/data'
       - './database/seed:/docker-entrypoint-initdb.d'
+    networks:
+      - m7-network
     healthcheck:
       test:
         - CMD-SHELL
@@ -91,6 +89,8 @@ services:
       - TZ=America/Bogota
     volumes:
       - 'm7_backups:/backups'
+    networks:
+      - m7-network
     depends_on:
       postgres:
         condition: service_healthy
