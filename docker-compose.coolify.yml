@@ -30,12 +30,6 @@ services:
         condition: service_healthy
     mem_limit: 1g
     memswap_limit: 1g
-    entrypoint: >
-      sh -c "
-        echo '[M7-BACKEND] Servidor arrancando con configuracion Rclone nativa...';
-        touch /app/rclone.conf;
-        exec node dist_backend/server.js
-      "
 
   frontend:
     image: 'ghcr.io/oesantama/m7-frontend:latest'

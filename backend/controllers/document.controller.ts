@@ -1927,24 +1927,24 @@ export const uploadCumplido = async (req: Request, res: Response) => {
             const finalFile = compressErr ? tmpPath : compressedPath;
             if (compressErr) console.error(`[CUMPLIDOS] Error compression: ${compressErr}`);
 
-            // 2. Subir al Drive
-            const uploadCmd = `rclone --config ${rcloneConfig} copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
+        // 2. Subir al Drive
+        const uploadCmd = `rclone copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
 
-            exec(uploadCmd, async (uploadErr, stdout, stderr) => {
-                if (uploadErr) {
-                    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                    if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
-                    console.error(`[CUMPLIDOS] Error rclone copy: ${stderr}`);
-                    return res.status(500).json({ error: 'Error al subir a Google Drive' });
-                }
+        exec(uploadCmd, async (uploadErr, stdout, stderr) => {
+            if (uploadErr) {
+                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+                if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
+                console.error(`[CUMPLIDOS] Error rclone copy: ${stderr}`);
+                return res.status(500).json({ error: 'Error al subir a Google Drive' });
+            }
 
-                // 3. Obtener Link y continuar
-                const linkCmd = `rclone --config ${rcloneConfig} link "gdrive_cumplidos:${drivePath}/${fileName}"`;
-                exec(linkCmd, async (linkErr, linkStdout) => {
-                    const driveLink = linkStdout ? linkStdout.trim() : '';
+            // 3. Obtener Link y continuar
+            const linkCmd = `rclone link "gdrive_cumplidos:${drivePath}/${fileName}"`;
+            exec(linkCmd, async (linkErr, linkStdout) => {
+                const driveLink = linkStdout ? linkStdout.trim() : '';
 
-                    const countCmd = `rclone --config ${rcloneConfig} lsf "gdrive_cumplidos:${drivePath}" | wc -l`;
-                    exec(countCmd, async (countErr, countStdout) => {
+                const countCmd = `rclone lsf "gdrive_cumplidos:${drivePath}" | wc -l`;
+                exec(countCmd, async (countErr, countStdout) => {
                         const fileCount = parseInt(countStdout.trim()) || 1;
                         
                         if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
