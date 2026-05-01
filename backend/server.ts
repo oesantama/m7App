@@ -12,7 +12,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import apiRoutes from './routes/index.js';
 import ghVisitasRoutes from './routes/gh-visitas.routes.js';
-import documentRoutes from './routes/document.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import { initDeliveryTables } from './controllers/dispatch.controller.js';
 import { initScheduler } from './services/scheduler.service.js';
@@ -116,7 +115,6 @@ app.get('/ready', (req, res) => {
 });
 
 // Middleware de Whitelisting y Protección Global (Seguridad Arquitectónica)
-app.use('/api/documents', documentRoutes);
 app.use('/api', (req, res, next) => {
   const publicPaths = [
     '/auth/login', 
