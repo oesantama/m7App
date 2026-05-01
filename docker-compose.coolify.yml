@@ -109,7 +109,6 @@ services:
           find /backups -name '*.sql.gz' -mtime +3 -delete;
         }
 
-        do_backup;
         while true; do
           CURRENT_HOUR=$$(date +%H);
           if [ \"$$CURRENT_HOUR\" = \"01\" ] || [ \"$$CURRENT_HOUR\" = \"15\" ]; then

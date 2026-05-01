@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/useAppStore';
 import { api } from '../services/api';
 import { normalizeData } from '../utils/normalize';
 import { hasPermission } from '../utils/permissions';
+import { MasterCategory } from '../types';
 
 /**
  * Hook para gestionar la sincronización global de datos de la aplicación.
@@ -141,7 +142,7 @@ export const useAppData = () => {
           api.getRoutes().then(res => useAppStore.setState({ routes: Array.isArray(res) ? res : [] })).catch(() => []);
       }
 
-      if (hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) {
+      if (hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL') || hasPerm('DESPACHO_L') || hasPerm('RUTAS')) {
           api.getInvoices(targetClientId).then(res => useAppStore.setState({ invoices: Array.isArray(res) ? res : [] })).catch(() => []);
       }
 

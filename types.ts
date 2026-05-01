@@ -270,21 +270,23 @@ export interface Route extends AuditBase {
   total_invoices?: number;
 }
 
-export type MasterCategory = 
-  | 'masterUsuarios' 
-  | 'masterClientes' 
-  | 'masterArticulo' 
-  | 'masterRol' 
-  | 'masterPermisosRol' 
+export type MasterCategory =
+  | 'masterUsuarios'
+  | 'masterClientes'
+  | 'masterArticulo'
+  | 'masterRol'
+  | 'masterPermisosRol'
   | 'masterPermisosUsuario'
-  | 'masterCategorias' // Dedicated Table
-  | 'masterEstados' 
-  | 'masterTiposVehiculo' 
-  | 'masterMarcas' 
+  | 'masterCategorias'
+  | 'masterEstados'
+  | 'masterTiposVehiculo'
+  | 'masterMarcas'
   | 'masterNotificaciones'
   | 'masterTipoNotificacion'
   | 'masterUnidadMedida'
   | 'masterTipoDocumento'
-  | 'modules' // Direct table access
-  | 'pages'; // Direct table access
+  | 'masterVehiculos'
+  | 'masterConductores'
+  | 'modules'
+  | 'pages';
 
