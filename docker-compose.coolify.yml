@@ -29,6 +29,10 @@ services:
         echo '[M7-BACKEND] rclone.conf listo. Arrancando servidor...';
         exec node dist_backend/server.js
       "
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.m7app-backend.rule=Host(`apiapps.m7apps.com`)"
+      - "traefik.http.services.m7app-backend.loadbalancer.server.port=8080"
 
   frontend:
     image: 'ghcr.io/oesantama/m7-frontend:latest'
@@ -36,6 +40,12 @@ services:
     restart: always
     expose:
       - '80'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.m7app-frontend.rule=Host(`orbitm7.m7apps.com`)"
+      - "traefik.http.routers.m7app-frontend.entrypoints=https"
+      - "traefik.http.routers.m7app-frontend.tls=true"
+      - "traefik.http.services.m7app-frontend.loadbalancer.server.port=80"
     depends_on:
       m7app-backend:
         condition: service_started
