@@ -1908,7 +1908,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
     fs.writeFileSync(tmpPath, file.buffer);
 
     try {
-        const ref = uploadDate ? new Date(uploadDate) : new Date();
+        const ref = uploadDate ? new Date(`${uploadDate}T12:00:00`) : new Date();
         const year = ref.getFullYear();
         const month = MESES[ref.getMonth()].toUpperCase();
         const day = `DIA ${ref.getDate()}`;
