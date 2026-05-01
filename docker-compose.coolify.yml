@@ -11,7 +11,7 @@ services:
       - coolify
     environment:
       - PORT=8080
-      - DB_HOST=postgres
+      - DB_HOST=m7-postgres
       - DB_PORT=5432
       - 'DB_USER=${POSTGRES_USER}'
       - 'DB_PASS=${POSTGRES_PASSWORD}'
@@ -69,7 +69,9 @@ services:
       - 'm7_logistica_data:/var/lib/postgresql/data'
       - './database/seed:/docker-entrypoint-initdb.d'
     networks:
-      - m7-network
+      m7-network:
+        aliases:
+          - m7-postgres
     healthcheck:
       test:
         - CMD-SHELL
