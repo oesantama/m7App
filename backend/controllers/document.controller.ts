@@ -1910,10 +1910,10 @@ export const uploadCumplido = async (req: Request, res: Response) => {
     try {
         const ref = uploadDate ? new Date(uploadDate) : new Date();
         const year = ref.getFullYear();
-        const month = MESES[ref.getMonth()];
-        const day = `dia ${ref.getDate()}`;
+        const month = MESES[ref.getMonth()].toUpperCase();
+        const day = `DIA ${ref.getDate()}`;
 
-        const cleanClientName = clientName.replace(/[^a-zA-Z0-9 ]/g, '').trim();
+        const cleanClientName = clientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
         const drivePath = `CUMPLIDOS MILLA 7/${year}/${cleanClientName}/${month}/${day}`;
         const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
 

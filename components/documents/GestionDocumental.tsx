@@ -98,7 +98,7 @@ const GestionDocumental: React.FC = () => {
     const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
     const refDate = uploadDate ? new Date(`${uploadDate}T12:00:00`) : new Date();
     const currentPathPreview = selectedClient
-        ? `CUMPLIDOS MILLA 7 / ${refDate.getFullYear()} / ${authorizedClients.find(c => c.id === selectedClient)?.name} / ${MESES_ES[refDate.getMonth()]} / dia ${refDate.getDate()}`
+        ? `CUMPLIDOS MILLA 7/${refDate.getFullYear()}/${authorizedClients.find(c => c.id === selectedClient)?.name?.replace(/[^a-zA-Z0-9 ()-]/g, '').trim()}/${MESES_ES[refDate.getMonth()].toUpperCase()}/DIA ${refDate.getDate()}`
         : 'Seleccione un cliente para ver la ruta';
 
     const filteredHistory = history.filter(h =>
