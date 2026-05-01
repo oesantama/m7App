@@ -24,6 +24,7 @@ services:
     memswap_limit: 1g
     entrypoint: >
       sh -c "
+        echo '[M7-BACKEND] Iniciando configuracion de rclone...';
         mkdir -p /config;
         cat <<EOF > /config/rclone.conf
         [gdrive]
@@ -39,7 +40,8 @@ services:
         token = {\"access_token\":\"ya29.a0AQvPyIPpsBRxEE8EnLi79gcuMGRL4A_gK3BHbxuowSsxEt2q6V9-hCnJmGhpx97gfQBT3_1K4WXS-QUoU7MBk09rp_zyfFJ0bsr8IG2mszF0qvXcfeQ0q51QVz0XRcCE3_BjHfr9Ufsbyj1XrYs0kfpMZj9q0bfWsku4Jik0-I__A19hb40NGKWZyZrwwLt4kn7_OwaCgYKAaSARQSFQHGX2MiHLPixjHeqVV88Sm-6WR9RQ0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE\"}
         EOF
         
-        node dist_backend/server.js
+        echo '[M7-BACKEND] Arrancando servidor Node...';
+        exec node dist_backend/server.js
       "
 
   frontend:
