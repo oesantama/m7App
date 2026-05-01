@@ -1866,7 +1866,7 @@ Si no encuentras ninguno, responde: {"remisiones": []}`;
     res.status(500).json({ error: 'Servicio de IA temporalmente no disponible. Intente de nuevo en unos segundos.' });
   } catch (err: any) {
     console.error('[M7-PARSE-PDF-ERR]', err.message);
-    res.status(500).json({ error: 'Error al procesar el PDF: ' + err.message });
+res.status(500).json({ error: 'Error al procesar el PDF: ' + err.message });
   }
 };
 
@@ -1889,7 +1889,6 @@ export const getConciliationHistory = async (req: any, res: Response) => {
   }
 };
 
-// ─── Gestión Documental de Cumplidos (rclone + Drive) ─────────────────────────
 const MESES = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
@@ -1897,166 +1896,155 @@ const MESES = [
 
 export const uploadCumplido = async (req: Request, res: Response) => {
     const { clientId, clientName, uploadDate } = req.body;
-    const file = req.file;
+    const files = req.files as Express.Multer.File[];
     const userId = (req as any).user?.id;
 
-    if (!file || !clientId || !clientName) {
-        return res.status(400).json({ error: 'Faltan datos obligatorios (archivo, cliente)' });
+    if (!files || files.length === 0 || !clientId || !clientName) {
+        return res.status(400).json({ error: 'Faltan datos obligatorios (archivos, cliente)' });
     }
 
-    const tmpPath = path.join('/tmp', `cumplido_${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`);
-    fs.writeFileSync(tmpPath, file.buffer);
+    const results: any[] = [];
+    const ref = uploadDate ? new Date(`${uploadDate}T12:00:00`) : new Date();
+    const year = ref.getFullYear();
+    const month = MESES[ref.getMonth()].toUpperCase();
+    const day = `DIA ${ref.getDate()}`;
+    const cleanClientName = clientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
+    const drivePath = `CUMPLIDOS MILLA 7/${year}/${cleanClientName}/${month}/${day}`;
 
     try {
-        const ref = uploadDate ? new Date(`${uploadDate}T12:00:00`) : new Date();
-        const year = ref.getFullYear();
-        const month = MESES[ref.getMonth()].toUpperCase();
-        const day = `DIA ${ref.getDate()}`;
+        const clientRes = await pool.query('SELECT name, client_type FROM clients WHERE id = $1', [clientId]);
+        const isNational = clientRes.rows[0]?.client_type === 'NACIONAL';
+        const fullClientName = clientRes.rows[0]?.name || clientName;
 
-        const cleanClientName = clientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
-        const drivePath = `CUMPLIDOS MILLA 7/${year}/${cleanClientName}/${month}/${day}`;
-        const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
+        for (const file of files) {
+            const timestamp = Date.now();
+            const safeOriginalName = file.originalname.replace(/\s+/g, '_');
+            const tmpPath = path.join('/tmp', `cumplido_${timestamp}_${safeOriginalName}`);
+            const compressedPath = `${tmpPath}_compressed.pdf`;
+            const fileName = `${timestamp}_${safeOriginalName}`;
 
-        const rcloneConfig = '/app/rclone.conf';
-        const compressedPath = `${tmpPath}_compressed.pdf`;
+            fs.writeFileSync(tmpPath, file.buffer);
 
-        // 1. Comprimir PDF con Ghostscript (Máxima compresión /screen)
-        const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
-
-        exec(compressCmd, (compressErr) => {
-            const finalFile = compressErr ? tmpPath : compressedPath;
-            if (compressErr) console.error(`[CUMPLIDOS] Error compression: ${compressErr}`);
-
-        // 2. Subir al Drive
-        const uploadCmd = `rclone copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
-
-        exec(uploadCmd, async (uploadErr, stdout, stderr) => {
-            if (uploadErr) {
-                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
-                console.error(`[CUMPLIDOS] Error rclone copy: ${stderr}`);
-                return res.status(500).json({ error: 'Error al subir a Google Drive' });
-            }
-
-            // 3. Obtener Link y continuar
-            const linkCmd = `rclone link "gdrive_cumplidos:${drivePath}/${fileName}"`;
-            exec(linkCmd, async (linkErr, linkStdout) => {
-                const driveLink = linkStdout ? linkStdout.trim() : '';
-
-                const countCmd = `rclone lsf "gdrive_cumplidos:${drivePath}" | wc -l`;
-                exec(countCmd, async (countErr, countStdout) => {
-                        const fileCount = parseInt(countStdout.trim()) || 1;
-                        
-                        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                        if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
-
-                    try {
-                        const clientRes = await pool.query('SELECT name, client_type FROM clients WHERE id = $1', [clientId]);
-                        const isNational = clientRes.rows[0]?.client_type === 'NACIONAL';
-
-                        await pool.query(
-                            `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category)
-                             VALUES ($1, $2, $3, $4, $5, $6)`,
-                            [userId, clientId, fileName, drivePath, driveLink, 'CUMPLIDOS']
-                        );
-
-                        if (isNational) {
-                            const [notifRes, userRes] = await Promise.all([
-                                pool.query(
-                                    `SELECT notification_email FROM notificaciones
-                                     WHERE tipo_notificacion_id = 'TGN-002' AND status_id = 'EST-01'`
-                                ),
-                                pool.query('SELECT name FROM users WHERE id = $1', [userId]),
-                            ]);
-
-                            const emailList = notifRes.rows.map((r: any) => r.notification_email).filter(Boolean);
-                            if (emailList.length > 0) {
-                                const clientName = clientRes.rows[0].name;
-                                const uploaderName = userRes.rows[0]?.name || userId;
-                                const colombiaTime = new Date().toLocaleString('es-CO', {
-                                    timeZone: 'America/Bogota',
-                                    dateStyle: 'full',
-                                    timeStyle: 'short',
-                                });
-
-                                const subject = `[M7 CUMPLIDOS] ${clientName} — Nuevo soporte cargado`;
-                                const html = `
-                                    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
-                                        <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:24px 32px;border-radius:12px 12px 0 0;">
-                                            <h2 style="color:white;margin:0;font-size:20px;">&#128196; Nuevo Cumplido Cargado</h2>
-                                            <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">Orbit M7 &middot; Gestión Documental</p>
-                                        </div>
-                                        <div style="background:#f8fafc;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
-                                            <table style="width:100%;border-collapse:collapse;">
-                                                <tr>
-                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;width:130px;">Cliente</td>
-                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;font-weight:700;color:#1e293b;">${clientName}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;">Usuario</td>
-                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">${uploaderName}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;">Fecha y Hora</td>
-                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">${colombiaTime}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;">Archivo</td>
-                                                    <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">${fileName}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding:10px 0;font-size:13px;color:#64748b;vertical-align:top;">Ruta en Drive</td>
-                                                    <td style="padding:10px 0;font-size:12px;color:#475569;word-break:break-all;">${drivePath}</td>
-                                                </tr>
-                                            </table>
-                                            <div style="margin-top:24px;text-align:center;">
-                                                <a href="${driveLink}" style="display:inline-block;background:#4f46e5;color:white;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;">Ver Documento en Drive &rarr;</a>
-                                            </div>
-                                            <p style="margin-top:24px;font-size:11px;color:#94a3b8;text-align:center;">Mensaje autom&aacute;tico &middot; Orbit M7 Intelligence &middot; No responder</p>
-                                        </div>
-                                    </div>
-                                `;
-                                await sendEmail(emailList, subject, html).catch(() => {});
-                            }
-                        }
-
-                        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-
-                        res.json({
-                            message: 'Cumplido subido y registrado exitosamente',
-                            path: drivePath,
-                            link: driveLink,
-                            folderFileCount: fileCount
-                        });
-                    } catch (dbErr) {
-                        console.error('[CUMPLIDOS] Error DB:', dbErr);
-                        res.status(500).json({ error: 'Error al procesar el registro' });
-                    }
+            await new Promise<void>((resolve) => {
+                const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
+                exec(compressCmd, (err) => {
+                    if (err) console.error(`[CUMPLIDOS] Error comprimiendo ${file.originalname}:`, err);
+                    resolve();
                 });
             });
+
+            const finalFile = fs.existsSync(compressedPath) ? compressedPath : tmpPath;
+
+            await new Promise<void>((resolve, reject) => {
+                const uploadCmd = `rclone copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
+                exec(uploadCmd, (err, stdout, stderr) => {
+                    if (err) {
+                        console.error(`[CUMPLIDOS] Error rclone subiendo ${file.originalname}:`, stderr);
+                        reject(err);
+                    } else resolve();
+                });
+            });
+
+            const driveLink = await new Promise<string>((resolve) => {
+                const linkCmd = `rclone link "gdrive_cumplidos:${drivePath}/${fileName}"`;
+                exec(linkCmd, (err, stdout) => resolve(stdout ? stdout.trim() : ''));
+            });
+
+            await pool.query(
+                `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category, folder_date)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [userId, clientId, fileName, drivePath, driveLink, 'CUMPLIDOS', uploadDate || null]
+            );
+
+            results.push({ fileName, link: driveLink });
+
+            if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+            if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
+        }
+
+        if (isNational) {
+            const [notifRes, userRes] = await Promise.all([
+                pool.query(
+                    `SELECT notification_email FROM notificaciones
+                     WHERE tipo_notificacion_id = 'TGN-002' AND status_id = 'EST-01'`
+                ),
+                pool.query('SELECT name FROM users WHERE id = $1', [userId]),
+            ]);
+
+            const emailList = notifRes.rows.map((r: any) => r.notification_email).filter(Boolean);
+            if (emailList.length > 0) {
+                const uploaderName = userRes.rows[0]?.name || userId;
+                const colombiaTime = new Date().toLocaleString('es-CO', {
+                    timeZone: 'America/Bogota',
+                    dateStyle: 'full',
+                    timeStyle: 'short',
+                });
+
+                const subject = `[M7 CUMPLIDOS] ${fullClientName} — ${results.length} soporte(s) cargado(s)`;
+                const html = `
+                    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
+                        <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:24px 32px;border-radius:12px 12px 0 0;">
+                            <h2 style="color:white;margin:0;font-size:20px;">&#128196; Carga Masiva de Cumplidos</h2>
+                            <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">Orbit M7 &middot; Gestión Documental</p>
+                        </div>
+                        <div style="background:#f8fafc;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+                            <p>Se han cargado <b>${results.length}</b> archivos para el cliente <b>${fullClientName}</b>.</p>
+                            <p><b>Usuario:</b> ${uploaderName}<br><b>Fecha:</b> ${colombiaTime}</p>
+                            <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+                            <div style="text-align:center;">
+                                <a href="https://orbitm7.m7apps.com/cumplidos" style="display:inline-block;background:#4f46e5;color:white;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;">Ver Trazabilidad en Orbit &rarr;</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                await sendEmail(emailList, subject, html).catch(() => {});
+            }
+        }
+
+        res.json({
+            message: `${results.length} cumplido(s) subido(s) exitosamente`,
+            results
         });
-    });
 
     } catch (err) {
         console.error('[CUMPLIDOS] Global error:', err);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        res.status(500).json({ error: 'Error interno al procesar la carga múltiple' });
     }
 };
 
-
 export const getDocumentStats = async (req: Request, res: Response) => {
     try {
-        const { dateFrom, dateTo } = req.query;
+        const { dateFrom, dateTo, clientId, userId, search } = req.query;
         const params: any[] = [];
         const conditions: string[] = [];
 
-        if (dateFrom && typeof dateFrom === 'string') {
-            params.push(dateFrom);
-            conditions.push(`(d.upload_date AT TIME ZONE 'America/Bogota')::date >= $${params.length}::date`);
+        if (!dateFrom && !dateTo && !search && !clientId) {
+            conditions.push("d.upload_date >= NOW() - INTERVAL '48 hours'");
         }
-        if (dateTo && typeof dateTo === 'string') {
+
+        if (dateFrom) {
+            params.push(dateFrom);
+            conditions.push(`d.upload_date::date >= $${params.length}::date`);
+        }
+        if (dateTo) {
             params.push(dateTo);
-            conditions.push(`(d.upload_date AT TIME ZONE 'America/Bogota')::date <= $${params.length}::date`);
+            conditions.push(`d.upload_date::date <= $${params.length}::date`);
+        }
+        if (clientId) {
+            params.push(clientId);
+            conditions.push(`d.client_id = $${params.length}`);
+        }
+        if (userId) {
+            params.push(userId);
+            conditions.push(`d.user_id = $${params.length}`);
+        }
+        if (folderDate) {
+            params.push(folderDate);
+            conditions.push(`d.folder_date = $${params.length}::date`);
+        }
+        if (search) {
+            params.push(`%${search}%`);
+            conditions.push(`(d.file_name ILIKE $${params.length} OR c.name ILIKE $${params.length})`);
         }
 
         const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
