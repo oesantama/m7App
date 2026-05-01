@@ -17,19 +17,18 @@ services:
       - 'GEMINI_API_KEY=${GEMINI_API_KEY}'
       - 'GOOGLE_API_KEY=${GOOGLE_API_KEY}'
       - 'AI_MODEL=${AI_MODEL}'
-      - RCLONE_CONFIG_GDRIVE_TYPE=drive
-      - RCLONE_CONFIG_GDRIVE_SCOPE=drive
-      - 'RCLONE_CONFIG_GDRIVE_TOKEN={"access_token":"ya29.a0AQvPyIOIpamab25CgGR9UxbuM22-EaKsOP148hP3wgsckvJm5AVXeE1ptPaO9_hUfxYvY1YH1nnGIze97vb4dRAFml7teZgNBuKeMa6GdJG98AEmY3rxQPS3J3jRVBp0_B2ioYbPzOJtlIBZHiqc8ozwF0gv2BWXJB50TdrnROINdGFRYnYxdggEnzSH2VU9-b_MAHUaCgYKAdISARcSFQHGX2MimFgoUmzftA5K3tCXwV3jdg0206","token_type":"Bearer","refresh_token":"1//05NEocypqb9wgCgYIARAAGAUSNwF-L9IrHzvKSUxrxbkccgx-9MegtC6VH084gqRiNcy18hH_pVLLRU0UVu-B8Pcx6eREnIqrL7M","expiry":"2026-04-30T08:37:58.726474705-05:00","expires_in":3599}'
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=drive
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
-      - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyIPpsBRxEE8EnLi79gcuMGRL4A_gK3BHbxuowSsxEt2q6V9-hCnJmGhpx97gfQBT3_1K4WXS-QUoU7MBk09rp_zyfFJ0bsr8IG2mszF0qvXcfeQ0q51QVz0XRcCE3_BjHfr9Ufsbyj1XrYs0kfpMZj9q0bfWsku4Jik0-I__A19hb40NGKWZyZrwwLt4kn7_OwaCgYKAaSARQSFQHGX2MiHLPixjHeqVV88Sm-6WR9RQ0206","token_type":"Bearer","refresh_token":"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE"}'
-    networks:
-      - m7-network
     depends_on:
       postgres:
         condition: service_healthy
+    mem_limit: 1g
+    memswap_limit: 1g
+    entrypoint: >
+      sh -c "
+        echo '[M7-BACKEND] Generando rclone.conf...';
+        printf '[gdrive]\ntype = drive\nscope = drive\ntoken = {\"access_token\":\"ya29.a0AQvPyIOIpamab25CgGR9UxbuM22-EaKsOP148hP3wgsckvJm5AVXeE1ptPaO9_hUfxYvY1YH1nnGIze97vb4dRAFml7teZgNBuKeMa6GdJG98AEmY3rxQPS3J3jRVBp0_B2ioYbPzOJtlIBZHiqc8ozwF0gv2BWXJB50TdrnROINdGFRYnYxdggEnzSH2VU9-b_MAHUaCgYKAdISARcSFQHGX2MimFgoUmzftA5K3tCXwV3jdg0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05NEocypqb9wgCgYIARAAGAUSNwF-L9IrHzvKSUxrxbkccgx-9MegtC6VH084gqRiNcy18hH_pVLLRU0UVu-B8Pcx6eREnIqrL7M\",\"expiry\":\"2026-04-30T08:37:58.726474705-05:00\",\"expires_in\":3599}\n\n[gdrive_cumplidos]\ntype = drive\nclient_id = 410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com\nclient_secret = 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\nscope = drive\ntoken = {\"access_token\":\"ya29.a0AQvPyIPpsBRxEE8EnLi79gcuMGRL4A_gK3BHbxuowSsxEt2q6V9-hCnJmGhpx97gfQBT3_1K4WXS-QUoU7MBk09rp_zyfFJ0bsr8IG2mszF0qvXcfeQ0q51QVz0XRcCE3_BjHfr9Ufsbyj1XrYs0kfpMZj9q0bfWsku4Jik0-I__A19hb40NGKWZyZrwwLt4kn7_OwaCgYKAaSARQSFQHGX2MiHLPixjHeqVV88Sm-6WR9RQ0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE\"}\n' > ./rclone.conf;
+        echo '[M7-BACKEND] rclone.conf listo. Arrancando servidor...';
+        exec node dist_backend/server.js
+      "
 
   frontend:
     image: 'ghcr.io/oesantama/m7-frontend:latest'
@@ -37,15 +36,11 @@ services:
     restart: always
     expose:
       - '80'
-    networks:
-      - m7-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.m7-frontend.rule=Host(`orbitm7.m7apps.com`)"
-      - "traefik.http.services.m7-frontend.loadbalancer.server.port=80"
     depends_on:
       m7app-backend:
         condition: service_started
+    mem_limit: 128m
+    memswap_limit: 128m
 
   postgres:
     image: 'postgres:15-alpine'
@@ -57,8 +52,7 @@ services:
       - 'POSTGRES_DB=${POSTGRES_DB}'
     volumes:
       - 'm7_logistica_data:/var/lib/postgresql/data'
-    networks:
-      - m7-network
+      - './database/seed:/docker-entrypoint-initdb.d'
     healthcheck:
       test:
         - CMD-SHELL
@@ -66,6 +60,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    mem_limit: 1500m
+    memswap_limit: 1500m
 
   db-backup:
     image: 'postgres:15-alpine'
@@ -78,8 +74,6 @@ services:
       - TZ=America/Bogota
     volumes:
       - 'm7_backups:/backups'
-    networks:
-      - m7-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,5 +104,7 @@ networks:
     driver: bridge
 
 volumes:
-  m7_logistica_data:
-  m7_backups:
+  m7_logistica_data: null
+  evolution_instances: null
+  evolution_store: null
+  m7_backups: null
