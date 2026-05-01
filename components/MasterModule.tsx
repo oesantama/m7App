@@ -164,6 +164,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterPermisosUsuario: 'PUS',
     masterTipoDocumento: 'DOC',
     masterCategorias: 'CAT',
+    masterVehiculos: 'VEH',
+    masterConductores: 'CON',
     modules: 'MOD',
     pages: 'PAG'
   };
@@ -183,6 +185,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterPermisosUsuario: 'MATRIZ DE USUARIOS',
     masterTipoDocumento: 'TIPOS DE DOCUMENTO',
     masterCategorias: 'CATEGORÍAS DE ARTÍCULO',
+    masterVehiculos: 'VEHÍCULOS',
+    masterConductores: 'CONDUCTORES',
     modules: 'MÓDULOS',
     pages: 'PÁGINAS WEB'
   };
@@ -334,6 +338,9 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       });
     });
   }, [allMasterData, modules, pages, activeMaster, searchTerm]);
+
+  // Resetear a página 1 cuando cambia la categoría activa o el buscador
+  React.useEffect(() => { setCurrentPage(1); }, [activeMaster, searchTerm]);
 
   const paginatedData = useMemo(() => {
     if (rowsPerPage === 'all') return filteredData;
@@ -590,7 +597,6 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       }
 
       // ÉXITO CONFIRMADO
-      console.log('[M7-MASTER] ✅ Save successful!', saveResponse);
 
       // Actualizar el estado local para que la tabla se refresque sin recargar página
       // PRIORIDAD: Usar objeto completo del backend si está disponible (ej: saveResponse.article o saveResponse.record)
@@ -923,13 +929,6 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     loadUsersIfNeeded();
   }, [activeMaster]);
 
-  // DEBUG: Check permissions data
-  React.useEffect(() => {
-    if (activeMaster === 'masterPermisosUsuario') {
-        console.log("DEBUG PERMISSIONS DATA:", paginatedData);
-        console.log("DEBUG USERS DATA:", allMasterData.masterUsuarios);
-    }
-  }, [activeMaster, paginatedData, allMasterData.masterUsuarios]);
 
   const commonInputStyle = "w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs outline-none focus:border-emerald-500 transition-all shadow-sm appearance-none cursor-pointer";
 

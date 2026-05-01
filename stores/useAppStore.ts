@@ -247,9 +247,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   // ============ UTILIDADES ============
-  refreshAllData: (clientId) => {
+  refreshAllData: (_clientId) => {
     // Placeholder - la lógica compleja se mantiene en App.tsx por ahora
-    console.log('[ZUSTAND-STORE] refreshAllData called for client:', clientId);
   },
   
   logout: () => {

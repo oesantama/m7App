@@ -282,16 +282,25 @@ const App: React.FC = () => {
     localStorage.setItem('m7_active_tab', activeTab);
   }, [activeTab]);
 
-  // Auto-refresh al navegar entre páginas — garantiza datos frescos sin F5
-  // Solo refresca datos operativos (documentos, facturas, rutas, vehículos), NO los maestros
-  // para no hacer un request masivo en cada clic de navegación
+  // Refresh de módulos y páginas en cada navegación — garantiza que nuevas páginas/módulos
+  // creadas manualmente aparezcan en el menú sin recargar la app completa
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    Promise.all([
+      api.getModules().catch(() => []),
+      api.getPages().catch(() => []),
+    ]).then(([mods, pags]) => {
+      if (Array.isArray(mods) && mods.length > 0) useAppStore.setState({ modules: mods });
+      if (Array.isArray(pags) && pags.length > 0) useAppStore.setState({ pages: pags });
+    });
+  }, [activeTab, activePageId, isAuthenticated]);
+
+  // Auto-refresh de datos operativos al navegar entre páginas
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     const hasPerm = (mod: string) => hasPermission(user, mod, 'view');
     const clientId = user.clientId || (user.clientIds && user.clientIds[0]) || 'CLI-01';
-    const isSuper = (user as any).roleId === 'ROL-01' || (user as any).email === 'admin@millasiete.com';
 
-    // Páginas que NO requieren refresh operativo (son maestros o configuración)
     const staticTabs = ['dashboard', 'master', 'admin', 'seguridad', 'capacitaciones', 'formacion'];
     if (staticTabs.includes(activeTab)) return;
 
@@ -318,7 +327,7 @@ const App: React.FC = () => {
         }
 
         await Promise.all(fetches);
-      } catch { /* silencioso — no interrumpir navegación */ }
+      } catch { /* silencioso */ }
     };
 
     refreshOperational();
@@ -441,7 +450,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && needsWelcomeRedirect && pages.length > 0 && modules.length > 0 && user) {
-      console.log('[M7-ROUTING] Calculando ruta de bienvenida...');
 
       const isSuperUser = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
 
@@ -481,7 +489,6 @@ const App: React.FC = () => {
           if (masterCat) setActiveMasterCategory(masterCat as any);
           setActivePageId(firstPage.id);
           setNeedsWelcomeRedirect(false);
-          console.log(`[M7-ROUTING] Redirigido a: ${firstPage.name} (${firstPage.id})`);
           return;
         }
       }
@@ -683,7 +690,6 @@ const App: React.FC = () => {
               setAssignments([...assignments, newAssign]);
             }}
             onSaveRoute={(route) => {
-              console.log('Ruta Guardada:', route);
               alert('Ruta OrbitM7 Guardada Exitosamente');
             }}
           />
@@ -1075,7 +1081,6 @@ const App: React.FC = () => {
             try {
               const updatedUser = { ...user, ...data } as User;
               setUser(updatedUser);
-              console.log('[M7-APP] Persistiendo usuario...', updatedUser);
               await api.saveUser(updatedUser);
 
               const freshUsers = await api.getUsers().catch(() => []);
