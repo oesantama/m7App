@@ -1999,11 +1999,14 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                 });
             });
         });
+    });
 
     } catch (err) {
+        console.error('[CUMPLIDOS] Global error:', err);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
+
 
 export const getDocumentStats = async (req: Request, res: Response) => {
     try {
