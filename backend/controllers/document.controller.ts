@@ -2014,7 +2014,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
 
 export const getDocumentStats = async (req: Request, res: Response) => {
     try {
-        const { dateFrom, dateTo, clientId, userId, search } = req.query;
+        const { dateFrom, dateTo, clientId, userId, search, folderDate } = req.query;
         const params: any[] = [];
         const conditions: string[] = [];
 
