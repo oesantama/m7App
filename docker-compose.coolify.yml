@@ -25,6 +25,8 @@ services:
       - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
       - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
       - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyIPpsBRxEE8EnLi79gcuMGRL4A_gK3BHbxuowSsxEt2q6V9-hCnJmGhpx97gfQBT3_1K4WXS-QUoU7MBk09rp_zyfFJ0bsr8IG2mszF0qvXcfeQ0q51QVz0XRcCE3_BjHfr9Ufsbyj1XrYs0kfpMZj9q0bfWsku4Jik0-I__A19hb40NGKWZyZrwwLt4kn7_OwaCgYKAaSARQSFQHGX2MiHLPixjHeqVV88Sm-6WR9RQ0206","token_type":"Bearer","refresh_token":"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE"}'
+    networks:
+      - m7-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,6 +39,8 @@ services:
     restart: always
     expose:
       - '80'
+    networks:
+      - m7-network
     depends_on:
       m7app-backend:
         condition: service_started
@@ -51,6 +55,10 @@ services:
       - 'POSTGRES_USER=${POSTGRES_USER}'
       - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
       - 'POSTGRES_DB=${POSTGRES_DB}'
+    volumes:
+      - 'm7_logistica_data:/var/lib/postgresql/data'
+    networks:
+      - m7-network
     healthcheck:
       test:
         - CMD-SHELL
@@ -58,33 +66,51 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    mem_limit: 1g
-    memswap_limit: 1g
+    mem_limit: 1500m
+    memswap_limit: 1500m
 
   db-backup:
-    image: 'alpine:latest'
+    image: 'postgres:15-alpine'
+    container_name: m7-backup
     restart: always
     environment:
+      - 'PGPASSWORD=${POSTGRES_PASSWORD}'
       - 'POSTGRES_USER=${POSTGRES_USER}'
-      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
       - 'POSTGRES_DB=${POSTGRES_DB}'
-      - DB_HOST=postgres
+      - TZ=America/Bogota
+    volumes:
+      - 'm7_backups:/backups'
+    networks:
+      - m7-network
     depends_on:
       postgres:
         condition: service_healthy
     entrypoint: >
       sh -c "
-        apk add --no-cache postgresql-client rclone;
-        echo '[M7-BACKUP] Generando rclone.conf para backups...';
-        printf '[gdrive]\ntype = drive\nscope = drive\ntoken = {\"access_token\":\"ya29.a0AQvPyIOIpamab25CgGR9UxbuM22-EaKsOP148hP3wgsckvJm5AVXeE1ptPaO9_hUfxYvY1YH1nnGIze97vb4dRAFml7teZgNBuKeMa6GdJG98AEmY3rxQPS3J3jRVBp0_B2ioYbPzOJtlIBZHiqc8ozwF0gv2BWXJB50TdrnROINdGFRYnYxdggEnzSH2VU9-b_MAHUaCgYKAdISARcSFQHGX2MimFgoUmzftA5K3tCXwV3jdg0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05NEocypqb9wgCgYIARAAGAUSNwF-L9IrHzvKSUxrxbkccgx-9MegtC6VH084gqRiNcy18hH_pVLLRU0UVu-B8Pcx6eREnIqrL7M\",\"expiry\":\"2026-04-30T08:37:58.726474705-05:00\",\"expires_in\":3599}\n' > /tmp/rclone.conf;
+        apk add --no-cache rclone;
+        printf '[gdrive]\ntype = drive\nscope = drive\ntoken = {\"access_token\":\"ya29.a0AQvPyIOIpamab25CgGR9UxbuM22-EaKsOP148hP3wgsckvJm5AVXeE1ptPaO9_hUfxYvY1YH1nnGIze97vb4dRAFml7teZgNBuKeMa6GdJG98AEmY3rxQPS3J3jRVBp0_B2ioYbPzOJtlIBZHiqc8ozwF0gv2BWXJB50TdrnROINdGFRYnYxdggEnzSH2VU9-b_MAHUaCgYKAdISARcSFQHGX2MimFgoUmzftA5K3tCXwV3jdg0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05NEocypqb9wgCgYIARAAGAUSNwF-L9IrHzvKSUxrxbkccgx-9MegtC6VH084gqRiNcy18hH_pVLLRU0UVu-B8Pcx6eREnIqrL7M\",\"expiry\":\"2026-04-30T08:37:58.726474705-05:00\",\"expires_in\":3599}\n\n[gdrive_cumplidos]\ntype = drive\nclient_id = 410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com\nclient_secret = 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\nscope = drive\ntoken = {\"access_token\":\"ya29.a0AQvPyIPpsBRxEE8EnLi79gcuMGRL4A_gK3BHbxuowSsxEt2q6V9-hCnJmGhpx97gfQBT3_1K4WXS-QUoU7MBk09rp_zyfFJ0bsr8IG2mszF0qvXcfeQ0q51QVz0XRcCE3_BjHfr9Ufsbyj1XrYs0kfpMZj9q0bfWsku4Jik0-I__A19hb40NGKWZyZrwwLt4kn7_OwaCgYKAaSARQSFQHGX2MiHLPixjHeqVV88Sm-6WR9RQ0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05Eo38IaZetKLCgYIARAAGAUSNwF-L9IRHUPvwi78MEzb9K06mt52ITvS8PR5lZAd_Op9UL8eofrexl7ZMg3j0sqE34sozzxwTsE\"}\n' > /tmp/rclone.conf;
+        
+        do_backup() {
+          BACKUP_FILE=/backups/m7_logistica_$$(date +%Y%m%d_%H%M%S).sql.gz;
+          pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} | gzip > $$BACKUP_FILE;
+          rclone --config /tmp/rclone.conf copy $$BACKUP_FILE gdrive:m7_backups -v;
+          find /backups -name '*.sql.gz' -mtime +3 -delete;
+        }
+
         while true; do
-          DATE=$$(date +%Y-%m-%d_%H-%M-%S);
-          echo \"[M7-BACKUP] Iniciando respaldo: $$DATE\";
-          PGPASSWORD=$$POSTGRES_PASSWORD pg_dump -h $$DB_HOST -U $$POSTGRES_USER $$POSTGRES_DB > /tmp/backup.sql;
-          rclone --config /tmp/rclone.conf copy /tmp/backup.sql gdrive:BACKUPS_M7;
-          echo \"[M7-BACKUP] Respaldo completado y subido a Drive.\";
-          sleep 86400;
+          CURRENT_HOUR=$$(date +%H);
+          if [ \"$$CURRENT_HOUR\" = \"01\" ] || [ \"$$CURRENT_HOUR\" = \"15\" ]; then
+            do_backup;
+            sleep 3000;
+          fi
+          sleep 60;
         done
       "
-    mem_limit: 256m
-    memswap_limit: 256m
+
+networks:
+  m7-network:
+    driver: bridge
+
+volumes:
+  m7_logistica_data:
+  m7_backups:
