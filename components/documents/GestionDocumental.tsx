@@ -259,7 +259,14 @@ const GestionDocumental: React.FC = () => {
                                 ? 'bg-slate-200 cursor-not-allowed text-slate-400'
                                 : 'bg-indigo-600 hover:bg-indigo-500 hover:-translate-y-1 shadow-indigo-500/20'}`}
                     >
-                        {isUploading ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={18} /> PROCESAR CARGA</>}
+                        {isUploading ? (
+                            <span className="flex items-center gap-3">
+                                <Loader2 className="animate-spin" size={18} />
+                                PROCESANDO CARGA...
+                            </span>
+                        ) : (
+                            <><CheckCircle2 size={18} /> PROCESAR CARGA</>
+                        )}
                     </button>
                 </div>
 
