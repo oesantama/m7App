@@ -484,54 +484,58 @@ const healSchema = async (client: any) => {
     `);
 
     // ── FIX: routing_patterns.id debe ser SERIAL (no TEXT) para que el INSERT sin id funcione ──
-    // Si la columna id es TEXT (sin default), los INSERTs sin id fallan con NOT NULL violation.
     await client.query(`
       DO $$
       BEGIN
-        -- Solo migrar si id es TEXT (no tiene default de secuencia)
         IF EXISTS (
           SELECT 1 FROM information_schema.columns
           WHERE table_name = 'routing_patterns'
             AND column_name = 'id'
             AND data_type = 'text'
         ) THEN
-          -- Crear secuencia y asignar como default
           CREATE SEQUENCE IF NOT EXISTS routing_patterns_id_seq;
           ALTER TABLE routing_patterns ALTER COLUMN id TYPE BIGINT USING (
             CASE WHEN id ~ '^[0-9]+$' THEN id::BIGINT ELSE nextval('routing_patterns_id_seq') END
           );
           ALTER TABLE routing_patterns ALTER COLUMN id SET DEFAULT nextval('routing_patterns_id_seq');
-          SELECT setval('routing_patterns_id_seq', COALESCE((SELECT MAX(id::BIGINT) FROM routing_patterns), 0) + 1);
-        -- Tabla para gestión documental y trazabilidad de Drive
-        CREATE TABLE IF NOT EXISTS document_drive_logs (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
-            client_id VARCHAR(50),
-            file_name TEXT NOT NULL,
-            file_type VARCHAR(20) DEFAULT 'PDF',
-            category VARCHAR(50) DEFAULT 'CUMPLIDOS',
-            drive_path TEXT,
-            drive_link TEXT,
-            upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status VARCHAR(20) DEFAULT 'SUCCESS'
-        );
-
-        -- Curación de esquema para Clientes Nacionales y IDs de Notificación
-        ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type VARCHAR(20) DEFAULT 'MUNICIPAL';
-        UPDATE master_records SET id = 'TGN-002' WHERE id = 'TGN-100' AND category = 'TIPOS_NOTIFICACION';
-        UPDATE master_records SET parent_id = 'TGN-002' WHERE parent_id = 'TGN-100' AND category = 'NOTIFICACIONES';
-
-        -- Registro del nuevo Módulo y Página en el menú
-        INSERT INTO modules (id, name, icon_class, status_id)
-        SELECT 'MOD-10', 'GESTIÓN DOCUMENTOS DRIVE', 'FileText', 'EST-01'
-        WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-10');
-
-        INSERT INTO pages (id, name, route, module_id, status_id)
-        SELECT 'PAG-45', 'CUMPLIDOS DRIVE', 'cumplidos', 'MOD-10', 'EST-01'
-        WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-45');
-
-        COMMIT;
+          PERFORM setval('routing_patterns_id_seq', COALESCE((SELECT MAX(id) FROM routing_patterns), 0) + 1);
+        END IF;
       END$$;
+    `);
+
+    // ── MOD-10 / PAG-45: Gestión Documental Drive ────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS document_drive_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        client_id VARCHAR(50),
+        file_name TEXT NOT NULL,
+        file_type VARCHAR(20) DEFAULT 'PDF',
+        category VARCHAR(50) DEFAULT 'CUMPLIDOS',
+        drive_path TEXT,
+        drive_link TEXT,
+        upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'SUCCESS'
+      );
+    `);
+
+    await client.query(`
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type VARCHAR(20) DEFAULT 'MUNICIPAL';
+    `);
+
+    await client.query(`
+      UPDATE master_records SET id = 'TGN-002' WHERE id = 'TGN-100' AND category = 'TIPOS_NOTIFICACION';
+      UPDATE master_records SET parent_id = 'TGN-002' WHERE parent_id = 'TGN-100' AND category = 'NOTIFICACIONES';
+    `);
+
+    await client.query(`
+      INSERT INTO modules (id, name, icon_class, status_id)
+      SELECT 'MOD-10', 'GESTIÓN DOCUMENTOS DRIVE', 'FileText', 'EST-01'
+      WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-10');
+
+      INSERT INTO pages (id, name, route, module_id, status_id)
+      SELECT 'PAG-45', 'CUMPLIDOS DRIVE', 'cumplidos', 'MOD-10', 'EST-01'
+      WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-45');
     `);
 
     // ── NORMALIZACIÓN document_items.item_status ─────────────────────────────
