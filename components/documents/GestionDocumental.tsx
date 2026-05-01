@@ -74,6 +74,7 @@ const GestionDocumental: React.FC = () => {
         formData.append('file', file);
         formData.append('clientId', client.id);
         formData.append('clientName', client.name);
+        formData.append('userId', String(user?.id || ''));
         formData.append('uploadDate', uploadDate);
 
         try {
