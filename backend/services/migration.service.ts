@@ -507,7 +507,7 @@ const healSchema = async (client: any) => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS document_drive_logs (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id TEXT REFERENCES users(id),
         client_id VARCHAR(50),
         file_name TEXT NOT NULL,
         file_type VARCHAR(20) DEFAULT 'PDF',
@@ -518,6 +518,9 @@ const healSchema = async (client: any) => {
         status VARCHAR(20) DEFAULT 'SUCCESS'
       );
     `);
+
+    // Fix user_id type mismatch
+    await client.query(`ALTER TABLE document_drive_logs ALTER COLUMN user_id TYPE TEXT;`).catch(() => {});
 
     await client.query(`
       ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type VARCHAR(20) DEFAULT 'MUNICIPAL';
