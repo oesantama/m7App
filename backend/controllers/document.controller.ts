@@ -1964,7 +1964,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                             const [notifRes, userRes] = await Promise.all([
                                 pool.query(
                                     `SELECT notification_email FROM notificaciones
-                                     WHERE tipo_notificacion_id IN ('TGN-002', 'TGN-100') AND status_id = 'EST-01'`
+                                     WHERE tipo_notificacion_id = 'TGN-002' AND status_id = 'EST-01'`
                                 ),
                                 pool.query('SELECT name FROM users WHERE id = $1', [userId]),
                             ]);
