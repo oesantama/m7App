@@ -20,6 +20,8 @@ const GestionDocumental: React.FC = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [history, setHistory] = useState<DocumentLog[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const todayStr = new Date().toISOString().split('T')[0];
+    const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
     const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
 
@@ -40,11 +42,13 @@ const GestionDocumental: React.FC = () => {
         }
     }, [authorizedClients.length]);
 
-    const fetchHistory = async () => {
+    const fetchHistory = async (date?: string) => {
         try {
             const token = user?.token || '';
+            const params = date ? { date } : {};
             const res = await axios.get('/api/documents/stats', {
                 headers: { Authorization: `Bearer ${token}` },
+                params,
             });
             if (Array.isArray(res.data)) setHistory(res.data);
         } catch {
@@ -52,7 +56,7 @@ const GestionDocumental: React.FC = () => {
         }
     };
 
-    useEffect(() => { fetchHistory(); }, []);
+    useEffect(() => { fetchHistory(selectedDate); }, [selectedDate]);
 
     const handleUpload = async () => {
         if (!selectedClient || !file) {
@@ -67,6 +71,7 @@ const GestionDocumental: React.FC = () => {
         formData.append('file', file);
         formData.append('clientId', client.id);
         formData.append('clientName', client.name);
+        formData.append('uploadDate', selectedDate);
 
         try {
             const token = user?.token || '';
@@ -79,7 +84,7 @@ const GestionDocumental: React.FC = () => {
             toast.success('¡Cumplido subido exitosamente!');
             setFile(null);
             if (authorizedClients.length !== 1) setSelectedClient('');
-            fetchHistory();
+            fetchHistory(selectedDate);
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error al subir el archivo');
         } finally {
@@ -87,9 +92,9 @@ const GestionDocumental: React.FC = () => {
         }
     };
 
-    const now = new Date();
+    const refDate = selectedDate ? new Date(`${selectedDate}T12:00:00`) : new Date();
     const currentPathPreview = selectedClient
-        ? `cumplidos / ${now.getFullYear()} / ${authorizedClients.find(c => c.id === selectedClient)?.name} / ${now.toLocaleString('es-ES', { month: 'long' })} / dia ${now.getDate()}`
+        ? `CUMPLIDOS MILLA 7 / ${refDate.getFullYear()} / ${authorizedClients.find(c => c.id === selectedClient)?.name} / ${refDate.toLocaleString('es-ES', { month: 'long' })} / dia ${refDate.getDate()}`
         : 'Seleccione un cliente para ver la ruta';
 
     const filteredHistory = history.filter(h =>
@@ -129,9 +134,22 @@ const GestionDocumental: React.FC = () => {
                         )}
                     </div>
 
+                    <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-slate-700 uppercase tracking-wider">
+                            2. Fecha del Cumplido
+                        </label>
+                        <input
+                            type="date"
+                            className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-sm"
+                            value={selectedDate}
+                            max={todayStr}
+                            onChange={e => setSelectedDate(e.target.value)}
+                        />
+                    </div>
+
                     <div className="space-y-4">
                         <label className="block text-sm font-semibold text-slate-700 uppercase tracking-wider">
-                            2. Adjuntar PDF de Cumplido
+                            3. Adjuntar PDF de Cumplido
                         </label>
                         <div
                             className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer

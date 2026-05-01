@@ -1896,7 +1896,7 @@ const MESES = [
 ];
 
 export const uploadCumplido = async (req: Request, res: Response) => {
-    const { clientId, clientName } = req.body;
+    const { clientId, clientName, uploadDate } = req.body;
     const file = req.file;
     const userId = (req as any).user?.id;
 
@@ -1904,21 +1904,26 @@ export const uploadCumplido = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Faltan datos obligatorios (archivo, cliente)' });
     }
 
+    // Escribir buffer a archivo temporal (multer usa memoryStorage)
+    const tmpPath = path.join('/tmp', `cumplido_${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`);
+    fs.writeFileSync(tmpPath, file.buffer);
+
     try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = MESES[now.getMonth()];
-        const day = `dia ${now.getDate()}`;
+        const ref = uploadDate ? new Date(uploadDate) : new Date();
+        const year = ref.getFullYear();
+        const month = MESES[ref.getMonth()];
+        const day = `dia ${ref.getDate()}`;
 
         const cleanClientName = clientName.replace(/[^a-zA-Z0-9 ]/g, '').trim();
-        const drivePath = `cumplidos/${year}/${cleanClientName}/${month}/${day}`;
+        const drivePath = `CUMPLIDOS MILLA 7/${year}/${cleanClientName}/${month}/${day}`;
         const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
 
         const rcloneConfig = '/config/rclone.conf';
-        const uploadCmd = `rclone --config ${rcloneConfig} copyto "${file.path}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
+        const uploadCmd = `rclone --config ${rcloneConfig} copyto "${tmpPath}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
 
         exec(uploadCmd, async (error, stdout, stderr) => {
             if (error) {
+                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
                 console.error(`[CUMPLIDOS] Error rclone copy: ${stderr}`);
                 return res.status(500).json({ error: 'Error al subir a Google Drive' });
             }
@@ -1965,7 +1970,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                             }
                         }
 
-                        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+                        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
 
                         res.json({
                             message: 'Cumplido subido y registrado exitosamente',
@@ -1988,17 +1993,24 @@ export const uploadCumplido = async (req: Request, res: Response) => {
 
 export const getDocumentStats = async (req: Request, res: Response) => {
     try {
-        const stats = await pool.query(`
-            SELECT 
-                c.name as client_name,
-                COUNT(d.id) as total_uploads,
-                MAX(d.upload_date) as last_upload
-            FROM document_drive_logs d
-            JOIN clients c ON d.client_id = c.id
-            GROUP BY c.name
-            ORDER BY total_uploads DESC
-        `);
-        res.json(stats.rows);
+        const { date } = req.query;
+        const params: any[] = [];
+        let whereClause = '';
+
+        if (date && typeof date === 'string') {
+            params.push(date);
+            whereClause = `WHERE DATE(d.upload_date AT TIME ZONE 'America/Bogota') = $1::date`;
+        }
+
+        const result = await pool.query(
+            `SELECT d.id, d.file_name, d.client_id, d.drive_path, d.drive_link, d.upload_date
+             FROM document_drive_logs d
+             ${whereClause}
+             ORDER BY d.upload_date DESC
+             LIMIT 200`,
+            params
+        );
+        res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: 'Error al obtener estadísticas' });
     }
