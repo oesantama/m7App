@@ -6,6 +6,9 @@ services:
     restart: always
     expose:
       - '8080'
+    networks:
+      - m7-network
+      - coolify
     environment:
       - PORT=8080
       - DB_HOST=postgres
@@ -43,6 +46,7 @@ services:
       - '80'
     networks:
       - m7-network
+      - coolify
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.m7app-frontend.rule=Host(`orbitm7.m7apps.com`)"
@@ -119,6 +123,8 @@ services:
 networks:
   m7-network:
     driver: bridge
+  coolify:
+    external: true
 
 volumes:
   m7_logistica_data: null
