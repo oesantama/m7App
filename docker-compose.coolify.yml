@@ -26,8 +26,6 @@ services:
       - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
       - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
       - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyINyMiVK9BqykFhW5vMbP-7fX16REtrfsl7rOH_LYNmd52k2V2W7WxEKBCvtpukRbSMEUK9mjDeyySxcnobwqAx71Lapvtm5M-S8JybDdRQq5qW2rD6PUSmXex2fMQfzHMtU5xquCLzyHarBk_LdSgV9rtQHsy5QVmV1frLHE9c405ZZlK0Heu1hvbzCp3LYopcaCgYKAYQSARQSFQHGX2Mis4O4rn496LKSLmPZuHj8Pg0206","token_type":"Bearer","refresh_token":"1//05hSCjSte2j4ECgYIARAAGAUSNwF-L9Ir0yWdyc2TO43xc8vby6F0R_7kPo5QLNb7gqwhH2u9-X0v6wTNgQGyg9VhZrk3ws--Gl0","expiry":"2026-05-01T00:28:42.595243355-05:00","expires_in":3599}'
-    networks:
-      - m7-network
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.m7app-backend.rule=Host(`apiapps.m7apps.com`)"
