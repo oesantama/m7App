@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, Search } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, Search, Calendar } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -13,6 +13,9 @@ interface DocumentLog {
     upload_date: string;
 }
 
+const colombiaToday = () =>
+    new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }); // YYYY-MM-DD
+
 const GestionDocumental: React.FC = () => {
     const { user, allMasterData } = useAppStore();
     const [selectedClient, setSelectedClient] = useState<string>('');
@@ -20,12 +23,14 @@ const GestionDocumental: React.FC = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [history, setHistory] = useState<DocumentLog[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const todayStr = new Date().toISOString().split('T')[0];
-    const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+
+    const today = colombiaToday();
+    const [uploadDate, setUploadDate] = useState<string>(today);
+    const [dateFrom, setDateFrom] = useState<string>(today);
+    const [dateTo, setDateTo] = useState<string>(today);
 
     const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
 
-    // Clientes del store filtrados por los clientIds del usuario
     const allClients: { id: string; name: string }[] = (allMasterData.masterClientes || []).map((c: any) => ({
         id: String(c.id || c.clientId || ''),
         name: String(c.name || c.nombre || c.businessName || c.business_name || ''),
@@ -35,20 +40,18 @@ const GestionDocumental: React.FC = () => {
         ? allClients
         : allClients.filter(c => user?.clientIds?.includes(c.id));
 
-    // Auto-seleccionar si solo hay un cliente autorizado
     useEffect(() => {
         if (authorizedClients.length === 1 && !selectedClient) {
             setSelectedClient(authorizedClients[0].id);
         }
     }, [authorizedClients.length]);
 
-    const fetchHistory = async (date?: string) => {
+    const fetchHistory = async (from: string, to: string) => {
         try {
             const token = user?.token || '';
-            const params = date ? { date } : {};
             const res = await axios.get('/api/documents/stats', {
                 headers: { Authorization: `Bearer ${token}` },
-                params,
+                params: { dateFrom: from, dateTo: to },
             });
             if (Array.isArray(res.data)) setHistory(res.data);
         } catch {
@@ -56,7 +59,7 @@ const GestionDocumental: React.FC = () => {
         }
     };
 
-    useEffect(() => { fetchHistory(selectedDate); }, [selectedDate]);
+    useEffect(() => { fetchHistory(dateFrom, dateTo); }, [dateFrom, dateTo]);
 
     const handleUpload = async () => {
         if (!selectedClient || !file) {
@@ -71,7 +74,7 @@ const GestionDocumental: React.FC = () => {
         formData.append('file', file);
         formData.append('clientId', client.id);
         formData.append('clientName', client.name);
-        formData.append('uploadDate', selectedDate);
+        formData.append('uploadDate', uploadDate);
 
         try {
             const token = user?.token || '';
@@ -84,7 +87,7 @@ const GestionDocumental: React.FC = () => {
             toast.success('¡Cumplido subido exitosamente!');
             setFile(null);
             if (authorizedClients.length !== 1) setSelectedClient('');
-            fetchHistory(selectedDate);
+            fetchHistory(dateFrom, dateTo);
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error al subir el archivo');
         } finally {
@@ -92,13 +95,15 @@ const GestionDocumental: React.FC = () => {
         }
     };
 
-    const refDate = selectedDate ? new Date(`${selectedDate}T12:00:00`) : new Date();
+    const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const refDate = uploadDate ? new Date(`${uploadDate}T12:00:00`) : new Date();
     const currentPathPreview = selectedClient
-        ? `CUMPLIDOS MILLA 7 / ${refDate.getFullYear()} / ${authorizedClients.find(c => c.id === selectedClient)?.name} / ${refDate.toLocaleString('es-ES', { month: 'long' })} / dia ${refDate.getDate()}`
+        ? `CUMPLIDOS MILLA 7 / ${refDate.getFullYear()} / ${authorizedClients.find(c => c.id === selectedClient)?.name} / ${MESES_ES[refDate.getMonth()]} / dia ${refDate.getDate()}`
         : 'Seleccione un cliente para ver la ruta';
 
     const filteredHistory = history.filter(h =>
-        h.file_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        h.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (allClients.find(c => c.id === h.client_id)?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -110,10 +115,10 @@ const GestionDocumental: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Formulario de Carga */}
-                <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-xl border border-slate-100 space-y-6">
-                    <div className="space-y-4">
+                <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-xl border border-slate-100 space-y-5">
+                    <div className="space-y-3">
                         <label className="block text-sm font-semibold text-slate-700 uppercase tracking-wider">
-                            1. Seleccionar Cliente Autorizado
+                            1. Cliente Autorizado
                         </label>
                         {authorizedClients.length === 1 ? (
                             <div className="w-full p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-bold text-emerald-800 flex items-center gap-2">
@@ -141,13 +146,13 @@ const GestionDocumental: React.FC = () => {
                         <input
                             type="date"
                             className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-indigo-500 transition-all outline-none text-sm"
-                            value={selectedDate}
-                            max={todayStr}
-                            onChange={e => setSelectedDate(e.target.value)}
+                            value={uploadDate}
+                            max={today}
+                            onChange={e => setUploadDate(e.target.value)}
                         />
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         <label className="block text-sm font-semibold text-slate-700 uppercase tracking-wider">
                             3. Adjuntar PDF de Cumplido
                         </label>
@@ -208,17 +213,42 @@ const GestionDocumental: React.FC = () => {
                 {/* Trazabilidad */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        {/* Header con filtros */}
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/50 space-y-3">
                             <h2 className="text-xl font-bold text-slate-800">Trazabilidad de Cargas</h2>
-                            <div className="relative">
-                                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por archivo..."
-                                    className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                />
+                            <div className="flex flex-wrap gap-3 items-center">
+                                <div className="flex items-center gap-2">
+                                    <Calendar size={15} className="text-slate-400" />
+                                    <span className="text-xs font-semibold text-slate-500 uppercase">Desde</span>
+                                    <input
+                                        type="date"
+                                        className="p-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                                        value={dateFrom}
+                                        max={dateTo}
+                                        onChange={e => setDateFrom(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-slate-500 uppercase">Hasta</span>
+                                    <input
+                                        type="date"
+                                        className="p-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                                        value={dateTo}
+                                        min={dateFrom}
+                                        max={today}
+                                        onChange={e => setDateTo(e.target.value)}
+                                    />
+                                </div>
+                                <div className="relative ml-auto">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar archivo o cliente..."
+                                        className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition-all outline-none w-52"
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -249,7 +279,7 @@ const GestionDocumental: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-slate-500 text-sm">
-                                                {new Date(h.upload_date).toLocaleString('es-ES')}
+                                                {new Date(h.upload_date).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 {h.drive_link ? (
@@ -265,12 +295,12 @@ const GestionDocumental: React.FC = () => {
                             </table>
 
                             {filteredHistory.length === 0 && (
-                                <div className="p-20 text-center space-y-3">
+                                <div className="p-16 text-center space-y-3">
                                     <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
                                         <AlertCircle size={32} className="text-slate-300" />
                                     </div>
-                                    <h3 className="text-slate-800 font-bold">Sin cargas registradas hoy</h3>
-                                    <p className="text-slate-400 text-sm max-w-xs mx-auto">Los archivos que subas aparecerán aquí para que puedas consultar sus links rápidamente.</p>
+                                    <h3 className="text-slate-800 font-bold">Sin cargas en el rango seleccionado</h3>
+                                    <p className="text-slate-400 text-sm max-w-xs mx-auto">Ajusta el rango de fechas o sube un nuevo cumplido para verlo aquí.</p>
                                 </div>
                             )}
                         </div>

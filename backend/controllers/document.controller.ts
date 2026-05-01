@@ -1993,25 +1993,32 @@ export const uploadCumplido = async (req: Request, res: Response) => {
 
 export const getDocumentStats = async (req: Request, res: Response) => {
     try {
-        const { date } = req.query;
+        const { dateFrom, dateTo } = req.query;
         const params: any[] = [];
-        let whereClause = '';
+        const conditions: string[] = [];
 
-        if (date && typeof date === 'string') {
-            params.push(date);
-            whereClause = `WHERE DATE(d.upload_date AT TIME ZONE 'America/Bogota') = $1::date`;
+        if (dateFrom && typeof dateFrom === 'string') {
+            params.push(dateFrom);
+            conditions.push(`(d.upload_date AT TIME ZONE 'America/Bogota')::date >= $${params.length}::date`);
         }
+        if (dateTo && typeof dateTo === 'string') {
+            params.push(dateTo);
+            conditions.push(`(d.upload_date AT TIME ZONE 'America/Bogota')::date <= $${params.length}::date`);
+        }
+
+        const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
         const result = await pool.query(
             `SELECT d.id, d.file_name, d.client_id, d.drive_path, d.drive_link, d.upload_date
              FROM document_drive_logs d
-             ${whereClause}
+             ${where}
              ORDER BY d.upload_date DESC
-             LIMIT 200`,
+             LIMIT 500`,
             params
         );
         res.json(result.rows);
-    } catch (err) {
+    } catch (err: any) {
+        if (err.code === '42P01') return res.json([]); // tabla no existe aún
         res.status(500).json({ error: 'Error al obtener estadísticas' });
     }
 };
