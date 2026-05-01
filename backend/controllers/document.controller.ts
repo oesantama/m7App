@@ -1918,7 +1918,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
         const drivePath = `CUMPLIDOS MILLA 7/${year}/${cleanClientName}/${month}/${day}`;
         const fileName = `${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
 
-        const rcloneConfig = '/config/rclone.conf';
+        const rcloneConfig = './rclone.conf';
         const uploadCmd = `rclone --config ${rcloneConfig} copyto "${tmpPath}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
 
         exec(uploadCmd, async (error, stdout, stderr) => {
