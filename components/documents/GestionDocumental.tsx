@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { 
     Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, 
@@ -28,6 +28,7 @@ const GestionDocumental: React.FC = () => {
     const [selectedClient, setSelectedClient] = useState<string>('');
     const [files, setFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
+    const [isConsulting, setIsConsulting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [history, setHistory] = useState<DocumentLog[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -58,7 +59,8 @@ const GestionDocumental: React.FC = () => {
         }
     }, [authorizedClients.length]);
 
-    const fetchHistory = async () => {
+    const fetchHistory = useCallback(async () => {
+        setIsConsulting(true);
         try {
             const token = user?.token || '';
             const res = await axios.get('/api/documents/stats', {
@@ -84,12 +86,19 @@ const GestionDocumental: React.FC = () => {
                 });
                 setUsersList(Array.from(uniqueUsersMap.values()));
             }
-        } catch { /* silencioso */ }
-    };
+        } catch { 
+            toast.error("Error al consultar el Drive");
+        } finally {
+            setIsConsulting(false);
+        }
+    }, [user?.token, dateFrom, dateTo, searchTerm, selectedClientFilter, selectedUserFilter, folderDateFilter]);
 
+    // Solo cargar automáticamente al entrar a la pestaña si no hay datos
     useEffect(() => { 
-        if (activeTab === 'consult') fetchHistory(); 
-    }, [activeTab, dateFrom, dateTo, searchTerm, selectedClientFilter, selectedUserFilter, folderDateFilter]);
+        if (activeTab === 'consult' && history.length === 0) {
+            fetchHistory(); 
+        }
+    }, [activeTab]);
 
     const handleUpload = async () => {
         if (!selectedClient || files.length === 0) {
@@ -123,6 +132,7 @@ const GestionDocumental: React.FC = () => {
             setFiles([]);
             setUploadProgress(0);
             setActiveTab('consult');
+            fetchHistory();
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Error al subir archivos');
         } finally {
@@ -131,9 +141,11 @@ const GestionDocumental: React.FC = () => {
     };
 
     const calculateSLA = (uploadStr: string, folderStr: string, type: string) => {
-        const upload = uploadStr ? new Date(uploadStr) : new Date();
-        // Normalizar folder date a medianoche Bogota
-        const folder = folderStr ? new Date(`${folderStr}T00:00:00`) : upload;
+        if (!uploadStr || !folderStr) return { diffHours: 0, status: 'SUCCESS', limit: 24 };
+        
+        const upload = new Date(uploadStr);
+        // Si folder date viene como YYYY-MM-DD, añadir T12 para evitar desfases
+        const folder = folderStr.includes('T') ? new Date(folderStr) : new Date(`${folderStr}T12:00:00`);
         
         const uploadMs = isNaN(upload.getTime()) ? Date.now() : upload.getTime();
         const folderMs = isNaN(folder.getTime()) ? uploadMs : folder.getTime();
@@ -141,7 +153,7 @@ const GestionDocumental: React.FC = () => {
         const diffMs = uploadMs - folderMs;
         const diffHours = diffMs / (1000 * 60 * 60);
         
-        const limit = type === 'NACIONAL' ? 72 : 24;
+        const limit = (type || '').toUpperCase() === 'NACIONAL' ? 72 : 24;
         return {
             diffHours: isNaN(diffHours) ? 0 : diffHours,
             status: diffHours <= limit ? 'SUCCESS' : 'LATE',
@@ -151,7 +163,6 @@ const GestionDocumental: React.FC = () => {
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '---';
-        // Añadir T12:00:00 para evitar saltos de día por zona horaria al parsear YYYY-MM-DD
         const normalized = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`;
         const d = new Date(normalized);
         if (isNaN(d.getTime())) return '---';
@@ -175,7 +186,7 @@ const GestionDocumental: React.FC = () => {
                     'Cliente': h.clientName,
                     'Tipo Cliente': h.clientType,
                     'Usuario': h.userName,
-                    'Fecha Carpeta': h.folderDate,
+                    'Fecha Carpeta': formatDate(h.folderDate),
                     'Fecha Subida': `${formatDate(h.uploadDate)} ${formatTime(h.uploadDate)}`,
                     'Tiempo Respuesta (Horas)': diffHours.toFixed(1),
                     'Estado SLA': status === 'SUCCESS' ? 'A TIEMPO' : 'FUERA DE TIEMPO'
@@ -199,7 +210,7 @@ const GestionDocumental: React.FC = () => {
 
     return (
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
-            {/* Header Header */}
+            {/* Header */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                 <div className="space-y-1">
                     <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">CUMPLIDOS DRIVE PRO</h1>
@@ -229,7 +240,7 @@ const GestionDocumental: React.FC = () => {
 
             {/* Main Content Area */}
             <div className="relative min-h-[600px]">
-                {/* Overlay de Carga con Progreso Real */}
+                {/* Overlay de Carga */}
                 {isUploading && (
                     <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md rounded-[3rem] flex flex-col items-center justify-center p-10 animate-in fade-in zoom-in duration-300">
                         <div className="w-full max-w-md space-y-6 text-center">
@@ -362,7 +373,7 @@ const GestionDocumental: React.FC = () => {
                     <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-500">
                         {/* Filtros Premium */}
                         <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-slate-100">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 items-end">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Desde (Cargue)</label>
                                     <input type="date" className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 focus:bg-white transition-all" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
@@ -387,34 +398,45 @@ const GestionDocumental: React.FC = () => {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Usuario</label>
-                                    <select 
-                                        className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none"
-                                        value={selectedUserFilter}
-                                        onChange={e => setSelectedUserFilter(e.target.value)}
-                                    >
-                                        <option value="">TODOS LOS USUARIOS</option>
-                                        {usersList.map((u, i) => <option key={u.id || i} value={u.id}>{u.name}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Buscar</label>
                                     <div className="relative">
                                         <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
                                             type="text"
-                                            placeholder="Nombre de archivo..."
+                                            placeholder="Nombre archivo..."
                                             className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 focus:bg-white transition-all"
                                             value={searchTerm}
                                             onChange={e => setSearchTerm(e.target.value)}
                                         />
                                     </div>
                                 </div>
+                                <div>
+                                    <button 
+                                        onClick={() => fetchHistory()}
+                                        disabled={isConsulting}
+                                        className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-900/20 disabled:opacity-50"
+                                    >
+                                        {isConsulting ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                                        CONSULTAR
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Tabla de Resultados Responsive */}
+                        {/* Tabla de Resultados */}
                         <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
+                            <div className="flex justify-between items-center p-8 bg-slate-50/30 border-b border-slate-50">
+                                <h3 className="text-slate-800 font-black uppercase tracking-tight flex items-center gap-3">
+                                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                                    Registros de Trazabilidad ({history.length})
+                                </h3>
+                                <div className="flex gap-3">
+                                    <button onClick={exportToExcel} className="px-5 py-3 bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                                        <Download size={16} /> Exportar
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="overflow-x-auto custom-scrollbar">
                                 <table className="w-full border-collapse min-w-[1000px]">
                                     <thead>
@@ -485,15 +507,22 @@ const GestionDocumental: React.FC = () => {
                                 </table>
                             </div>
 
-                            {history.length === 0 && (
+                            {history.length === 0 && !isConsulting && (
                                 <div className="flex flex-col items-center justify-center py-32 gap-6 bg-slate-50/20">
                                     <div className="w-32 h-32 bg-white rounded-[3rem] shadow-xl flex items-center justify-center text-slate-100">
                                         <Search size={64} />
                                     </div>
                                     <div className="text-center space-y-2">
                                         <h3 className="text-slate-800 font-black uppercase tracking-widest text-lg">Inicia una consulta</h3>
-                                        <p className="text-slate-400 text-sm font-medium">Usa los filtros superiores para auditar la trazabilidad del Drive.</p>
+                                        <p className="text-slate-400 text-sm font-medium">Usa los filtros superiores y haz clic en CONSULTAR.</p>
                                     </div>
+                                </div>
+                            )}
+                            
+                            {isConsulting && (
+                                <div className="flex flex-col items-center justify-center py-32 gap-6 bg-slate-50/20">
+                                    <Loader2 className="animate-spin text-indigo-500" size={64} />
+                                    <p className="text-slate-500 font-black uppercase tracking-widest animate-pulse">Sincronizando Historial...</p>
                                 </div>
                             )}
                         </div>

@@ -2062,7 +2062,7 @@ export const getDocumentStats = async (req: Request, res: Response) => {
                 u.name as "userName",
                 d.user_id as "userId"
              FROM document_drive_logs d
-             LEFT JOIN master_clientes c ON d.client_id = c.id::text
+             LEFT JOIN clients c ON d.client_id = c.id
              LEFT JOIN users u ON d.user_id = u.id
              ${where}
              ORDER BY d.upload_date DESC
