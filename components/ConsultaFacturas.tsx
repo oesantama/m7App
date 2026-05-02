@@ -312,7 +312,7 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
     setLoading(true);
     setError(null);
     try {
-      const [stockRes, movRes] = await Promise.all([
+      const [stockRes, movRes, dashRes] = await Promise.all([
         api.getInventoryStock({
           articleId: term,
           clientId: selectedClientId || undefined,
@@ -623,7 +623,7 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {stock.map((s, i) => {
-                        const isVehicle = !!s.vehicle_plate || s.location === 'VEHICULO';
+                        const isVehicle = s.location === 'VEHICULO';
                         return (
                           <tr key={i} className="group hover:bg-slate-50/80 transition-colors">
                             <td className="px-6 py-4">
