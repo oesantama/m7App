@@ -816,6 +816,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(document_items.client_ref) as "clientRef",
         MAX(COALESCE(p.vmetodo::numeric, 0)) as "invoiceValue",
         MAX(p.metodo_pago) as "paymentMethod",
+        MAX(u.name) as "userName",
         (
           SELECT JSON_AGG(grouped_items)
           FROM (
@@ -829,30 +830,26 @@ export const getInvoices = async (req: Request, res: Response) => {
               MAX(items_sub.client_ref) as "clientRef"
             FROM document_items items_sub
             LEFT JOIN articles art_sub ON items_sub.article_id = art_sub.id
-            WHERE items_sub.document_id = document_items.document_id 
-            AND (
-              TRIM(COALESCE(NULLIF(items_sub.invoice, ''), items_sub.order_number)) 
-              = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
-            )
+            WHERE TRIM(COALESCE(NULLIF(items_sub.invoice, ''), items_sub.order_number)) 
+              = ${sqlIdGen}
             GROUP BY items_sub.article_id
           ) grouped_items
         ) as "items",
         MIN(COALESCE(gc.lat, 6.2518)) as lat,
         MIN(COALESCE(gc.lng, -75.5636)) as lng
       FROM document_items
-      LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(TRIM(CONCAT(document_items.address, '|', document_items.city)))
+      LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(CONCAT(TRIM(document_items.address), '|', TRIM(document_items.city)))
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
       LEFT JOIN articles ON document_items.article_id = articles.id
       LEFT JOIN document_l_payments p ON (TRIM(UPPER(document_items.invoice)) = TRIM(UPPER(p.invoice)) AND document_items.invoice != '')
       LEFT JOIN dispatch_assignments da ON (
-        da.invoice_id = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
-        OR da.invoice_id = ${sqlIdGen}
+        da.invoice_id = ${sqlIdGen}
       )
       LEFT JOIN picking_assignments pa ON (
-        pa.invoice_id = TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
-        OR pa.invoice_id = ${sqlIdGen}
+        pa.invoice_id = ${sqlIdGen}
       )
       LEFT JOIN estados est_item ON est_item.id = document_items.item_status
+      LEFT JOIN users u ON u.id = documents_l.created_by
       WHERE 1=1
     `;
 
