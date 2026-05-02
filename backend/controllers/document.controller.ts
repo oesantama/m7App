@@ -858,7 +858,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(COALESCE(p.vmetodo::numeric, 0)) as "invoiceValue",
         MAX(p.metodo_pago) as "paymentMethod",
         MAX(u.name) as "userName",
-        MAX(ia.items_json) as "items",
+        MAX(ia.items_json::text)::json as "items",
         MIN(COALESCE(gc.lat, 6.2518)) as lat,
         MIN(COALESCE(gc.lng, -75.5636)) as lng
       FROM base_data
