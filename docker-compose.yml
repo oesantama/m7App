@@ -12,6 +12,11 @@ services:
       - AI_MODEL=${AI_MODEL}
       # Reducido a 768M para dejar margen a postgres y evolution en gota básica
       - NODE_OPTIONS=--max-old-space-size=768
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=drive
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
+      - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyINyMiVK9BqykFhW5vMbP-7fX16REtrfsl7rOH_LYNmd52k2V2W7WxEKBCvtpukRbSMEUK9mjDeyySxcnobwqAx71Lapvtm5M-S8JybDdRQq5qW2rD6PUSmXex2fMQfzHMtU5xquCLzyHarBk_LdSgV9rtQHsy5QVmV1frLHE9c405ZZlK0Heu1hvbzCp3LYopcaCgYKAYQSARQSFQHGX2Mis4O4rn496LKSLmPZuHj8Pg0206","token_type":"Bearer","refresh_token":"1//05hSCjSte2j4ECgYIARAAGAUSNwF-L9Ir0yWdyc2TO43xc8vby6F0R_7kPo5QLNb7gqwhH2u9-X0v6wTNgQGyg9VhZrk3ws--Gl0","expiry":"2026-05-01T00:28:42.595243355-05:00","expires_in":3599}'
     env_file:
       - .env
     volumes:
@@ -126,9 +131,13 @@ services:
     environment:
       - PGPASSWORD=m7_master_password
       - TZ=America/Bogota
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=drive
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
+      - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyINyMiVK9BqykFhW5vMbP-7fX16REtrfsl7rOH_LYNmd52k2V2W7WxEKBCvtpukRbSMEUK9mjDeyySxcnobwqAx71Lapvtm5M-S8JybDdRQq5qW2rD6PUSmXex2fMQfzHMtU5xquCLzyHarBk_LdSgV9rtQHsy5QVmV1frLHE9c405ZZlK0Heu1hvbzCp3LYopcaCgYKAYQSARQSFQHGX2Mis4O4rn496LKSLmPZuHj8Pg0206","token_type":"Bearer","refresh_token":"1//05hSCjSte2j4ECgYIARAAGAUSNwF-L9Ir0yWdyc2TO43xc8vby6F0R_7kPo5QLNb7gqwhH2u9-X0v6wTNgQGyg9VhZrk3ws--Gl0","expiry":"2026-05-01T00:28:42.595243355-05:00","expires_in":3599}'
     volumes:
       - m7_backups:/backups
-      - ./rclone.conf:/config/rclone.conf:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,13 +159,16 @@ services:
           pg_dump -h postgres -U m7_admin -d m7_logistica | gzip > $$BACKUP_FILE;
           echo \"[M7-BACKUP] Backup local creado: $$BACKUP_FILE\";
           
-          if [ -f /config/rclone.conf ]; then
-            echo \"[M7-BACKUP] Sincronizando con Google Drive...\";
-            rclone --config /config/rclone.conf copy $$BACKUP_FILE gdrive:m7_backups;
+          echo \"[M7-BACKUP] Sincronizando con Google Drive (GDRIVE_CUMPLIDOS)...\";
+          # Usamos el remoto configurado vía variables de entorno
+          rclone copy $$BACKUP_FILE gdrive_cumplidos:m7_backups;
+          
+          if [ $$? -eq 0 ]; then
             echo \"[M7-BACKUP] Sincronización completada exitosamente\";
           else
-            echo \"[M7-BACKUP] ERROR: rclone.conf no encontrado en /config/\";
+            echo \"[M7-BACKUP] ERROR: Falló la sincronización con rclone\";
           fi
+          
           find /backups -name '*.sql.gz' -mtime +3 -delete;
         }
 

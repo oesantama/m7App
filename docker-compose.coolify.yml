@@ -91,6 +91,11 @@ services:
       - 'POSTGRES_USER=${POSTGRES_USER}'
       - 'POSTGRES_DB=${POSTGRES_DB}'
       - TZ=America/Bogota
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=drive
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
+      - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyINyMiVK9BqykFhW5vMbP-7fX16REtrfsl7rOH_LYNmd52k2V2W7WxEKBCvtpukRbSMEUK9mjDeyySxcnobwqAx71Lapvtm5M-S8JybDdRQq5qW2rD6PUSmXex2fMQfzHMtU5xquCLzyHarBk_LdSgV9rtQHsy5QVmV1frLHE9c405ZZlK0Heu1hvbzCp3LYopcaCgYKAYQSARQSFQHGX2Mis4O4rn496LKSLmPZuHj8Pg0206","token_type":"Bearer","refresh_token":"1//05hSCjSte2j4ECgYIARAAGAUSNwF-L9Ir0yWdyc2TO43xc8vby6F0R_7kPo5QLNb7gqwhH2u9-X0v6wTNgQGyg9VhZrk3ws--Gl0","expiry":"2026-05-01T00:28:42.595243355-05:00","expires_in":3599}'
     volumes:
       - 'm7_backups:/backups'
     networks:
@@ -101,12 +106,13 @@ services:
     entrypoint: >
       sh -c "
         apk add --no-cache rclone;
-        printf '[gdrive]\ntype = drive\nscope = drive\ntoken = {\"access_token\":\"ya29.a0AQvPyIOIpamab25CgGR9UxbuM22-EaKsOP148hP3wgsckvJm5AVXeE1ptPaO9_hUfxYvY1YH1nnGIze97vb4dRAFml7teZgNBuKeMa6GdJG98AEmY3rxQPS3J3jRVBp0_B2ioYbPzOJtlIBZHiqc8ozwF0gv2BWXJB50TdrnROINdGFRYnYxdggEnzSH2VU9-b_MAHUaCgYKAdISARcSFQHGX2MimFgoUmzftA5K3tCXwV3jdg0206\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//05NEocypqb9wgCgYIARAAGAUSNwF-L9IrHzvKSUxrxbkccgx-9MegtC6VH084gqRiNcy18hH_pVLLRU0UVu-B8Pcx6eREnIqrL7M\",\"expiry\":\"2026-04-30T08:37:58.726474705-05:00\",\"expires_in\":3599}\n' > /tmp/rclone.conf;
+        echo '[M7-BACKUP] Servicio iniciado (Modo: GDRIVE_CUMPLIDOS)';
         
         do_backup() {
           BACKUP_FILE=/backups/m7_logistica_$$(date +%Y%m%d_%H%M%S).sql.gz;
-          pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} | gzip > $$BACKUP_FILE;
-          rclone --config /tmp/rclone.conf copy $$BACKUP_FILE gdrive:m7_backups -v;
+          pg_dump -h m7-postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} | gzip > $$BACKUP_FILE;
+          echo \"[M7-BACKUP] Backup creado. Sincronizando...\";
+          rclone copy $$BACKUP_FILE gdrive_cumplidos:m7_backups -v;
           find /backups -name '*.sql.gz' -mtime +3 -delete;
         }
 
