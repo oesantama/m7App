@@ -243,6 +243,10 @@ interface StockRow {
   last_updated: string | null;
   last_user: string | null;
   last_user_name: string | null;
+  barcode?: string | null;
+  uom_std?: string | null;
+  category_articulo_id?: string | null;
+  image_url?: string | null;
 }
 
 const MOVEMENT_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
@@ -281,6 +285,7 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
   const [searched, setSearched]           = useState(false);
   const [error, setError]                 = useState<string | null>(null);
   const [articleLabel, setArticleLabel]   = useState('');
+  const [articleData, setArticleData]     = useState<any>(null);
 
   // Client selector
   const [clients, setClients]             = useState<Client[]>([]);
@@ -322,7 +327,6 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
         }),
       ]);
 
-      // Stock API returns { success, bodega: [], vehiculos: [] }
       const bodega:   StockRow[] = Array.isArray(stockRes?.bodega)    ? stockRes.bodega    : [];
       const vehiculos:StockRow[] = Array.isArray(stockRes?.vehiculos)  ? stockRes.vehiculos : [];
       const movData:  Movement[] = Array.isArray(movRes?.data)         ? movRes.data        : [];
@@ -330,7 +334,10 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
       setStockBodega(bodega);
       setStockVehicle(vehiculos);
       setMovements(movData);
-      setArticleLabel(bodega[0]?.article_name || vehiculos[0]?.article_name || movData[0]?.article_name || term);
+
+      const firstItem = bodega[0] || vehiculos[0];
+      setArticleData(firstItem || null);
+      setArticleLabel(firstItem?.article_name || movData[0]?.article_name || term);
       setSearched(true);
     } catch (err: any) {
       setError(err.message || 'Error de conexión');
@@ -344,12 +351,14 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
   const totalStock   = totalBodega + totalVehicle;
   const stock        = [...stockBodega, ...stockVehicle];
 
-  // Totales de movimientos
   const totalIngresado  = movements.filter(m => ['INGRESO','RECIBO'].includes(m.movement_type)).reduce((a, m) => a + Number(m.quantity), 0);
   const totalDespachado = movements.filter(m => m.movement_type === 'DESPACHO').reduce((a, m) => a + Number(m.quantity), 0);
   const totalEntregado  = movements.filter(m => ['ENTREGA','ENTREGA_PARCIAL'].includes(m.movement_type)).reduce((a, m) => a + Number(m.quantity), 0);
   const totalDevuelto   = movements.filter(m => m.movement_type === 'DEVOLUCION').reduce((a, m) => a + Number(m.quantity), 0);
   const totalProveedor  = movements.filter(m => m.movement_type === 'SALIDA_PROVEEDOR').reduce((a, m) => a + Number(m.quantity), 0);
+
+  // Invoices where this item appears
+  const uniqueInvoices = Array.from(new Set(movements.map(m => m.invoice).filter(Boolean)));
 
   return (
     <div className="flex flex-col gap-6">
@@ -406,11 +415,6 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
             </button>
           )}
         </div>
-        {(dateFrom || dateTo) && (
-          <p className="text-[10px] text-indigo-600 font-bold">
-            Filtrando por periodo {dateFrom ? fmtDate(dateFrom) : '…'} → {dateTo ? fmtDate(dateTo) : '…'}
-          </p>
-        )}
       </form>
 
       {error && (
@@ -439,91 +443,188 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
 
       {searched && !loading && (
         <>
-          {/* Encabezado del artículo */}
-          <div className="bg-slate-900 rounded-3xl p-6 text-white">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-1">Artículo</div>
-                <div className="text-2xl font-black tracking-tight">{articleLabel || articleSearch}</div>
-                <div className="text-slate-400 text-xs mt-1 font-mono">{articleSearch}</div>
-              </div>
-              <div className="flex gap-3 flex-wrap">
-                <div className="text-center bg-white/5 rounded-2xl px-5 py-3 border border-white/10">
-                  <div className="text-2xl font-black text-white">{totalStock}</div>
-                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Total Stock</div>
+          {/* Dashboard Header */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Info Card Principal */}
+            <div className="lg:col-span-2 bg-slate-900 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none"></div>
+              
+              <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
+                {/* Imagen del Artículo */}
+                <div className="w-32 h-32 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden group">
+                  {articleData?.image_url ? (
+                    <img src={articleData.image_url} alt="Article" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  ) : (
+                    <div className="text-white/20 w-12 h-12"><Icons.Package /></div>
+                  )}
                 </div>
-                <div className="text-center bg-emerald-500/10 rounded-2xl px-5 py-3 border border-emerald-500/20">
-                  <div className="text-2xl font-black text-emerald-400">{totalBodega}</div>
-                  <div className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">Bodega</div>
-                </div>
-                <div className="text-center bg-blue-500/10 rounded-2xl px-5 py-3 border border-blue-500/20">
-                  <div className="text-2xl font-black text-blue-400">{totalVehicle}</div>
-                  <div className="text-[8px] font-black text-blue-500 uppercase tracking-widest mt-0.5">Vehículos</div>
+
+                <div className="flex-1 flex flex-col gap-4">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-black uppercase tracking-widest mb-3">
+                      SKU: {articleData?.article_id || articleSearch}
+                    </div>
+                    <h1 className="text-3xl font-black tracking-tight leading-tight mb-2">
+                      {articleLabel}
+                    </h1>
+                    <div className="flex flex-wrap gap-4 text-slate-400 text-xs font-semibold">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-indigo-400/60 uppercase text-[9px] font-black">Categoría:</span>
+                        <span className="text-slate-200">{articleData?.category_articulo_id || 'Sin Categoría'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-indigo-400/60 uppercase text-[9px] font-black">Barcode:</span>
+                        <span className="text-slate-200 font-mono">{articleData?.barcode || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-indigo-400/60 uppercase text-[9px] font-black">UOM:</span>
+                        <span className="text-slate-200">{articleData?.uom_std || 'UN'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="flex-1 bg-white/5 rounded-2xl p-4 border border-white/10 text-center">
+                      <div className="text-3xl font-black text-white">{totalStock}</div>
+                      <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">Stock Consolidado</div>
+                    </div>
+                    <div className="flex-1 bg-emerald-500/10 rounded-2xl p-4 border border-emerald-500/20 text-center">
+                      <div className="text-3xl font-black text-emerald-400">{totalBodega}</div>
+                      <div className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mt-1">En Bodega</div>
+                    </div>
+                    <div className="flex-1 bg-blue-500/10 rounded-2xl p-4 border border-blue-500/20 text-center">
+                      <div className="text-3xl font-black text-blue-400">{totalVehicle}</div>
+                      <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-1">En Vehículos</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Resumen de movimientos */}
-            <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-2 md:grid-cols-5 gap-3">
-              {[
-                { label: 'Ingresado',  val: totalIngresado,  color: 'text-emerald-400' },
-                { label: 'Despachado', val: totalDespachado, color: 'text-blue-400' },
-                { label: 'Entregado',  val: totalEntregado,  color: 'text-teal-400' },
-                { label: 'Devuelto',   val: totalDevuelto,   color: 'text-amber-400' },
-                { label: 'A Proveedor',val: totalProveedor,  color: 'text-rose-400' },
-              ].map(s => (
-                <div key={s.label} className="text-center">
-                  <div className={`text-xl font-black ${s.color}`}>{s.val}</div>
-                  <div className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{s.label}</div>
-                </div>
-              ))}
+            {/* Invoices List Card */}
+            <div className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Facturas Relacionadas</h3>
+                <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black">{uniqueInvoices.length}</span>
+              </div>
+              <div className="flex-1 overflow-y-auto max-h-[220px] pr-2 custom-scrollbar">
+                {uniqueInvoices.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {uniqueInvoices.map((inv, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 hover:bg-indigo-50/30 transition-all cursor-pointer">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-500 group-hover:border-indigo-200 transition-colors">
+                            <Icons.FileText />
+                          </div>
+                          <span className="text-xs font-bold text-slate-700 font-mono">{inv}</span>
+                        </div>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-slate-300 group-hover:text-indigo-400">
+                          <Icons.ChevronRight />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-2 py-8">
+                    <Icons.FileText />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Sin facturas registradas</span>
+                  </div>
+                )}
+              </div>
             </div>
+          </div>
+
+          {/* Quick Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[
+              { label: 'Total Ingreso', val: totalIngresado,  color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', icon: '📥' },
+              { label: 'Total Despacho',val: totalDespachado, color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-100',    icon: '🚛' },
+              { label: 'Total Entrega', val: totalEntregado,  color: 'text-teal-600',    bg: 'bg-teal-50',    border: 'border-teal-100',    icon: '✅' },
+              { label: 'Devoluciones',  val: totalDevuelto,   color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-100',   icon: '🔄' },
+              { label: 'A Proveedor',   val: totalProveedor,  color: 'text-rose-600',    bg: 'bg-rose-50',    border: 'border-rose-100',    icon: '↩️' },
+            ].map((s, idx) => (
+              <div key={idx} className={`rounded-2xl p-4 border ${s.bg} ${s.border} flex flex-col gap-1 shadow-sm`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-lg">{s.icon}</span>
+                  <span className={`text-xl font-black ${s.color}`}>{s.val}</span>
+                </div>
+                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-tight">
+                  {s.label}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Stock por ubicación */}
           {stock.length > 0 && (
             <div>
-              <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
-                Stock Actual por Ubicación
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold normal-case">{stock.length}</span>
-              </h2>
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Stock Actual por Ubicación</h2>
+                <div className="h-px flex-1 bg-slate-100"></div>
+                <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-black border border-indigo-100">{stock.length} REGISTROS</span>
+              </div>
+              
+              <div className="bg-white rounded-[1.5rem] border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50">
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Ubicación</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Placa / Conductor</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Lote</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Cliente</th>
-                        <th className="text-right px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Cantidad</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Última Act.</th>
+                      <tr className="border-b border-slate-100 bg-slate-50/50">
+                        <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Ubicación</th>
+                        <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Placa y Conductor</th>
+                        <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Lote / Batch</th>
+                        <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Cliente</th>
+                        <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Cantidad</th>
+                        <th className="text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Última Actualización</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-50">
                       {stock.map((s, i) => {
                         const isVehicle = !!s.vehicle_plate || s.location === 'VEHICULO';
                         return (
-                          <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                            <td className="px-4 py-2.5 font-bold">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${isVehicle ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                                {isVehicle ? '🚛 Vehículo' : '🏭 Bodega'}
+                          <tr key={i} className="group hover:bg-slate-50/80 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black ${isVehicle ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
+                                {isVehicle ? '🚛 VEHÍCULO' : '🏭 BODEGA'}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              {s.vehicle_plate ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                                    <span className="font-mono font-black text-slate-900 text-[13px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{s.vehicle_plate}</span>
+                                  </div>
+                                  <span className="text-slate-500 font-bold text-[11px] ml-4">{s.driver_name || 'Sin asignar'}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-300 italic font-medium ml-2">Asignado a Bodega Central</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <Icons.Hash className="w-3 h-3 text-slate-300" />
+                                <span className="font-mono text-slate-600 font-semibold">{s.batch || 'S/L'}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-slate-700 font-bold text-[11px] bg-indigo-50/50 px-2 py-1 rounded-lg border border-indigo-100/50">
+                                {s.client_name || s.client_id || '—'}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-slate-600">
-                              {s.vehicle_plate
-                                ? <span className="font-mono font-black text-slate-800">{s.vehicle_plate}</span>
-                                : <span className="text-slate-300">—</span>}
-                              {s.driver_name && <span className="text-slate-500 ml-1.5 text-[11px]">· {s.driver_name}</span>}
+                            <td className="px-6 py-4 text-right">
+                              <div className="text-sm font-black text-slate-900 tabular-nums">
+                                {Number(s.quantity).toLocaleString()}
+                                <span className="text-[10px] text-slate-400 ml-1 font-bold">{articleData?.uom_std || 'UN'}</span>
+                              </div>
                             </td>
-                            <td className="px-4 py-2.5 text-slate-500 font-mono text-[10px]">{s.batch || 'S/L'}</td>
-                            <td className="px-4 py-2.5 text-slate-700 font-semibold text-[11px]">
-                              {s.client_name || s.client_id || '—'}
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{Number(s.quantity)}</td>
-                            <td className="px-4 py-2.5 text-slate-400 text-[10px]">
-                              <div>{fmtDateTime(s.last_updated)}</div>
-                              {s.last_user_name && <div className="text-slate-300 text-[9px]">{s.last_user_name}</div>}
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex flex-col">
+                                  <span className="text-slate-700 font-bold text-[10px]">{fmtDateTime(s.last_updated)}</span>
+                                  {s.last_user_name && <span className="text-slate-400 text-[9px] uppercase tracking-wider font-black">POR: {s.last_user_name}</span>}
+                                </div>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -536,59 +637,77 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
           )}
 
           {/* Historial de movimientos */}
-          <div>
-            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
-              Historial de Movimientos
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold normal-case">{movements.length}</span>
-            </h2>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Trazabilidad Histórica de Movimientos</h2>
+              <div className="h-px flex-1 bg-slate-100"></div>
+              <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black">{movements.length} EVENTOS</span>
+            </div>
+
             {movements.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-                <p className="text-slate-300 font-semibold">Sin movimientos registrados para este artículo{(dateFrom || dateTo) ? ' en el periodo seleccionado' : ''}</p>
+              <div className="bg-white rounded-[2rem] border border-slate-200 p-12 text-center border-dashed">
+                <div className="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center mx-auto mb-4 text-slate-200">
+                  <Icons.Archive />
+                </div>
+                <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">Sin movimientos registrados</p>
+                <p className="text-slate-300 text-xs mt-1">{(dateFrom || dateTo) ? 'Ajuste el periodo de búsqueda para ver más resultados.' : 'Este artículo no presenta actividad en el sistema.'}</p>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="bg-white rounded-[1.5rem] border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50">
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Fecha</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Tipo</th>
-                        <th className="text-right px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Cant.</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Factura</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Placa / Conductor</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Desde → Hacia</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Registrado por</th>
-                        <th className="text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Notas</th>
+                      <tr className="border-b border-slate-100 bg-slate-50/50">
+                        <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Fecha y Hora</th>
+                        <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Operación</th>
+                        <th className="text-right px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Cant.</th>
+                        <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Factura / Doc</th>
+                        <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Ubicación / Móvil</th>
+                        <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Flujo Logístico</th>
+                        <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Responsable</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-50">
                       {movements.map((m, i) => (
-                        <tr key={m.id || i} className="border-b border-slate-50 hover:bg-slate-50">
-                          <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap text-[10px]">{fmtDateTime(m.created_at)}</td>
-                          <td className="px-4 py-2.5">{movBadge(m.movement_type)}</td>
-                          <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{Number(m.quantity)}</td>
-                          <td className="px-4 py-2.5 font-mono text-slate-700 text-[10px]">{m.invoice || <span className="text-slate-300">—</span>}</td>
-                          <td className="px-4 py-2.5 text-[11px]">
-                            {m.vehicle_plate
-                              ? <span className="font-mono font-black text-slate-800">{m.vehicle_plate}</span>
-                              : <span className="text-slate-300">—</span>}
-                            {(m.driver_name_lookup) && (
-                              <span className="text-slate-400 ml-1.5">· {m.driver_name_lookup}</span>
+                        <tr key={m.id || i} className="group hover:bg-slate-50/80 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="text-slate-500 font-bold text-[10px] tabular-nums whitespace-nowrap">{fmtDateTime(m.created_at)}</span>
+                          </td>
+                          <td className="px-6 py-4">{movBadge(m.movement_type)}</td>
+                          <td className="px-6 py-4 text-right">
+                            <span className="font-black text-slate-900 text-[13px] tabular-nums">{Number(m.quantity)}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            {m.invoice ? (
+                              <div className="flex items-center gap-2 group/inv">
+                                <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 group-hover/inv:bg-indigo-100 transition-colors text-[11px]">{m.invoice}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 italic">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 text-[10px] text-slate-500 whitespace-nowrap">
-                            {m.location_from && <span className="text-slate-400">{m.location_from}</span>}
-                            {m.location_from && m.location_to && <span className="text-slate-300 mx-1">→</span>}
-                            {m.location_to && <span className="font-semibold text-slate-700">{m.location_to}</span>}
-                            {!m.location_from && !m.location_to && <span className="text-slate-300">—</span>}
+                          <td className="px-6 py-4">
+                            {m.vehicle_plate ? (
+                              <div className="flex flex-col">
+                                <span className="font-mono font-black text-slate-800 text-[11px] bg-slate-100 px-1.5 py-0.5 rounded w-fit border border-slate-200">{m.vehicle_plate}</span>
+                                {m.driver_name_lookup && <span className="text-[9px] font-bold text-slate-400 mt-0.5">· {m.driver_name_lookup}</span>}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 font-semibold uppercase text-[9px] tracking-widest">Almacén</span>
+                            )}
                           </td>
-                          <td className="px-4 py-2.5 text-[11px]">
-                            <span className="text-slate-700 font-semibold">
-                              {m.user_name || m.user_id || <span className="text-slate-300">—</span>}
-                            </span>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold whitespace-nowrap">
+                              <span className={m.location_from ? "bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded" : ""}>{m.location_from || 'INICIO'}</span>
+                              <Icons.ArrowRight className="w-3 h-3 text-slate-300" />
+                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-1.5 py-0.5 rounded font-black">{m.location_to || 'FINAL'}</span>
+                            </div>
                           </td>
-                          <td className="px-4 py-2.5 text-slate-400 text-[10px] max-w-[180px] truncate" title={m.notes || ''}>
-                            {m.notes || <span className="text-slate-200">—</span>}
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-slate-700 font-black text-[10px] uppercase tracking-tight">{m.user_name || m.user_id}</span>
+                              {m.notes && <span className="text-[9px] text-slate-400 italic truncate max-w-[120px]" title={m.notes}>{m.notes}</span>}
+                            </div>
                           </td>
                         </tr>
                       ))}

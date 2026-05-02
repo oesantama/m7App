@@ -338,7 +338,8 @@ export const getInventoryStock = async (req: Request, res: Response) => {
         SELECT ic.client_id, c.name AS client_name,
                ic.article_id, COALESCE(a.name, ic.article_id) AS article_name, ic.batch,
                ic.quantity::numeric AS quantity, ic.last_updated, ic.last_user,
-               u.name AS last_user_name
+               u.name AS last_user_name,
+               a.barcode, a.uom_std, a.category_articulo_id, a.image_url
         FROM inventario_clientes ic
         LEFT JOIN articles a  ON a.id  = ic.article_id
         LEFT JOIN clients  c  ON c.id  = ic.client_id
@@ -358,9 +359,11 @@ export const getInventoryStock = async (req: Request, res: Response) => {
       if (dateTo)    { params.push(dateTo);             conds.push(`vi.last_updated < ($${params.length}::date + INTERVAL '1 day')`); }
       const r = await pool.query(`
         SELECT vi.vehicle_plate, vi.driver_name, vi.client_id, c.name AS client_name,
-               vi.article_id, COALESCE(vi.article_name, vi.article_id) AS article_name,
-               vi.batch, vi.quantity, vi.last_updated
+               vi.article_id, COALESCE(a.name, vi.article_name, vi.article_id) AS article_name,
+               vi.batch, vi.quantity, vi.last_updated,
+               a.barcode, a.uom_std, a.category_articulo_id, a.image_url
         FROM vehicle_inventory vi
+        LEFT JOIN articles a ON a.id = vi.article_id
         LEFT JOIN clients c ON c.id = vi.client_id
         WHERE ${conds.join(' AND ')}
         ORDER BY vi.vehicle_plate, vi.article_id
