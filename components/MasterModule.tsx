@@ -142,7 +142,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   const { canCreate, canEdit, canDelete } = getPagePermissions();
 
   // DERIVED STATE FOR FILTERS
-  const filteredPages = useMemo(() => pages.filter(p => p.name.toLowerCase().includes(permissionSearch.toLowerCase())), [pages, permissionSearch]);
+  const filteredPages = useMemo(() => pages.filter(p => (p.name || '').toLowerCase().includes(permissionSearch.toLowerCase())), [pages, permissionSearch]);
 
   const finalCanCreate = activeMaster === 'masterPermisosUsuario' ? false : canCreate;
   const finalCanDelete = activeMaster === 'masterPermisosUsuario' ? false : canDelete;
@@ -193,7 +193,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
 
   const generateNextId = (category: MasterCategory, data: MasterRecord[]) => {
     const prefix = MASTER_PREFIXES[category] || 'M7';
-    const existingIds = data.map(d => d.id).filter(id => id.startsWith(`${prefix}-`));
+    const existingIds = data.map(d => d.id).filter(id => typeof id === 'string' && id.startsWith(`${prefix}-`));
 
     let nextNum = 1;
     if (existingIds.length > 0) {
