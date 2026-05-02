@@ -786,13 +786,12 @@ export const getInvoices = async (req: Request, res: Response) => {
     }
     const queryParams: any[] = [];
 
-    const sqlIdGen = `TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))`;
-    const invoiceKey = `TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))`;
+    const invoiceKeyExpr = `TRIM(COALESCE(NULLIF(invoice, ''), order_number))`;
 
     let query = `
       WITH base_data AS (
         SELECT 
-          ${invoiceKey} as inv_key,
+          TRIM(COALESCE(NULLIF(di.invoice, ''), di.order_number)) as inv_key,
           di.*,
           dl.client_id,
           dl.external_doc_id,
@@ -910,8 +909,8 @@ export const getInvoices = async (req: Request, res: Response) => {
         AND base_data.doc_status NOT IN ('EST-16','EST-12','EST-07','EST-17')`;
     }
 
-    query += ` GROUP BY 1, 2
-      ORDER BY 2 ASC`;
+    query += ` GROUP BY base_data.inv_key
+      ORDER BY base_data.inv_key ASC`;
 
     const result = await pool.query(query, queryParams);
 
