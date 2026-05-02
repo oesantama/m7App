@@ -1197,13 +1197,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         } catch { /* GPS update failed silently */ }
                     }
                 },
-                (err) => { 
-                    console.error('[GPS-ERROR]', err.code, err.message);
+                (err) => {
                     if (err.code === 1) { // Permission Denied
-                         toast.error('Permiso de GPS denegado. Active el GPS en su navegador.');
+                        toast.error('Permiso de GPS denegado. Active el GPS en su navegador.');
                     }
+                    // code 2 = unavailable, code 3 = timeout — ignorar silenciosamente
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
             );
         }, 15000); // Reducción a 15 segundos para mayor precisión
 

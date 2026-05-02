@@ -41,10 +41,9 @@ export const getRoutes = async (req: Request, res: Response) => {
       LEFT JOIN vehicles v ON r.vehicle_id::text = v.id::text
       LEFT JOIN drivers d ON r.driver_id::text = d.id::text
       WHERE r.created_at >= CURRENT_DATE - INTERVAL '7 days'
-        -- Solo excluir rutas canceladas/reasignadas; la visibilidad se basa en el estado de los ítems
+        -- Solo excluir rutas canceladas/reasignadas
         AND r.status_id NOT IN ('EST-16', 'COMPLETADO', 'FINALIZADO')
-        -- Mostrar la ruta si tiene al menos una factura en estado activo (ASIGNADO, EN RUTA, REPICE)
-        -- o si no hay coincidencia en document_items (ruta nueva aún sin ítems actualizados)
+        -- Mostrar la ruta si tiene al menos una factura vinculada que no esté en estado final
         AND EXISTS (
           SELECT 1 FROM route_invoices ri
           LEFT JOIN document_items di ON (
@@ -53,7 +52,7 @@ export const getRoutes = async (req: Request, res: Response) => {
           )
           WHERE ri.route_id::text = r.id::text
             AND (
-              di.item_status IN ('EST-10','EST-11','EST-15','REPICE','ASIGNADO','EN_RUTA')
+              di.item_status NOT IN ('EST-12','EST-13','EST-14','COMPLETADO','FINALIZADO','ENTREGADO')
               OR di.item_status IS NULL
             )
         )
@@ -168,23 +167,14 @@ export const saveRoute = async (req: Request, res: Response) => {
       console.log('[DEBUG] Attempting to update status for IDs:', uniqueInvoiceIds);
 
       const updateResult = await client.query(`
-         UPDATE document_items 
-         SET item_status = 'EST-10' -- ASIGNADO
-         WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = ANY($1)
+         UPDATE document_items
+         SET item_status = 'EST-10'
+         WHERE TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = ANY($1)
+            OR CONCAT(document_id, '_', TRIM(COALESCE(NULLIF(invoice, ''), order_number))) = ANY($1)
          RETURNING id
        `, [uniqueInvoiceIds]);
 
       console.log(`[DEBUG] Updated ${updateResult.rowCount} document_items to EST-10`);
-
-      if (updateResult.rowCount === 0) {
-        console.warn('[WARN] No document_items were updated! Checking for whitespace mismatches...');
-        // Intento secundario con TRIM si el primero falla
-        await client.query(`
-             UPDATE document_items 
-             SET item_status = 'EST-10' -- ASIGNADO
-             WHERE CONCAT(document_id, '_', TRIM(COALESCE(NULLIF(invoice, ''), order_number))) = ANY($1)
-          `, [uniqueInvoiceIds]);
-      }
     }
 
     await client.query('COMMIT');
