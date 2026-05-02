@@ -1254,7 +1254,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         );
 
       case 'masterPermisosRol':
-        const availableRoles = editingRecord ? roles : roles.filter(r => !rolePermissions.some(rp => rp.roleId === r.id));
+        const availableRoles = editingRecord ? roles : roles.filter(r => !rolePermissions.some(rp => rp.roleId === r.id && rp.id));
         return (
           <div className="space-y-10 animate-in fade-in">
             <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Seleccione Rol (Solo disponibles)</label>
