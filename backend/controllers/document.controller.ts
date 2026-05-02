@@ -786,7 +786,7 @@ export const getInvoices = async (req: Request, res: Response) => {
     }
     const queryParams: any[] = [];
 
-    const sqlIdGen = `CONCAT(TRIM(document_items.document_id), '_', TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number, 'NA')))`;
+    const sqlIdGen = `TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number, 'NA'))`;
 
     let query = `
       SELECT 
@@ -801,7 +801,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(document_items.customer_name) as "customerName",
         SUM(document_items.expected_qty) as "totalItems",
         SUM(document_items.volume) as "volumeM3",
-        document_items.document_id as "docLId",
+        MAX(document_items.document_id) as "docLId",
         MAX(documents_l.client_id) as "clientId", 
         MAX(documents_l.codplan) as "codplan",
         MAX(documents_l.plan_type) as "planType",
@@ -907,10 +907,6 @@ export const getInvoices = async (req: Request, res: Response) => {
     }
 
     query += ` GROUP BY 
-        ${sqlIdGen},
-        document_items.document_id,
-        document_items.invoice,
-        document_items.order_number,
         TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
       ORDER BY 2 ASC`;
 
@@ -1966,7 +1962,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
             const [notifRes, userRes] = await Promise.all([
                 pool.query(
                     `SELECT notification_email FROM notificaciones
-                     WHERE tipo_notificacion_id = 'TGN-002' AND status_id = 'EST-01'`
+                     WHERE tipo_notificacion_id = 'TGN-02' AND status_id = 'EST-01'`
                 ),
                 pool.query('SELECT name FROM users WHERE id = $1', [userId]),
             ]);
