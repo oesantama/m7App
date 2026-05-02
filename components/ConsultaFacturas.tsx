@@ -723,18 +723,26 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
                                   </span>
                                 </div>
                               </div>
+                              <div className="flex flex-col items-end">
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Fecha Asignación</span>
+                                <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">
+                                  {dashInfo.doc_date ? fmtDateTime(dashInfo.doc_date) : 'N/A'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
                               {dashInfo.vehicle_plate && (
-                                <div className="flex flex-col items-end">
+                                <div className="flex flex-col">
                                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Placa Asignada</span>
                                   <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 font-mono">
                                     {dashInfo.vehicle_plate}
                                   </span>
                                 </div>
                               )}
-                            </div>
-                            <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 bg-white/50 px-2 py-1.5 rounded-lg border border-slate-100 italic">
-                              <Icons.Hash className="w-3 h-3 shrink-0" />
-                              Lote: {dashInfo.batch || 'Sin lote'}
+                              <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 bg-white/50 px-2 py-1.5 rounded-lg border border-slate-100 italic ml-auto">
+                                <Icons.Hash className="w-3 h-3 shrink-0" />
+                                Lote: {dashInfo.batch || 'Sin lote'}
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -758,12 +766,13 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
           </div>
 
           {/* Historial de movimientos */}
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Trazabilidad Histórica de Movimientos</h2>
-                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black">{movements.length} EVENTOS</span>
-              </div>
+          {movements.length > 0 && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Trazabilidad Histórica de Movimientos</h2>
+                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black">{movements.length} EVENTOS</span>
+                </div>
 
               <div className="flex gap-2 items-center flex-1 md:max-w-md">
                 <div className="relative flex-1">
@@ -860,8 +869,8 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
                   </table>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </div>

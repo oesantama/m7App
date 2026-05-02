@@ -360,7 +360,7 @@ export const getInventoryStock = async (req: Request, res: Response) => {
       if (dateTo)    { params.push(dateTo);             conds.push(`vi.last_updated < ($${params.length}::date + INTERVAL '1 day')`); }
       const r = await pool.query(`
         SELECT vi.vehicle_plate, 
-               COALESCE(d.name, vi.driver_name) AS driver_name,
+               COALESCE(d.name, ud.name, vi.driver_name) AS driver_name,
                vi.client_id, c.name AS client_name,
                vi.article_id, COALESCE(a.name, vi.article_name, vi.article_id) AS article_name,
                vi.batch, vi.quantity, vi.last_updated,
@@ -370,6 +370,7 @@ export const getInventoryStock = async (req: Request, res: Response) => {
         LEFT JOIN articles a ON a.id = vi.article_id
         LEFT JOIN clients  c ON c.id = vi.client_id
         LEFT JOIN drivers  d ON d.id::text = vi.driver_id::text
+        LEFT JOIN users   ud ON ud.id::text = vi.driver_id::text
         WHERE ${conds.join(' AND ')}
         ORDER BY vi.vehicle_plate, vi.article_id
       `, params);
@@ -406,12 +407,13 @@ export const getInventoryMovements = async (req: Request, res: Response) => {
       pool.query(`
         SELECT m.*,
                u.name  AS user_name,
-               d.name  AS driver_name_lookup,
+               COALESCE(d.name, ud.name) AS driver_name_lookup,
                c.name  AS client_name
         FROM inventory_movements m
-        LEFT JOIN users   u ON u.id         = m.user_id
-        LEFT JOIN drivers d ON d.id::text   = m.driver_id::text
-        LEFT JOIN clients c ON c.id         = m.client_id
+        LEFT JOIN users   u  ON u.id         = m.user_id
+        LEFT JOIN drivers d  ON d.id::text   = m.driver_id::text
+        LEFT JOIN users   ud ON ud.id::text  = m.driver_id::text
+        LEFT JOIN clients c  ON c.id         = m.client_id
         ${where}
         ORDER BY m.created_at DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
