@@ -2050,8 +2050,20 @@ export const getDocumentStats = async (req: Request, res: Response) => {
         const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
         const result = await pool.query(
-            `SELECT d.id, d.file_name, d.client_id, d.drive_path, d.drive_link, d.upload_date
+            `SELECT 
+                d.id, 
+                d.file_name as "fileName", 
+                d.drive_path as "drivePath", 
+                d.drive_link as "driveLink", 
+                d.upload_date as "uploadDate", 
+                d.folder_date as "folderDate",
+                c.name as "clientName",
+                c.client_type as "clientType",
+                u.name as "userName",
+                d.user_id as "userId"
              FROM document_drive_logs d
+             LEFT JOIN master_clientes c ON d.client_id = c.id::text
+             LEFT JOIN users u ON d.user_id = u.id
              ${where}
              ORDER BY d.upload_date DESC
              LIMIT 500`,
