@@ -841,7 +841,7 @@ export const getInvoices = async (req: Request, res: Response) => {
       LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(CONCAT(TRIM(document_items.address), '|', TRIM(document_items.city)))
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
       LEFT JOIN articles ON document_items.article_id = articles.id
-      LEFT JOIN document_l_payments p ON (TRIM(UPPER(document_items.invoice)) = TRIM(UPPER(p.invoice)) AND document_items.invoice != '')
+      LEFT JOIN document_l_payments p ON (TRIM(UPPER(${sqlIdGen})) = TRIM(UPPER(p.invoice)) AND p.invoice != '')
       LEFT JOIN dispatch_assignments da ON (
         da.invoice_id = ${sqlIdGen}
       )
