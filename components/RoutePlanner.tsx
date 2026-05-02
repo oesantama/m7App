@@ -243,6 +243,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [confirmedSessionIds, setConfirmedSessionIds] = useState<Set<string>>(new Set());
 
   const setInvoices = useAppStore(state => state.setInvoices);
+  const setRoutes  = useAppStore(state => state.setRoutes);
+
+  // Al montar: sincronizar rutas activas para que el contador SIN RUTA sea exacto desde el inicio
+  useEffect(() => {
+    api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
+  }, []);
 
   // Recargar facturas automáticamente cuando el usuario cambia de cliente
   useEffect(() => {
@@ -1580,6 +1586,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           .catch(() => { /* route learning failed — non-critical */ });
 
         setSuggestedRoutes(prev => prev.filter(r => r.id !== route.id));
+        // Actualizar rutas en el store inmediatamente (no esperar al onRefresh del padre)
+        api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
         if (onRefresh) onRefresh();
       } else {
         toast.error("Error al confirmar despacho");
@@ -1882,6 +1890,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         toast.warning(`${failCount} rutas no pudieron ser confirmadas.`);
       }
       setSuggestedRoutes([]);
+      // Refrescar rutas en el store inmediatamente para que el contador SIN RUTA sea exacto
+      api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
       if (onRefresh) onRefresh();
     } else if (failCount > 0) {
       toast.error("Error al procesar el despacho masivo. No se confirmó ninguna ruta.");
