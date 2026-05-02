@@ -786,12 +786,13 @@ export const getInvoices = async (req: Request, res: Response) => {
     }
     const queryParams: any[] = [];
 
-    const sqlIdGen = `TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number, 'NA'))`;
+    const sqlIdGen = `TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))`;
+    const invoiceKey = `TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))`;
 
     let query = `
       SELECT 
-        ${sqlIdGen} as id,
-        TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number)) as "invoiceNumber",
+        ${invoiceKey} as id,
+        ${invoiceKey} as "invoiceNumber",
         MAX(document_items.order_number) as "orderNumber",
         STRING_AGG(DISTINCT document_items.observation, '. ') as "notes",
         MAX(documents_l.external_doc_id) as "externalDocId",
@@ -831,7 +832,7 @@ export const getInvoices = async (req: Request, res: Response) => {
             FROM document_items items_sub
             LEFT JOIN articles art_sub ON items_sub.article_id = art_sub.id
             WHERE TRIM(COALESCE(NULLIF(items_sub.invoice, ''), items_sub.order_number)) 
-              = ${sqlIdGen}
+              = ${invoiceKey}
             GROUP BY items_sub.article_id
           ) grouped_items
         ) as "items",
@@ -841,12 +842,12 @@ export const getInvoices = async (req: Request, res: Response) => {
       LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(CONCAT(TRIM(document_items.address), '|', TRIM(document_items.city)))
       LEFT JOIN documents_l ON document_items.document_id = documents_l.id
       LEFT JOIN articles ON document_items.article_id = articles.id
-      LEFT JOIN document_l_payments p ON (TRIM(UPPER(${sqlIdGen})) = TRIM(UPPER(p.invoice)) AND p.invoice != '')
+      LEFT JOIN document_l_payments p ON (TRIM(UPPER(${invoiceKey})) = TRIM(UPPER(p.invoice)) AND p.invoice != '')
       LEFT JOIN dispatch_assignments da ON (
-        da.invoice_id = ${sqlIdGen}
+        da.invoice_id = ${invoiceKey}
       )
       LEFT JOIN picking_assignments pa ON (
-        pa.invoice_id = ${sqlIdGen}
+        pa.invoice_id = ${invoiceKey}
       )
       LEFT JOIN estados est_item ON est_item.id = document_items.item_status
       LEFT JOIN users u ON u.id = documents_l.created_by
@@ -903,8 +904,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         AND documents_l.status NOT IN ('EST-16','EST-12','EST-07','EST-17')`;
     }
 
-    query += ` GROUP BY 
-        TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))
+    query += ` GROUP BY 1, 2
       ORDER BY 2 ASC`;
 
     const result = await pool.query(query, queryParams);
