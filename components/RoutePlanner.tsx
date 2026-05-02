@@ -522,7 +522,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     let planNormal = 0;
     unassignedInvoices.forEach(inv => {
       const doc = documents.find(d => d.id === inv.docLId);
-      if (doc?.planType === 'Orbit (R)') planR++;
+      const pt = String(doc?.planType || '').toUpperCase();
+      if (pt.includes('PLAN R') || pt.includes('(R)') || pt === 'R') planR++;
       else planNormal++;
     });
     return { planR, planNormal };
@@ -3012,7 +3013,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                                 ⚡ REPICE
                               </span>
                             )}
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${documents.find(d => d.id === inv.docLId)?.planType === 'Orbit (R)' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${String(documents.find(d => d.id === inv.docLId)?.planType || '').toUpperCase().includes('PLAN R') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                               {documents.find(d => d.id === inv.docLId)?.planType || 'Plan Normal'}
                             </span>
                           </div>
@@ -3246,7 +3247,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                                 <p className="font-black text-sm text-slate-900 uppercase tracking-tight">{label}</p>
                                 <div className="flex gap-1.5">
                                   <span className="bg-amber-100 text-amber-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Activo</span>
-                                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${planType.includes('(R)') ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${String(planType).toUpperCase().includes('PLAN R') || planType.includes('(R)') ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
                                     {planType}
                                   </span>
                                 </div>
