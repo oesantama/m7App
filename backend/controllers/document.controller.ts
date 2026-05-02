@@ -810,7 +810,7 @@ export const getInvoices = async (req: Request, res: Response) => {
           TRIM(COALESCE(NULLIF(di.invoice, ''), di.order_number)) as inv_key,
           di.order_number,
           di.observation,
-          di.external_doc_id,
+          dl.external_doc_id,
           di.city,
           di.neighborhood,
           di.address,
