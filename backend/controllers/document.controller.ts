@@ -790,31 +790,45 @@ export const getInvoices = async (req: Request, res: Response) => {
     const invoiceKey = `TRIM(COALESCE(NULLIF(document_items.invoice, ''), document_items.order_number))`;
 
     let query = `
+      WITH base_data AS (
+        SELECT 
+          ${invoiceKey} as inv_key,
+          di.*,
+          dl.client_id,
+          dl.external_doc_id,
+          dl.plan_type,
+          dl.codplan,
+          dl.vehicle_plate,
+          dl.status as doc_status,
+          dl.created_by as doc_created_by
+        FROM document_items di
+        LEFT JOIN documents_l dl ON di.document_id = dl.id
+      )
       SELECT 
-        ${invoiceKey} as id,
-        ${invoiceKey} as "invoiceNumber",
-        MAX(document_items.order_number) as "orderNumber",
-        STRING_AGG(DISTINCT document_items.observation, '. ') as "notes",
-        MAX(documents_l.external_doc_id) as "externalDocId",
-        MAX(document_items.city) as city,
-        MAX(document_items.neighborhood) as neighborhood,
-        MAX(document_items.address) as address,
-        MAX(document_items.customer_name) as "customerName",
-        SUM(document_items.expected_qty) as "totalItems",
-        SUM(document_items.volume) as "volumeM3",
-        MAX(document_items.document_id) as "docLId",
-        MAX(documents_l.client_id) as "clientId", 
-        MAX(documents_l.codplan) as "codplan",
-        MAX(documents_l.plan_type) as "planType",
-        MAX(documents_l.vehicle_plate) as "plate",
-        MAX(documents_l.status) as "status",
-        MAX(document_items.item_status) as "itemStatus",
+        inv_key as id,
+        inv_key as "invoiceNumber",
+        MAX(order_number) as "orderNumber",
+        STRING_AGG(DISTINCT observation, '. ') as "notes",
+        MAX(external_doc_id) as "externalDocId",
+        MAX(city) as city,
+        MAX(neighborhood) as neighborhood,
+        MAX(address) as address,
+        MAX(customer_name) as "customerName",
+        SUM(expected_qty) as "totalItems",
+        SUM(volume) as "volumeM3",
+        MAX(document_id) as "docLId",
+        MAX(client_id) as "clientId", 
+        MAX(codplan) as "codplan",
+        MAX(plan_type) as "planType",
+        MAX(vehicle_plate) as "plate",
+        MAX(doc_status) as "status",
+        MAX(item_status) as "itemStatus",
         MAX(est_item.name) as "itemStatusName",
         MAX(da.id) as "dispatchId",
         MAX(da.status) as "dispatchStatus",
         MAX(pa.leader_id) as "pickerLeader",
-        MAX(document_items.un_code) as "unCode",
-        MAX(document_items.client_ref) as "clientRef",
+        MAX(un_code) as "unCode",
+        MAX(client_ref) as "clientRef",
         MAX(COALESCE(p.vmetodo::numeric, 0)) as "invoiceValue",
         MAX(p.metodo_pago) as "paymentMethod",
         MAX(u.name) as "userName",
@@ -832,25 +846,19 @@ export const getInvoices = async (req: Request, res: Response) => {
             FROM document_items items_sub
             LEFT JOIN articles art_sub ON items_sub.article_id = art_sub.id
             WHERE TRIM(COALESCE(NULLIF(items_sub.invoice, ''), items_sub.order_number)) 
-              = ${invoiceKey}
-            GROUP BY items_sub.article_id
+              = base_data.inv_key
+            GROUP BY 1
           ) grouped_items
         ) as "items",
         MIN(COALESCE(gc.lat, 6.2518)) as lat,
         MIN(COALESCE(gc.lng, -75.5636)) as lng
-      FROM document_items
-      LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(CONCAT(TRIM(document_items.address), '|', TRIM(document_items.city)))
-      LEFT JOIN documents_l ON document_items.document_id = documents_l.id
-      LEFT JOIN articles ON document_items.article_id = articles.id
-      LEFT JOIN document_l_payments p ON (TRIM(UPPER(${invoiceKey})) = TRIM(UPPER(p.invoice)) AND p.invoice != '')
-      LEFT JOIN dispatch_assignments da ON (
-        da.invoice_id = ${invoiceKey}
-      )
-      LEFT JOIN picking_assignments pa ON (
-        pa.invoice_id = ${invoiceKey}
-      )
-      LEFT JOIN estados est_item ON est_item.id = document_items.item_status
-      LEFT JOIN users u ON u.id = documents_l.created_by
+      FROM base_data
+      LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(CONCAT(TRIM(base_data.address), '|', TRIM(base_data.city)))
+      LEFT JOIN document_l_payments p ON (TRIM(UPPER(base_data.inv_key)) = TRIM(UPPER(p.invoice)) AND p.invoice != '')
+      LEFT JOIN dispatch_assignments da ON (da.invoice_id = base_data.inv_key)
+      LEFT JOIN picking_assignments pa ON (pa.invoice_id = base_data.inv_key)
+      LEFT JOIN estados est_item ON est_item.id = base_data.item_status
+      LEFT JOIN users u ON u.id = base_data.doc_created_by
       WHERE 1=1
     `;
 
@@ -859,14 +867,14 @@ export const getInvoices = async (req: Request, res: Response) => {
 
     if (clientId && clientId !== 'GLOBAL') {
       queryParams.push(clientId);
-      query += ` AND documents_l.client_id = $${queryParams.length}`;
+      query += ` AND base_data.client_id = $${queryParams.length}`;
     }
 
     // [SECURITY FIX] Siempre filtrar por los clientes autorizados si no es Super Admin
     if (!isSuper) {
       const allowedIds = user?.client_ids || [];
       queryParams.push(allowedIds);
-      query += ` AND documents_l.client_id = ANY($${queryParams.length}::text[])`;
+      query += ` AND base_data.client_id = ANY($${queryParams.length}::text[])`;
     }
 
     if (ids) {
@@ -884,30 +892,29 @@ export const getInvoices = async (req: Request, res: Response) => {
           queryParams.push(docIdExtracted);
           const pIdxDoc = `$${queryParams.length}`;
           return `(
-               (TRIM(COALESCE(document_items.invoice, '')) = ${pIdx} OR TRIM(COALESCE(document_items.order_number, '')) = ${pIdx})
-               AND document_items.document_id = ${pIdxDoc}
+               (TRIM(COALESCE(base_data.invoice, '')) = ${pIdx} OR TRIM(COALESCE(base_data.order_number, '')) = ${pIdx})
+               AND base_data.document_id = ${pIdxDoc}
             )`;
         }
 
         return `(
-            TRIM(COALESCE(document_items.invoice, '')) = ${pIdx} 
+            TRIM(COALESCE(base_data.invoice, '')) = ${pIdx} 
             OR 
-            TRIM(COALESCE(document_items.order_number, '')) = ${pIdx}
+            TRIM(COALESCE(base_data.order_number, '')) = ${pIdx}
          )`;
       });
       if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;
     } else if (history !== 'true') {
       // Planificador: solo facturas pendientes o en repique a bodega
-      // EST-01 = pendiente inicial | EST-15 = repice (devuelto para re-entrega)
-      // NULL = registros legacy antes del backfill (compatibilidad con producción)
-      query += ` AND (document_items.item_status IN ('EST-01', 'EST-03', 'EST-08', 'EST-15') OR document_items.item_status IS NULL)
-        AND documents_l.status NOT IN ('EST-16','EST-12','EST-07','EST-17')`;
+      query += ` AND (base_data.item_status IN ('EST-01', 'EST-03', 'EST-08', 'EST-15') OR base_data.item_status IS NULL)
+        AND base_data.doc_status NOT IN ('EST-16','EST-12','EST-07','EST-17')`;
     }
 
     query += ` GROUP BY 1, 2
       ORDER BY 2 ASC`;
 
     const result = await pool.query(query, queryParams);
+
     console.log(`[M7-SUCCESS] getInvoices: Enviando ${result.rows.length} facturas.`);
 
     // Guardar en caché si aplica
