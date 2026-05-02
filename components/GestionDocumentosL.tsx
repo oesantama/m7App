@@ -38,7 +38,7 @@ interface GestionDocumentosLProps {
 
 
 const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invoices, user, masterEstados, onDocumentsChange, onRefresh }) => {
-  const [activeTab, setActiveTab] = useState<'cargue' | 'consultas' | 'consulta-facturas'>('cargue');
+  const [activeTab, setActiveTab] = useState<'cargue' | 'consultas' | 'consulta-facturas' | 'correccion'>('cargue');
   const [activeModalTab, setActiveModalTab] = useState<'reception' | 'audit' | 'payments'>('reception');
   const [preview, setPreview] = useState<{ fileName: string; mapped: PreviewDocument[]; type: string } | null>(null);
   const [selectedPendingDoc, setSelectedPendingDoc] = useState<DocumentL | null>(null);
@@ -70,6 +70,16 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   // States for Document L Payment Upload
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<DocumentL | null>(null);
+
+  // Estados para Corrección de Archivos Plan
+  const [corrClientId, setCorrClientId] = useState<string>('');
+  const [corrLoading, setCorrLoading] = useState(false);
+  const [corrPreviewResult, setCorrPreviewResult] = useState<any | null>(null);
+  const [corrParsedItems, setCorrParsedItems] = useState<any[]>([]);
+  const [corrConfirmOpen, setCorrConfirmOpen] = useState(false);
+  const [corrApplying, setCorrApplying] = useState(false);
+  const [corrPreviewSearch, setCorrPreviewSearch] = useState('');
+  const [corrPreviewPage, setCorrPreviewPage] = useState(1);
 
   // Estados para edición de count_2 en auditoría
   const [editingAuditItem, setEditingAuditItem] = useState<any | null>(null);
@@ -680,6 +690,169 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     reader.readAsArrayBuffer(file);
   };
 
+  const handleCorrectionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!corrClientId) {
+      toast.error('Selecciona un cliente antes de cargar el archivo');
+      e.target.value = '';
+      return;
+    }
+
+    setCorrLoading(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+
+        if (ws['!merges']) {
+          ws['!merges'].forEach((merge: any) => {
+            const masterAddr = XLSX.utils.encode_cell({ r: merge.s.r, c: merge.s.c });
+            const masterCell = ws[masterAddr];
+            if (!masterCell) return;
+            for (let r = merge.s.r; r <= merge.e.r; r++) {
+              for (let c = merge.s.c; c <= merge.e.c; c++) {
+                const addr = XLSX.utils.encode_cell({ r, c });
+                if (addr !== masterAddr) ws[addr] = { ...masterCell };
+              }
+            }
+          });
+        }
+
+        const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false }) as any[][];
+        if (!rawData || rawData.length < 1) { setCorrLoading(false); return; }
+
+        const requiredTerms = ['placa', 'carga', 'articulo', 'item', 'un orig', 'un', 'cant env'];
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(rawData.length, 50); i++) {
+          const row = (rawData[i] || []).map(c => String(c || '').toLowerCase().trim());
+          if (row.filter(cell => requiredTerms.some(term => cell === term || cell.includes(term))).length >= 3) {
+            headerRowIndex = i; break;
+          }
+        }
+        if (headerRowIndex === -1) {
+          toast.error('No se detectó la fila de títulos en el archivo.');
+          setCorrLoading(false);
+          e.target.value = '';
+          return;
+        }
+
+        const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
+        const normStr = (s: string) => s.toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const findIdx = (terms: string[]) => {
+          const exact = headers.findIndex(h => h && terms.some(t => normStr(h) === normStr(t)));
+          if (exact !== -1) return exact;
+          return headers.findIndex(h => h && terms.some(t => normStr(h).includes(normStr(t))));
+        };
+
+        const isPlanR = type === 'Plan R';
+        const iPlaca    = findIdx(['placa', 'vehículo', 'vehiculo']);
+        const iCarga    = findIdx(['carga', 'nº carga', 'n de carga', 'documento de transporte', 'shipment', 'viaje']);
+        const iArticulo = findIdx(['articulo', 'item', 'codigo', 'código', 'sku']);
+        const iFactura  = findIdx(['remision/transferencia', 'remision / transferencia', 'no. factura', 'nro. factura', 'factura', 'remision', 'remisión', 'invoice']);
+        const iCiudad   = findIdx(['destino', 'ciudad', 'city']);
+        const iDir      = findIdx(['dirección 1', 'dirección', 'direccion 1', 'direccion', 'dir 1', 'address', 'f_dirección']);
+        const iCant     = findIdx(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
+        const iVolTotal = isPlanR ? findIdx(['volumen', 'total volume', 'volumen total']) : findIdx(['vol. total', 'total volume', 'volumen total']);
+        const iVolUnit  = isPlanR ? -1 : findIdx(['volumen']);
+        const iPeso     = findIdx(['peso', 'weight', 'kgs', 'kilogramos']);
+        const iLat      = isPlanR ? findIdx(['latitud', 'lat', 'latitude', 'coord y']) : -1;
+        const iLng      = isPlanR ? findIdx(['longitud', 'lng', 'longitude', 'coord x']) : -1;
+
+        if (iPlaca === -1 || iCarga === -1) {
+          toast.error('No se detectaron columnas PLACA o CARGA en el archivo.');
+          setCorrLoading(false);
+          e.target.value = '';
+          return;
+        }
+
+        const parseNumberM7 = (raw: string, planR: boolean, columnType: 'qty' | 'vol' | 'weight') => {
+          if (!raw || raw.trim() === '') return 0;
+          let val = raw.trim();
+          if (columnType === 'weight') {
+            if (!planR) return 0;
+            return parseFloat(val.replace(/[.]/g, '')) || 0;
+          }
+          if (!planR) return parseFloat(val.replace(/,/g, '.')) || 0;
+          return parseFloat(val) || 0;
+        };
+
+        const items: any[] = [];
+        const dataRows = rawData.slice(headerRowIndex + 1);
+        dataRows.forEach(row => {
+          if (!row || row.length === 0 || row.every(c => c === '')) return;
+          const val = (idx: number) => idx !== -1 ? String(row[idx] || '').trim() : '';
+          const placa  = val(iPlaca);
+          const carga  = val(iCarga);
+          const artId  = val(iArticulo)?.toUpperCase();
+          const invoice = val(iFactura) || 'S/I';
+          if (!placa && !carga) return;
+          if (!artId) return;
+
+          let volVal = parseNumberM7(val(iVolTotal), isPlanR, 'vol');
+          if (!isPlanR && iVolUnit !== -1) {
+            const vUnit = val(iVolUnit).toUpperCase().trim();
+            if (vUnit === 'CM3' || vUnit === 'CMT3') volVal = volVal / 1000000;
+          } else if (volVal > 1000) {
+            volVal = volVal / 1000000;
+          }
+
+          items.push({
+            documentId: `doc-${placa}-${carga}`,
+            articleId: artId,
+            invoice,
+            city:        val(iCiudad)  || undefined,
+            address:     val(iDir)     || undefined,
+            volume:      iVolTotal !== -1 ? volVal : undefined,
+            expectedQty: iCant !== -1  ? parseNumberM7(val(iCant), isPlanR, 'qty') : undefined,
+            peso:        iPeso !== -1  ? parseNumberM7(val(iPeso), isPlanR, 'weight') : undefined,
+            lat:  iLat !== -1 && val(iLat)  ? (parseFloat(val(iLat).replace(',', '.'))  || null) : null,
+            lng:  iLng !== -1 && val(iLng)  ? (parseFloat(val(iLng).replace(',', '.')) || null) : null,
+          });
+        });
+
+        if (items.length === 0) {
+          toast.error('El archivo no contiene filas de datos válidas.');
+          setCorrLoading(false);
+          e.target.value = '';
+          return;
+        }
+
+        // Llamar al endpoint dryRun para obtener el preview
+        const result = await api.correctDocumentItems({ items, dryRun: true, changedBy: user.name });
+        setCorrParsedItems(items);
+        setCorrPreviewResult(result);
+        setCorrPreviewSearch('');
+        setCorrPreviewPage(1);
+        setCorrConfirmOpen(true);
+      } catch (err: any) {
+        toast.error('Error al procesar el archivo: ' + (err.message || 'Error desconocido'));
+      } finally {
+        setCorrLoading(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleCorrectionApply = async () => {
+    if (!corrPreviewResult || corrParsedItems.length === 0) return;
+    setCorrApplying(true);
+    try {
+      const result = await api.correctDocumentItems({ items: corrParsedItems, dryRun: false, changedBy: user.name });
+      toast.success(`Corrección aplicada: ${result.found} ítems actualizados. ${result.notFound > 0 ? `${result.notFound} no encontrados.` : ''}`);
+      setCorrConfirmOpen(false);
+      setCorrPreviewResult(null);
+      setCorrParsedItems([]);
+    } catch (err: any) {
+      toast.error('Error al aplicar corrección: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setCorrApplying(false);
+    }
+  };
+
   const filteredPreviewItems = useMemo(() => {
     if (!preview) return [];
     const allItems = preview.mapped.flatMap(doc => doc.items.map(it => ({ ...it, docId: doc.externalDocId, docVehicle: doc.vehicleData, isDuplicate: doc.isDuplicate })));
@@ -797,6 +970,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             <button onClick={()=>setActiveTab('cargue')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'cargue' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Cargue Masivo</button>
             <button onClick={()=>setActiveTab('consultas')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consultas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta Histórica</button>
             <button onClick={()=>setActiveTab('consulta-facturas')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consulta-facturas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta de Facturas</button>
+            <button onClick={()=>setActiveTab('correccion')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'correccion' ? 'bg-white shadow-sm text-orange-700' : 'text-slate-400 hover:text-orange-600'}`}>Corrección Archivos</button>
          </div>
       </div>
 
@@ -1019,8 +1193,94 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               masterEstados={masterEstados}
               onRefresh={onRefresh}
             />
-          ) : (
+          ) : activeTab === 'consulta-facturas' ? (
             <ConsultaFacturas />
+          ) : (
+            /* ── TAB: CORRECCIÓN ARCHIVOS PLAN ── */
+            <div className="max-w-4xl mx-auto space-y-10 p-4 animate-in fade-in">
+              {/* Header */}
+              <div className="flex items-start gap-4 px-1">
+                <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center shrink-0 mt-1">
+                  <Icons.Edit className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Corrección de Archivos Plan</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                    Actualiza campos de ítems existentes — solo UPDATE, nunca INSERT
+                  </p>
+                  <p className="text-[9px] text-amber-600 font-bold uppercase tracking-wide mt-1.5 bg-amber-50 px-3 py-1.5 rounded-lg inline-block border border-amber-100">
+                    ⚠ Los cambios son irreversibles. Se conserva log de auditoría completo.
+                  </p>
+                </div>
+              </div>
+
+              {/* Client selector */}
+              <div className="flex items-center gap-4 px-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Cliente</label>
+                {!clientsReady ? (
+                  <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                ) : clients.length === 1 ? (
+                  <span className="text-[10px] bg-orange-50 border border-orange-200 text-orange-700 font-black px-3 py-1.5 rounded-xl uppercase tracking-widest">
+                    {clients[0].name}
+                  </span>
+                ) : (
+                  <select
+                    value={corrClientId}
+                    onChange={e => setCorrClientId(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-orange-500 transition-all min-w-[200px]">
+                    <option value="">— Seleccionar cliente —</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* File upload cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-orange-50/20 p-8 rounded-[2rem] border-2 border-dashed border-orange-100 flex flex-col items-center justify-center text-center hover:border-orange-500 hover:bg-orange-50/40 transition-all group">
+                  <div className="w-12 h-12 bg-white text-orange-600 rounded-xl flex items-center justify-center mb-4 shadow-sm border border-orange-50 group-hover:scale-110 transition-transform">
+                    <Icons.Excel className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase">Corregir Plan Normal</h3>
+                  <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Archivo con columnas "UN ORIG"</p>
+                  {corrLoading ? (
+                    <div className="mt-6 w-7 h-7 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <label className={`bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[9px] uppercase mt-6 cursor-pointer shadow-md hover:bg-orange-600 transition-all active:scale-95 ${!corrClientId && clients.length !== 1 ? 'opacity-40 pointer-events-none' : ''}`}>
+                      Subir y Previsualizar
+                      <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => handleCorrectionFileUpload(e, 'Plan Normal')} disabled={corrLoading} />
+                    </label>
+                  )}
+                </div>
+                <div className="bg-blue-50/20 p-8 rounded-[2rem] border-2 border-dashed border-blue-100 flex flex-col items-center justify-center text-center hover:border-blue-500 hover:bg-blue-50/40 transition-all group">
+                  <div className="w-12 h-12 bg-white text-blue-600 rounded-xl flex items-center justify-center mb-4 shadow-sm border border-blue-50 group-hover:scale-110 transition-transform">
+                    <Icons.Excel className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase">Corregir Plan R</h3>
+                  <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Archivo con columnas "UN"</p>
+                  {corrLoading ? (
+                    <div className="mt-6 w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <label className={`bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[9px] uppercase mt-6 cursor-pointer shadow-md hover:bg-blue-600 transition-all active:scale-95 ${!corrClientId && clients.length !== 1 ? 'opacity-40 pointer-events-none' : ''}`}>
+                      Subir y Previsualizar
+                      <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={e => handleCorrectionFileUpload(e, 'Plan R')} disabled={corrLoading} />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Campos que se actualizan */}
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Campos que se actualizan</p>
+                <div className="flex flex-wrap gap-2">
+                  {['Ciudad', 'Dirección', 'Volumen', 'Barrio', 'Latitud / Longitud', 'Cant. Esperada', 'Peso'].map(f => (
+                    <span key={f} className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-600 uppercase tracking-wide shadow-sm">{f}</span>
+                  ))}
+                </div>
+                <p className="text-[8px] text-slate-400 mt-3 font-bold">WHERE: document_id + article_id + invoice</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1553,6 +1813,151 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Corrección de Archivos Plan */}
+      {corrConfirmOpen && corrPreviewResult && (
+        <div className="fixed inset-0 z-[620] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md" onClick={() => !corrApplying && setCorrConfirmOpen(false)} />
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100 flex flex-col max-h-[90vh]">
+            <div className="h-2 bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500" />
+
+            <div className="p-8 pb-4 shrink-0 border-b border-slate-100">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-orange-600 mb-1">Revisión de Cambios — Corrección Plan</p>
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Vista Previa de Actualización</h3>
+                  <div className="flex gap-3 mt-2">
+                    <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-black px-3 py-1 rounded-lg uppercase">
+                      {corrPreviewResult.found} encontrados
+                    </span>
+                    {corrPreviewResult.notFound > 0 && (
+                      <span className="text-[9px] bg-red-50 text-red-700 border border-red-200 font-black px-3 py-1 rounded-lg uppercase">
+                        {corrPreviewResult.notFound} NO encontrados
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => !corrApplying && setCorrConfirmOpen(false)}
+                  className="w-10 h-10 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-slate-400 rounded-2xl flex items-center justify-center transition-all">
+                  <Icons.X />
+                </button>
+              </div>
+              <p className="text-[9px] text-amber-700 font-black bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-xl mt-4 uppercase tracking-wide">
+                ⚠ ADVERTENCIA: Esta operación es irreversible. Se registrará un log de auditoría con los valores anteriores y los nuevos.
+              </p>
+
+              {/* Search */}
+              <div className="mt-4">
+                <input
+                  type="text"
+                  placeholder="BUSCAR POR ARTÍCULO O FACTURA..."
+                  value={corrPreviewSearch}
+                  onChange={e => { setCorrPreviewSearch(e.target.value); setCorrPreviewPage(1); }}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 outline-none focus:border-orange-400 transition-all bg-slate-50"
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-y-auto p-6 min-h-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-[9px]">
+                  <thead>
+                    <tr className="text-slate-400 uppercase tracking-wide border-b border-slate-100">
+                      <th className="py-3 px-3 font-black">Estado</th>
+                      <th className="py-3 px-3 font-black">Artículo</th>
+                      <th className="py-3 px-3 font-black">Factura</th>
+                      <th className="py-3 px-3 font-black">Campo</th>
+                      <th className="py-3 px-3 font-black text-rose-600">Antes</th>
+                      <th className="py-3 px-3 font-black text-emerald-600">Después</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {corrPreviewResult.preview
+                      .filter((p: any) => {
+                        if (!corrPreviewSearch) return true;
+                        const s = corrPreviewSearch.toLowerCase();
+                        return p.articleId?.toLowerCase().includes(s) || p.invoice?.toLowerCase().includes(s) || p.documentId?.toLowerCase().includes(s);
+                      })
+                      .slice((corrPreviewPage - 1) * 10, corrPreviewPage * 10)
+                      .flatMap((p: any) => {
+                        if (!p.found) {
+                          return [(
+                            <tr key={`${p.documentId}-${p.articleId}-${p.invoice}-notfound`} className="bg-red-50/40">
+                              <td className="py-2 px-3"><span className="text-[8px] bg-red-100 text-red-600 font-black px-2 py-0.5 rounded-lg uppercase">No encontrado</span></td>
+                              <td className="py-2 px-3 font-black text-slate-700">{p.articleId}</td>
+                              <td className="py-2 px-3 text-slate-500 font-mono">{p.invoice}</td>
+                              <td colSpan={3} className="py-2 px-3 text-slate-400 italic text-[8px]">No existe en document_items con esos datos</td>
+                            </tr>
+                          )];
+                        }
+                        const fieldLabels: Record<string, string> = {
+                          city: 'Ciudad', address: 'Dirección', volume: 'Volumen',
+                          neighborhood: 'Barrio', expected_qty: 'Cant. Esperada', peso: 'Peso'
+                        };
+                        const changes = Object.entries(p.new)
+                          .filter(([k, v]) => v !== undefined && String(p.old[k] ?? '') !== String(v))
+                          .map(([k, v]) => ({ field: k, oldVal: p.old[k], newVal: v }));
+                        if (changes.length === 0) {
+                          return [(
+                            <tr key={`${p.documentId}-${p.articleId}-${p.invoice}-nochange`} className="bg-slate-50/50">
+                              <td className="py-2 px-3"><span className="text-[8px] bg-slate-100 text-slate-500 font-black px-2 py-0.5 rounded-lg uppercase">Sin cambio</span></td>
+                              <td className="py-2 px-3 font-black text-slate-500">{p.articleId}</td>
+                              <td className="py-2 px-3 text-slate-400 font-mono">{p.invoice}</td>
+                              <td colSpan={3} className="py-2 px-3 text-slate-300 italic text-[8px]">Los valores del archivo coinciden con los actuales</td>
+                            </tr>
+                          )];
+                        }
+                        return changes.map((ch, i) => (
+                          <tr key={`${p.documentId}-${p.articleId}-${p.invoice}-${ch.field}`} className="hover:bg-orange-50/20">
+                            {i === 0 ? (
+                              <td className="py-2 px-3" rowSpan={changes.length}>
+                                <span className="text-[8px] bg-orange-100 text-orange-700 font-black px-2 py-0.5 rounded-lg uppercase">Actualizar</span>
+                              </td>
+                            ) : null}
+                            {i === 0 ? <td className="py-2 px-3 font-black text-slate-900" rowSpan={changes.length}>{p.articleId}</td> : null}
+                            {i === 0 ? <td className="py-2 px-3 text-slate-500 font-mono" rowSpan={changes.length}>{p.invoice}</td> : null}
+                            <td className="py-2 px-3 text-slate-500 font-bold">{fieldLabels[ch.field] || ch.field}</td>
+                            <td className="py-2 px-3 text-rose-600 font-black line-through opacity-70">{String(ch.oldVal ?? '—')}</td>
+                            <td className="py-2 px-3 text-emerald-700 font-black">{String(ch.newVal ?? '—')}</td>
+                          </tr>
+                        ));
+                      })}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              {Math.ceil(corrPreviewResult.preview.filter((p: any) => !corrPreviewSearch || p.articleId?.toLowerCase().includes(corrPreviewSearch.toLowerCase()) || p.invoice?.toLowerCase().includes(corrPreviewSearch.toLowerCase())).length / 10) > 1 && (
+                <div className="flex justify-center items-center gap-4 mt-4">
+                  <button disabled={corrPreviewPage === 1} onClick={() => setCorrPreviewPage(p => p - 1)}
+                    className="p-2 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180 w-4 h-4" /></button>
+                  <span className="text-[10px] font-black uppercase">Pág {corrPreviewPage}</span>
+                  <button disabled={corrPreviewPage * 10 >= corrPreviewResult.preview.length} onClick={() => setCorrPreviewPage(p => p + 1)}
+                    className="p-2 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="w-4 h-4" /></button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer buttons */}
+            <div className="p-6 border-t bg-slate-50/50 flex justify-between items-center shrink-0 gap-4">
+              <button onClick={() => !corrApplying && setCorrConfirmOpen(false)} disabled={corrApplying}
+                className="px-8 py-3 rounded-2xl border-2 border-slate-200 text-slate-500 font-black text-[10px] uppercase hover:bg-slate-100 transition-all disabled:opacity-50">
+                Cancelar
+              </button>
+              {corrPreviewResult.found > 0 && (
+                <button onClick={handleCorrectionApply} disabled={corrApplying}
+                  className="px-10 py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-black text-[10px] uppercase transition-all shadow-lg flex items-center gap-2">
+                  {corrApplying ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Aplicando...</>
+                  ) : (
+                    <>Confirmar y Aplicar {corrPreviewResult.found} cambios</>
+                  )}
+                </button>
               )}
             </div>
           </div>

@@ -2058,12 +2058,12 @@ export const getDocumentStats = async (req: Request, res: Response) => {
         const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
         const result = await pool.query(
-            `SELECT 
-                d.id, 
-                d.file_name as "fileName", 
-                d.drive_path as "drivePath", 
-                d.drive_link as "driveLink", 
-                d.upload_date as "uploadDate", 
+            `SELECT
+                d.id,
+                d.file_name as "fileName",
+                d.drive_path as "drivePath",
+                d.drive_link as "driveLink",
+                d.upload_date as "uploadDate",
                 d.folder_date as "folderDate",
                 c.name as "clientName",
                 c.client_type as "clientType",
@@ -2082,4 +2082,178 @@ export const getDocumentStats = async (req: Request, res: Response) => {
         if (err.code === '42P01') return res.json([]); // tabla no existe aún
         res.status(500).json({ error: 'Error al obtener estadísticas' });
     }
+};
+
+// ─── Corrección de ítems de documentos (actualización masiva desde archivo) ──
+export const correctDocumentItems = async (req: Request, res: Response) => {
+  const { items, dryRun, changedBy } = req.body as {
+    items: Array<{
+      documentId: string;
+      articleId: string;
+      invoice: string;
+      city?: string;
+      address?: string;
+      volume?: number;
+      neighborhood?: string;
+      lat?: number | null;
+      lng?: number | null;
+      expectedQty?: number;
+      peso?: number;
+    }>;
+    dryRun: boolean;
+    changedBy: string;
+  };
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Se requiere al menos un ítem para corregir.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Garantizar tabla de auditoría
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS document_items_correction_log (
+        id SERIAL PRIMARY KEY,
+        document_id VARCHAR(255) NOT NULL,
+        article_id  VARCHAR(255) NOT NULL,
+        invoice     VARCHAR(255) NOT NULL,
+        field_name  VARCHAR(100) NOT NULL,
+        old_value   TEXT,
+        new_value   TEXT,
+        changed_by  VARCHAR(255),
+        changed_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const preview: Array<{
+      documentId: string;
+      articleId: string;
+      invoice: string;
+      found: boolean;
+      old: Record<string, any>;
+      new: Record<string, any>;
+    }> = [];
+
+    for (const item of items) {
+      const artId = item.articleId?.trim().toUpperCase();
+      const inv   = item.invoice?.trim() || 'S/I';
+      const docId = item.documentId?.trim();
+
+      const existing = await client.query(
+        `SELECT id, city, address, volume, neighborhood, expected_qty, peso
+         FROM document_items
+         WHERE document_id = $1 AND article_id = $2 AND TRIM(invoice) = $3
+         LIMIT 1`,
+        [docId, artId, inv]
+      );
+
+      if (existing.rowCount === 0) {
+        preview.push({ documentId: docId, articleId: artId, invoice: inv, found: false, old: {}, new: {} });
+        continue;
+      }
+
+      const old = existing.rows[0];
+      const proposed: Record<string, any> = {};
+      if (item.city      !== undefined) proposed.city         = item.city;
+      if (item.address   !== undefined) proposed.address      = item.address;
+      if (item.volume    !== undefined) proposed.volume       = item.volume;
+      if (item.neighborhood !== undefined) proposed.neighborhood = item.neighborhood;
+      if (item.expectedQty !== undefined) proposed.expected_qty = item.expectedQty;
+      if (item.peso      !== undefined) proposed.peso         = item.peso;
+
+      preview.push({
+        documentId: docId,
+        articleId: artId,
+        invoice: inv,
+        found: true,
+        old: {
+          city: old.city, address: old.address, volume: old.volume,
+          neighborhood: old.neighborhood, expected_qty: old.expected_qty, peso: old.peso,
+        },
+        new: proposed,
+      });
+
+      if (!dryRun) {
+        const setClauses: string[] = [];
+        const params: any[]        = [];
+        let   p = 1;
+
+        const addField = (col: string, val: any) => {
+          setClauses.push(`${col} = $${p++}`);
+          params.push(val);
+        };
+
+        if (item.city      !== undefined) addField('city',         item.city);
+        if (item.address   !== undefined) addField('address',      item.address);
+        if (item.volume    !== undefined) addField('volume',       item.volume);
+        if (item.neighborhood !== undefined) addField('neighborhood', item.neighborhood);
+        if (item.expectedQty !== undefined) addField('expected_qty', item.expectedQty);
+        if (item.peso      !== undefined) addField('peso',         item.peso);
+
+        if (setClauses.length > 0) {
+          params.push(docId, artId, inv);
+          await client.query(
+            `UPDATE document_items SET ${setClauses.join(', ')}
+             WHERE document_id = $${p} AND article_id = $${p+1} AND TRIM(invoice) = $${p+2}`,
+            params
+          );
+        }
+
+        // Actualizar geocoding_cache si se proporcionaron coordenadas y dirección
+        const newAddr = item.address ?? old.address;
+        const newCity = item.city    ?? old.city;
+        if (item.lat != null && item.lng != null && newAddr) {
+          const addrKey = (newAddr + '|' + (newCity || '')).toLowerCase().trim();
+          await client.query(
+            `INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (address_key) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng`,
+            [addrKey, newAddr, newCity, item.lat, item.lng]
+          );
+        }
+
+        // Log de auditoría campo por campo
+        const fieldsToLog: Array<[string, any, any]> = [];
+        if (item.city      !== undefined && String(old.city)         !== String(item.city))      fieldsToLog.push(['city',         old.city,         item.city]);
+        if (item.address   !== undefined && String(old.address)      !== String(item.address))   fieldsToLog.push(['address',      old.address,      item.address]);
+        if (item.volume    !== undefined && String(old.volume)       !== String(item.volume))    fieldsToLog.push(['volume',       old.volume,       item.volume]);
+        if (item.neighborhood !== undefined && String(old.neighborhood) !== String(item.neighborhood)) fieldsToLog.push(['neighborhood', old.neighborhood, item.neighborhood]);
+        if (item.expectedQty !== undefined && String(old.expected_qty) !== String(item.expectedQty)) fieldsToLog.push(['expected_qty', old.expected_qty, item.expectedQty]);
+        if (item.peso      !== undefined && String(old.peso)         !== String(item.peso))      fieldsToLog.push(['peso',         old.peso,         item.peso]);
+        if (item.lat  != null) fieldsToLog.push(['lat',  null, item.lat]);
+        if (item.lng  != null) fieldsToLog.push(['lng',  null, item.lng]);
+
+        for (const [field, oldVal, newVal] of fieldsToLog) {
+          await client.query(
+            `INSERT INTO document_items_correction_log (document_id, article_id, invoice, field_name, old_value, new_value, changed_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [docId, artId, inv, field, oldVal == null ? null : String(oldVal), newVal == null ? null : String(newVal), changedBy || 'sistema']
+          );
+        }
+      }
+    }
+
+    if (dryRun) {
+      await client.query('ROLLBACK');
+    } else {
+      await client.query('COMMIT');
+    }
+
+    res.json({
+      success: true,
+      dryRun,
+      total: items.length,
+      found: preview.filter(p => p.found).length,
+      notFound: preview.filter(p => !p.found).length,
+      preview,
+    });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-CORRECT-ITEMS]', err.message);
+    res.status(500).json({ error: 'Error al corregir ítems: ' + err.message });
+  } finally {
+    client.release();
+  }
 };

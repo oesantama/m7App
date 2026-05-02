@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2, getInvoiceTraceability, getConciliationHistory, uploadCumplido, getDocumentStats } from '../controllers/document.controller.js';
+import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2, getInvoiceTraceability, getConciliationHistory, uploadCumplido, getDocumentStats, correctDocumentItems } from '../controllers/document.controller.js';
 import multer from 'multer';
 
 import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
@@ -87,5 +87,8 @@ router.get('/invoice-traceability', (req, res, next) => {
 // Gestión Documental de Cumplidos (Drive) — PAG-45 / MOD-10
 router.post('/upload-cumplido', authenticateToken, upload.array('files', 10), uploadCumplido);
 router.get('/stats', authenticateToken, getDocumentStats);
+
+// Corrección masiva de ítems desde archivo (solo edición, no inserción)
+router.post('/correct-items', requireAuditEdit, correctDocumentItems);
 
 export default router;

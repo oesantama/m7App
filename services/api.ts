@@ -706,6 +706,12 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ docId, targetEmail })
   }),
+  correctDocumentItems: (data: { items: any[]; dryRun: boolean; changedBy: string }) =>
+    fetchJson(`${API_URL}/documents/correct-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }),
 
   getWhatsAppStatus: (userId: string) => fetchJson(`${API_URL}/whatsapp/status?userId=${userId}`),
   connectWhatsApp: (userId: string) => fetchJson(`${API_URL}/whatsapp/connect`, {
