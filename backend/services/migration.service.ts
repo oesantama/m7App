@@ -457,6 +457,33 @@ const healSchema = async (client: any) => {
       ON inventario_clientes (client_id, article_id, batch)
     `);
 
+    console.log('[M7-DB-HEAL] Limpiando duplicados de Patrones IA para estabilidad ON CONFLICT...');
+    
+    // Limpiar routing_patterns
+    await client.query(`
+      DELETE FROM routing_patterns a USING (
+        SELECT MIN(ctid) as keepid, city, vehicle_id, COALESCE(neighborhood, '') as neighborhood
+        FROM routing_patterns
+        GROUP BY city, vehicle_id, COALESCE(neighborhood, '') HAVING COUNT(*) > 1
+      ) b
+      WHERE a.city = b.city 
+        AND a.vehicle_id = b.vehicle_id 
+        AND COALESCE(a.neighborhood, '') = b.neighborhood
+        AND a.ctid > b.keepid
+    `);
+
+    // Limpiar delivery_patterns
+    await client.query(`
+      DELETE FROM delivery_patterns a USING (
+        SELECT MIN(ctid) as keepid, address_key, vehicle_id
+        FROM delivery_patterns
+        GROUP BY address_key, vehicle_id HAVING COUNT(*) > 1
+      ) b
+      WHERE a.address_key = b.address_key 
+        AND a.vehicle_id = b.vehicle_id 
+        AND a.ctid > b.keepid
+    `);
+
     console.log('[M7-DB-IQ] Configurando restricciones de Aprendizaje Granular...');
     await client.query(`
       DROP INDEX IF EXISTS unq_routing_patterns_city_veh;
@@ -711,6 +738,12 @@ export const restoreSystem = async () => {
     await client.query(`
       INSERT INTO roles (id, name, status_id) VALUES
       ('ROL-01', 'Super Admin', 'EST-01'), ('ROL-02', 'ADMIN', 'EST-01'), ('ROL-03', 'CONDUCTORES', 'EST-01')
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    await client.query(`
+      INSERT INTO clients (id, name, status_id, client_type) VALUES
+      ('CLI-01', 'Milla 7 Logistics', 'EST-01', 'MUNICIPAL')
       ON CONFLICT (id) DO NOTHING;
     `);
 

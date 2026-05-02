@@ -789,12 +789,39 @@ export const getInvoices = async (req: Request, res: Response) => {
     const invoiceKeyExpr = `TRIM(COALESCE(NULLIF(invoice, ''), order_number))`;
 
     let query = `
-      WITH base_data AS (
+      WITH items_agg AS (
+        SELECT 
+          TRIM(COALESCE(NULLIF(items_sub.invoice, ''), items_sub.order_number)) as item_inv_key,
+          JSON_AGG(JSON_BUILD_OBJECT(
+            'sku', items_sub.article_id,
+            'qty', items_sub.expected_qty,
+            'receivedQty', items_sub.received_qty,
+            'articleName', COALESCE(art_sub.name, items_sub.article_id),
+            'unit', items_sub.unit,
+            'unCode', items_sub.un_code,
+            'clientRef', items_sub.client_ref
+          )) as items_json
+        FROM document_items items_sub
+        LEFT JOIN articles art_sub ON items_sub.article_id = art_sub.id
+        GROUP BY 1
+      ),
+      base_data AS (
         SELECT 
           TRIM(COALESCE(NULLIF(di.invoice, ''), di.order_number)) as inv_key,
-          di.*,
+          di.order_number,
+          di.observation,
+          di.external_doc_id,
+          di.city,
+          di.neighborhood,
+          di.address,
+          di.customer_name,
+          di.expected_qty,
+          di.volume,
+          di.document_id,
+          di.un_code,
+          di.client_ref,
+          di.item_status,
           dl.client_id,
-          dl.external_doc_id,
           dl.plan_type,
           dl.codplan,
           dl.vehicle_plate,
@@ -804,8 +831,8 @@ export const getInvoices = async (req: Request, res: Response) => {
         LEFT JOIN documents_l dl ON di.document_id = dl.id
       )
       SELECT 
-        inv_key as id,
-        inv_key as "invoiceNumber",
+        base_data.inv_key as id,
+        base_data.inv_key as "invoiceNumber",
         MAX(base_data.order_number) as "orderNumber",
         STRING_AGG(DISTINCT base_data.observation, '. ') as "notes",
         MAX(base_data.external_doc_id) as "externalDocId",
@@ -831,27 +858,11 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(COALESCE(p.vmetodo::numeric, 0)) as "invoiceValue",
         MAX(p.metodo_pago) as "paymentMethod",
         MAX(u.name) as "userName",
-        (
-          SELECT JSON_AGG(grouped_items)
-          FROM (
-            SELECT 
-              items_sub.article_id as sku,
-              SUM(items_sub.expected_qty) as qty,
-              SUM(items_sub.received_qty) as "receivedQty",
-              MAX(COALESCE(art_sub.name, items_sub.article_id)) as "articleName",
-              MAX(items_sub.unit) as unit,
-              MAX(items_sub.un_code) as "unCode",
-              MAX(items_sub.client_ref) as "clientRef"
-            FROM document_items items_sub
-            LEFT JOIN articles art_sub ON items_sub.article_id = art_sub.id
-            WHERE TRIM(COALESCE(NULLIF(items_sub.invoice, ''), items_sub.order_number)) 
-              = base_data.inv_key
-            GROUP BY 1
-          ) grouped_items
-        ) as "items",
+        MAX(ia.items_json) as "items",
         MIN(COALESCE(gc.lat, 6.2518)) as lat,
         MIN(COALESCE(gc.lng, -75.5636)) as lng
       FROM base_data
+      LEFT JOIN items_agg ia ON ia.item_inv_key = base_data.inv_key
       LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(CONCAT(TRIM(base_data.address), '|', TRIM(base_data.city)))
       LEFT JOIN document_l_payments p ON (TRIM(UPPER(base_data.inv_key)) = TRIM(UPPER(p.invoice)) AND p.invoice != '')
       LEFT JOIN dispatch_assignments da ON (da.invoice_id = base_data.inv_key)
@@ -891,15 +902,13 @@ export const getInvoices = async (req: Request, res: Response) => {
           queryParams.push(docIdExtracted);
           const pIdxDoc = `$${queryParams.length}`;
           return `(
-               (TRIM(COALESCE(base_data.invoice, '')) = ${pIdx} OR TRIM(COALESCE(base_data.order_number, '')) = ${pIdx})
+               (TRIM(COALESCE(base_data.inv_key, '')) = ${pIdx})
                AND base_data.document_id = ${pIdxDoc}
             )`;
         }
 
         return `(
-            TRIM(COALESCE(base_data.invoice, '')) = ${pIdx} 
-            OR 
-            TRIM(COALESCE(base_data.order_number, '')) = ${pIdx}
+            TRIM(COALESCE(base_data.inv_key, '')) = ${pIdx}
          )`;
       });
       if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;

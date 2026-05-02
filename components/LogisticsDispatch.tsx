@@ -168,20 +168,39 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     });
 
     // ── Load filtered clients via API (same pattern as other pages) ──────────
-    useEffect(() => {
         const allowedIds: string[] = (user as any)?.clientIds?.length
             ? (user as any).clientIds
             : user?.clientId ? [user.clientId] : [];
+        
+        // M7-FIX: Admin check based on roleId and specific email as fallback
+        const isSuperAdmin = user?.roleId === 'ROL-01' || (user as any)?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        
+        console.log(`[M7-DISPATCH-DIAGNOSTIC] 🛰️ Cargando clientes para usuario: ${user?.email}. isSuperAdmin: ${isSuperAdmin}`);
+
         api.getClients().then((all: any[]) => {
-            const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
+            // Si la API no retorna nada pero tenemos clientes por props, los usamos (fallback offline/sync)
+            const sourceClients = (all.length === 0 && clients.length > 0) ? clients : all;
+            
+            const isAdmin = isSuperAdmin || (allowedIds.length === 1 && allowedIds[0] === 'CLI-01');
             const filtered = isAdmin || allowedIds.length === 0
-                ? all
-                : all.filter((c: any) => allowedIds.includes(c.id));
+                ? sourceClients
+                : sourceClients.filter((c: any) => allowedIds.includes(c.id));
+            
+            console.log(`[M7-DISPATCH-DIAGNOSTIC] 🛰️ Clientes filtrados: ${filtered.length} de ${sourceClients.length} totales.`);
+            
             setFilteredClients(filtered);
             if (filtered.length === 1) setInternalClientId(filtered[0].id);
             setClientsReady(true);
-        }).catch(() => setClientsReady(true));
-    }, [user]);
+        }).catch((err) => {
+            console.error('[M7-DISPATCH-DIAGNOSTIC] ❌ Error cargando clientes:', err);
+            // Fallback total a props si falla la API
+            if (clients.length > 0) {
+                setFilteredClients(clients);
+                if (clients.length === 1) setInternalClientId(clients[0].id);
+            }
+            setClientsReady(true);
+        });
+    }, [user, clients]);
 
     // 1. Inicialización del Mapa
     useEffect(() => {

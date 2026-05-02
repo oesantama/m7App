@@ -258,7 +258,7 @@ export const learnFromCompletedRoute = async (req: Request, res: Response) => {
         INSERT INTO routing_patterns (city, vehicle_id, neighborhood, strength, last_used)
         VALUES ($1, $2, $3, 2, NOW())
         ON CONFLICT (city, vehicle_id, neighborhood) DO UPDATE SET
-          strength = routing_patterns.strength + 2,
+          strength = COALESCE(routing_patterns.strength, 0) + 2,
           last_used = NOW()
       `, [city, vehicleId, neighborhood]);
 
@@ -271,7 +271,7 @@ export const learnFromCompletedRoute = async (req: Request, res: Response) => {
           INSERT INTO delivery_patterns (address_key, vehicle_id, client_id, strength, last_used)
           VALUES ($1, $2, $3, 2, NOW())
           ON CONFLICT (address_key, vehicle_id) DO UPDATE SET
-            strength = delivery_patterns.strength + 2,
+            strength = COALESCE(delivery_patterns.strength, 0) + 2,
             last_used = NOW()
         `, [addrKey, vehicleId, clientId]);
       }
@@ -282,8 +282,8 @@ export const learnFromCompletedRoute = async (req: Request, res: Response) => {
     res.json({ success: true, patternsUpdated: stops.length });
   } catch (err: any) {
     await client.query('ROLLBACK');
-    console.error('[M7-IQ-ROUTE-ERR]', err.message);
-    res.status(500).json({ error: "Error al registrar aprendizaje de ruta" });
+    console.error('[M7-IQ-ROUTE-ERR] DETALLE:', err);
+    res.status(500).json({ error: "Error al registrar aprendizaje de ruta", details: err.message });
   } finally {
     client.release();
   }
