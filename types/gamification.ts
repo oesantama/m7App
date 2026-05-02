@@ -39,7 +39,7 @@ export interface DriverStats {
   routeOptimizationScore: number; // 0-100
   
   // Seguridad
-  accidentFreeD days: number;
+  accidentFreeDays: number;
   safetyScore: number; // 0-100
   
   // Satisfacción cliente

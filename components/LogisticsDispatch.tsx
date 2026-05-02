@@ -168,6 +168,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     });
 
     // ── Load filtered clients via API (same pattern as other pages) ──────────
+    useEffect(() => {
         const allowedIds: string[] = (user as any)?.clientIds?.length
             ? (user as any).clientIds
             : user?.clientId ? [user.clientId] : [];
