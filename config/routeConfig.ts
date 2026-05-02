@@ -138,6 +138,67 @@ export const CITY_TO_CORRIDOR: Record<string, ViaCorridor> = {
   'HELICONIA': 'OCCIDENTE_ANT',
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NORMALIZACIÓN DE NOMBRES DE CIUDAD
+// Mapea códigos DANE, abreviaciones y variantes al nombre canónico esperado
+// por CITY_TO_CORRIDOR. Si el nombre ya es canónico, la función lo devuelve igual.
+// ─────────────────────────────────────────────────────────────────────────────
+const CITY_NAME_MAP: Record<string, string> = {
+  // Códigos DANE Antioquia
+  '05001': 'MEDELLÍN', '5001': 'MEDELLÍN',
+  '05088': 'BELLO',    '5088': 'BELLO',
+  '05360': 'ITAGÜÍ',   '5360': 'ITAGÜÍ',
+  '05631': 'SABANETA', '5631': 'SABANETA',
+  '05129': 'CALDAS',   '5129': 'CALDAS',
+  '05212': 'LA ESTRELLA', '5212': 'LA ESTRELLA',
+  '05266': 'ENVIGADO', '5266': 'ENVIGADO',
+  '05308': 'GIRARDOTA','5308': 'GIRARDOTA',
+  '05197': 'COPACABANA','5197': 'COPACABANA',
+  '05045': 'BARBOSA',  '5045': 'BARBOSA',
+  '05615': 'RIONEGRO', '5615': 'RIONEGRO',
+  '05310': 'GUARNE',   '5310': 'GUARNE',
+  '05353': 'ITAGÜÍ',   '5353': 'ITAGÜÍ',
+  '05380': 'LA CEJA',  '5380': 'LA CEJA',
+  '05400': 'MARINILLA','5400': 'MARINILLA',
+  '05756': 'EL RETIRO','5756': 'EL RETIRO',
+  '05697': 'SAN VICENTE','5697': 'SAN VICENTE',
+  // Abreviaciones y variantes comunes
+  'MEDELLIN': 'MEDELLÍN', 'MEDELL': 'MEDELLÍN', 'MED': 'MEDELLÍN',
+  'ITAGUI': 'ITAGÜÍ', 'ITAG': 'ITAGÜÍ',
+  'SABANETA': 'SABANETA', 'SAB': 'SABANETA',
+  'LA ESTRELLA': 'LA ESTRELLA', 'ESTRELLA': 'LA ESTRELLA', 'L ESTRELLA': 'LA ESTRELLA',
+  'ENVIGADO': 'ENVIGADO', 'ENV': 'ENVIGADO',
+  'BELLO': 'BELLO',
+  'COPACABANA': 'COPACABANA', 'COPA': 'COPACABANA',
+  'GIRARDOTA': 'GIRARDOTA',
+  'BARBOSA': 'BARBOSA',
+  'CALDAS': 'CALDAS',
+  'RIONEGRO': 'RIONEGRO', 'RIO NEGRO': 'RIONEGRO',
+  'MARINILLA': 'MARINILLA',
+  'GUARNE': 'GUARNE',
+  'LA CEJA': 'LA CEJA',
+  'EL RETIRO': 'EL RETIRO',
+  'SANTA FE DE ANTIOQUIA': 'SANTA FE DE ANTIOQUIA', 'SANTA FE': 'SANTA FE DE ANTIOQUIA',
+  'SOPETRAN': 'SOPETRÁN', 'SOPETRÁN': 'SOPETRÁN',
+  'DON MATIAS': 'DON MATÍAS', 'DON MATÍAS': 'DON MATÍAS',
+  'LA UNION': 'LA UNIÓN', 'LA UNIÓN': 'LA UNIÓN',
+  'SONSON': 'SONSÓN', 'SONSÓN': 'SONSÓN',
+  'EL CARMEN': 'EL CARMEN DE VIBORAL', 'EL CARMEN DE VIBORAL': 'EL CARMEN DE VIBORAL',
+};
+
+/** Convierte cualquier representación de ciudad (código DANE, abreviación, variante)
+ *  al nombre canónico que usa CITY_TO_CORRIDOR. */
+export function normalizeCityName(raw: string): string {
+  const upper = raw.trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
+  // Chequear el mapa (sin tildes para la clave de búsqueda)
+  for (const [key, canonical] of Object.entries(CITY_NAME_MAP)) {
+    const keyNorm = key.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (upper === keyNorm) return canonical;
+  }
+  // Si no hay mapeo, devolver el original en mayúsculas (puede ya ser canónico)
+  return raw.trim().toUpperCase();
+}
+
 /**
  * Corredores que pueden fusionarse cuando el volumen individual es bajo.
  * Un corredor A puede mezclarse con B si B está en la lista de adyacentes de A.

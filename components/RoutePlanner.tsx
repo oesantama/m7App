@@ -27,6 +27,7 @@ import {
   RETAIL_CHAIN_MIN_VOLUME_M3,
   CORRIDOR_ORDER,
   MAX_ROUTE_MINUTES,
+  normalizeCityName,
   type ViaCorridor,
 } from '../config/routeConfig';
 import jsPDF from 'jspdf';
@@ -792,8 +793,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           : null;
         // @ts-ignore
         inv.isPriority = priorityKeywords.some(kw => notes.includes(kw)) || !!timeMatch;
+        // Normalizar ciudad: convierte códigos DANE, abreviaciones y variantes al nombre canónico
+        const normalizedCity = normalizeCityName(String(inv.city || 'SIN_CIUDAD'));
+        if (normalizedCity !== (inv.city || '').trim().toUpperCase()) {
+          (inv as any).city = normalizedCity; // actualizar para display en UI y geocodificación
+        }
         // @ts-ignore
-        inv.cityKey = (String(inv.city || 'SIN_CIUDAD')).toUpperCase().trim();
+        inv.cityKey = normalizedCity;
 
         const rawAddr = (String(inv.address || '')).toUpperCase();
         // @ts-ignore

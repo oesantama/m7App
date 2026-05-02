@@ -8,6 +8,7 @@ import {
   CORRIDOR_ADJACENT,
   CONGESTION_ZONES,
   TUNEL_ORIENTE_FIXED_MIN,
+  normalizeCityName,
   type ViaCorridor,
 } from '../config/routeConfig';
 
@@ -302,7 +303,9 @@ export function hasDefaultCoords(lat: number, lng: number): boolean {
  * Jerarquía: macro-región por nombre de ciudad → corredor por coords GPS → fallback.
  */
 export function classifyCorridor(lat: number, lng: number, cityStr: string): ViaCorridor {
-  const city = cityStr.toUpperCase().trim()
+  // Normalizar primero (resuelve códigos DANE y abreviaciones)
+  const normalized = normalizeCityName(cityStr);
+  const city = normalized.toUpperCase().trim()
     .normalize('NFD').replace(/[̀-ͯ]/g, '');
 
   // Buscar en el mapa de ciudades (normalizado sin tildes)
