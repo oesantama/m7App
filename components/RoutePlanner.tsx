@@ -239,6 +239,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return allowedClientIds.includes(user.clientId) ? user.clientId : (allowedClientIds[0] || '');
   });
 
+  // IDs de facturas ya confirmadas en esta sesión — evita que reboten al limpiar suggestedRoutes
+  const [confirmedSessionIds, setConfirmedSessionIds] = useState<Set<string>>(new Set());
+
   const setInvoices = useAppStore(state => state.setInvoices);
 
   // Recargar facturas automáticamente cuando el usuario cambia de cliente
@@ -499,8 +502,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     // Buscamos en invoiceIds e invoice_ids por compatibilidad de aliasing
     const activeConfirmedIds = new Set(activeRoutes.flatMap(r => r.invoiceIds || (r as any).invoice_ids || []));
 
-    return validInvoices.filter(inv => !suggestedIds.has(inv.id) && !activeConfirmedIds.has(inv.id));
-  }, [validInvoices, suggestedRoutes, activeRoutes]);
+    return validInvoices.filter(inv =>
+      !suggestedIds.has(inv.id) &&
+      !activeConfirmedIds.has(inv.id) &&
+      !confirmedSessionIds.has(inv.id)
+    );
+  }, [validInvoices, suggestedRoutes, activeRoutes, confirmedSessionIds]);
 
   // DESGLOSE DE PENDIENTES POR TIPO DE PLAN (Solicitud Usuario)
   const unassignedCounts = useMemo(() => {
@@ -1558,6 +1565,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       if (res.success) {
         toast.success("Despacho Orbit Confirmado Exitosamente");
 
+        // Registrar IDs confirmados para que no reboten en el contador SIN RUTA
+        const confirmedIds = route.assignedInvoices.map(i => i.id || i.invoiceNumber);
+        setConfirmedSessionIds(prev => new Set([...prev, ...confirmedIds]));
+
         // M7 IQ: aprender de la ruta confirmada (señal más fuerte que adición manual)
         const stops = route.assignedInvoices.map(inv => ({
           city: String(inv.city || 'SIN_CIUDAD').toUpperCase().trim(),
@@ -1840,6 +1851,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
         if (res.success) {
           successCount++;
+          // Registrar IDs confirmados para que no reboten en el contador SIN RUTA
+          const confirmedIds = route.assignedInvoices.map(i => i.id || i.invoiceNumber);
+          setConfirmedSessionIds(prev => new Set([...prev, ...confirmedIds]));
           // M7 IQ: aprender de cada ruta confirmada en despacho masivo
           const stops = route.assignedInvoices.map(inv => ({
             city: String(inv.city || 'SIN_CIUDAD').toUpperCase().trim(),
