@@ -244,6 +244,7 @@ export const api = {
     if (params?.limit)        qs.set('limit',        String(params.limit));
     return fetchJson(`${API_URL}/inventory/movements?${qs}`);
   },
+  getArticleDashboardSummary: (articleId: string) => fetchJson(`${API_URL}/inventory/dashboard-summary?articleId=${encodeURIComponent(articleId)}`),
   // ── Salida a Proveedor ────────────────────────────────────────────────────
   getSupplierReturns: (params?: { clientId?: string; status?: string }) => {
     const qs = new URLSearchParams();

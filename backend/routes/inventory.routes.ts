@@ -12,6 +12,7 @@ import {
   approveConciliationHeader,
   getInventoryStock,
   getInventoryMovements,
+  getArticleDashboardSummary,
 } from '../controllers/inventory.controller.js';
 
 const router = Router();
@@ -58,5 +59,6 @@ router.patch('/conciliation-headers/:id/approve', requireInventoryEdit, approveC
 // ─── Consulta de Stock e Inventario ──────────────────────────────────────────
 router.get('/stock',     requireInventoryView, getInventoryStock);
 router.get('/movements', requireInventoryView, getInventoryMovements);
+router.get('/dashboard-summary', requireInventoryView, getArticleDashboardSummary);
 
 export default router;

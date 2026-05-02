@@ -423,3 +423,47 @@ export const getInventoryMovements = async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// ─── DASHBOARD SUMMARY (Consolidado de Manifiestos/Archivos) ──────────────────
+export const getArticleDashboardSummary = async (req: Request, res: Response) => {
+  const { articleId } = req.query as Record<string, string>;
+  if (!articleId) return res.status(400).json({ error: 'articleId es requerido' });
+
+  try {
+    // 1. Resumen de Manifiestos (Archivo vs Conteo)
+    const manifestSummaryRes = await pool.query(`
+      SELECT 
+        SUM(di.expected_qty) as total_expected,
+        SUM(di.received_qty) as total_received
+      FROM document_items di
+      WHERE di.article_id = $1
+    `, [articleId]);
+
+    // 2. Listado de Facturas Relacionadas (desde document_items)
+    const invoicesRes = await pool.query(`
+      SELECT 
+        di.invoice,
+        di.document_id,
+        dl.external_doc_id,
+        di.expected_qty,
+        di.received_qty,
+        di.batch,
+        dl.created_at as doc_date,
+        dl.vehicle_plate,
+        dl.status as doc_status
+      FROM document_items di
+      JOIN documents_l dl ON dl.id = di.document_id
+      WHERE di.article_id = $1
+      ORDER BY dl.created_at DESC
+      LIMIT 20
+    `, [articleId]);
+
+    res.json({
+      success: true,
+      summary: manifestSummaryRes.rows[0],
+      invoices: invoicesRes.rows
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};

@@ -286,6 +286,7 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
   const [error, setError]                 = useState<string | null>(null);
   const [articleLabel, setArticleLabel]   = useState('');
   const [articleData, setArticleData]     = useState<any>(null);
+  const [dashboardSummary, setDashboardSummary] = useState<{ summary: any, invoices: any[] } | null>(null);
 
   // Client selector
   const [clients, setClients]             = useState<Client[]>([]);
@@ -325,6 +326,7 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
           dateTo: dateTo || undefined,
           limit: 500,
         }),
+        api.getArticleDashboardSummary(term),
       ]);
 
       const bodega:   StockRow[] = Array.isArray(stockRes?.bodega)    ? stockRes.bodega    : [];
@@ -334,6 +336,7 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
       setStockBodega(bodega);
       setStockVehicle(vehiculos);
       setMovements(movData);
+      setDashboardSummary(dashRes);
 
       const firstItem = bodega[0] || vehiculos[0];
       setArticleData(firstItem || null);
@@ -357,8 +360,18 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
   const totalDevuelto   = movements.filter(m => m.movement_type === 'DEVOLUCION').reduce((a, m) => a + Number(m.quantity), 0);
   const totalProveedor  = movements.filter(m => m.movement_type === 'SALIDA_PROVEEDOR').reduce((a, m) => a + Number(m.quantity), 0);
 
-  // Invoices where this item appears
-  const uniqueInvoices = Array.from(new Set(movements.map(m => m.invoice).filter(Boolean)));
+  // Invoices where this item appears (from manifests + movements)
+  const invoicesFromDash = dashboardSummary?.invoices || [];
+  const invoicesFromMovs = Array.from(new Set(movements.map(m => m.invoice).filter(Boolean)));
+  
+  // Create a combined list of unique invoices
+  const combinedInvoices = Array.from(new Set([
+    ...invoicesFromDash.map(inv => inv.invoice),
+    ...invoicesFromMovs
+  ])).filter(Boolean);
+
+  const expectedIngresoTotal = Number(dashboardSummary?.summary?.total_expected || 0);
+  const receivedIngresoTotal = Number(dashboardSummary?.summary?.total_received || 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -505,25 +518,52 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
             {/* Invoices List Card */}
             <div className="bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Facturas Relacionadas</h3>
-                <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black">{uniqueInvoices.length}</span>
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Relación de Facturas</h3>
+                <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black">{combinedInvoices.length}</span>
               </div>
               <div className="flex-1 overflow-y-auto max-h-[220px] pr-2 custom-scrollbar">
-                {uniqueInvoices.length > 0 ? (
+                {combinedInvoices.length > 0 ? (
                   <div className="flex flex-col gap-2">
-                    {uniqueInvoices.map((inv, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 hover:bg-indigo-50/30 transition-all cursor-pointer">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-500 group-hover:border-indigo-200 transition-colors">
-                            <Icons.FileText />
+                    {combinedInvoices.map((invCode, idx) => {
+                      const dashInfo = invoicesFromDash.find(d => d.invoice === invCode);
+                      return (
+                        <div key={idx} className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 hover:bg-indigo-50/30 transition-all">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-500 group-hover:border-indigo-200 transition-colors">
+                                <Icons.FileText />
+                              </div>
+                              <span className="text-xs font-black text-slate-900 font-mono tracking-tight">{invCode}</span>
+                            </div>
+                            <div className="text-[9px] font-black text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-100">
+                              DOC: {dashInfo?.external_doc_id || 'N/A'}
+                            </div>
                           </div>
-                          <span className="text-xs font-bold text-slate-700 font-mono">{inv}</span>
+                          
+                          {dashInfo && (
+                            <div className="flex items-center justify-between border-t border-slate-200/50 pt-2 mt-1">
+                              <div className="flex gap-4">
+                                <div className="flex flex-col">
+                                  <span className="text-[8px] font-black text-slate-400 uppercase">Archivo</span>
+                                  <span className="text-[11px] font-black text-slate-700">{Number(dashInfo.expected_qty)}</span>
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[8px] font-black text-slate-400 uppercase">Recibido</span>
+                                  <span className={`text-[11px] font-black ${Number(dashInfo.received_qty) < Number(dashInfo.expected_qty) ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                    {Number(dashInfo.received_qty)}
+                                  </span>
+                                </div>
+                              </div>
+                              {dashInfo.vehicle_plate && (
+                                <div className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                                  {dashInfo.vehicle_plate}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-slate-300 group-hover:text-indigo-400">
-                          <Icons.ChevronRight />
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-2 py-8">
@@ -538,7 +578,7 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
-              { label: 'Total Ingreso', val: totalIngresado,  color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', icon: '📥' },
+              { label: 'Total Ingreso', val: receivedIngresoTotal, sub: `Archivo: ${expectedIngresoTotal}`, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', icon: '📥' },
               { label: 'Total Despacho',val: totalDespachado, color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-100',    icon: '🚛' },
               { label: 'Total Entrega', val: totalEntregado,  color: 'text-teal-600',    bg: 'bg-teal-50',    border: 'border-teal-100',    icon: '✅' },
               { label: 'Devoluciones',  val: totalDevuelto,   color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-100',   icon: '🔄' },
@@ -547,7 +587,10 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
               <div key={idx} className={`rounded-2xl p-4 border ${s.bg} ${s.border} flex flex-col gap-1 shadow-sm`}>
                 <div className="flex items-center justify-between">
                   <span className="text-lg">{s.icon}</span>
-                  <span className={`text-xl font-black ${s.color}`}>{s.val}</span>
+                  <div className="flex flex-col items-end">
+                    <span className={`text-xl font-black ${s.color}`}>{s.val}</span>
+                    {s.sub && <span className="text-[9px] font-bold text-slate-400">{s.sub}</span>}
+                  </div>
                 </div>
                 <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-tight">
                   {s.label}
