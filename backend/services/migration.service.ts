@@ -510,6 +510,26 @@ const healSchema = async (client: any) => {
         ON delivery_patterns (address_key);
     `);
 
+    // ── FIX: delivery_patterns.id debe tener secuencia BIGSERIAL para INSERT sin id ──
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'delivery_patterns'
+            AND column_name = 'id'
+            AND column_default IS NULL
+        ) THEN
+          CREATE SEQUENCE IF NOT EXISTS delivery_patterns_id_seq;
+          ALTER TABLE delivery_patterns ALTER COLUMN id TYPE BIGINT USING (
+            CASE WHEN id::text ~ '^[0-9]+$' THEN id::text::BIGINT ELSE nextval('delivery_patterns_id_seq') END
+          );
+          ALTER TABLE delivery_patterns ALTER COLUMN id SET DEFAULT nextval('delivery_patterns_id_seq');
+          PERFORM setval('delivery_patterns_id_seq', COALESCE((SELECT MAX(id) FROM delivery_patterns), 0) + 1);
+        END IF;
+      END$$;
+    `);
+
     // ── FIX: routing_patterns.id debe ser SERIAL (no TEXT) para que el INSERT sin id funcione ──
     await client.query(`
       DO $$
