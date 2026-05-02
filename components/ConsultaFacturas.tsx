@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
 import { Icons } from '../constants';
 import { hasPermission } from '../utils/permissions';
