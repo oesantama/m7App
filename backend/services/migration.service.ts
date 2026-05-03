@@ -888,6 +888,15 @@ export const restoreSystem = async () => {
       ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS max_weight_kg NUMERIC(10,2);
     `);
 
+    // ── geocoding_cache: id legacy puede ser NOT NULL sin default → hacerlo nullable ──
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE geocoding_cache ALTER COLUMN id DROP NOT NULL;
+      EXCEPTION WHEN undefined_column THEN NULL;
+                WHEN OTHERS THEN NULL;
+      END $$;
+    `);
+
     // ── Caché de distancias reales por red vial (OSRM) ────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS road_distance_cache (
