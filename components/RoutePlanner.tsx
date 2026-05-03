@@ -358,46 +358,35 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       return;
     }
     let cancelled = false;
-    // 400ms: dar tiempo al DOM para que el modal y el flex container tengan dimensiones reales
-    const timer = setTimeout(async () => {
-      const container = document.getElementById('route-preview-map');
+
+    const initMap = async () => {
+      // Esperar a que el container tenga dimensiones reales (máx 20 intentos × 50ms)
+      let container: HTMLElement | null = null;
+      for (let i = 0; i < 20; i++) {
+        container = document.getElementById('route-preview-map');
+        if (container && container.clientWidth > 0 && container.clientHeight > 0) break;
+        await new Promise(r => setTimeout(r, 50));
+        if (cancelled) return;
+      }
       if (!container || cancelled) return;
-      // El wrapper padre (position:relative) ya tiene dimensiones reales gracias a flex-1
-      // container usa position:absolute inset:0 → hereda exactamente esas dimensiones
+
       if (routePreviewMapRef.current) {
         routePreviewMapRef.current.remove();
         routePreviewMapRef.current = null;
       }
+
       const route = routeMapModal.route!;
+      const dotColor = getCityDotColor(route.city);
 
-      // Geocodificar stops que tienen coordenadas por defecto (centro de Medellín)
-      const DEFAULT_LAT = 6.2518, DEFAULT_LNG = -75.5636;
-      const enriched = await Promise.all(
-        route.assignedInvoices.map(async (inv) => {
-          const lat = Number(inv.lat), lng = Number(inv.lng);
-          const isDefault = Math.abs(lat - DEFAULT_LAT) < 0.001 && Math.abs(lng - DEFAULT_LNG) < 0.001;
-          if (isDefault && inv.address && inv.city) {
-            try {
-              const geo = await api.geocodeAddress({ address: inv.address, city: inv.city });
-              if (geo?.lat && geo?.lng && !geo.fallback) return { ...inv, lat: geo.lat, lng: geo.lng };
-            } catch { }
-          }
-          return inv;
-        })
-      );
-      if (cancelled) return;
-
-      const stops = enriched.filter(inv => Number(inv.lat) && Number(inv.lng));
+      // Usar coordenadas existentes directamente (sin bloquear con geocodificación)
+      const stops = route.assignedInvoices.filter(inv => Number(inv.lat) && Number(inv.lng));
       const centerLat = stops.length > 0 ? stops.reduce((a, inv) => a + Number(inv.lat), 0) / stops.length : ORBIT_HUB_ORIGIN.lat;
       const centerLng = stops.length > 0 ? stops.reduce((a, inv) => a + Number(inv.lng), 0) / stops.length : ORBIT_HUB_ORIGIN.lng;
 
+      // Inicializar mapa con dimensiones ya garantizadas
       const map = L.map(container, { zoomControl: true, preferCanvas: true }).setView([centerLat, centerLng], 12);
+      routePreviewMapRef.current = map;
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxZoom: 19 }).addTo(map);
-      // Múltiples invalidaciones para garantizar render correcto en flex containers
-      setTimeout(() => { if (!cancelled) map.invalidateSize({ pan: false }); }, 50);
-      setTimeout(() => { if (!cancelled) map.invalidateSize({ pan: false }); }, 300);
-      setTimeout(() => { if (!cancelled) map.invalidateSize({ pan: false }); }, 700);
-      setTimeout(() => { if (!cancelled) { map.invalidateSize({ pan: false }); } }, 1200);
 
       // Hub marker
       const hubIcon = L.divIcon({
@@ -408,8 +397,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         .bindPopup('<b>HUB ORBIT</b><br>Punto de despacho').addTo(map);
 
       const points: L.LatLng[] = [L.latLng(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng)];
-      const dotColor = getCityDotColor(route.city);
-
       stops.forEach((inv, i) => {
         const lat = Number(inv.lat), lng = Number(inv.lng);
         points.push(L.latLng(lat, lng));
@@ -423,59 +410,38 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       if (points.length > 1) {
-        map.fitBounds(L.latLngBounds(points), { padding: [24, 24] });
+        map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
 
-        // Intentar ruta real por calles via OSRM
-        // OSRM público limita a ~10 waypoints por petición → chunking para rutas largas
-        const MAX_WP_PER_CALL = 9; // 9 stops + 1 overlap = 10 per chunk
+        // Línea de fallback inmediata (guiones) mientras carga OSRM
+        const fallbackLine = L.polyline(points, { color: dotColor, weight: 2.5, opacity: 0.55, dashArray: '8,5' }).addTo(map);
+
+        // OSRM en background: reemplaza la línea de fallback sin bloquear el render
+        const MAX_WP = 9;
         const wpArray = points.map(p => ({ lat: p.lat, lng: p.lng }));
-        let allCoords: [number, number][] = [];
-        let osrmOk = false;
-
         try {
-          if (wpArray.length <= MAX_WP_PER_CALL + 1) {
-            // Ruta corta: una sola llamada
-            const roadData = await api.getRoadRoute(wpArray);
-            if (roadData?.coordinates?.length > 1) {
-              allCoords = roadData.coordinates;
-              osrmOk = true;
-            }
+          let allCoords: [number, number][] = [];
+          if (wpArray.length <= MAX_WP + 1) {
+            const rd = await api.getRoadRoute(wpArray);
+            if (rd?.coordinates?.length > 1) allCoords = rd.coordinates;
           } else {
-            // Ruta larga: dividir en chunks con overlap de 1 punto
-            for (let ci = 0; ci < wpArray.length - 1; ci += MAX_WP_PER_CALL) {
-              const chunk = wpArray.slice(ci, ci + MAX_WP_PER_CALL + 1);
-              try {
-                const rd = await api.getRoadRoute(chunk);
-                if (rd?.coordinates?.length > 1) {
-                  allCoords = [...allCoords, ...rd.coordinates];
-                  osrmOk = true;
-                } else { osrmOk = false; break; }
-              } catch { osrmOk = false; break; }
+            for (let ci = 0; ci < wpArray.length - 1; ci += MAX_WP) {
+              const chunk = wpArray.slice(ci, ci + MAX_WP + 1);
+              const rd = await api.getRoadRoute(chunk);
+              if (rd?.coordinates?.length > 1) allCoords = [...allCoords, ...rd.coordinates];
+              else { allCoords = []; break; }
             }
           }
-        } catch { osrmOk = false; }
-
-        if (!cancelled) {
-          if (osrmOk && allCoords.length > 1) {
+          if (!cancelled && allCoords.length > 1 && routePreviewMapRef.current) {
+            map.removeLayer(fallbackLine);
             const latlngs = allCoords.map(([lng, lat]: [number, number]) => L.latLng(lat, lng));
             L.polyline(latlngs, { color: dotColor, weight: 3.5, opacity: 0.85 }).addTo(map);
-          } else {
-            // Fallback: línea recta entre paradas (indicado con guiones)
-            L.polyline(points, { color: dotColor, weight: 2.5, opacity: 0.7, dashArray: '8,5' }).addTo(map);
           }
-        }
+        } catch { /* conservar línea de fallback */ }
       }
-      routePreviewMapRef.current = map;
-      // Ajustar vista a todos los puntos una vez que el mapa esté estabilizado
-      if (points.length > 1) {
-        setTimeout(() => {
-          if (!cancelled && routePreviewMapRef.current) {
-            try { routePreviewMapRef.current.fitBounds(L.latLngBounds(points), { padding: [40, 40] }); } catch { }
-          }
-        }, 1300);
-      }
-    }, 600);
-    return () => { cancelled = true; clearTimeout(timer); };
+    };
+
+    initMap();
+    return () => { cancelled = true; };
   }, [routeMapModal.isOpen, routeMapModal.route]);
 
   // FILTRADO DE FACTURAS APTAS: Real (basado en lo que viene del API de facturas)
