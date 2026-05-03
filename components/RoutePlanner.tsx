@@ -741,8 +741,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const baseInvoicePool = specificInvoices
         ? specificInvoices
         : validInvoices.filter(inv => !_activeRouteIds.has(inv.id) && !confirmedSessionIds.has(inv.id));
+      // Deduplicar el pool de entrada por número de factura.
+      // El SQL puede retornar la misma factura N veces si sus ítems están
+      // en documentos distintos o si algún JOIN expande filas antes del GROUP BY.
+      const _poolSeen = new Set<string>();
       let availableInvoices = baseInvoicePool
-        .filter(inv => inv && typeof inv === 'object')
+        .filter(inv => {
+          if (!inv || typeof inv !== 'object') return false;
+          const k = String(inv.invoiceNumber || inv.id || '').trim().toUpperCase();
+          if (!k || _poolSeen.has(k)) return false;
+          _poolSeen.add(k);
+          return true;
+        })
         .map(inv => ({ ...inv }));
 
       // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA (MEJORA 6: clustering espacial) ---
@@ -1543,6 +1553,28 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             osrmRefinedCount++;
           } catch { /* OSRM no disponible — conservar orden Haversine */ }
         }));
+      }
+
+      // ── Deduplicación global final ───────────────────────────────────────────
+      // Una factura nunca debe aparecer en más de una ruta ni repetida en la misma.
+      // Esto es la tercera línea de defensa (pool input + validInvoices + esta).
+      {
+        const _globalSeen = new Set<string>();
+        suggestions.forEach((r, ri) => {
+          const unique = r.assignedInvoices.filter(inv => {
+            const k = String(inv.invoiceNumber || inv.id || '').trim().toUpperCase();
+            if (!k || _globalSeen.has(k)) return false;
+            _globalSeen.add(k);
+            return true;
+          });
+          if (unique.length !== r.assignedInvoices.length) {
+            const cap = Number(r.vehicle.capacityM3) || 25;
+            const vol = unique.reduce((s, i) => s + (Number(i.volumeM3) || 0), 0);
+            suggestions[ri] = { ...r, assignedInvoices: unique, totalVolume: Number(vol.toFixed(4)), utilization: Math.round((vol / cap) * 100) };
+          }
+        });
+        // Eliminar rutas que quedaron vacías tras la dedup
+        suggestions.splice(0, suggestions.length, ...suggestions.filter(r => r.assignedInvoices.length > 0));
       }
 
       if (suggestions.length === 0) {

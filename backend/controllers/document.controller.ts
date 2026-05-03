@@ -828,6 +828,8 @@ export const getInvoices = async (req: Request, res: Response) => {
           di.un_code,
           di.client_ref,
           di.item_status,
+          di.latitude,
+          di.longitude,
           dl.client_id,
           dl.plan_type,
           dl.codplan,
@@ -867,8 +869,8 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(p.metodo_pago) as "paymentMethod",
         MAX(u.name) as "userName",
         MAX(ia.items_json::text)::json as "items",
-        MIN(COALESCE(gc.lat, 6.2518)) as lat,
-        MIN(COALESCE(gc.lng, -75.5636)) as lng
+        MIN(COALESCE(gc.lat, NULLIF(base_data.latitude, 0), 6.2518)) as lat,
+        MIN(COALESCE(gc.lng, NULLIF(base_data.longitude, 0), -75.5636)) as lng
       FROM base_data
       LEFT JOIN items_agg ia ON ia.item_inv_key = base_data.inv_key
       LEFT JOIN geocoding_cache gc ON gc.address_key = LOWER(CONCAT(TRIM(base_data.address), '|', TRIM(base_data.city)))
