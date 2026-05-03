@@ -3404,13 +3404,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 {(() => {
                   const docMap = new Map<string, { label: string, desc: string, planType: string, invoices: Invoice[], volume: number }>();
 
-                  // DocStatus enum usa Title Case: 'Pendiente', 'Recibido', 'En Conteo', 'Inventariado'
-                  const validDocStatuses = ['pendiente', 'recibido', 'en conteo', 'inventariado'];
+                  // Solo excluir documentos en estado terminal (eliminado, entregado, anulado)
+                  const terminalDocStatuses = new Set(['est-16','est-12','est-07','est-17','eliminado','anulado','entregado']);
                   validInvoices.forEach(inv => {
                     if (!inv.docLId) return;
 
                     const doc = documents.find(d => d.id === inv.docLId);
-                    if (doc && !validDocStatuses.includes(String(doc.status || '').toLowerCase())) return;
+                    if (doc && terminalDocStatuses.has(String(doc.status || '').toLowerCase())) return;
                     const groupKey = inv.docLId;
                     const label = doc?.externalDocId
                       ? `Documento Maestro: ${doc.externalDocId}`

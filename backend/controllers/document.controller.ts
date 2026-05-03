@@ -921,13 +921,24 @@ export const getInvoices = async (req: Request, res: Response) => {
       });
       if (orClauses.length > 0) query += ` AND (${orClauses.join(' OR ')})`;
     } else if (history !== 'true') {
-      // Planificador: solo facturas pendientes o en repique a bodega
-      query += ` AND (base_data.item_status IN ('EST-01', 'EST-03', 'EST-08', 'EST-15') OR base_data.item_status IS NULL)
-        AND base_data.doc_status NOT IN ('EST-16','EST-12','EST-07','EST-17')`;
+      // Pre-filtrar solo documentos terminales a nivel de fila; el filtro de item_status
+      // se aplica a nivel de factura (HAVING) para evitar que ítems mixtos [EST-03+EST-10]
+      // hagan aparecer facturas ya asignadas como pendientes.
+      query += ` AND base_data.doc_status NOT IN ('EST-16','EST-12','EST-07','EST-17')`;
     }
 
-    query += ` GROUP BY base_data.inv_key
-      ORDER BY base_data.inv_key ASC`;
+    query += ` GROUP BY base_data.inv_key`;
+
+    if (!ids && history !== 'true') {
+      // HAVING a nivel factura: excluir si ALGÚN ítem está asignado/en ruta/entregado.
+      // Incluir solo si AL MENOS UN ítem está en estado pendiente o repique.
+      query += `
+      HAVING
+        MAX(CASE WHEN base_data.item_status IN ('EST-10','EST-11','EST-12','EST-13','EST-14') THEN 1 ELSE 0 END) = 0
+        AND (MAX(CASE WHEN base_data.item_status IN ('EST-01','EST-03','EST-04','EST-05','EST-08','EST-15') OR base_data.item_status IS NULL THEN 1 ELSE 0 END) = 1)`;
+    }
+
+    query += ` ORDER BY base_data.inv_key ASC`;
 
     const result = await pool.query(query, queryParams);
 
