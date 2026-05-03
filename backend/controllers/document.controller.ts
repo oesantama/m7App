@@ -693,11 +693,13 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
           // Plan R: guardar coordenadas directas en geocoding_cache
           if (itemLat !== null && itemLng !== null && item.address) {
             const addrKey = (item.address + '|' + (item.city || '')).toLowerCase().trim();
-            await client.query(`
-              INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
-              VALUES ($1, $2, $3, $4, $5)
-              ON CONFLICT (address_key) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng
-            `, [addrKey, item.address, item.city || '', itemLat, itemLng]);
+            try {
+              await client.query(`
+                INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (address_key) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng
+              `, [addrKey, item.address, item.city || '', itemLat, itemLng]);
+            } catch (_) { /* caché no crítica */ }
           }
         }
       }
@@ -2208,12 +2210,14 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
         const newCity = item.city    ?? old.city;
         if (item.lat != null && item.lng != null && newAddr) {
           const addrKey = (newAddr + '|' + (newCity || '')).toLowerCase().trim();
-          await client.query(
-            `INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (address_key) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng`,
-            [addrKey, newAddr, newCity, item.lat, item.lng]
-          );
+          try {
+            await client.query(
+              `INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (address_key) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng`,
+              [addrKey, newAddr, newCity, item.lat, item.lng]
+            );
+          } catch (_) { /* caché de geocodificación no crítica — la migración corregirá el schema */ }
         }
 
         // Log de auditoría campo por campo
