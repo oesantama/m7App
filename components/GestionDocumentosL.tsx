@@ -514,9 +514,9 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           ? findIdx(['nombre', 'nombre cliente', 'razon social', 'razon'])
           : findIdx(['clnt envio', 'clnt env', 'cliente envio', 'nombre envio', 'nombre cliente', 'razon social']);
 
-        // Plan R: coordenadas GPS directas (fuente primaria para el planificador de rutas)
-        const iLat = isPlanR ? findIdx(['latitud', 'lat', 'latitude', 'coord y', 'coordenada y', 'y_coord', 'coord_y']) : -1;
-        const iLng = isPlanR ? findIdx(['longitud', 'lng', 'longitude', 'coord x', 'coordenada x', 'x_coord', 'coord_x']) : -1;
+        // Coordenadas GPS — disponibles tanto en Plan R como en Plan Normal
+        const iLat = findIdx(['latitud', 'lat', 'latitude', 'coord y', 'coordenada y', 'y_coord', 'coord_y']);
+        const iLng = findIdx(['longitud', 'lng', 'longitude', 'coord x', 'coordenada x', 'x_coord', 'coord_x']);
 
         if (import.meta.env.DEV) {
           const dataRowsDebug = rawData.slice(headerRowIndex + 1).filter(r => r && r.length > 0).slice(0, 3);
