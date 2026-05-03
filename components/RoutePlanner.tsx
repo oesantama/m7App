@@ -270,6 +270,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   }, [selectedClient]);
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizingProgress, setOptimizingProgress] = useState(0);
+  const [optimizingPhase, setOptimizingPhase] = useState('');
   const [viewMode, setViewMode] = useState<'intelligence' | 'map' | 'active'>('intelligence');
 
   const [auditLogs, setAuditLogs] = useState<RouteLog[]>([]);
@@ -300,6 +302,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ isOpen: boolean; id: string } | null>(null);
   const [routeMapModal, setRouteMapModal] = useState<{ isOpen: boolean; route: SuggestedRoute | null }>({ isOpen: false, route: null });
+  const [routeMapStats, setRouteMapStats] = useState<{ km: number; minutes: number } | null>(null);
   const routePreviewMapRef = useRef<L.Map | null>(null);
   const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addInvoiceInputRef = useRef<HTMLInputElement>(null);
@@ -355,6 +358,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         routePreviewMapRef.current.remove();
         routePreviewMapRef.current = null;
       }
+      setRouteMapStats(null);
       return;
     }
     let cancelled = false;
@@ -379,14 +383,24 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const dotColor = getCityDotColor(route.city);
 
       // Usar coordenadas existentes directamente (sin bloquear con geocodificación)
-      const stops = route.assignedInvoices.filter(inv => Number(inv.lat) && Number(inv.lng));
+      const DEFAULT_LAT = 6.2518, DEFAULT_LNG = -75.5636;
+      const isDefaultCoord = (lat: number, lng: number) =>
+        Math.abs(lat - DEFAULT_LAT) < 0.0001 && Math.abs(lng - DEFAULT_LNG) < 0.0001;
+      const stops = route.assignedInvoices.filter(inv => {
+        const lat = Number(inv.lat), lng = Number(inv.lng);
+        return lat !== 0 && lng !== 0 && !isDefaultCoord(lat, lng);
+      });
       const centerLat = stops.length > 0 ? stops.reduce((a, inv) => a + Number(inv.lat), 0) / stops.length : ORBIT_HUB_ORIGIN.lat;
       const centerLng = stops.length > 0 ? stops.reduce((a, inv) => a + Number(inv.lng), 0) / stops.length : ORBIT_HUB_ORIGIN.lng;
 
       // Inicializar mapa con dimensiones ya garantizadas
       const map = L.map(container, { zoomControl: true, preferCanvas: true }).setView([centerLat, centerLng], 12);
       routePreviewMapRef.current = map;
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxZoom: 19 }).addTo(map);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO',
+        subdomains: 'abcd',
+        maxZoom: 20
+      }).addTo(map);
 
       // Hub marker
       const hubIcon = L.divIcon({
@@ -418,23 +432,35 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // OSRM en background: reemplaza la línea de fallback sin bloquear el render
         const MAX_WP = 9;
         const wpArray = points.map(p => ({ lat: p.lat, lng: p.lng }));
+        setRouteMapStats(null);
         try {
           let allCoords: [number, number][] = [];
+          let totalDistM = 0, totalDurS = 0;
           if (wpArray.length <= MAX_WP + 1) {
             const rd = await api.getRoadRoute(wpArray);
-            if (rd?.coordinates?.length > 1) allCoords = rd.coordinates;
+            if (rd?.coordinates?.length > 1) {
+              allCoords = rd.coordinates;
+              totalDistM = rd.distance || 0;
+              totalDurS = rd.duration || 0;
+            }
           } else {
             for (let ci = 0; ci < wpArray.length - 1; ci += MAX_WP) {
               const chunk = wpArray.slice(ci, ci + MAX_WP + 1);
               const rd = await api.getRoadRoute(chunk);
-              if (rd?.coordinates?.length > 1) allCoords = [...allCoords, ...rd.coordinates];
-              else { allCoords = []; break; }
+              if (rd?.coordinates?.length > 1) {
+                allCoords = [...allCoords, ...rd.coordinates];
+                totalDistM += rd.distance || 0;
+                totalDurS += rd.duration || 0;
+              } else { allCoords = []; break; }
             }
           }
           if (!cancelled && allCoords.length > 1 && routePreviewMapRef.current) {
             map.removeLayer(fallbackLine);
             const latlngs = allCoords.map(([lng, lat]: [number, number]) => L.latLng(lat, lng));
             L.polyline(latlngs, { color: dotColor, weight: 3.5, opacity: 0.85 }).addTo(map);
+            if (totalDistM > 0) {
+              setRouteMapStats({ km: Math.round(totalDistM / 100) / 10, minutes: Math.round(totalDurS / 60) });
+            }
           }
         } catch { /* conservar línea de fallback */ }
       }
@@ -727,6 +753,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   const runOrbitOptimization = (specificInvoices?: Invoice[]) => {
     setIsOptimizing(true);
+    setOptimizingProgress(0); setOptimizingPhase('Preparando facturas...');
     setSuggestedRoutes([]);
     if (!specificInvoices) setLastReadjustmentResult(null);
     setReadjustmentModal({ isOpen: false, selectedDocIds: new Set() });
@@ -756,6 +783,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         .map(inv => ({ ...inv }));
 
       // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA (MEJORA 6: clustering espacial) ---
+      setOptimizingProgress(5); setOptimizingPhase('Analizando cadenas comerciales...');
       const retailGroups: { [key: string]: Invoice[] } = {};
       RETAIL_CHAIN_KEYWORDS.forEach(chain => {
         const matches = availableInvoices.filter(inv =>
@@ -893,6 +921,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       // ── PRE-PASO: Agrupación por dirección/cliente ────────────────────────
+      setOptimizingProgress(12); setOptimizingPhase('Agrupando por dirección y cliente...');
       {
         const addrGroups = new Map<string, Invoice[]>();
         availableInvoices.forEach(inv => {
@@ -1009,6 +1038,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       // Mapa: vehicle_id → Map<"CIUDAD|BARRIO", strength>
       // ── FASE 0: Pre-asignación por cliente recurrente (delivery_patterns) ────
+      setOptimizingProgress(20); setOptimizingPhase('Aplicando patrones de entrega...');
       // Facturas cuya dirección exacta tiene un patrón fuerte (≥3) se anclan al
       // vehículo que históricamente las entrega, sacándolas del pool general.
       if (deliveryPatterns.length > 0) {
@@ -1083,6 +1113,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // ──────────────────────────────────────────────────────────────────────────
 
       // ── Territorio aprendido con decaimiento por recencia ────────────────────
+      setOptimizingProgress(30); setOptimizingPhase('Calculando territorios optimizados...');
       // effectiveStrength = strength * decay(lastUsed)
       // decay: 1.0 (usado hoy) → 0.2 (mínimo, +180 días sin uso)
       const MS_PER_DAY = 86_400_000;
@@ -1140,6 +1171,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         }
       }
       // ──────────────────────────────────────────────────────────────────────
+      setOptimizingProgress(40); setOptimizingPhase('Ejecutando algoritmo cluster-first...');
 
       prioritizedFleet.forEach(vehicle => {
         if (remainingCells.every(c => c.invoices.length === 0)) return;
@@ -1352,6 +1384,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       });
 
       // ── Balance post-clustering ────────────────────────────────────────────────
+      setOptimizingProgress(65); setOptimizingPhase('Balanceando carga entre rutas...');
       // Mueve facturas de rutas con muy pocas paradas hacia rutas livianas de la
       // misma zona geográfica, respetando capacidad de volumen y MAX_INVOICES.
       if (suggestions.length >= 2) {
@@ -1451,6 +1484,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // ─────────────────────────────────────────────────────────────────────────
 
       // ── Sweep final: absorber facturas sobrantes en rutas existentes ─────────
+      setOptimizingProgress(72); setOptimizingPhase('Absorbiendo facturas sobrantes...');
       // Para cada factura que quedó sin ruta, busca el candidato más cercano que
       // sea del mismo corredor, tenga capacidad y no supere 8h.
       if (availableInvoices.length > 0 && suggestions.length > 0) {
@@ -1502,6 +1536,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
 
       // ── Or-opt inter-ruta ───────────────────────────────────────────────────
+      setOptimizingProgress(80); setOptimizingPhase('Optimizando inter-rutas (Or-opt)...');
       // Mueve paradas individuales entre rutas para minimizar distancia total.
       // Corre después del sweep para que trabaje sobre el conjunto final completo.
       if (suggestions.length > 1) {
@@ -1519,6 +1554,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
 
       // ── ILS: perturbación + reparación para escapar mínimos locales ──────────
+      setOptimizingProgress(87); setOptimizingPhase('Refinando con ILS...');
       // Ejecuta 4 rondas destroy→repair→oropt, acepta solo si mejora el score.
       if (suggestions.length > 1) {
         const ilsResult = ilsImprove(suggestions, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, 4);
@@ -1526,6 +1562,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
 
       // ── OSRM: refinamiento final con distancias reales por red vial ──────────
+      setOptimizingProgress(93); setOptimizingPhase('Calculando rutas reales (OSRM)...');
       // Cada ruta recibe su propia matriz NxN de OSRM y re-corre 2-opt + Or-opt(1).
       // Corre en paralelo (Promise.all). Si OSRM falla en alguna ruta, esa ruta
       // conserva el orden Haversine ya optimizado — sin pérdida de datos.
@@ -1556,6 +1593,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
 
       // ── Deduplicación global final ───────────────────────────────────────────
+      setOptimizingProgress(98); setOptimizingPhase('Validando y deduplicando...');
       // Una factura nunca debe aparecer en más de una ruta ni repetida en la misma.
       // Esto es la tercera línea de defensa (pool input + validInvoices + esta).
       {
@@ -1613,7 +1651,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         setLastReadjustmentResult(null);
       }
 
+      setOptimizingProgress(100); setOptimizingPhase('');
       setIsOptimizing(false);
+      setOptimizingProgress(0);
     }, 1200);
   };
 
@@ -2688,18 +2728,33 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             />
           </div>
 
-          <button
-            onClick={async () => {
-              setIsOptimizing(true);
-              const enriched = await enrichInvoicesWithGeocode([...validInvoices]);
-              runOrbitOptimization(enriched.length > 0 ? enriched : undefined);
-            }}
-            disabled={isOptimizing || validInvoices.length === 0}
-            className="shrink-0 bg-slate-900 text-emerald-500 px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-[0.15em] shadow-xl hover:bg-emerald-500 hover:text-slate-900 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 whitespace-nowrap"
-          >
-            {isOptimizing ? <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent animate-spin rounded-full"></div> : <Icons.Scan className="w-3.5 h-3.5" />}
-            {isOptimizing ? '...' : (suggestedRoutes.length > 0 ? 'RECALCULAR' : 'GENERAR')}
-          </button>
+          <div className="shrink-0 flex flex-col items-center gap-1">
+            <button
+              onClick={async () => {
+                setIsOptimizing(true);
+                setOptimizingProgress(0);
+                setOptimizingPhase('Iniciando...');
+                const enriched = await enrichInvoicesWithGeocode([...validInvoices]);
+                runOrbitOptimization(enriched.length > 0 ? enriched : undefined);
+              }}
+              disabled={isOptimizing || validInvoices.length === 0}
+              className="bg-slate-900 text-emerald-500 px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-[0.15em] shadow-xl hover:bg-emerald-500 hover:text-slate-900 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 whitespace-nowrap"
+            >
+              {isOptimizing ? <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent animate-spin rounded-full"></div> : <Icons.Scan className="w-3.5 h-3.5" />}
+              {isOptimizing ? (optimizingProgress < 100 ? `${optimizingProgress}%` : '...') : (suggestedRoutes.length > 0 ? 'RECALCULAR' : 'GENERAR')}
+            </button>
+            {isOptimizing && (
+              <div className="w-full flex flex-col items-center gap-0.5" style={{ minWidth: 120 }}>
+                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                    style={{ width: `${optimizingProgress}%` }}
+                  />
+                </div>
+                <p className="text-[7px] text-slate-400 font-bold uppercase tracking-wide truncate max-w-[130px] text-center">{optimizingPhase}</p>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={handleExportRoutesExcel}
@@ -3856,7 +3911,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   </h3>
                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mt-0.5">
                     <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getCityDotColor(routeMapModal.route.city) }} />
-                    {routeMapModal.route.city} · {(routeMapModal.route.vehicle as any).driverName || 'S/C'} · {routeMapModal.route.assignedInvoices.length} paradas
+                    {routeMapModal.route.city} · {(routeMapModal.route.vehicle as any).driverName || 'S/C'} · {routeMapModal.route.assignedInvoices.length} paradas{routeMapStats ? ` · ${routeMapStats.km}km · ${routeMapStats.minutes}min` : ''}
                   </p>
                 </div>
               </div>
