@@ -774,35 +774,26 @@ const ConsultaItem: React.FC<{ user: any }> = ({ user }) => {
                   <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black">{movements.length} EVENTOS</span>
                 </div>
 
-              <div className="flex gap-2 items-center flex-1 md:max-w-md">
-                <div className="relative flex-1">
-                  <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar en historial (factura, placa, nota...)"
-                    value={movFilter}
-                    onChange={e => setMovFilter(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none font-semibold shadow-sm"
-                  />
+                <div className="flex gap-2 items-center flex-1 md:max-w-md">
+                  <div className="relative flex-1">
+                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar en historial (factura, placa, nota...)"
+                      value={movFilter}
+                      onChange={e => setMovFilter(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none font-semibold shadow-sm"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => exportToExcel(movements, `Historial_${articleLabel}`)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm"
+                  >
+                    <Icons.FileText className="w-3 h-3" /> EXCEL
+                  </button>
                 </div>
-                <button 
-                  onClick={() => exportToExcel(movements, `Historial_${articleLabel}`)}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm"
-                >
-                  <Icons.FileText className="w-3 h-3" /> EXCEL
-                </button>
               </div>
-            </div>
 
-            {movements.length === 0 ? (
-              <div className="bg-white rounded-[2rem] border border-slate-200 p-12 text-center border-dashed">
-                <div className="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center mx-auto mb-4 text-slate-200">
-                  <Icons.Archive />
-                </div>
-                <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">Sin movimientos registrados</p>
-                <p className="text-slate-300 text-xs mt-1">{(dateFrom || dateTo) ? 'Ajuste el periodo de búsqueda para ver más resultados.' : 'Este artículo no presenta actividad en el sistema.'}</p>
-              </div>
-            ) : (
               <div className="bg-white rounded-[1.5rem] border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
