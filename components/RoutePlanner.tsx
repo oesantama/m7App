@@ -362,19 +362,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const timer = setTimeout(async () => {
       const container = document.getElementById('route-preview-map');
       if (!container || cancelled) return;
-      // Calcular altura disponible para el mapa: modal height - header height
-      const modalWrapEl = container.closest('[style*="min(90vh"]') as HTMLElement | null;
-      const allParents = [container.parentElement, container.parentElement?.parentElement, container.parentElement?.parentElement?.parentElement];
-      let bestH = 0;
-      for (const el of allParents) {
-        if (el) {
-          const h = (el as HTMLElement).getBoundingClientRect().height;
-          if (h > bestH) bestH = h;
-        }
-      }
-      const mapH = Math.max(bestH || window.innerHeight * 0.75, 320);
-      container.style.height = `${mapH}px`;
-      container.style.width = '100%';
+      // El wrapper padre (position:relative) ya tiene dimensiones reales gracias a flex-1
+      // container usa position:absolute inset:0 → hereda exactamente esas dimensiones
       if (routePreviewMapRef.current) {
         routePreviewMapRef.current.remove();
         routePreviewMapRef.current = null;
@@ -3828,8 +3817,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
             {/* Map + Stop list: fila siempre, mapa a la izquierda, lista a la derecha */}
             <div className="flex flex-row flex-1 overflow-hidden min-h-0">
-              {/* Leaflet map — altura 100% del contenedor flex */}
-              <div id="route-preview-map" className="flex-1 z-0 relative min-h-0" style={{ minHeight: 300 }} />
+              {/* Wrapper relativo: le da dimensiones reales a Leaflet */}
+              <div className="flex-1 relative min-h-0" style={{ minHeight: 300 }}>
+                <div id="route-preview-map" style={{ position: 'absolute', inset: 0 }} />
+              </div>
 
               {/* Stop list — panel derecho siempre visible con scroll */}
               <div className="w-56 shrink-0 overflow-y-auto custom-scrollbar bg-slate-50 border-l border-slate-100 p-3 space-y-2">
