@@ -466,7 +466,16 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       return validStatuses.includes(s);
     });
 
-    return filtered;
+    // Deduplicar por número de factura: el SQL puede retornar la misma factura
+    // más de una vez cuando sus ítems pertenecen a documentos distintos.
+    // Conservar la primera ocurrencia (la de mayor docLId por MAX en SQL).
+    const seen = new Set<string>();
+    return filtered.filter(inv => {
+      const key = String(inv.invoiceNumber || inv.id || '').trim().toUpperCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }, [invoices, selectedClient]);
 
   // Facturas que NO están en ninguna ruta sugerida NI en rutas activas ya confirmadas
@@ -1991,38 +2000,83 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const today = new Date().toISOString().slice(0, 10);
     const wb = XLSX.utils.book_new();
 
-    // Hoja resumen: una fila por ruta
-    const summaryRows = suggestedRoutes.map((r, idx) => ({
-      '#': idx + 1,
-      'PLACA': r.vehicle.plate,
-      'CONDUCTOR': (() => {
-        const link = assignments.find(a => a.vehicleId === r.vehicle.id && a.isActive);
-        if (!link) return 'SIN ASIGNAR';
-        const drv = drivers.find(d => d.id === link.driverId);
-        return drv ? drv.name || link.driverId : link.driverId;
-      })(),
-      'CIUDAD DOMINANTE': r.city,
-      'FACTURAS': r.assignedInvoices.length,
-      'VOLUMEN M3': Number(r.totalVolume.toFixed(3)),
-      'UTILIZACION %': r.utilization,
-    }));
+    const DEFAULT_LAT = 6.2518, DEFAULT_LNG = -75.5636;
+    const isDefaultCoord = (lat: any, lng: any) => {
+      const la = Number(lat || 0), lo = Number(lng || 0);
+      return (la === 0 && lo === 0) ||
+        (Math.abs(la - DEFAULT_LAT) < 0.001 && Math.abs(Math.abs(lo) - Math.abs(DEFAULT_LNG)) < 0.001);
+    };
+
+    // Deduplicar assignedInvoices por número de factura (por si el pool aún tiene duplicados)
+    const dedupRoute = (invs: typeof suggestedRoutes[0]['assignedInvoices']) => {
+      const seen = new Set<string>();
+      return invs.filter(inv => {
+        const k = String(inv.invoiceNumber || inv.id || '').trim().toUpperCase();
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    };
+
+    // ── RESUMEN: una fila por ruta + desglose por documento ─────────────────
+    const summaryRows: Record<string, any>[] = [];
+
+    suggestedRoutes.forEach((r, idx) => {
+      const deduped = dedupRoute(r.assignedInvoices);
+      const conductorLink = assignments.find(a => a.vehicleId === r.vehicle.id && a.isActive);
+      const conductorName = conductorLink
+        ? (drivers.find(d => d.id === conductorLink.driverId)?.name || conductorLink.driverId)
+        : 'SIN ASIGNAR';
+
+      // Agrupar por documento
+      const docCounts = new Map<string, number>();
+      deduped.forEach(inv => {
+        const doc = documents.find(d => d.id === inv.docLId);
+        const docLabel = doc?.externalDocId || String(inv.docLId || 'S/DOC').slice(-8);
+        docCounts.set(docLabel, (docCounts.get(docLabel) || 0) + 1);
+      });
+
+      const row: Record<string, any> = {
+        '#': idx + 1,
+        'PLACA': r.vehicle.plate,
+        'CONDUCTOR': conductorName,
+        'CIUDAD DOMINANTE': r.city,
+        'FACTURAS': deduped.length,
+        'VOLUMEN M3': Number(r.totalVolume.toFixed(3)),
+        'UTILIZACION %': r.utilization,
+      };
+      // Columnas dinámicas por documento
+      docCounts.forEach((count, docId) => {
+        row[`DOC ${docId}`] = count;
+      });
+      summaryRows.push(row);
+    });
+
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'RESUMEN');
 
-    // Una hoja por ruta con detalle de facturas
+    // ── Hojas de detalle: una fila por factura (deduplicada) ─────────────────
     suggestedRoutes.forEach((r, idx) => {
-      const rows = r.assignedInvoices.map((inv, pos) => ({
-        'ORDEN': pos + 1,
-        'FACTURA': inv.invoiceNumber || inv.id,
-        'CLIENTE': inv.customerName || '',
-        'CIUDAD': inv.city || '',
-        'BARRIO': (inv as any).neighborhoodKey || '',
-        'DIRECCIÓN': inv.address || '',
-        'VOLUMEN M3': Number(inv.volumeM3 || (inv as any).volume_m3 || 0),
-        'VALOR': inv.invoiceValue || '',
-        'PAGO': (inv as any).paymentMethod || '',
-        'LAT': inv.lat || '',
-        'LNG': inv.lng || '',
-      }));
+      const deduped = dedupRoute(r.assignedInvoices);
+      const rows = deduped.map((inv, pos) => {
+        const doc = documents.find(d => d.id === inv.docLId);
+        const docLabel = doc?.externalDocId || String(inv.docLId || '').slice(-8) || 'S/DOC';
+        const lat = isDefaultCoord(inv.lat, inv.lng) ? 0 : Number(inv.lat || 0);
+        const lng = isDefaultCoord(inv.lat, inv.lng) ? 0 : Number(inv.lng || 0);
+        return {
+          'ORDEN': pos + 1,
+          'DOCUMENTO': docLabel,
+          'FACTURA': inv.invoiceNumber || inv.id,
+          'CLIENTE': inv.customerName || '',
+          'CIUDAD': inv.city || '',
+          'BARRIO': (inv as any).neighborhoodKey || inv.neighborhood || '',
+          'DIRECCIÓN': inv.address || '',
+          'VOLUMEN M3': Number(inv.volumeM3 || (inv as any).volume_m3 || 0),
+          'VALOR': inv.invoiceValue || '',
+          'PAGO': (inv as any).paymentMethod || '',
+          'LAT': lat,
+          'LNG': lng,
+        };
+      });
       const sheetName = `${idx + 1}_${r.vehicle.plate}`.slice(0, 31);
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
     });
