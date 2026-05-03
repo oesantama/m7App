@@ -1898,7 +1898,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                         }
                         const fieldLabels: Record<string, string> = {
                           city: 'Ciudad', address: 'Dirección', volume: 'Volumen',
-                          neighborhood: 'Barrio', expected_qty: 'Cant. Esperada', peso: 'Peso'
+                          neighborhood: 'Barrio', expected_qty: 'Cant. Esperada', peso: 'Peso',
+                          latitude: 'Latitud', longitude: 'Longitud'
                         };
                         const changes = Object.entries(p.new)
                           .filter(([k, v]) => v !== undefined && String(p.old[k] ?? '') !== String(v))
