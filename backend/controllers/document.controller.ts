@@ -842,6 +842,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         MAX(base_data.customer_name) as "customerName",
         SUM(base_data.expected_qty) as "totalItems",
         SUM(base_data.volume) as "volumeM3",
+        SUM(base_data.peso) as "weightKg",
         MAX(base_data.document_id) as "docLId",
         MAX(base_data.client_id) as "clientId", 
         MAX(base_data.codplan) as "codplan",

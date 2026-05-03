@@ -388,6 +388,127 @@ export const getRoadRoute = async (req: Request, res: Response) => {
   return res.status(500).json({ error: 'Error al calcular ruta por calles' });
 };
 
+// ─── POST /routes/road-matrix ─────────────────────────────────────────────────
+// Retorna la matriz NxN de distancias reales (km) y tiempos (min) entre puntos.
+// Consulta la caché primero; llama OSRM solo para pares no cacheados.
+// Fallback silencioso: si OSRM falla retorna matrix:null para que el frontend
+// use Haversine en su lugar.
+export const getRoadMatrix = async (req: Request, res: Response) => {
+  const { points } = req.body as { points: { lat: number; lng: number }[] };
+  if (!Array.isArray(points) || points.length < 2) {
+    return res.json({ matrix: null });
+  }
+  if (points.length > 30) {
+    // Limit de seguridad: OSRM público rechaza >100 coords, nosotros limitamos a 30
+    return res.json({ matrix: null });
+  }
+
+  const toKey = (p: { lat: number; lng: number }) =>
+    `${Number(p.lat).toFixed(6)},${Number(p.lng).toFixed(6)}`;
+
+  const n = points.length;
+  const keys = points.map(toKey);
+
+  // ── 1. Consultar caché ──────────────────────────────────────────────────────
+  const distMatrix: (number | null)[][] = Array.from({ length: n }, () => Array(n).fill(null));
+  const durMatrix:  (number | null)[][] = Array.from({ length: n }, () => Array(n).fill(null));
+  for (let i = 0; i < n; i++) distMatrix[i][i] = durMatrix[i][i] = 0;
+
+  const missingPairs: [number, number][] = [];
+
+  try {
+    // Batch cache lookup — una query para todos los pares
+    const fromKeys = keys.flatMap((fk, i) => keys.map((_tk, j) => i !== j ? fk : null).filter(Boolean) as string[]);
+    const toKeys   = keys.flatMap((_fk, i) => keys.map((tk, j) => i !== j ? tk : null).filter(Boolean) as string[]);
+
+    if (fromKeys.length > 0) {
+      const cached = await pool.query(
+        `SELECT from_key, to_key, dist_km, dur_min FROM road_distance_cache
+         WHERE (from_key, to_key) IN (${fromKeys.map((_, idx) => `($${idx * 2 + 1}, $${idx * 2 + 2})`).join(',')})`,
+        fromKeys.flatMap((fk, idx) => [fk, toKeys[idx]])
+      );
+      type CacheRow = { from_key: string; to_key: string; dist_km: string; dur_min: string };
+      const cacheMap = new Map<string, CacheRow>(
+        (cached.rows as CacheRow[]).map(r => [`${r.from_key}|${r.to_key}`, r])
+      );
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          const entry = cacheMap.get(`${keys[i]}|${keys[j]}`);
+          if (entry) {
+            distMatrix[i][j] = Number(entry.dist_km);
+            durMatrix[i][j]  = Number(entry.dur_min);
+          } else {
+            missingPairs.push([i, j]);
+          }
+        }
+      }
+    }
+  } catch {
+    // Si la caché falla, simplemente llamamos OSRM para todo
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (i !== j) missingPairs.push([i, j]);
+  }
+
+  // ── 2. Llamar OSRM si hay pares no cacheados ────────────────────────────────
+  if (missingPairs.length > 0) {
+    const coords = points.map(p => `${p.lng},${p.lat}`).join(';');
+    let osrmOk = false;
+
+    for (const server of OSRM_SERVERS) {
+      try {
+        const url = `${server}/table/v1/driving/${coords}?annotations=distance,duration`;
+        const resp = await fetch(url, {
+          headers: { 'User-Agent': 'OrbitM7-Logistics/1.0' },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!resp.ok) throw new Error(`status ${resp.status}`);
+        const data = await resp.json() as any;
+        if (data.code !== 'Ok') throw new Error('OSRM code != Ok');
+
+        // data.distances[i][j] en metros, data.durations[i][j] en segundos
+        const distM: number[][] = data.distances;
+        const durS:  number[][] = data.durations;
+
+        // Llenar matrices y preparar INSERT a caché
+        const insValues: any[] = [];
+        for (const [i, j] of missingPairs) {
+          const dkm  = distM[i][j] / 1000;
+          const dmin = durS[i][j]  / 60;
+          distMatrix[i][j] = dkm;
+          durMatrix[i][j]  = dmin;
+          insValues.push(keys[i], keys[j], dkm, dmin);
+        }
+
+        // Guardar en caché (fire-and-forget)
+        if (insValues.length > 0) {
+          const placeholders = missingPairs
+            .map((_, idx) => `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`)
+            .join(',');
+          pool.query(
+            `INSERT INTO road_distance_cache (from_key, to_key, dist_km, dur_min)
+             VALUES ${placeholders}
+             ON CONFLICT (from_key, to_key) DO UPDATE SET
+               dist_km = EXCLUDED.dist_km, dur_min = EXCLUDED.dur_min, cached_at = NOW()`,
+            insValues
+          ).catch(() => {});
+        }
+
+        osrmOk = true;
+        break;
+      } catch (err: any) {
+        console.warn(`[M7-ROAD-MATRIX] OSRM ${server} falló: ${err.message}`);
+      }
+    }
+
+    if (!osrmOk) {
+      // Todos los servidores fallaron — frontend usará Haversine como fallback
+      return res.json({ matrix: null, fallback: true });
+    }
+  }
+
+  res.json({ distMatrix, durMatrix });
+};
+
 // ─── GET /routes/:routeId/invoices ───────────────────────────────────────────
 export const getRouteInvoices = async (req: Request, res: Response) => {
     const { routeId } = req.params;

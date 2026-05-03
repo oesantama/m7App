@@ -883,6 +883,28 @@ export const restoreSystem = async () => {
       ON CONFLICT (id) DO NOTHING;
     `, [adminHash]);
 
+    // ── Columna max_weight_kg en vehicles (constraint de peso por vehículo) ──
+    await client.query(`
+      ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS max_weight_kg NUMERIC(10,2);
+    `);
+
+    // ── Caché de distancias reales por red vial (OSRM) ────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS road_distance_cache (
+        from_key  TEXT NOT NULL,
+        to_key    TEXT NOT NULL,
+        dist_km   NUMERIC(10,4) NOT NULL,
+        dur_min   NUMERIC(10,2),
+        cached_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (from_key, to_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_road_dist_from ON road_distance_cache (from_key);
+    `);
+    // Limpiar entradas más viejas de 90 días para evitar crecer indefinidamente
+    await client.query(`
+      DELETE FROM road_distance_cache WHERE cached_at < NOW() - INTERVAL '90 days';
+    `);
+
     await client.query('COMMIT');
 
     // FASE FINAL: SINCRONIZACIÓN NUCLEAR DE MENÚS (REUBICACIÓN LOGÍSTICA)

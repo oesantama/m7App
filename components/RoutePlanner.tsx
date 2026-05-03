@@ -16,6 +16,12 @@ import {
   haversineKm,
   hasDefaultCoords,
   twoOptImprove,
+  orOpt1Intra,
+  orOptInterRoute,
+  ilsImprove,
+  buildRoadDistFn,
+  buildRoadTimeFn,
+  estimateArrivalAtStopMinutes,
   classifyCorridor,
   corridorsCompatible,
 } from '../utils/routeUtils';
@@ -27,6 +33,7 @@ import {
   RETAIL_CHAIN_MIN_VOLUME_M3,
   CORRIDOR_ORDER,
   MAX_ROUTE_MINUTES,
+  DISPATCH_DEPARTURE_HOUR,
   normalizeCityName,
   type ViaCorridor,
 } from '../config/routeConfig';
@@ -211,6 +218,7 @@ interface RoutingPattern {
   vehicle_id: string;
   strength: number;
   neighborhood?: string;
+  last_used?: string;
 }
 
 interface SuggestedRoute {
@@ -591,6 +599,34 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return availableVehicles.filter(v => !usedIds.has(v.id));
   }, [availableVehicles, suggestedRoutes]);
 
+  const routeDistancesKm = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of suggestedRoutes) {
+      let d = 0;
+      const stops = r.assignedInvoices;
+      if (stops.length > 0) {
+        d += haversineKm(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, Number(stops[0].lat) || ORBIT_HUB_ORIGIN.lat, Number(stops[0].lng) || ORBIT_HUB_ORIGIN.lng);
+        for (let i = 0; i < stops.length - 1; i++) {
+          d += haversineKm(Number(stops[i].lat) || ORBIT_HUB_ORIGIN.lat, Number(stops[i].lng) || ORBIT_HUB_ORIGIN.lng, Number(stops[i+1].lat) || ORBIT_HUB_ORIGIN.lat, Number(stops[i+1].lng) || ORBIT_HUB_ORIGIN.lng);
+        }
+        d += haversineKm(Number(stops[stops.length-1].lat) || ORBIT_HUB_ORIGIN.lat, Number(stops[stops.length-1].lng) || ORBIT_HUB_ORIGIN.lng, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
+      }
+      map.set(r.id, Math.round(d));
+    }
+    return map;
+  }, [suggestedRoutes]);
+
+  const preflightWarning = useMemo(() => {
+    if (validInvoices.length === 0 || availableVehicles.length === 0) return null;
+    const totalDemand = validInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
+    const totalFleetCapacity = availableVehicles.reduce((acc, v) => acc + (Number(v.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY), 0);
+    const usableCapacity = totalFleetCapacity * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION;
+    if (totalDemand <= usableCapacity) return null;
+    const gap = Number((totalDemand - usableCapacity).toFixed(2));
+    const extraVehicles = Math.ceil(gap / OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY);
+    return { totalDemand: Number(totalDemand.toFixed(2)), usableCapacity: Number(usableCapacity.toFixed(2)), gap, extraVehicles };
+  }, [validInvoices, availableVehicles]);
+
   // Carga inicial de patrones de aprendizaje
   useEffect(() => {
     api.getRoutingPatterns().then(data => {
@@ -725,7 +761,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     if (!specificInvoices) setLastReadjustmentResult(null);
     setReadjustmentModal({ isOpen: false, selectedDocIds: new Set() });
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const suggestions: SuggestedRoute[] = [];
       const usedVehicleIds = new Set<string>(); // MOVIMIENTO DE DECLARACIÓN AQUÍ
 
@@ -817,8 +853,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // Clasificar corredor vial (nueva lógica jerárquica)
         const cUpper = (inv as any).cityKey || '';
 
-        // Enriquecimiento de barrio desde dirección cuando no hay datos (Medellín)
-        if (cUpper.includes('MEDELL')) {
+        // Enriquecimiento de barrio desde dirección cuando no hay datos.
+        // Solo aplica si el hub de despacho está en el área de Medellín — para
+        // que el sistema funcione sin modificación en cualquier otra ciudad.
+        const hubIsMedellin = Math.abs(ORBIT_HUB_ORIGIN.lat - 6.24) < 0.18
+          && Math.abs(ORBIT_HUB_ORIGIN.lng - (-75.58)) < 0.12;
+        if (hubIsMedellin && cUpper.includes('MEDELL')) {
           const nKey = (inv as any).neighborhoodKey;
           if (nKey === 'SIN_BARRIO' || !nKey) {
             const foundOcc = BARRIOS_OCCIDENTE.find(b => rawAddr.includes(b));
@@ -904,7 +944,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       // ──────────────────────────────────────────────────────────────────────
 
       const CELL_SIZE = 0.022; // ~2.4km por celda
-      const MAX_CLUSTER_SPREAD_KM = 7;  // radio máximo del cluster (~7km = 1 corredor del valle)
+      // Radio máximo del cluster: corredores lineales norte/sur usan 10 km porque
+      // sus municipios se extienden ~15 km a lo largo de la autopista.
+      // Corredores compactos (MED_*) y macro-regiones usan 7 km.
+      const SPREAD_KM_BY_CORRIDOR: Partial<Record<ViaCorridor, number>> = {
+        NORTE: 10, NORTE_LEJANO: 14,
+        SUR: 10, SUR_LEJANO: 14,
+        ORIENTE_ANT: 20, OCCIDENTE_ANT: 20,
+      };
+      const getMaxSpread = (corridor: ViaCorridor) => SPREAD_KM_BY_CORRIDOR[corridor] ?? 7;
       const MIN_ANCHOR_SEPARATION_KM = 5; // anclas de distintos vehículos deben estar al menos 5km aparte
 
       interface GeoCell {
@@ -925,9 +973,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const hasDefCoords = (inv as any).hasDefaultCoords;
         const corridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
 
-        // Sin coords → celda separada por corredor+barrio para no mezclar macro-regiones
+        // Sin coords → celda por corredor+ciudad+barrio para no mezclar municipios distintos sin geocodificar
         const cellKey = hasDefCoords || (lat === 0 && lng === 0)
-          ? `nogeo_${corridor}_${(inv as any).neighborhoodKey || 'SIN_BARRIO'}`
+          ? `nogeo_${corridor}_${(inv as any).cityKey || 'SIN_CIUDAD'}_${(inv as any).neighborhoodKey || 'SIN_BARRIO'}`
           : `${Math.floor(lat / CELL_SIZE)}_${Math.floor(lng / CELL_SIZE)}`;
 
         if (!cellMap.has(cellKey)) {
@@ -1049,17 +1097,39 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
       // ──────────────────────────────────────────────────────────────────────────
 
-      // Usar ciudad+barrio como territorio porque múltiples vehículos sirven la misma ciudad
+      // ── Territorio aprendido con decaimiento por recencia ────────────────────
+      // effectiveStrength = strength * decay(lastUsed)
+      // decay: 1.0 (usado hoy) → 0.2 (mínimo, +180 días sin uso)
+      const MS_PER_DAY = 86_400_000;
+      const DECAY_HALF_LIFE_MS = 90 * MS_PER_DAY; // 50% a los 90 días
+      const FLOOR_DECAY = 0.2;
+      const now = Date.now();
+      const computeEffectiveStrength = (p: RoutingPattern): number => {
+        const raw = p.strength || 0;
+        if (!p.last_used) return raw * FLOOR_DECAY;
+        const msElapsed = now - new Date(p.last_used).getTime();
+        const decay = Math.max(FLOOR_DECAY, 1 - msElapsed / (DECAY_HALF_LIFE_MS * 2));
+        return raw * decay;
+      };
+
       const vehicleTerritoryStrength = new Map<string, Map<string, number>>();
       for (const p of learningPatterns) {
         if (!p.vehicle_id || !p.city) continue;
         if (!vehicleTerritoryStrength.has(p.vehicle_id)) vehicleTerritoryStrength.set(p.vehicle_id, new Map());
         const tMap = vehicleTerritoryStrength.get(p.vehicle_id)!;
         const tKey = p.neighborhood ? `${p.city}|${p.neighborhood}` : p.city;
-        tMap.set(tKey, (tMap.get(tKey) || 0) + (p.strength || 0));
+        tMap.set(tKey, (tMap.get(tKey) || 0) + computeEffectiveStrength(p));
       }
 
-      // Ordenar vehículos por fuerza total desc (más experimentados reclaman primero)
+      // Fuerza máxima en todo el sistema — sirve de referencia para escalar el bonus
+      let maxSystemStrength = 1;
+      for (const tMap of vehicleTerritoryStrength.values()) {
+        for (const v of tMap.values()) {
+          if (v > maxSystemStrength) maxSystemStrength = v;
+        }
+      }
+
+      // Ordenar vehículos por fuerza total efectiva desc (más experimentados reclaman primero)
       const vehiclesByExperience = [...prioritizedFleet].sort((a, b) => {
         const totalA = [...(vehicleTerritoryStrength.get(a.id)?.values() || [])].reduce((s, v) => s + v, 0);
         const totalB = [...(vehicleTerritoryStrength.get(b.id)?.values() || [])].reduce((s, v) => s + v, 0);
@@ -1094,6 +1164,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const nominalCapacity = vCap > 0 ? vCap : OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
         const absoluteMaxCapacity = nominalCapacity * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION;
         const isLargeVehicle = nominalCapacity > LARGE_VEHICLE_THRESHOLD_M3;
+        // Restricción de peso: undefined = sin límite (vehículos sin dato configurado)
+        const maxWeightKg = Number(vehicle.maxWeightKg || (vehicle as any).max_weight_kg || 0) || undefined;
 
         // Territorios propios: barrios históricos de este vehículo
         const ownedNeighborhoods = vehicleOwnedNeighborhoods.get(vehicle.id) || new Set<string>();
@@ -1133,55 +1205,78 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
         // Corredor del ancla — es la restricción dura de compatibilidad
         const anchorCorridor = anchorCell.zone as ViaCorridor;
+        // Radio dinámico según corredor: autopistas lineales tienen spread más amplio
+        const maxSpreadKm = getMaxSpread(anchorCorridor);
+
+        // Fuerza máxima de este vehículo → escala el bonus de distancia (hasta 10 km)
+        const vTMap = vehicleTerritoryStrength.get(vehicle.id);
+        const vehicleMaxStrength = vTMap ? Math.max(0, ...vTMap.values()) : 0;
+        const MAX_OWNED_BONUS_KM = 10;
+        const ownedBonus = (vehicleMaxStrength / maxSystemStrength) * MAX_OWNED_BONUS_KM;
+        // Umbral para radio expandido: conductor con experiencia sólida (+5 ef. strength)
+        const STRONG_TERRITORY_THRESHOLD = 5;
+        const canExpandRadius = vehicleMaxStrength >= STRONG_TERRITORY_THRESHOLD;
 
         const candidateCells = remainingCells.filter(c => {
           if (c.invoices.length === 0) return false;
           const cellCorridor = c.zone as ViaCorridor;
-          // Regla dura: macro-regiones nunca se mezclan con nada más
           if (!corridorsCompatible(anchorCorridor, cellCorridor)) return false;
-          // Celdas en barrios propios siempre candidatas (dentro del radio)
           const hasOwnedInvoice = c.invoices.some(i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || ''));
           if (anchorCell.centerLat > 0 && c.centerLat > 0) {
-            if (getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng) > MAX_CLUSTER_SPREAD_KM) {
-              return hasOwnedInvoice; // fuera del radio solo si es territorio propio
+            const distToAnchor = getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng);
+            if (distToAnchor > maxSpreadKm) {
+              // Conductor con fuerte experiencia puede extenderse hasta 1.5× el radio
+              if (hasOwnedInvoice && canExpandRadius && distToAnchor <= maxSpreadKm * 1.5) return true;
+              return hasOwnedInvoice; // sin experiencia fuerte: solo territorio propio dentro del radio
             }
           }
           return true;
         });
 
-        // Ordenar celdas candidatas: ciudades propias primero, luego por distancia al ancla
-        candidateCells.sort((a, b) => {
-          const aOwned = a.invoices.some(i => ownedCities.has((i as any).cityKey || '')) ? 0 : 1;
-          const bOwned = b.invoices.some(i => ownedCities.has((i as any).cityKey || '')) ? 0 : 1;
-          if (aOwned !== bOwned) return aOwned - bOwned;
-          if (anchorCell.centerLat === 0) return 0;
-          const dA = a.centerLat > 0 ? getDistance(anchorCell.centerLat, anchorCell.centerLng, a.centerLat, a.centerLng) : 999;
-          const dB = b.centerLat > 0 ? getDistance(anchorCell.centerLat, anchorCell.centerLng, b.centerLat, b.centerLng) : 999;
-          return dA - dB;
-        });
+        // ── Nearest-Neighbor Greedy ──────────────────────────────────────────────
+        const cellPool = [...candidateCells]; // pool mutable
 
-        // Llenar vehículo celda por celda
+        // Llenar vehículo celda por celda — NN desde centroide dinámico
         const load: Invoice[] = [];
         let currentLoadVolume = 0;
-        // Centroide dinámico de la ruta (se recalcula con cada celda agregada)
+        let currentLoadWeight = 0; // kg acumulados en la ruta
         let clusterCenterLat = anchorCell.centerLat;
         let clusterCenterLng = anchorCell.centerLng;
 
-        for (const cell of candidateCells) {
+        while (cellPool.length > 0) {
           if (currentLoadVolume >= absoluteMaxCapacity) break;
           if (load.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) break;
+
+          // Buscar la celda más cercana al centroide actual
+          // Bonus de 3 km para celdas de territorios propios del vehículo
+          let nearestIdx = 0;
+          let nearestScore = Infinity;
+          for (let ci = 0; ci < cellPool.length; ci++) {
+            const c = cellPool[ci];
+            if (c.invoices.length === 0) { cellPool.splice(ci, 1); ci--; continue; }
+            const isOwned = c.invoices.some(
+              i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || '')
+            );
+            const dist = (clusterCenterLat > 0 && c.centerLat > 0)
+              ? getDistance(clusterCenterLat, clusterCenterLng, c.centerLat, c.centerLng)
+              : (isOwned ? 0 : 30);
+            const score = isOwned ? Math.max(0, dist - ownedBonus) : dist;
+            if (score < nearestScore) { nearestScore = score; nearestIdx = ci; }
+          }
+          if (cellPool.length === 0) break;
+          const cell = cellPool.splice(nearestIdx, 1)[0];
 
           // P4: Restricción de 8 horas — estimar duración si se agrega esta celda
           if (load.length > 0) {
             const preview = [...load, ...cell.invoices.slice(0, 1)];
             const estimatedMin = estimateRouteTotalMinutes(preview, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
-            if (estimatedMin >= MAX_ROUTE_MINUTES) break;
+            if (estimatedMin >= MAX_ROUTE_MINUTES) continue;
           }
 
-          // Chequeo de cohesión: la celda candidata no debe alejar el centroide más allá del radio
+          // Chequeo de cohesión: la celda no debe alejar el centroide más allá del radio
           if (clusterCenterLat > 0 && cell.centerLat > 0) {
             const distToCluster = getDistance(clusterCenterLat, clusterCenterLng, cell.centerLat, cell.centerLng);
-            if (distToCluster > MAX_CLUSTER_SPREAD_KM) break;
+            if (distToCluster > maxSpreadKm) continue;
           }
 
           const toAdd: Invoice[] = [];
@@ -1202,13 +1297,23 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             const invVol = Number(inv.volumeM3 || (inv as any).volume_m3 || 0);
             const nKey = (inv as any).neighborhoodKey || '';
             if (isLargeVehicle && RESTRICTED_NEIGHBORHOODS.includes(nKey)) continue;
-            if (currentLoadVolume + invVol <= absoluteMaxCapacity) {
-              // P4: verificar que agregar esta parada no supera 8h
+            const invWeight = Number(inv.weightKg || 0);
+            const weightOk = !maxWeightKg || (currentLoadWeight + invWeight <= maxWeightKg);
+            if (currentLoadVolume + invVol <= absoluteMaxCapacity && weightOk) {
+              // Verificar que agregar esta parada no supera 8h
               const withInv = [...load, ...toAdd, inv];
               const testMin = estimateRouteTotalMinutes(withInv, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
-              if (testMin >= MAX_ROUTE_MINUTES) continue; // saltar esta factura, no break
+              if (testMin >= MAX_ROUTE_MINUTES) continue;
+              // Verificar ventana de tiempo: si tiene hora límite, estimar llegada y rechazar si llega tarde
+              const tw = (inv as any).timeWindowMinutes;
+              if (typeof tw === 'number') {
+                const pos = withInv.length - 1;
+                const arrivalFromDep = estimateArrivalAtStopMinutes(withInv, pos, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
+                if (DISPATCH_DEPARTURE_HOUR * 60 + arrivalFromDep > tw) continue;
+              }
               toAdd.push(inv);
               currentLoadVolume += invVol;
+              currentLoadWeight += invWeight;
             }
           }
 
@@ -1230,11 +1335,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const usedIds = new Set(load.map(i => i.id));
         availableInvoices = availableInvoices.filter(i => !usedIds.has(i.id));
 
-        // Optimización 2-opt post-cluster
+        // Optimización 2-opt + Or-opt(1) intra post-cluster
         if (load.length >= 4) {
-          const optimized = twoOptImprove(load, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
+          const opt2 = twoOptImprove(load, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
+          const opt3 = orOpt1Intra(opt2, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
           load.length = 0;
-          load.push(...optimized);
+          load.push(...opt3);
         }
 
         if (load.length > 0) {
@@ -1277,16 +1383,29 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             const donorCorridor: ViaCorridor = (donor.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
             const donorCap = Number(donor.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
 
-            for (let j = 0; j < suggestions.length; j++) {
-              if (i === j) continue;
-              const receiver = suggestions[j];
-              if (receiver.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) continue;
-              const receiverCap = Number(receiver.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
-              if (receiver.totalVolume >= receiverCap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
+            // Receptores ordenados: mismo corredor primero, luego adyacentes
+            // Garantiza que el overflow de SUR va a SUR antes que a ENVIGADO o MED_OCC
+            const receiverOrder = suggestions
+              .map((r, idx) => ({ r, idx }))
+              .filter(({ idx }) => idx !== i)
+              .filter(({ r }) => {
+                if (r.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) return false;
+                const cap = Number(r.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+                if (r.totalVolume >= cap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) return false;
+                const rCorridor: ViaCorridor = (r.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+                return corridorsCompatible(donorCorridor, rCorridor);
+              })
+              .sort(({ r: a }, { r: b }) => {
+                const aC: ViaCorridor = (a.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+                const bC: ViaCorridor = (b.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+                // Mismo corredor que el donante tiene máxima prioridad
+                const aExact = aC === donorCorridor ? 0 : 1;
+                const bExact = bC === donorCorridor ? 0 : 1;
+                return aExact - bExact;
+              });
 
-              const receiverCorridor: ViaCorridor = (receiver.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
-              // Solo balance entre corredores compatibles
-              if (!corridorsCompatible(donorCorridor, receiverCorridor)) continue;
+            for (const { r: receiver, idx: j } of receiverOrder) {
+              const receiverCap = Number(receiver.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
 
               // Intentar mover la última factura del donor (más cerca del receiver geográficamente)
               const movable = [...donor.assignedInvoices].sort((a, b) => {
@@ -1346,6 +1465,111 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
       // ─────────────────────────────────────────────────────────────────────────
 
+      // ── Sweep final: absorber facturas sobrantes en rutas existentes ─────────
+      // Para cada factura que quedó sin ruta, busca el candidato más cercano que
+      // sea del mismo corredor, tenga capacidad y no supere 8h.
+      if (availableInvoices.length > 0 && suggestions.length > 0) {
+        const swept = new Set<string>();
+        for (const inv of availableInvoices) {
+          const invCorridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
+          const invVol = Number(inv.volumeM3) || 0;
+          const invLat = Number((inv as any).lat || 0);
+          const invLng = Number((inv as any).lng || 0);
+          let bestIdx = -1;
+          let bestDist = Infinity;
+          for (let ri = 0; ri < suggestions.length; ri++) {
+            const r = suggestions[ri];
+            if (r.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) continue;
+            const cap = Number(r.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+            if (r.totalVolume + invVol > cap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
+            const rCorridor: ViaCorridor = (r.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+            if (!corridorsCompatible(invCorridor, rCorridor)) continue;
+            const withInv = [...r.assignedInvoices, inv];
+            if (estimateRouteTotalMinutes(withInv, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) >= MAX_ROUTE_MINUTES) continue;
+            const lastInv = r.assignedInvoices[r.assignedInvoices.length - 1];
+            const rLat = Number((lastInv as any)?.lat || 0);
+            const rLng = Number((lastInv as any)?.lng || 0);
+            const dist = (invLat > 0 && rLat > 0)
+              ? haversineKm(invLat, invLng, rLat, rLng)
+              : (invCorridor === rCorridor ? 5 : 15);
+            if (dist < bestDist) { bestDist = dist; bestIdx = ri; }
+          }
+          if (bestIdx >= 0) {
+            const t = suggestions[bestIdx];
+            const cap = Number(t.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+            suggestions[bestIdx] = {
+              ...t,
+              assignedInvoices: [...t.assignedInvoices, inv],
+              totalVolume: Number((t.totalVolume + invVol).toFixed(4)),
+              utilization: Math.round(((t.totalVolume + invVol) / cap) * 100),
+            };
+            swept.add(inv.id);
+          }
+        }
+        if (swept.size > 0) {
+          suggestions.forEach((r, idx) => {
+            if (r.assignedInvoices.some(i => swept.has(i.id)) && r.assignedInvoices.length >= 4) {
+              suggestions[idx] = { ...r, assignedInvoices: twoOptImprove(r.assignedInvoices, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[] };
+            }
+          });
+          availableInvoices = availableInvoices.filter(i => !swept.has(i.id));
+        }
+      }
+
+      // ── Or-opt inter-ruta ───────────────────────────────────────────────────
+      // Mueve paradas individuales entre rutas para minimizar distancia total.
+      // Corre después del sweep para que trabaje sobre el conjunto final completo.
+      if (suggestions.length > 1) {
+        const orOptResult = orOptInterRoute(suggestions, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
+        // Re-aplicar 2-opt + Or-opt(1) intra a las rutas que cambiaron
+        const origLengths = suggestions.map(r => r.assignedInvoices.length);
+        orOptResult.forEach((r, idx) => {
+          if (r.assignedInvoices.length !== origLengths[idx] && r.assignedInvoices.length >= 4) {
+            const opt2 = twoOptImprove(r.assignedInvoices, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
+            const opt3 = orOpt1Intra(opt2, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
+            orOptResult[idx] = { ...r, assignedInvoices: opt3 };
+          }
+        });
+        suggestions.splice(0, suggestions.length, ...orOptResult);
+      }
+
+      // ── ILS: perturbación + reparación para escapar mínimos locales ──────────
+      // Ejecuta 4 rondas destroy→repair→oropt, acepta solo si mejora el score.
+      if (suggestions.length > 1) {
+        const ilsResult = ilsImprove(suggestions, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, 4);
+        suggestions.splice(0, suggestions.length, ...ilsResult);
+      }
+
+      // ── OSRM: refinamiento final con distancias reales por red vial ──────────
+      // Cada ruta recibe su propia matriz NxN de OSRM y re-corre 2-opt + Or-opt(1).
+      // Corre en paralelo (Promise.all). Si OSRM falla en alguna ruta, esa ruta
+      // conserva el orden Haversine ya optimizado — sin pérdida de datos.
+      let osrmRefinedCount = 0;
+      if (suggestions.length > 0) {
+        await Promise.all(suggestions.map(async (route, idx) => {
+          if (route.assignedInvoices.length < 3) return;
+          try {
+            const points = [
+              { lat: ORBIT_HUB_ORIGIN.lat, lng: ORBIT_HUB_ORIGIN.lng },
+              ...route.assignedInvoices.map(inv => ({
+                lat: Number(inv.lat) || ORBIT_HUB_ORIGIN.lat,
+                lng: Number(inv.lng) || ORBIT_HUB_ORIGIN.lng,
+              })),
+            ];
+            const result = await api.getRoadMatrix(points);
+            if (!result?.distMatrix) return;
+            const distFn = buildRoadDistFn(points, result.distMatrix);
+            const timeFn = result.durMatrix ? buildRoadTimeFn(points, result.durMatrix) : undefined;
+            const opt2 = twoOptImprove(route.assignedInvoices, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, distFn) as Invoice[];
+            const opt3 = orOpt1Intra(opt2, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, distFn) as Invoice[];
+            // Validate the OSRM-refined route still respects 8h (road times may differ from Haversine)
+            const roadMinutes = estimateRouteTotalMinutes(opt3, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, DISPATCH_DEPARTURE_HOUR, timeFn);
+            suggestions[idx] = { ...route, assignedInvoices: roadMinutes < MAX_ROUTE_MINUTES ? opt3 : route.assignedInvoices };
+            osrmRefinedCount++;
+          } catch { /* OSRM no disponible — conservar orden Haversine */ }
+        }));
+      }
+
       if (suggestions.length === 0) {
         if (availableVehicles.length === 0) {
           toast.error(`NO HAY TRIPULACIONES DISPONIBLES.`);
@@ -1353,7 +1577,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           toast.info("No se hallaron rutas factibles.");
         }
       } else {
-        toast.success(`Algoritmo OrbitM7 (IQ 95%): ${suggestions.length} rutas generadas.`);
+        const assignedCount = suggestions.reduce((acc, r) => acc + r.assignedInvoices.length, 0);
+        const leftover = availableInvoices.length;
+        const leftoverTxt = leftover > 0 ? ` · ${leftover} sin ruta` : '';
+        const osrmTag = osrmRefinedCount > 0 ? ` · OSRM ${osrmRefinedCount}/${suggestions.length}` : '';
+        toast.success(`OrbitM7: ${suggestions.length} rutas · ${assignedCount} facturas asignadas${leftoverTxt}${osrmTag}`);
       }
 
       setSuggestedRoutes(suggestions);
@@ -1584,13 +1812,17 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
         // M7 IQ: aprender de la ruta confirmada (señal más fuerte que adición manual)
         const stops = route.assignedInvoices.map(inv => ({
-          city: String(inv.city || 'SIN_CIUDAD').toUpperCase().trim(),
+          city: (inv as any).cityKey || normalizeCityName(String(inv.city || 'SIN_CIUDAD')),
           neighborhood: String((inv as any).neighborhoodKey || '').toUpperCase().trim(),
           address: String(inv.address || '').trim(),
           clientId: String(inv.clientId || (inv as any).docLId || '').trim(),
         }));
         api.learnFromCompletedRoute({ vehicleId: route.vehicle.id, stops })
-          .catch(() => { /* route learning failed — non-critical */ });
+          .then(() => {
+            // Refrescar patrones para que la próxima optimización en la misma sesión ya use los nuevos
+            api.getRoutingPatterns().then((d: any[]) => { if (Array.isArray(d)) setLearningPatterns(d); }).catch(() => {});
+          })
+          .catch(() => { /* non-critical */ });
 
         setSuggestedRoutes(prev => prev.filter(r => r.id !== route.id));
         // Actualizar rutas en el store inmediatamente (no esperar al onRefresh del padre)
@@ -1871,7 +2103,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           setConfirmedSessionIds(prev => new Set([...prev, ...confirmedIds]));
           // M7 IQ: aprender de cada ruta confirmada en despacho masivo
           const stops = route.assignedInvoices.map(inv => ({
-            city: String(inv.city || 'SIN_CIUDAD').toUpperCase().trim(),
+            city: (inv as any).cityKey || normalizeCityName(String(inv.city || 'SIN_CIUDAD')),
             neighborhood: String((inv as any).neighborhoodKey || '').toUpperCase().trim(),
             address: String(inv.address || '').trim(),
             clientId: String(inv.clientId || (inv as any).docLId || '').trim(),
@@ -1897,8 +2129,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         toast.warning(`${failCount} rutas no pudieron ser confirmadas.`);
       }
       setSuggestedRoutes([]);
-      // Refrescar rutas en el store inmediatamente para que el contador SIN RUTA sea exacto
+      // Refrescar rutas y patrones de aprendizaje para que la próxima sesión ya los use
       api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
+      api.getRoutingPatterns().then((d: any[]) => { if (Array.isArray(d)) setLearningPatterns(d); }).catch(() => {});
       if (onRefresh) onRefresh();
     } else if (failCount > 0) {
       toast.error("Error al procesar el despacho masivo. No se confirmó ninguna ruta.");
@@ -2453,6 +2686,24 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         </div>
       </div>
 
+      {/* ADVERTENCIA DE CAPACIDAD INSUFICIENTE (preflight) */}
+      {preflightWarning && suggestedRoutes.length === 0 && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-2 px-4 rounded-[1.5rem] animate-in slide-in-from-top duration-500 shadow-sm ml-auto">
+          <div className="flex flex-col border-r border-amber-200 pr-3">
+            <p className="text-[6px] font-black text-amber-600 uppercase tracking-widest">Demanda</p>
+            <p className="text-xs font-black text-amber-900 leading-none">{preflightWarning.totalDemand}m³</p>
+          </div>
+          <div className="flex flex-col border-r border-amber-200 px-3">
+            <p className="text-[6px] font-black text-amber-600 uppercase tracking-widest">Flota</p>
+            <p className="text-xs font-black text-amber-900 leading-none">{preflightWarning.usableCapacity}m³</p>
+          </div>
+          <div className="flex flex-col pl-2">
+            <p className="text-[6px] font-black text-amber-600 uppercase tracking-widest">Déficit</p>
+            <p className="text-xs font-black text-amber-900 leading-none">+{preflightWarning.extraVehicles} veh.</p>
+          </div>
+        </div>
+      )}
+
       {/* INDICADORES DE DÉFICIT EN HEADER (RELOCALIZADOS) */}
       {(unassignedMetrics.count > 0) && (
         <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 p-2 px-4 rounded-[1.5rem] animate-in slide-in-from-top duration-500 shadow-sm ml-auto relative group">
@@ -2582,6 +2833,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                             <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-white/10 rounded-full text-[7px] text-slate-300 font-bold">
                               ↩ ~{estimateRouteReturn(route.assignedInvoices.length)}
                             </span>
+                            {(routeDistancesKm.get(route.id) ?? 0) > 0 && (
+                              <span className="inline-flex items-center gap-1 ml-1 mt-1 px-2 py-0.5 bg-blue-500/20 rounded-full text-[7px] text-blue-300 font-bold">
+                                {routeDistancesKm.get(route.id)} km
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="text-right flex items-center gap-3">

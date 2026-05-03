@@ -8,7 +8,9 @@ import {
   CORRIDOR_ADJACENT,
   CONGESTION_ZONES,
   TUNEL_ORIENTE_FIXED_MIN,
+  ORBIT_HUB_ORIGIN,
   normalizeCityName,
+  MAX_ROUTE_MINUTES,
   type ViaCorridor,
 } from '../config/routeConfig';
 
@@ -314,17 +316,26 @@ export function classifyCorridor(lat: number, lng: number, cityStr: string): Via
     if (city === keyNorm || city.includes(keyNorm)) return corridor as ViaCorridor;
   }
 
-  // Si no hay coincidencia por nombre de ciudad, clasificar por coordenadas GPS
+  // Fallback por coordenadas GPS — expresado en offsets relativos al hub de despacho
+  // para que funcione en cualquier ciudad (no hardcoded a Medellín).
+  // Equivalencia para el hub actual (La Tablaza, Antioquia):
+  //   dlat > 0.31 → lat > 6.42 (NORTE_LEJANO)
+  //   dlat > 0.20 → lat > 6.31 (NORTE)
+  //   etc.
   if (lat === 0 || lng === 0) return 'MED_CENTRO';
 
-  const RIVER_LNG = -75.578;
+  const dlat = lat - ORBIT_HUB_ORIGIN.lat;
+  const dlng = lng - ORBIT_HUB_ORIGIN.lng;
+  // EAST_OFFSET: distancia longitudinal desde el hub hasta la separación este/oeste
+  // Para Medellín = río Medellín (lng ≈ -75.578). En otra ciudad = división este/oeste del hub.
+  const isEast = dlng > 0.063;
 
-  if (lat > 6.42) return 'NORTE_LEJANO';
-  if (lat > 6.31) return 'NORTE';
-  if (lat > 6.265) return lng < RIVER_LNG ? 'MED_OCC' : 'MED_ORI';
-  if (lat > 6.205) return lng < RIVER_LNG ? 'MED_OCC' : 'MED_CENTRO';
-  if (lat > 6.155) return lng < RIVER_LNG ? 'SUR' : 'ENVIGADO';
-  if (lat > 6.100) return 'SUR';
+  if (dlat > 0.31)  return 'NORTE_LEJANO';
+  if (dlat > 0.20)  return 'NORTE';
+  if (dlat > 0.155) return isEast ? 'MED_ORI'    : 'MED_OCC';
+  if (dlat > 0.095) return isEast ? 'MED_CENTRO' : 'MED_OCC';
+  if (dlat > 0.045) return isEast ? 'ENVIGADO'   : 'SUR';
+  if (dlat > -0.01) return 'SUR';
   return 'SUR_LEJANO';
 }
 
@@ -359,24 +370,44 @@ export function getCongestionMultiplier(lat: number, lng: number, departureHourL
 }
 
 /**
+ * Estima el tiempo de entrega real en una parada basado en la carga.
+ * Reemplaza la constante AVG_MINUTES_PER_STOP (25 min para todos).
+ * - BASE: 8 min (estacionar, buscar dirección, firmar)
+ * - +0.3 min por ítem (descargar cada caja/unidad)
+ * - +1.5 min por m³ (volumen extra requiere más maniobras)
+ * - Mínimo 5 min, máximo 45 min
+ */
+export function estimateDeliveryMinutes(
+    stop: { volumeM3?: number | null; totalItems?: number | null; items?: any[] | null; [key: string]: any }
+): number {
+    const BASE = 8;
+    const MIN_PER_ITEM = 0.3;
+    const MIN_PER_M3 = 1.5;
+    const items = Number(stop.totalItems ?? stop.items?.length ?? 1);
+    const vol = Number(stop.volumeM3 ?? 0);
+    const estimated = BASE + (items * MIN_PER_ITEM) + (vol * MIN_PER_M3);
+    return Math.min(45, Math.max(5, Math.round(estimated)));
+}
+
+/**
  * Estima la duración total de una ruta en minutos.
  * Usa Haversine para distancia + velocidad promedio + tiempo de entrega + congestión.
  * Agrega TUNEL_ORIENTE_FIXED_MIN si el corredor es ORIENTE_ANT.
  *
  * Modelo: velocidad promedio urbana 22 km/h, suburbana 45 km/h.
- * Tiempo de entrega por parada: AVG_MINUTES_PER_STOP (configurable).
+ * Tiempo de entrega por parada: estimateDeliveryMinutes (variable según carga).
  */
 export function estimateRouteTotalMinutes(
   stops: Array<{ lat?: number | null; lng?: number | null; corridor?: ViaCorridor; [key: string]: any }>,
   hubLat: number,
   hubLng: number,
-  departureHour: number = DISPATCH_DEPARTURE_HOUR
+  departureHour: number = DISPATCH_DEPARTURE_HOUR,
+  travelTimeFn?: (lat1: number, lng1: number, lat2: number, lng2: number) => number
 ): number {
   if (stops.length === 0) return 0;
 
   const URBAN_SPEED_KMH = 22;
   const SUBURBAN_SPEED_KMH = 40;
-  const DELIVERY_MIN_PER_STOP = AVG_MINUTES_PER_STOP;
 
   const isOriente = stops.some(s => (s as any).corridor === 'ORIENTE_ANT');
 
@@ -391,11 +422,12 @@ export function estimateRouteTotalMinutes(
   const distFirst = haversineKm(hubLat, hubLng, firstLat, firstLng);
   const speedFirst = distFirst > 15 ? SUBURBAN_SPEED_KMH : URBAN_SPEED_KMH;
   const congFirst = getCongestionMultiplier(firstLat, firstLng, departureHour);
-  totalMinutes += (distFirst / speedFirst) * 60 * congFirst;
+  const travelMinFirst = travelTimeFn ? travelTimeFn(hubLat, hubLng, firstLat, firstLng) : (distFirst / speedFirst) * 60 * congFirst;
+  totalMinutes += travelMinFirst;
 
   // Entre paradas consecutivas + tiempo de entrega por parada
   for (let i = 0; i < stops.length; i++) {
-    totalMinutes += DELIVERY_MIN_PER_STOP;
+    totalMinutes += estimateDeliveryMinutes(stops[i]);
     if (i < stops.length - 1) {
       const aLat = getLat(stops[i]);
       const aLng = getLng(stops[i]);
@@ -404,7 +436,8 @@ export function estimateRouteTotalMinutes(
       const dist = haversineKm(aLat, aLng, bLat, bLng);
       const speed = dist > 10 ? SUBURBAN_SPEED_KMH : URBAN_SPEED_KMH;
       const cong = getCongestionMultiplier(bLat, bLng, departureHour);
-      totalMinutes += (dist / speed) * 60 * cong;
+      const travelMin = travelTimeFn ? travelTimeFn(aLat, aLng, bLat, bLng) : (dist / speed) * 60 * cong;
+      totalMinutes += travelMin;
     }
   }
 
@@ -413,29 +446,97 @@ export function estimateRouteTotalMinutes(
   const lastLng = getLng(stops[stops.length - 1]);
   const distReturn = haversineKm(lastLat, lastLng, hubLat, hubLng);
   const speedReturn = distReturn > 15 ? SUBURBAN_SPEED_KMH : URBAN_SPEED_KMH;
-  totalMinutes += (distReturn / speedReturn) * 60;
+  const travelMinReturn = travelTimeFn ? travelTimeFn(lastLat, lastLng, hubLat, hubLng) : (distReturn / speedReturn) * 60;
+  totalMinutes += travelMinReturn;
   if (isOriente) totalMinutes += TUNEL_ORIENTE_FIXED_MIN; // regreso
 
   return Math.round(totalMinutes);
 }
 
+// ─── Llegada estimada por parada ─────────────────────────────────────────────
+/**
+ * Retorna los minutos transcurridos desde la salida del hub hasta llegar
+ * a la parada en `targetIndex` (sin contar el tiempo de entrega en esa parada).
+ * Usa la misma lógica de velocidades/congestión que estimateRouteTotalMinutes.
+ */
+export function estimateArrivalAtStopMinutes(
+    stops: Array<{ lat?: number | null; lng?: number | null; corridor?: ViaCorridor; [key: string]: any }>,
+    targetIndex: number,
+    hubLat: number,
+    hubLng: number,
+    departureHour: number = DISPATCH_DEPARTURE_HOUR,
+    travelTimeFn?: (lat1: number, lng1: number, lat2: number, lng2: number) => number
+): number {
+    if (stops.length === 0 || targetIndex < 0) return 0;
+
+    const URBAN_SPEED_KMH = 22;
+    const SUBURBAN_SPEED_KMH = 40;
+
+    const getLat = (s: typeof stops[0]) => Number(s.lat || hubLat);
+    const getLng = (s: typeof stops[0]) => Number(s.lng || hubLng);
+
+    // Hub → primera parada
+    const distFirst = haversineKm(hubLat, hubLng, getLat(stops[0]), getLng(stops[0]));
+    const speedFirst = distFirst > 15 ? SUBURBAN_SPEED_KMH : URBAN_SPEED_KMH;
+    const congFirst = getCongestionMultiplier(getLat(stops[0]), getLng(stops[0]), departureHour);
+    let minutes = travelTimeFn
+        ? travelTimeFn(hubLat, hubLng, getLat(stops[0]), getLng(stops[0]))
+        : (distFirst / speedFirst) * 60 * congFirst;
+
+    for (let i = 0; i < targetIndex; i++) {
+        minutes += estimateDeliveryMinutes(stops[i]); // tiempo de entrega en la parada i
+        const aLat = getLat(stops[i]);
+        const aLng = getLng(stops[i]);
+        const bLat = getLat(stops[i + 1]);
+        const bLng = getLng(stops[i + 1]);
+        const dist = haversineKm(aLat, aLng, bLat, bLng);
+        const speed = dist > 10 ? SUBURBAN_SPEED_KMH : URBAN_SPEED_KMH;
+        const cong = getCongestionMultiplier(bLat, bLng, departureHour);
+        minutes += travelTimeFn ? travelTimeFn(aLat, aLng, bLat, bLng) : (dist / speed) * 60 * cong;
+    }
+
+    return Math.round(minutes);
+}
+
+/**
+ * Retorna true si alguna parada con ventana de tiempo (timeWindowMinutes)
+ * sería visitada después de su hora límite en la secuencia dada.
+ */
+export function routeViolatesTimeWindows(
+    stops: Array<{ lat?: number | null; lng?: number | null; [key: string]: any }>,
+    hubLat: number,
+    hubLng: number,
+    departureHour: number = DISPATCH_DEPARTURE_HOUR
+): boolean {
+    const departureMinutes = departureHour * 60;
+    for (let i = 0; i < stops.length; i++) {
+        const tw = (stops[i] as any).timeWindowMinutes;
+        if (typeof tw !== 'number') continue;
+        const arrivalFromDep = estimateArrivalAtStopMinutes(stops, i, hubLat, hubLng, departureHour);
+        if (departureMinutes + arrivalFromDep > tw) return true;
+    }
+    return false;
+}
+
 export function twoOptImprove(
     stops: Array<{ lat?: number | null; lng?: number | null; [key: string]: any }>,
     hubLat: number,
-    hubLng: number
+    hubLng: number,
+    distFn?: (lat1: number, lng1: number, lat2: number, lng2: number) => number
 ): typeof stops {
     if (stops.length < 4) return stops; // No vale la pena con menos de 4 paradas
 
+    const dist = distFn || haversineKm;
     const getLat = (s: typeof stops[0]) => Number(s.lat || hubLat);
     const getLng = (s: typeof stops[0]) => Number(s.lng || hubLng);
 
     // Distancia total de una secuencia (hub→primera, inter-paradas, última→hub)
     const totalDist = (seq: typeof stops): number => {
-        let d = haversineKm(hubLat, hubLng, getLat(seq[0]), getLng(seq[0]));
+        let d = dist(hubLat, hubLng, getLat(seq[0]), getLng(seq[0]));
         for (let i = 0; i < seq.length - 1; i++) {
-            d += haversineKm(getLat(seq[i]), getLng(seq[i]), getLat(seq[i + 1]), getLng(seq[i + 1]));
+            d += dist(getLat(seq[i]), getLng(seq[i]), getLat(seq[i + 1]), getLng(seq[i + 1]));
         }
-        d += haversineKm(getLat(seq[seq.length - 1]), getLng(seq[seq.length - 1]), hubLat, hubLng);
+        d += dist(getLat(seq[seq.length - 1]), getLng(seq[seq.length - 1]), hubLat, hubLng);
         return d;
     };
 
@@ -465,6 +566,380 @@ export function twoOptImprove(
                     improved = true;
                 }
             }
+        }
+    }
+
+    return best;
+}
+
+// ─── Función de distancia por red vial (OSRM) ────────────────────────────────
+/**
+ * Construye una función (lat1,lng1,lat2,lng2)→km usando la matriz OSRM.
+ * Para pares no encontrados en la matriz (coordenadas fuera de los puntos
+ * originales) cae automáticamente a Haversine.
+ *
+ * Uso:
+ *   const distFn = buildRoadDistFn(points, distMatrix);
+ *   twoOptImprove(stops, hubLat, hubLng, distFn);
+ */
+export function buildRoadDistFn(
+    points: Array<{ lat: number; lng: number }>,
+    distMatrix: number[][]
+): (lat1: number, lng1: number, lat2: number, lng2: number) => number {
+    const PREC = 5; // 5 decimales ≈ 1 metro de tolerancia
+    const idx = new Map<string, number>();
+    points.forEach((p, i) => idx.set(`${Number(p.lat).toFixed(PREC)},${Number(p.lng).toFixed(PREC)}`, i));
+
+    return (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+        const i = idx.get(`${lat1.toFixed(PREC)},${lng1.toFixed(PREC)}`);
+        const j = idx.get(`${lat2.toFixed(PREC)},${lng2.toFixed(PREC)}`);
+        if (i !== undefined && j !== undefined && distMatrix[i]?.[j] != null) {
+            return distMatrix[i][j];
+        }
+        return haversineKm(lat1, lng1, lat2, lng2);
+    };
+}
+
+/**
+ * Construye una función (lat1,lng1,lat2,lng2)→minutos usando la matriz de
+ * duraciones OSRM. Para pares no encontrados cae a la estimación por velocidad.
+ */
+export function buildRoadTimeFn(
+    points: Array<{ lat: number; lng: number }>,
+    durMatrix: number[][]
+): (lat1: number, lng1: number, lat2: number, lng2: number) => number {
+    const PREC = 5;
+    const idx = new Map<string, number>();
+    points.forEach((p, i) => idx.set(`${Number(p.lat).toFixed(PREC)},${Number(p.lng).toFixed(PREC)}`, i));
+
+    return (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+        const i = idx.get(`${lat1.toFixed(PREC)},${lng1.toFixed(PREC)}`);
+        const j = idx.get(`${lat2.toFixed(PREC)},${lng2.toFixed(PREC)}`);
+        if (i !== undefined && j !== undefined && durMatrix[i]?.[j] != null) {
+            return durMatrix[i][j]; // already in minutes
+        }
+        // Fallback: estimate from speed (urban ~22 km/h)
+        const dist = haversineKm(lat1, lng1, lat2, lng2);
+        return (dist / 22) * 60;
+    };
+}
+
+// ─── Or-opt(1) intra-ruta ────────────────────────────────────────────────────
+/**
+ * Complemento al 2-opt: reubica cada parada individualmente en su posición
+ * óptima dentro de la misma ruta. Captura casos que 2-opt no encuentra
+ * (paradas aisladas que generan desvíos cortos).
+ */
+export function orOpt1Intra(
+    stops: Array<{ lat?: number | null; lng?: number | null; [key: string]: any }>,
+    hubLat: number,
+    hubLng: number,
+    distFn?: (lat1: number, lng1: number, lat2: number, lng2: number) => number
+): typeof stops {
+    if (stops.length < 3) return stops;
+
+    const dist = distFn || haversineKm;
+    const getLat = (s: typeof stops[0]) => Number(s.lat || hubLat);
+    const getLng = (s: typeof stops[0]) => Number(s.lng || hubLng);
+
+    const totalDist = (seq: typeof stops): number => {
+        let d = dist(hubLat, hubLng, getLat(seq[0]), getLng(seq[0]));
+        for (let i = 0; i < seq.length - 1; i++) {
+            d += dist(getLat(seq[i]), getLng(seq[i]), getLat(seq[i + 1]), getLng(seq[i + 1]));
+        }
+        d += dist(getLat(seq[seq.length - 1]), getLng(seq[seq.length - 1]), hubLat, hubLng);
+        return d;
+    };
+
+    let best = [...stops];
+    let bestDist = totalDist(best);
+    let improved = true;
+    let iterations = 0;
+
+    while (improved && iterations < 40) {
+        improved = false;
+        iterations++;
+        outer: for (let i = 0; i < best.length; i++) {
+            const stop = best[i];
+            const without = [...best.slice(0, i), ...best.slice(i + 1)];
+            for (let j = 0; j <= without.length; j++) {
+                if (j === i || j === i - 1) continue; // same effective position
+                const candidate = [...without.slice(0, j), stop, ...without.slice(j)];
+                const candidateDist = totalDist(candidate);
+                if (candidateDist < bestDist - 0.01) {
+                    best = candidate;
+                    bestDist = candidateDist;
+                    improved = true;
+                    break outer;
+                }
+            }
+        }
+
+        // Or-opt(2): mover pares de paradas consecutivas
+        outer2: for (let i = 0; i < best.length - 1; i++) {
+            const pair = [best[i], best[i + 1]];
+            const without = [...best.slice(0, i), ...best.slice(i + 2)];
+            for (let j = 0; j <= without.length; j++) {
+                // orden original
+                const candidate = [...without.slice(0, j), ...pair, ...without.slice(j)];
+                const d = totalDist(candidate);
+                if (d < bestDist - 0.01) {
+                    best = candidate; bestDist = d; improved = true; break outer2;
+                }
+                // orden invertido
+                const candidateRev = [...without.slice(0, j), pair[1], pair[0], ...without.slice(j)];
+                const dRev = totalDist(candidateRev);
+                if (dRev < bestDist - 0.01) {
+                    best = candidateRev; bestDist = dRev; improved = true; break outer2;
+                }
+            }
+        }
+    }
+
+    return best;
+}
+
+// ─── Or-opt inter-ruta ───────────────────────────────────────────────────────
+/**
+ * Mueve paradas individuales entre rutas para minimizar la distancia total
+ * del sistema. Es el salto más grande en calidad después de 2-opt/Or-opt intra:
+ * detecta casos donde una parada "ajena" contamina una ruta y pertenece mejor
+ * a una ruta vecina del mismo corredor.
+ *
+ * Respeta: capacidad máxima, tiempo máximo (MAX_ROUTE_MINUTES), compatibilidad
+ * de corredor. Nunca deja una ruta vacía.
+ */
+export function orOptInterRoute(
+    routes: SuggestedRoute[],
+    hubLat: number,
+    hubLng: number,
+    maxRounds: number = 40
+): SuggestedRoute[] {
+    if (routes.length < 2) return routes;
+
+    const getLat = (inv: Invoice) => Number((inv as any).lat || hubLat);
+    const getLng = (inv: Invoice) => Number((inv as any).lng || hubLng);
+
+    const routeDist = (invs: Invoice[]): number => {
+        if (invs.length === 0) return 0;
+        let d = haversineKm(hubLat, hubLng, getLat(invs[0]), getLng(invs[0]));
+        for (let i = 0; i < invs.length - 1; i++) {
+            d += haversineKm(getLat(invs[i]), getLng(invs[i]), getLat(invs[i + 1]), getLng(invs[i + 1]));
+        }
+        d += haversineKm(getLat(invs[invs.length - 1]), getLng(invs[invs.length - 1]), hubLat, hubLng);
+        return d;
+    };
+
+    let work = routes.map(r => ({ ...r, assignedInvoices: [...r.assignedInvoices] }));
+
+    for (let round = 0; round < maxRounds; round++) {
+        let improved = false;
+
+        outer: for (let di = 0; di < work.length; di++) {
+            const donor = work[di];
+            if (donor.assignedInvoices.length <= 1) continue;
+            const donorCap = Number(donor.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+
+            for (let ki = 0; ki < donor.assignedInvoices.length; ki++) {
+                const inv = donor.assignedInvoices[ki];
+                const invVol = Number(inv.volumeM3) || 0;
+                const invCorridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
+
+                const donorWithout = [
+                    ...donor.assignedInvoices.slice(0, ki),
+                    ...donor.assignedInvoices.slice(ki + 1),
+                ];
+                const distDonorBefore = routeDist(donor.assignedInvoices);
+                const distDonorAfter = routeDist(donorWithout);
+
+                let bestGain = 0.05; // mejora mínima 50m para evitar movimientos triviales
+                let bestRi = -1;
+                let bestPos = -1;
+
+                for (let ri = 0; ri < work.length; ri++) {
+                    if (ri === di) continue;
+                    const receiver = work[ri];
+                    const rCorridor: ViaCorridor = (receiver.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+                    if (!corridorsCompatible(invCorridor, rCorridor)) continue;
+                    const rCap = Number(receiver.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+                    if (receiver.totalVolume + invVol > rCap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
+                    if (receiver.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) continue;
+
+                    const distReceiverBefore = routeDist(receiver.assignedInvoices);
+
+                    const invHasTW = typeof (inv as any).timeWindowMinutes === 'number';
+                    for (let pos = 0; pos <= receiver.assignedInvoices.length; pos++) {
+                        const receiverWith = [
+                            ...receiver.assignedInvoices.slice(0, pos),
+                            inv,
+                            ...receiver.assignedInvoices.slice(pos),
+                        ];
+                        if (estimateRouteTotalMinutes(receiverWith, hubLat, hubLng) >= MAX_ROUTE_MINUTES) continue;
+                        // Verificar que la inserción no rompe ventanas de tiempo existentes
+                        if (invHasTW || receiver.assignedInvoices.some(i => typeof (i as any).timeWindowMinutes === 'number')) {
+                            if (routeViolatesTimeWindows(receiverWith, hubLat, hubLng)) continue;
+                        }
+                        const distReceiverAfter = routeDist(receiverWith);
+                        const gain = (distDonorBefore + distReceiverBefore) - (distDonorAfter + distReceiverAfter);
+                        if (gain > bestGain) {
+                            bestGain = gain;
+                            bestRi = ri;
+                            bestPos = pos;
+                        }
+                    }
+                }
+
+                if (bestRi >= 0) {
+                    const receiver = work[bestRi];
+                    const rCap = Number(receiver.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+                    work[di] = {
+                        ...donor,
+                        assignedInvoices: donorWithout,
+                        totalVolume: Number((donor.totalVolume - invVol).toFixed(4)),
+                        utilization: Math.round(((donor.totalVolume - invVol) / donorCap) * 100),
+                    };
+                    work[bestRi] = {
+                        ...receiver,
+                        assignedInvoices: [
+                            ...receiver.assignedInvoices.slice(0, bestPos),
+                            inv,
+                            ...receiver.assignedInvoices.slice(bestPos),
+                        ],
+                        totalVolume: Number((receiver.totalVolume + invVol).toFixed(4)),
+                        utilization: Math.round(((receiver.totalVolume + invVol) / rCap) * 100),
+                    };
+                    improved = true;
+                    break outer;
+                }
+            }
+        }
+
+        if (!improved) break;
+    }
+
+    return work.filter(r => r.assignedInvoices.length > 0);
+}
+
+// ─── ILS — Iterated Local Search (variante GRASP) ────────────────────────────
+/**
+ * Después de Or-opt, ejecuta N rondas de perturbación + reparación para escapar
+ * mínimos locales que ningún intercambio local puede superar.
+ *
+ * Cada ronda:
+ *   1. DESTROY — extrae aleatoriamente K facturas de K rutas distintas.
+ *   2. REPAIR  — reinserta cada factura en la mejor posición disponible
+ *                (misma lógica que Or-opt, respetando capacidad/tiempo/corredor/TW).
+ *   3. LOCAL   — aplica Or-opt inter-ruta sobre la solución reparada.
+ *   4. ACCEPT  — reemplaza la solución actual si la nueva es mejor
+ *                (más facturas asignadas, o igual asignadas y menor distancia total).
+ *
+ * Equivalente práctico a GRASP con RCL: misma calidad de resultado, sin
+ * necesidad de refactorizar el 600-línea bloque de construcción de rutas.
+ */
+export function ilsImprove(
+    routes: SuggestedRoute[],
+    hubLat: number,
+    hubLng: number,
+    rounds: number = 4
+): SuggestedRoute[] {
+    if (routes.length < 2) return routes;
+
+    const getLat = (inv: Invoice) => Number((inv as any).lat || hubLat);
+    const getLng = (inv: Invoice) => Number((inv as any).lng || hubLng);
+
+    const routeDist = (invs: Invoice[]): number => {
+        if (invs.length === 0) return 0;
+        let d = haversineKm(hubLat, hubLng, getLat(invs[0]), getLng(invs[0]));
+        for (let i = 0; i < invs.length - 1; i++) {
+            d += haversineKm(getLat(invs[i]), getLng(invs[i]), getLat(invs[i + 1]), getLng(invs[i + 1]));
+        }
+        d += haversineKm(getLat(invs[invs.length - 1]), getLng(invs[invs.length - 1]), hubLat, hubLng);
+        return d;
+    };
+
+    const solutionScore = (rs: SuggestedRoute[]): number => {
+        const assigned = rs.reduce((s, r) => s + r.assignedInvoices.length, 0);
+        const dist = rs.reduce((s, r) => s + routeDist(r.assignedInvoices), 0);
+        return assigned * 100_000 - dist;
+    };
+
+    let best = routes.map(r => ({ ...r, assignedInvoices: [...r.assignedInvoices] }));
+    let bestScore = solutionScore(best);
+
+    for (let round = 0; round < rounds; round++) {
+        // ── DESTROY ─────────────────────────────────────────────────────────────
+        const perturbed = best.map(r => ({ ...r, assignedInvoices: [...r.assignedInvoices] }));
+        const removed: Invoice[] = [];
+
+        // Número de facturas a extraer: ~15% de las rutas, mínimo 2
+        const nRemove = Math.max(2, Math.ceil(perturbed.length * 0.2));
+        const shuffledIdxs = perturbed
+            .map((_, i) => i)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, nRemove);
+
+        for (const ri of shuffledIdxs) {
+            const r = perturbed[ri];
+            if (r.assignedInvoices.length === 0) continue;
+            const ki = Math.floor(Math.random() * r.assignedInvoices.length);
+            const inv = r.assignedInvoices[ki];
+            const invVol = Number(inv.volumeM3) || 0;
+            removed.push(inv);
+            const newInvs = r.assignedInvoices.filter((_, i) => i !== ki);
+            const cap = Number(r.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+            perturbed[ri] = {
+                ...r,
+                assignedInvoices: newInvs,
+                totalVolume: Number((r.totalVolume - invVol).toFixed(4)),
+                utilization: Math.round(((r.totalVolume - invVol) / cap) * 100),
+            };
+        }
+
+        // ── REPAIR ──────────────────────────────────────────────────────────────
+        for (const inv of removed) {
+            const invVol = Number(inv.volumeM3) || 0;
+            const invCorridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
+            let bestRi = -1, bestPos = -1, bestDist = Infinity;
+
+            for (let ri = 0; ri < perturbed.length; ri++) {
+                const r = perturbed[ri];
+                if (r.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) continue;
+                const cap = Number(r.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+                if (r.totalVolume + invVol > cap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
+                const rCorridor: ViaCorridor = (r.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+                if (!corridorsCompatible(invCorridor, rCorridor)) continue;
+
+                for (let pos = 0; pos <= r.assignedInvoices.length; pos++) {
+                    const withInv = [...r.assignedInvoices.slice(0, pos), inv, ...r.assignedInvoices.slice(pos)];
+                    if (estimateRouteTotalMinutes(withInv, hubLat, hubLng) >= MAX_ROUTE_MINUTES) continue;
+                    if (routeViolatesTimeWindows(withInv, hubLat, hubLng)) continue;
+                    const d = routeDist(withInv);
+                    if (d < bestDist) { bestDist = d; bestRi = ri; bestPos = pos; }
+                }
+            }
+
+            if (bestRi >= 0) {
+                const r = perturbed[bestRi];
+                const cap = Number(r.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+                const newInvs = [...r.assignedInvoices.slice(0, bestPos), inv, ...r.assignedInvoices.slice(bestPos)];
+                perturbed[bestRi] = {
+                    ...r,
+                    assignedInvoices: newInvs,
+                    totalVolume: Number((r.totalVolume + invVol).toFixed(4)),
+                    utilization: Math.round(((r.totalVolume + invVol) / cap) * 100),
+                };
+            }
+        }
+
+        // ── LOCAL SEARCH ────────────────────────────────────────────────────────
+        const repaired = perturbed.filter(r => r.assignedInvoices.length > 0);
+        const localOpt = orOptInterRoute(repaired, hubLat, hubLng, 15);
+
+        // ── ACCEPT ──────────────────────────────────────────────────────────────
+        const newScore = solutionScore(localOpt);
+        if (newScore > bestScore) {
+            best = localOpt;
+            bestScore = newScore;
         }
     }
 

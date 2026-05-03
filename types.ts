@@ -144,8 +144,9 @@ export interface Vehicle extends AuditBase {
   id: string;
   plate: string;
   owner: string;
-  brand: string; 
+  brand: string;
   capacityM3: number;
+  maxWeightKg?: number;
   status: VehicleStatus;
   clientId: string;
   soatExpiry?: string;
@@ -239,6 +240,7 @@ export interface Invoice extends AuditBase {
   lat: number;
   lng: number;
   volumeM3: number;
+  weightKg?: number;
   status: DocStatus;
   city?: string;
   invoiceValue: number;

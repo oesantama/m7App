@@ -633,6 +633,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ waypoints })
     }),
+  getRoadMatrix: (points: { lat: number; lng: number }[]) =>
+    fetchJson(`${API_URL}/routes/road-matrix`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ points })
+    }),
   reassignRouteVehicle: (data: { routeId: string; newVehicleId: string; observations?: string }) =>
     fetchJson(`${API_URL}/routes/reassign-vehicle`, {
       method: 'POST',
