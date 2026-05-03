@@ -694,12 +694,16 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
           if (itemLat !== null && itemLng !== null && item.address) {
             const addrKey = (item.address + '|' + (item.city || '')).toLowerCase().trim();
             try {
+              await client.query('SAVEPOINT sp_geo');
               await client.query(`
                 INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
                 VALUES ($1, $2, $3, $4, $5)
                 ON CONFLICT (address_key) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng
               `, [addrKey, item.address, item.city || '', itemLat, itemLng]);
-            } catch (_) { /* caché no crítica */ }
+              await client.query('RELEASE SAVEPOINT sp_geo');
+            } catch (_) {
+              await client.query('ROLLBACK TO SAVEPOINT sp_geo');
+            }
           }
         }
       }
@@ -2211,13 +2215,17 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
         if (item.lat != null && item.lng != null && newAddr) {
           const addrKey = (newAddr + '|' + (newCity || '')).toLowerCase().trim();
           try {
+            await client.query('SAVEPOINT sp_geo2');
             await client.query(
               `INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
                VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT (address_key) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng`,
               [addrKey, newAddr, newCity, item.lat, item.lng]
             );
-          } catch (_) { /* caché de geocodificación no crítica — la migración corregirá el schema */ }
+            await client.query('RELEASE SAVEPOINT sp_geo2');
+          } catch (_) {
+            await client.query('ROLLBACK TO SAVEPOINT sp_geo2');
+          }
         }
 
         // Log de auditoría campo por campo
