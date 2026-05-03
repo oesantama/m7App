@@ -766,8 +766,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const usedVehicleIds = new Set<string>(); // MOVIMIENTO DE DECLARACIÓN AQUÍ
 
       // 1. Preparación de Facturas (Copias)
-      let availableInvoices = (specificInvoices || [...validInvoices])
-        .filter(inv => inv && typeof inv === 'object') // Guardia extra
+      // Excluir facturas que ya tienen ruta activa confirmada o confirmadas en esta sesión
+      const _activeRouteIds = new Set<string>(activeRoutes.flatMap(r => r.invoiceIds || (r as any).invoice_ids || []));
+      const baseInvoicePool = specificInvoices
+        ? specificInvoices
+        : validInvoices.filter(inv => !_activeRouteIds.has(inv.id) && !confirmedSessionIds.has(inv.id));
+      let availableInvoices = baseInvoicePool
+        .filter(inv => inv && typeof inv === 'object')
         .map(inv => ({ ...inv }));
 
       // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA (MEJORA 6: clustering espacial) ---
