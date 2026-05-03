@@ -446,16 +446,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   // FILTRADO DE FACTURAS APTAS: Real (basado en lo que viene del API de facturas)
   const validInvoices = useMemo(() => {
-    // REGLA ORBIT: Solo planificar items en estado 'Pendiente' o 'Auditado'
+    // Estados de ítems que indican la factura ya tiene ruta activa — excluir del planificador
+    const assignedItemStatuses = new Set(['EST-10', 'EST-11', 'EST-15', 'EST-12', 'EST-13', 'EST-14', 'COMPLETADO', 'FINALIZADO', 'ENTREGADO']);
+
     const filtered = invoices.filter(inv => {
       // FILTRO 1: Debe pertenecer al cliente seleccionado
       const invClientId = inv.clientId || (inv as any).client_id;
       const clientMatch = selectedClient === 'GLOBAL' || invClientId === selectedClient;
       if (!clientMatch) return false;
 
-      // FILTRO 2: Estados aptos para despacho Orbit
+      // FILTRO 2: Excluir si los ítems ya están asignados a una ruta activa
+      // itemStatus = MAX(item_status) del API → si algún ítem está en EST-10, es EST-10
+      const itemSt = String((inv as any).itemStatus || (inv as any).item_status || '').toUpperCase();
+      if (itemSt && assignedItemStatuses.has(itemSt)) return false;
+
+      // FILTRO 3: Estado del documento apto para despacho
       const s = String(inv.status || '').toUpperCase();
-      // IDs EST-XX + texto legado (compatibilidad retroactiva mientras migra la BD)
       const validStatuses = ['EST-03', 'EST-04', 'EST-05', 'EST-08', 'PENDIENTE', 'AUDITADO', 'INVENTARIADO', 'EN CONTEO'];
       return validStatuses.includes(s);
     });
