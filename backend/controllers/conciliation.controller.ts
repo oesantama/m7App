@@ -94,15 +94,19 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
         `);
 
         // El HAVING solo se aplica si NO estamos buscando un documento específico (docId)
+        // BUG FIX: Incluir documentos con sobrecostos APROBADOS aunque todas las facturas estén
+        // conciliadas — evita que los sobrecostos "desaparezcan" al completar la conciliación.
         const havingClause = docId ? '' : `
             HAVING (
                 (
                   (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
-                  - 
+                  -
                   (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
                 ) > 0
                 OR
                 (SELECT COUNT(*) FROM route_surcharges rs WHERE rs.document_id = dl.id AND (rs.status_id IN ('PENDIENTE', 'EST-01') OR rs.status_id IS NULL)) > 0
+                OR
+                (SELECT COUNT(*) FROM route_surcharges rs WHERE rs.document_id = dl.id AND rs.status_id IN ('APROBADO', 'EST-02')) > 0
             )
               AND (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '') > 0
         `;
@@ -1048,17 +1052,21 @@ export const saveSobrecostos = async (req: Request, res: Response) => {
                 `, [item.valor, item.referencia, item.fecha, item.statusId, userId,
                     item.observaciones || null, item.facturas || null, item.id]);
             } else {
+                // Deduplication: check ANY existing record with same document+plate+valor+referencia
+                // regardless of status_id — prevents creating a PENDING duplicate of an APPROVED surcharge
                 const existing = await client.query(`
                     SELECT id FROM route_surcharges
-                    WHERE document_id = $1 AND plate = $2 AND valor = $3 AND referencia = $4 AND status_id = $5
+                    WHERE document_id = $1 AND plate = $2
+                      AND valor = $3
+                      AND (referencia = $4 OR (referencia IS NULL AND $4::text IS NULL))
                     LIMIT 1
-                `, [documentId, plate, item.valor, item.referencia, item.statusId || 'EST-01']);
+                `, [documentId, plate, item.valor, item.referencia || null]);
 
                 if (existing.rows.length === 0) {
                     await client.query(`
                         INSERT INTO route_surcharges (document_id, plate, valor, referencia, fecha, status_id, user_id, observaciones, facturas)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                    `, [documentId, plate, item.valor, item.referencia, item.fecha,
+                    `, [documentId, plate, item.valor, item.referencia || null, item.fecha,
                         item.statusId || 'EST-01', userId, item.observaciones || null, item.facturas || null]);
                 }
             }
