@@ -118,9 +118,8 @@ export const useAppData = () => {
           }).catch(() => []);
       }
 
-      if (isSuper || hasPerm('CLIENTES') || hasPerm('RUTAS') || hasPerm('DOCUMENTOS_L') || hasPerm('CUMPLIDOS_DRIVE') || hasPerm('GESTION_DOCUMENTOS_DRIVE') || hasPerm('CUMPLIDOS')) {
-          api.getClients().then(res => updateCat('masterClientes', res)).catch(() => []);
-      }
+      // Clientes: siempre cargar — el backend filtra por client_ids para no-superadmin
+      api.getClients().then(res => updateCat('masterClientes', res)).catch(() => []);
 
       if (hasPerm('ASIGNACIONES') || hasPerm('RUTAS') || hasPerm('DOCUMENTOS_L')) {
           api.getAssignments().then(res => {

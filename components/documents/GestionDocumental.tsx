@@ -36,6 +36,7 @@ const GestionDocumental: React.FC = () => {
     const [selectedUserFilter, setSelectedUserFilter] = useState('');
     const [folderDateFilter, setFolderDateFilter] = useState('');
     const [usersList, setUsersList] = useState<{id: string, name: string}[]>([]);
+    const [localClients, setLocalClients] = useState<{id: string; name: string}[]>([]);
 
     const today = colombiaToday();
     const [uploadDate, setUploadDate] = useState<string>(today);
@@ -44,10 +45,28 @@ const GestionDocumental: React.FC = () => {
 
     const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
 
-    const allClients: { id: string; name: string }[] = (allMasterData.masterClientes || []).map((c: any) => ({
+    // Fetch clients directly if masterClientes not yet hydrated
+    useEffect(() => {
+        const token = user?.token || localStorage.getItem('token') || '';
+        axios.get('/api/clients', { headers: { Authorization: `Bearer ${token}` } })
+            .then(res => {
+                if (Array.isArray(res.data)) {
+                    setLocalClients(res.data.map((c: any) => ({
+                        id: String(c.id || ''),
+                        name: String(c.name || c.nombre || c.business_name || ''),
+                    })).filter((c: any) => c.id && c.name));
+                }
+            }).catch(() => {});
+    }, [user?.token]);
+
+    const masterList = (allMasterData.masterClientes || []).length > 0
+        ? allMasterData.masterClientes
+        : localClients;
+
+    const allClients: { id: string; name: string }[] = masterList.map((c: any) => ({
         id: String(c.id || c.clientId || ''),
         name: String(c.name || c.nombre || c.businessName || c.business_name || ''),
-    })).filter(c => c.id && c.name);
+    })).filter((c: any) => c.id && c.name);
 
     // Normalize clientIds to strings to avoid number/string mismatch from DB
     const userClientIds = (user?.clientIds || (user?.clientId ? [user.clientId] : []))
