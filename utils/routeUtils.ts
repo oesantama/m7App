@@ -531,6 +531,40 @@ export function routeViolatesTimeWindows(
     return false;
 }
 
+// Max inter-stop distance by corridor type. Prevents routes with large geographic jumps.
+const MAX_INTER_STOP_KM: Partial<Record<string, number>> = {
+    MED_CENTRO: 4,  NORTE: 5,  SUR: 5,
+    NORTE_LEJANO: 10, SUR_LEJANO: 10,
+    ORIENTE_ANT: 14, OCCIDENTE_ANT: 14,
+};
+const DEFAULT_MAX_JUMP_KM = 6;
+
+/**
+ * Returns true if any consecutive pair of stops in the sequence exceeds the
+ * corridor's max inter-stop distance. Helps prevent routes that zigzag across
+ * the city. Only applied when stops carry valid non-default coordinates.
+ */
+export function routeHasLargeJump(
+    stops: Array<{ lat?: number | null; lng?: number | null; [key: string]: any }>,
+    hubLat: number,
+    hubLng: number,
+    corridor?: string
+): boolean {
+    if (stops.length < 2) return false;
+    const maxKm = (corridor ? MAX_INTER_STOP_KM[corridor] : undefined) ?? DEFAULT_MAX_JUMP_KM;
+    const getLat = (s: typeof stops[0]) => Number(s.lat || hubLat);
+    const getLng = (s: typeof stops[0]) => Number(s.lng || hubLng);
+    for (let i = 0; i < stops.length - 1; i++) {
+        const a = stops[i], b = stops[i + 1];
+        const aLat = getLat(a), bLat = getLat(b);
+        // Skip pairs where either stop lacks real coords
+        if (aLat === hubLat || bLat === hubLat) continue;
+        if ((a as any).hasDefaultCoords || (b as any).hasDefaultCoords) continue;
+        if (haversineKm(aLat, getLng(a), bLat, getLng(b)) > maxKm) return true;
+    }
+    return false;
+}
+
 export function twoOptImprove(
     stops: Array<{ lat?: number | null; lng?: number | null; [key: string]: any }>,
     hubLat: number,
@@ -665,6 +699,11 @@ export function orOpt1Intra(
         return d;
     };
 
+    // Dominant corridor for jump-distance check
+    const corridorCounts = new Map<string, number>();
+    stops.forEach(s => { const c = (s as any).corridor; if (c) corridorCounts.set(c, (corridorCounts.get(c) || 0) + 1); });
+    const dominantCorridor = [...corridorCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+
     let best = [...stops];
     let bestDist = totalDist(best);
     let improved = true;
@@ -682,6 +721,7 @@ export function orOpt1Intra(
                 const candidateDist = totalDist(candidate);
                 if (candidateDist < bestDist - 0.01) {
                     if (hasTW && routeViolatesTimeWindows(candidate, hubLat, hubLng)) continue;
+                    if (routeHasLargeJump(candidate, hubLat, hubLng, dominantCorridor)) continue;
                     best = candidate;
                     bestDist = candidateDist;
                     improved = true;
@@ -699,12 +739,14 @@ export function orOpt1Intra(
                 const d = totalDist(candidate);
                 if (d < bestDist - 0.01) {
                     if (hasTW && routeViolatesTimeWindows(candidate, hubLat, hubLng)) continue;
+                    if (routeHasLargeJump(candidate, hubLat, hubLng, dominantCorridor)) continue;
                     best = candidate; bestDist = d; improved = true; break outer2;
                 }
                 const candidateRev = [...without.slice(0, j), pair[1], pair[0], ...without.slice(j)];
                 const dRev = totalDist(candidateRev);
                 if (dRev < bestDist - 0.01) {
                     if (hasTW && routeViolatesTimeWindows(candidateRev, hubLat, hubLng)) continue;
+                    if (routeHasLargeJump(candidateRev, hubLat, hubLng, dominantCorridor)) continue;
                     best = candidateRev; bestDist = dRev; improved = true; break outer2;
                 }
             }
@@ -869,6 +911,8 @@ export function orOptInterRoute(
                         if (invHasTW || receiver.assignedInvoices.some(i => typeof (i as any).timeWindowMinutes === 'number')) {
                             if (routeViolatesTimeWindows(receiverWith, hubLat, hubLng)) continue;
                         }
+                        const rCorridor2 = (receiver.assignedInvoices[0] as any)?.corridor;
+                        if (routeHasLargeJump(receiverWith, hubLat, hubLng, rCorridor2)) continue;
                         const distReceiverAfter = routeDist(receiverWith);
                         const gain = (distDonorBefore + distReceiverBefore) - (distDonorAfter + distReceiverAfter);
                         if (gain > bestGain) {
