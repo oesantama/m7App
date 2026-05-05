@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { 
     Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, 
-    Search, Calendar, RotateCcw, Download, X, Loader2, LayoutGrid, List
+    Search, Calendar, RotateCcw, Download, X, Loader2, LayoutGrid, List, Edit2, Trash2, FolderSearch, Link
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -17,6 +17,8 @@ interface DocumentLog {
     folderDate: string;
     userName: string;
     userId: string;
+    isDeleted?: boolean;
+    deleteReason?: string;
 }
 
 const colombiaToday = () =>
@@ -24,7 +26,7 @@ const colombiaToday = () =>
 
 const GestionDocumental: React.FC = () => {
     const { user, allMasterData } = useAppStore();
-    const [activeTab, setActiveTab] = useState<'upload' | 'consult'>('upload');
+    const [activeTab, setActiveTab] = useState<'upload' | 'consult' | 'explore'>('upload');
     const [selectedClient, setSelectedClient] = useState<string>('');
     const [files, setFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -43,7 +45,15 @@ const GestionDocumental: React.FC = () => {
     const [dateFrom, setDateFrom] = useState<string>('');
     const [dateTo, setDateTo] = useState<string>('');
 
+    // Explore States
+    const [exploreYear, setExploreYear] = useState<string>(new Date().getFullYear().toString());
+    const [exploreClient, setExploreClient] = useState<string>('');
+    const [exploreFiles, setExploreFiles] = useState<any[]>([]);
+    const [isExploring, setIsExploring] = useState(false);
+    const [explorePath, setExplorePath] = useState('');
+
     const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const hasEditPermission = isSuper || user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
 
     // Fetch clients directly if masterClientes not yet hydrated
     useEffect(() => {
@@ -162,6 +172,86 @@ const GestionDocumental: React.FC = () => {
         }
     };
 
+    const handleRename = async (doc: DocumentLog) => {
+        const newName = window.prompt("Ingrese el nuevo nombre para el archivo:", doc.fileName);
+        if (!newName || newName.trim() === '' || newName === doc.fileName) return;
+
+        try {
+            const token = user?.token || '';
+            const res = await axios.put(`/api/documents/cumplido/${doc.id}/rename`, { newName }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            toast.success("Archivo renombrado exitosamente");
+            fetchHistory();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || "Error al renombrar el archivo");
+        }
+    };
+
+    const handleDelete = async (doc: DocumentLog) => {
+        const reason = window.prompt("Por favor, ingrese el motivo de la eliminación:");
+        if (!reason || reason.trim() === '') {
+            toast.error("Debe ingresar un motivo para eliminar.");
+            return;
+        }
+
+        if (window.confirm(`¿Está seguro que desea eliminar del drive el archivo: ${doc.fileName}?`)) {
+            try {
+                const token = user?.token || '';
+                await axios.delete(`/api/documents/cumplido/${doc.id}/delete`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    data: { reason }
+                });
+                toast.success("Archivo eliminado exitosamente");
+                fetchHistory();
+            } catch (error: any) {
+                toast.error(error.response?.data?.error || "Error al eliminar el archivo");
+            }
+        }
+    };
+
+    const handleExplore = async () => {
+        if (!exploreYear || !exploreClient) {
+            toast.error('Seleccione un cliente y un año');
+            return;
+        }
+        setIsExploring(true);
+        try {
+            const token = user?.token || '';
+            const clientObj = authorizedClients.find(c => c.id === exploreClient);
+            const res = await axios.get('/api/documents/drive-explorer', {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { year: exploreYear, clientName: clientObj?.name }
+            });
+            setExploreFiles(res.data.files || []);
+            setExplorePath(res.data.path || '');
+            if (res.data.files?.length === 0) toast.info('No se encontraron archivos en esa ruta.');
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || "Error al explorar Drive");
+        } finally {
+            setIsExploring(false);
+        }
+    };
+
+    const handleOpenDriveLink = async (filePath: string) => {
+        try {
+            const token = user?.token || '';
+            const toastId = toast.loading('Obteniendo enlace seguro de Google Drive...');
+            const res = await axios.post('/api/documents/drive-link', {
+                remotePath: `${explorePath}/${filePath}`
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            toast.dismiss(toastId);
+            if (res.data.link) {
+                window.open(res.data.link, '_blank');
+            } else {
+                toast.error('No se pudo obtener el enlace');
+            }
+        } catch (error) {
+            toast.dismiss();
+            toast.error('Error al comunicarse con Drive');
+        }
+    };
+
     const calculateSLA = (uploadStr: string, folderStr: string, type: string) => {
         if (!uploadStr || !folderStr) return { diffHours: 0, status: 'SUCCESS', limit: 24 };
         
@@ -256,6 +346,13 @@ const GestionDocumental: React.FC = () => {
                             ${activeTab === 'consult' ? 'bg-white text-indigo-600 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <List size={18} /> Consultar Drive
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('explore')}
+                        className={`flex-1 lg:flex-none px-8 py-3 rounded-[1.75rem] flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all
+                            ${activeTab === 'explore' ? 'bg-white text-indigo-600 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <FolderSearch size={18} /> Explorador Remoto
                     </button>
                 </div>
             </div>
@@ -476,19 +573,22 @@ const GestionDocumental: React.FC = () => {
                                         {history.map(h => {
                                             const { diffHours, status } = calculateSLA(h.uploadDate, h.folderDate, h.clientType);
                                             return (
-                                                <tr key={h.id} className="hover:bg-slate-50/50 transition-all group">
+                                                <tr key={h.id} className={`transition-all group ${h.isDeleted ? 'bg-rose-50/30' : 'hover:bg-slate-50/50'}`}>
                                                     <td className="px-8 py-6">
                                                         <div className={`w-4 h-4 rounded-full shadow-lg ${status === 'SUCCESS' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-rose-500 shadow-rose-500/20'}`} 
                                                              title={status === 'SUCCESS' ? 'Cumple SLA' : 'Fuera de Tiempo'} />
                                                     </td>
                                                     <td className="px-6 py-6">
                                                         <div className="flex items-center gap-4">
-                                                            <div className="bg-slate-50 p-3 rounded-2xl text-slate-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                                                            <div className={`p-3 rounded-2xl transition-all ${h.isDeleted ? 'bg-rose-100 text-rose-500' : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-500 group-hover:text-white'}`}>
                                                                 <FileText size={20} />
                                                             </div>
                                                             <div className="flex flex-col max-w-[200px]">
-                                                                <span className="font-black text-slate-800 text-[13px] truncate">{h.fileName}</span>
+                                                                <span className={`font-black text-[13px] truncate ${h.isDeleted ? 'text-rose-700 line-through' : 'text-slate-800'}`} title={h.fileName}>{h.fileName}</span>
                                                                 <span className="text-[10px] text-slate-400 font-bold uppercase">{formatDate(h.uploadDate)} @ {formatTime(h.uploadDate)}</span>
+                                                                {h.isDeleted && (
+                                                                    <span className="text-[9px] text-rose-600 font-bold mt-1 line-clamp-2" title={h.deleteReason}>Motivo: {h.deleteReason}</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -518,9 +618,28 @@ const GestionDocumental: React.FC = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-8 py-6 text-center">
-                                                        <a href={h.driveLink} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-slate-50 hover:bg-slate-900 hover:text-white rounded-[1.25rem] transition-all inline-flex items-center justify-center shadow-sm">
-                                                            <ExternalLink size={20} />
-                                                        </a>
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            {!h.isDeleted && (
+                                                                <a href={h.driveLink} target="_blank" rel="noopener noreferrer" title="Ver en Drive" className="w-10 h-10 bg-slate-50 hover:bg-slate-900 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
+                                                                    <ExternalLink size={16} />
+                                                                </a>
+                                                            )}
+                                                            {hasEditPermission && !h.isDeleted && (
+                                                                <>
+                                                                    <button onClick={() => handleRename(h)} title="Renombrar Archivo" className="w-10 h-10 bg-slate-50 hover:bg-indigo-500 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
+                                                                        <Edit2 size={16} />
+                                                                    </button>
+                                                                    <button onClick={() => handleDelete(h)} title="Eliminar Archivo" className="w-10 h-10 bg-slate-50 hover:bg-rose-500 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        {h.isDeleted && (
+                                                            <div className="mt-2 text-[10px] bg-rose-100 text-rose-700 px-2 py-1 rounded-lg font-bold w-fit mx-auto" title={h.deleteReason}>
+                                                                ELIMINADO
+                                                            </div>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );
@@ -545,6 +664,108 @@ const GestionDocumental: React.FC = () => {
                                 <div className="flex flex-col items-center justify-center py-32 gap-6 bg-slate-50/20">
                                     <Loader2 className="animate-spin text-indigo-500" size={64} />
                                     <p className="text-slate-500 font-black uppercase tracking-widest animate-pulse">Sincronizando Historial...</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: EXPLORE */}
+                {activeTab === 'explore' && (
+                    <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-500">
+                        {/* Filtros Explorer */}
+                        <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-slate-100">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Año</label>
+                                    <select 
+                                        className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none"
+                                        value={exploreYear}
+                                        onChange={e => setExploreYear(e.target.value)}
+                                    >
+                                        {[...Array(5)].map((_, i) => {
+                                            const y = new Date().getFullYear() - i;
+                                            return <option key={y} value={y}>{y}</option>;
+                                        })}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cliente</label>
+                                    <select 
+                                        className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none"
+                                        value={exploreClient}
+                                        onChange={e => setExploreClient(e.target.value)}
+                                    >
+                                        <option value="">SELECCIONAR CLIENTE</option>
+                                        {authorizedClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <button 
+                                        onClick={handleExplore}
+                                        disabled={isExploring || !exploreYear || !exploreClient}
+                                        className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-900/20 disabled:opacity-50"
+                                    >
+                                        {isExploring ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                                        EXPLORAR CARPETAS
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Resultados Explorer */}
+                        <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[400px]">
+                            <div className="flex justify-between items-center p-8 bg-slate-50/30 border-b border-slate-50">
+                                <h3 className="text-slate-800 font-black uppercase tracking-tight flex items-center gap-3">
+                                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                                    Archivos Encontrados ({exploreFiles.length})
+                                </h3>
+                                {explorePath && (
+                                    <span className="text-xs font-mono text-slate-400 bg-slate-100 px-3 py-1 rounded-lg">{explorePath}</span>
+                                )}
+                            </div>
+
+                            {exploreFiles.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-8">
+                                    {exploreFiles.filter((f: any) => !f.IsDir).map((file: any, idx: number) => (
+                                        <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-300 transition-all group">
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <div className="p-2 bg-indigo-100 text-indigo-500 rounded-lg group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                                                    <FileText size={18} />
+                                                </div>
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="text-[12px] font-black text-slate-700 truncate" title={file.Path}>{file.Name}</span>
+                                                    <span className="text-[9px] text-slate-400 font-mono truncate">{file.Path}</span>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleOpenDriveLink(file.Path)}
+                                                className="ml-2 w-8 h-8 flex-shrink-0 bg-white hover:bg-slate-900 hover:text-white rounded-lg flex items-center justify-center text-slate-400 shadow-sm transition-all"
+                                                title="Obtener Enlace de Drive"
+                                            >
+                                                <Link size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                !isExploring && (
+                                    <div className="flex flex-col items-center justify-center py-20 gap-6">
+                                        <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                                            <FolderSearch size={40} />
+                                        </div>
+                                        <div className="text-center space-y-2">
+                                            <h3 className="text-slate-600 font-black uppercase tracking-widest text-sm">Explorador Vacío</h3>
+                                            <p className="text-slate-400 text-xs font-medium">Selecciona un cliente y haz clic en explorar.</p>
+                                        </div>
+                                    </div>
+                                )
+                            )}
+                            
+                            {isExploring && (
+                                <div className="flex flex-col items-center justify-center py-20 gap-6 bg-white/80 absolute inset-0 z-10 backdrop-blur-sm">
+                                    <Loader2 className="animate-spin text-indigo-500" size={48} />
+                                    <p className="text-slate-500 font-black uppercase tracking-widest text-sm animate-pulse">Consultando Google Drive...</p>
                                 </div>
                             )}
                         </div>

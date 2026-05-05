@@ -571,6 +571,15 @@ const healSchema = async (client: any) => {
     // Fix user_id type mismatch
     await client.query(`ALTER TABLE document_drive_logs ALTER COLUMN user_id TYPE TEXT;`).catch(() => {});
 
+    // Add deletion columns
+    await client.query(`
+      ALTER TABLE document_drive_logs 
+      ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS delete_reason TEXT,
+      ADD COLUMN IF NOT EXISTS deleted_by TEXT,
+      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+    `).catch(err => console.error('Error adding deletion columns to document_drive_logs:', err));
+
     await client.query(`
       ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type VARCHAR(20) DEFAULT 'MUNICIPAL';
     `);

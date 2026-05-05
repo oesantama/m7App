@@ -2200,7 +2200,9 @@ export const getDocumentStats = async (req: Request, res: Response) => {
                 c.name as "clientName",
                 c.client_type as "clientType",
                 u.name as "userName",
-                d.user_id as "userId"
+                d.user_id as "userId",
+                d.is_deleted as "isDeleted",
+                d.delete_reason as "deleteReason"
              FROM document_drive_logs d
              LEFT JOIN clients c ON d.client_id = c.id
              LEFT JOIN users u ON d.user_id = u.id
@@ -2213,6 +2215,186 @@ export const getDocumentStats = async (req: Request, res: Response) => {
     } catch (err: any) {
         if (err.code === '42P01') return res.json([]); // tabla no existe aún
         res.status(500).json({ error: 'Error al obtener estadísticas' });
+    }
+};
+
+export const renameCumplido = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { newName } = req.body;
+        const user = (req as any).user;
+
+        // Check permission (PAG-45 edit)
+        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const hasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
+        if (!isSuper && !hasPerm) {
+            return res.status(403).json({ error: 'No tienes permisos para editar archivos.' });
+        }
+
+        if (!newName) return res.status(400).json({ error: 'El nuevo nombre es requerido.' });
+
+        const { rows } = await pool.query('SELECT * FROM document_drive_logs WHERE id = $1', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Archivo no encontrado en base de datos.' });
+
+        const doc = rows[0];
+        if (doc.is_deleted) return res.status(400).json({ error: 'El archivo está eliminado.' });
+
+        // Force .pdf extension to avoid breaking links or format
+        let finalNewName = newName.trim();
+        if (!finalNewName.toLowerCase().endsWith('.pdf')) {
+            finalNewName += '.pdf';
+        }
+        
+        // Remove spaces
+        finalNewName = finalNewName.replace(/\s+/g, '_');
+
+        if (finalNewName === doc.file_name) {
+            return res.json({ success: true, message: 'El nombre es el mismo.' });
+        }
+
+        const oldPath = `gdrive_cumplidos:${doc.drive_path}/${doc.file_name}`;
+        const newPath = `gdrive_cumplidos:${doc.drive_path}/${finalNewName}`;
+
+        await new Promise<void>((resolve, reject) => {
+            exec(`rclone moveto "${oldPath}" "${newPath}"`, (err, stdout, stderr) => {
+                if (err) {
+                    console.error('[RENAME-RCLONE-ERR]', stderr);
+                    reject(new Error('Error al renombrar en Google Drive'));
+                } else resolve();
+            });
+        });
+
+        // Get new link
+        const driveLink = await new Promise<string>((resolve) => {
+            exec(`rclone link "${newPath}"`, (err, stdout) => {
+                resolve(stdout ? stdout.trim() : doc.drive_link); // fallback to old link
+            });
+        });
+
+        await pool.query(
+            'UPDATE document_drive_logs SET file_name = $1, drive_link = $2 WHERE id = $3',
+            [finalNewName, driveLink, id]
+        );
+
+        res.json({ success: true, message: 'Archivo renombrado exitosamente.', newName: finalNewName, driveLink });
+    } catch (err: any) {
+        console.error('[M7-RENAME-ERR]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const deleteCumplido = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        const user = (req as any).user;
+
+        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const hasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
+        if (!isSuper && !hasPerm) {
+            return res.status(403).json({ error: 'No tienes permisos para eliminar archivos.' });
+        }
+
+        if (!reason || reason.trim() === '') {
+            return res.status(400).json({ error: 'Debe ingresar una nota del porqué elimina el archivo.' });
+        }
+
+        const { rows } = await pool.query('SELECT * FROM document_drive_logs WHERE id = $1', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Archivo no encontrado en base de datos.' });
+
+        const doc = rows[0];
+        if (doc.is_deleted) return res.status(400).json({ error: 'El archivo ya estaba eliminado.' });
+
+        const targetPath = `gdrive_cumplidos:${doc.drive_path}/${doc.file_name}`;
+
+        await new Promise<void>((resolve, reject) => {
+            exec(`rclone deletefile "${targetPath}"`, (err, stdout, stderr) => {
+                if (err) {
+                    // Try `rclone delete` in case it's older or different
+                    exec(`rclone delete "${targetPath}"`, (err2, stdout2, stderr2) => {
+                        if (err2) {
+                            console.error('[DELETE-RCLONE-ERR]', stderr2);
+                            reject(new Error('Error al eliminar en Google Drive'));
+                        } else resolve();
+                    });
+                } else resolve();
+            });
+        });
+
+        const userName = user.name || user.email || 'Sistema';
+
+        await pool.query(
+            `UPDATE document_drive_logs 
+             SET is_deleted = TRUE, delete_reason = $1, deleted_by = $2, deleted_at = NOW() 
+             WHERE id = $3`,
+            [reason.trim(), userName, id]
+        );
+
+        res.json({ success: true, message: 'Archivo eliminado exitosamente.' });
+    } catch (err: any) {
+        console.error('[M7-DELETE-ERR]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+
+export const driveExplorer = async (req: Request, res: Response) => {
+    try {
+        const { year, clientName } = req.query;
+        if (!year || !clientName) {
+            return res.status(400).json({ error: 'Faltan parámetros de búsqueda (año, cliente).' });
+        }
+
+        const cleanClientName = String(clientName).replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
+        const searchPath = `gdrive_cumplidos:CUMPLIDOS MILLA 7/${year}/${cleanClientName}`;
+
+        const results = await new Promise<any[]>((resolve, reject) => {
+            // Usamos -R para buscar recursivamente todos los archivos
+            exec(`rclone lsjson "${searchPath}" -R --files-only`, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout, stderr) => {
+                if (err) {
+                    if (stderr.includes('directory not found')) {
+                        resolve([]); // Carpeta no existe, no hay archivos
+                    } else {
+                        console.error('[DRIVE-EXPLORER-ERR]', stderr);
+                        reject(new Error('Error al consultar Google Drive'));
+                    }
+                } else {
+                    try {
+                        const parsed = JSON.parse(stdout);
+                        resolve(parsed);
+                    } catch (e) {
+                        resolve([]);
+                    }
+                }
+            });
+        });
+
+        res.json({ success: true, path: searchPath, files: results });
+    } catch (err: any) {
+        console.error('[M7-DRIVE-EXPLORER-ERR]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const generateDriveLink = async (req: Request, res: Response) => {
+    try {
+        const { remotePath } = req.body;
+        if (!remotePath) return res.status(400).json({ error: 'Ruta requerida' });
+
+        const driveLink = await new Promise<string>((resolve, reject) => {
+            exec(`rclone link "${remotePath}"`, (err, stdout, stderr) => {
+                if (err) {
+                    console.error('[RCLONE-LINK-ERR]', stderr);
+                    reject(new Error('No se pudo generar el enlace.'));
+                } else {
+                    resolve(stdout.trim());
+                }
+            });
+        });
+
+        res.json({ success: true, link: driveLink });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
     }
 };
 
