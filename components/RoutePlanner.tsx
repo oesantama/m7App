@@ -1214,16 +1214,45 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       //    cercanas hasta agotar capacidad. Overflow → siguiente vehículo.
       // ──────────────────────────────────────────────────────────────────────
 
-      const CELL_SIZE = 0.014; // ~1.5km por celda (reducido de 0.022 para mayor precisión geográfica)
-      // Radio máximo del cluster por corredor. Se redujo ligeramente para evitar
-      // que un camión del norte absorba facturas del sur de la zona.
+      const CELL_SIZE_DEFAULT = 0.014; // fallback global ~1.5km
+      // Adaptive CELL_SIZE: analyze per-corridor density and tune cell granularity
+      // Dense urban (>3 inv/km²) → 0.006° (~670m); normal urban → 0.010°; default → 0.014°; sparse rural → 0.022°
+      const corridorInvMap = new Map<ViaCorridor, { lats: number[]; lngs: number[] }>();
+      availableInvoices.forEach(inv => {
+        const lat = Number(inv.lat || 0);
+        const lng = Number(inv.lng || 0);
+        if (lat === 0 || lng === 0 || (inv as any).hasDefaultCoords) return;
+        const corr: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
+        if (!corridorInvMap.has(corr)) corridorInvMap.set(corr, { lats: [], lngs: [] });
+        corridorInvMap.get(corr)!.lats.push(lat);
+        corridorInvMap.get(corr)!.lngs.push(lng);
+      });
+      const corridorCellSize = new Map<ViaCorridor, number>();
+      corridorInvMap.forEach(({ lats, lngs }, corr) => {
+        if (lats.length < 3) { corridorCellSize.set(corr, CELL_SIZE_DEFAULT); return; }
+        const latSpan = Math.max(...lats) - Math.min(...lats);
+        const lngSpan = Math.max(...lngs) - Math.min(...lngs);
+        const areaKm2 = Math.max((latSpan * 111) * (lngSpan * 111 * Math.cos((lats.reduce((a,b)=>a+b,0)/lats.length)*Math.PI/180)), 1);
+        const density = lats.length / areaKm2;
+        let cs = CELL_SIZE_DEFAULT;
+        if (density > 3) cs = 0.006;
+        else if (density > 1.5) cs = 0.010;
+        else if (density < 0.3) cs = 0.022;
+        corridorCellSize.set(corr, cs);
+      });
+      // Tag each invoice with its corridor's adaptive cell size
+      availableInvoices.forEach(inv => {
+        const corr: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
+        (inv as any).adaptiveCellSize = corridorCellSize.get(corr) ?? CELL_SIZE_DEFAULT;
+      });
+
       const SPREAD_KM_BY_CORRIDOR: Partial<Record<ViaCorridor, number>> = {
         NORTE: 9, NORTE_LEJANO: 13,
         SUR: 9, SUR_LEJANO: 13,
         ORIENTE_ANT: 18, OCCIDENTE_ANT: 18,
       };
       const getMaxSpread = (corridor: ViaCorridor) => SPREAD_KM_BY_CORRIDOR[corridor] ?? 6;
-      const MIN_ANCHOR_SEPARATION_KM = 8; // anclas más separadas para menos solapamiento entre rutas
+      const MIN_ANCHOR_SEPARATION_KM = 8;
 
       interface GeoCell {
         key: string;
@@ -1244,9 +1273,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const corridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
 
         // Sin coords → celda por corredor+ciudad+barrio para no mezclar municipios distintos sin geocodificar
+        const cs = (inv as any).adaptiveCellSize || CELL_SIZE_DEFAULT;
         const cellKey = hasDefCoords || (lat === 0 && lng === 0)
           ? `nogeo_${corridor}_${(inv as any).cityKey || 'SIN_CIUDAD'}_${(inv as any).neighborhoodKey || 'SIN_BARRIO'}`
-          : `${Math.floor(lat / CELL_SIZE)}_${Math.floor(lng / CELL_SIZE)}`;
+          : `${Math.floor(lat / cs)}_${Math.floor(lng / cs)}`;
 
         if (!cellMap.has(cellKey)) {
           cellMap.set(cellKey, {

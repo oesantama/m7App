@@ -751,8 +751,23 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
       }
     }
     await client.query('COMMIT');
+
+    // Recopilar IDs de documentos recién insertados para geocodificación en background
+    const insertedDocIds: string[] = documents.map((d: any) => d.id).filter(Boolean);
+
     console.log(`[M7-SYNC-SUCCESS] Carga masiva completada.`);
     res.json({ success: true, count: documents.length });
+
+    // ── Geocodificación en background — NO bloquea la respuesta al usuario ────
+    // Se lanza después de responder para no añadir latencia al import.
+    if (insertedDocIds.length > 0) {
+      setImmediate(() => {
+        backgroundGeocodeDocumentItems(insertedDocIds).catch(e =>
+          console.error('[GEO-BG] Error en geocodificación background:', e.message)
+        );
+      });
+    }
+
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[M7-DOC-BULK] Error:', err.message);
@@ -761,6 +776,102 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
     client.release();
   }
 };
+
+// ── Geocodificación en background ─────────────────────────────────────────────
+// Se llama después de bulkCreateDocuments sin await. Geocodifica via Nominatim
+// las facturas sin coordenadas y guarda los resultados en geocoding_cache +
+// document_items para que estén listos cuando el planificador los consulte.
+async function backgroundGeocodeDocumentItems(docIds: string[]): Promise<void> {
+  try {
+    // 1. Facturas de estos documentos sin coordenadas válidas
+    const pending = await pool.query<{
+      addr_key: string; address: string; city: string;
+    }>(`
+      SELECT DISTINCT
+        LOWER(TRIM(di.address) || '|' || TRIM(COALESCE(di.city, ''))) AS addr_key,
+        TRIM(di.address)                  AS address,
+        TRIM(COALESCE(di.city, ''))       AS city
+      FROM document_items di
+      WHERE di.document_id = ANY($1)
+        AND di.address IS NOT NULL AND di.address <> ''
+        AND (di.latitude IS NULL OR di.latitude = 0)
+      LIMIT 200
+    `, [docIds]);
+
+    if (pending.rows.length === 0) return;
+
+    // 2. Cuáles ya están en caché → aplicar inmediatamente a document_items
+    const addrKeys = pending.rows.map(r => r.addr_key);
+    const cached = await pool.query<{ address_key: string; lat: number; lng: number }>(
+      `SELECT address_key, lat, lng FROM geocoding_cache WHERE address_key = ANY($1)`,
+      [addrKeys]
+    );
+    const cacheMap = new Map<string, { lat: number; lng: number }>(
+      cached.rows.map(r => [r.address_key, { lat: Number(r.lat), lng: Number(r.lng) }])
+    );
+
+    // Aplicar coords en caché a document_items (rápido, sin API)
+    for (const row of pending.rows) {
+      const coords = cacheMap.get(row.addr_key);
+      if (!coords) continue;
+      await pool.query(`
+        UPDATE document_items
+           SET latitude = $1, longitude = $2
+         WHERE document_id = ANY($3)
+           AND LOWER(TRIM(address) || '|' || TRIM(COALESCE(city,''))) = $4
+           AND (latitude IS NULL OR latitude = 0)
+      `, [coords.lat, coords.lng, docIds, row.addr_key]);
+    }
+
+    // 3. Las que no están en caché → geocodificar via Nominatim (1 req/s, gratis)
+    const missing = pending.rows.filter(r => !cacheMap.has(r.addr_key));
+    console.log(`[GEO-BG] Geocodificando ${missing.length} direcciones nuevas (${cached.rows.length} del caché)...`);
+
+    for (const row of missing) {
+      try {
+        await new Promise(r => setTimeout(r, 1100)); // Respetar rate-limit Nominatim: 1 req/s
+        const query = encodeURIComponent(`${row.address}, ${row.city || 'Antioquia'}, Colombia`);
+        const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=co`;
+        const resp = await fetch(url, {
+          headers: { 'User-Agent': 'OrbitM7/1.0 route-planner geocoder' },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!resp.ok) continue;
+        const data = await resp.json() as Array<{ lat: string; lon: string }>;
+        if (!data[0]?.lat) continue;
+
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        // Validar que esté dentro de Colombia (bbox aproximado)
+        if (lat < 1.0 || lat > 12.5 || lng < -79.0 || lng > -66.0) continue;
+
+        // Guardar en caché
+        await pool.query(`
+          INSERT INTO geocoding_cache (address_key, address, city, lat, lng)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (address_key) DO UPDATE
+            SET lat = EXCLUDED.lat, lng = EXCLUDED.lng
+        `, [row.addr_key, row.address, row.city, lat, lng]);
+
+        // Actualizar document_items
+        await pool.query(`
+          UPDATE document_items
+             SET latitude = $1, longitude = $2
+           WHERE document_id = ANY($3)
+             AND LOWER(TRIM(address) || '|' || TRIM(COALESCE(city,''))) = $4
+             AND (latitude IS NULL OR latitude = 0)
+        `, [lat, lng, docIds, row.addr_key]);
+
+      } catch {
+        // Fallo silencioso por dirección — continúa con la siguiente
+      }
+    }
+
+    console.log(`[GEO-BG] Completado: ${missing.length} nuevas + ${cached.rows.length} del caché.`);
+  } catch (err: any) {
+    console.error('[GEO-BG] Error general:', err.message);
+  }
+}
 
 export const updateStatus = async (req: Request, res: Response) => {
   const { id } = req.params;
