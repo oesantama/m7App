@@ -49,9 +49,12 @@ const GestionDocumental: React.FC = () => {
         name: String(c.name || c.nombre || c.businessName || c.business_name || ''),
     })).filter(c => c.id && c.name);
 
+    // Normalize clientIds to strings to avoid number/string mismatch from DB
+    const userClientIds = (user?.clientIds || (user?.clientId ? [user.clientId] : []))
+        .map((id: any) => String(id));
     const authorizedClients = isSuper
         ? allClients
-        : allClients.filter(c => user?.clientIds?.includes(c.id));
+        : allClients.filter(c => userClientIds.includes(String(c.id)));
 
     useEffect(() => {
         if (authorizedClients.length === 1 && !selectedClient) {

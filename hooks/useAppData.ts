@@ -118,7 +118,7 @@ export const useAppData = () => {
           }).catch(() => []);
       }
 
-      if (hasPerm('CLIENTES') || hasPerm('RUTAS') || hasPerm('DOCUMENTOS_L')) {
+      if (isSuper || hasPerm('CLIENTES') || hasPerm('RUTAS') || hasPerm('DOCUMENTOS_L') || hasPerm('CUMPLIDOS_DRIVE') || hasPerm('GESTION_DOCUMENTOS_DRIVE') || hasPerm('CUMPLIDOS')) {
           api.getClients().then(res => updateCat('masterClientes', res)).catch(() => []);
       }
 

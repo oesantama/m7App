@@ -332,17 +332,19 @@ export const deactivateEncuesta = async (req: Request, res: Response) => {
 
 export const validateSurveyAccess = async (req: Request, res: Response) => {
   const { cedula } = req.query;
+  if (!cedula) {
+    return res.status(400).json({ error: 'Cédula requerida.' });
+  }
   try {
     const r = await pool.query(`
-      SELECT p.nombre, p.cedula, p.cargo, p.fecha_ingreso
-      FROM gh_personal p
-      JOIN gh_encuestas_activas a ON a.cedula = p.cedula
-      WHERE p.cedula = $1 AND a.estado = 'EST-01'
+      SELECT nombre, cedula, cargo, fecha_ingreso
+      FROM gh_personal
+      WHERE TRIM(cedula) = TRIM($1)
       LIMIT 1
     `, [cedula]);
 
     if (r.rows.length === 0) {
-      return res.status(403).json({ error: 'No está autorizado para realizar la encuesta o ya expiró.' });
+      return res.status(403).json({ error: 'Cédula no encontrada. Verifique el número e intente de nuevo.' });
     }
 
     res.json(r.rows[0]);
