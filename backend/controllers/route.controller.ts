@@ -1109,3 +1109,74 @@ export const getDailyKPIs = async (_req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al obtener KPIs' });
   }
 };
+
+// ─── POST /routes/resolve-coords ─────────────────────────────────────────────
+// Para cada factura recibe {customerName, city, address, invoiceId} y devuelve
+// las coordenadas más recientes encontradas en document_items para ese cliente.
+// Así se aprovecha el historial real de entregas — clientes recurrentes reciben
+// sus coordenadas exactas sin geocodificación externa.
+export const resolveCustomerCoords = async (req: Request, res: Response) => {
+  const { invoices, clientId } = req.body as {
+    invoices: { invoiceId: string; customerName: string; city: string; address?: string }[];
+    clientId?: string;
+  };
+  if (!Array.isArray(invoices) || invoices.length === 0) {
+    return res.json({ coords: {} });
+  }
+
+  try {
+    // Construir lista de (customer_name, city) únicos para buscar en batch
+    const pairs = [...new Set(
+      invoices
+        .filter(i => i.customerName)
+        .map(i => `${i.customerName.trim().toUpperCase()}||${(i.city || '').trim().toUpperCase()}`)
+    )];
+
+    if (pairs.length === 0) return res.json({ coords: {} });
+
+    // Query: última posición conocida por cliente+ciudad, lat/lng != 0
+    const rows = await pool.query<{
+      customer_name: string; city: string;
+      latitude: string; longitude: string;
+    }>(`
+      SELECT DISTINCT ON (UPPER(TRIM(customer_name)), UPPER(TRIM(COALESCE(city, ''))))
+        TRIM(customer_name)                        AS customer_name,
+        TRIM(COALESCE(city, ''))                   AS city,
+        latitude::text,
+        longitude::text
+      FROM document_items
+      WHERE customer_name IS NOT NULL
+        AND latitude  IS NOT NULL AND latitude  <> 0
+        AND longitude IS NOT NULL AND longitude <> 0
+        AND (latitude  BETWEEN -90   AND 90)
+        AND (longitude BETWEEN -180  AND 180)
+        ${clientId ? 'AND client_id = $1' : ''}
+      ORDER BY
+        UPPER(TRIM(customer_name)),
+        UPPER(TRIM(COALESCE(city, ''))),
+        updated_at DESC NULLS LAST
+    `, clientId ? [clientId] : []);
+
+    // Construir mapa customerKey → coords
+    const coordMap: Record<string, { lat: number; lng: number }> = {};
+    for (const row of rows.rows) {
+      const lat = parseFloat(row.latitude);
+      const lng = parseFloat(row.longitude);
+      if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) continue;
+      const key = `${row.customer_name.toUpperCase()}||${row.city.toUpperCase()}`;
+      coordMap[key] = { lat, lng };
+    }
+
+    // Mapear invoiceId → coords
+    const result: Record<string, { lat: number; lng: number }> = {};
+    for (const inv of invoices) {
+      const key = `${(inv.customerName || '').trim().toUpperCase()}||${(inv.city || '').trim().toUpperCase()}`;
+      if (coordMap[key]) result[inv.invoiceId] = coordMap[key];
+    }
+
+    res.json({ coords: result, resolved: Object.keys(result).length, total: invoices.length });
+  } catch (err: any) {
+    console.error('[M7-RESOLVE-COORDS]', err.message);
+    res.json({ coords: {} }); // fallo silencioso — frontend usa fallback
+  }
+};

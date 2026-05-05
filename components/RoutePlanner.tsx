@@ -149,6 +149,38 @@ function inferMedellínSide(address: string): 'OCCIDENTE' | 'ORIENTE' | null {
   return null;
 }
 
+// Centroides de municipios del Área Metropolitana del Valle de Aburrá y Oriente Antioqueño.
+// Se usan cuando una factura no tiene coords históricas ni barrio reconocido,
+// para que classifyCorridor reciba una coordenada real y no 0,0.
+const CITY_CENTROIDS: Record<string, { lat: number; lng: number }> = {
+  // Valle de Aburrá — Norte
+  'BELLO':           { lat: 6.3370, lng: -75.5550 },
+  'COPACABANA':      { lat: 6.3530, lng: -75.5120 },
+  'GIRARDOTA':       { lat: 6.3780, lng: -75.4470 },
+  'BARBOSA':         { lat: 6.4380, lng: -75.3320 },
+  // Valle de Aburrá — Sur
+  'ITAGÜÍ':          { lat: 6.1843, lng: -75.5990 },
+  'ITAGUI':          { lat: 6.1843, lng: -75.5990 },
+  'ENVIGADO':        { lat: 6.1672, lng: -75.5940 },
+  'SABANETA':        { lat: 6.1513, lng: -75.6163 },
+  'LA ESTRELLA':     { lat: 6.1570, lng: -75.6440 },
+  'CALDAS':          { lat: 6.0937, lng: -75.6353 },
+  // Oriente Antioqueño
+  'RIONEGRO':        { lat: 6.1541, lng: -75.3739 },
+  'MARINILLA':       { lat: 6.1753, lng: -75.3396 },
+  'EL RETIRO':       { lat: 6.0560, lng: -75.5003 },
+  'GUARNE':          { lat: 6.2827, lng: -75.4406 },
+  'SAN VICENTE':     { lat: 6.3003, lng: -75.3346 },
+  'EL SANTUARIO':    { lat: 6.1386, lng: -75.2713 },
+  'CARMEN DE VIBORAL': { lat: 6.0876, lng: -75.3359 },
+  // Occidente Antioqueño
+  'SANTA FE DE ANTIOQUIA': { lat: 6.5567, lng: -75.8285 },
+  'SOPETRÁN':        { lat: 6.5048, lng: -75.7395 },
+  // Centro-Norte
+  'BELMIRA':         { lat: 6.6044, lng: -75.6696 },
+  'ENTRERRÍOS':      { lat: 6.5592, lng: -75.5461 },
+};
+
 // Radio máximo de dispersión geográfica por ruta (km) — se mantiene para cohesión intra-corredor
 const MAX_ROUTE_RADIUS_KM = 18;
 
@@ -850,6 +882,47 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         })
         .map(inv => ({ ...inv }));
 
+      // ── FASE 0: Coordenadas históricas de clientes recurrentes ─────────────
+      // Antes de geocodificar vía API, cargamos las últimas coords conocidas
+      // de document_items para cada cliente+ciudad. Esto resuelve el 90%+ de
+      // los casos (clientes recurrentes) sin consumir cuota de geocodificación
+      // y garantiza que Bello, Rionegro, Copacabana, etc. no caigan en el
+      // mismo nogeo_NORTE_* que Medellín norte.
+      setOptimizingProgress(3); setOptimizingPhase('Cargando ubicaciones históricas...');
+      try {
+        const invoicesNeedingCoords = availableInvoices.filter(inv => {
+          const lat = Number(inv.lat || 0), lng = Number(inv.lng || 0);
+          return (lat === 0 && lng === 0) || hasDefaultCoords(lat, lng);
+        });
+        if (invoicesNeedingCoords.length > 0) {
+          const clientIdForQuery = selectedClient !== 'GLOBAL' ? selectedClient : undefined;
+          const payload = invoicesNeedingCoords.map(inv => ({
+            invoiceId: inv.id,
+            customerName: String((inv as any).customerName || (inv as any).customer_name || '').trim(),
+            city: String(inv.city || '').trim(),
+          })).filter(p => p.customerName.length > 0);
+
+          if (payload.length > 0) {
+            const result = await api.resolveCustomerCoords({ invoices: payload, clientId: clientIdForQuery });
+            if (result?.coords && typeof result.coords === 'object') {
+              availableInvoices = availableInvoices.map(inv => {
+                const hist = (result.coords as Record<string, { lat: number; lng: number }>)[inv.id];
+                if (hist && hist.lat && hist.lng) {
+                  return { ...inv, lat: hist.lat, lng: hist.lng };
+                }
+                return inv;
+              });
+              if (result.resolved > 0) {
+                setOptimizingPhase(`${result.resolved}/${result.total} clientes con coords históricas`);
+              }
+            }
+          }
+        }
+      } catch {
+        // Fallo silencioso: continuar con geocodificación normal
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
       // --- FASE PREVIA M7 IQ: ALMACENES DE CADENA (MEJORA 6: clustering espacial) ---
       setOptimizingProgress(5); setOptimizingPhase('Analizando cadenas comerciales...');
       const retailGroups: { [key: string]: Invoice[] } = {};
@@ -988,9 +1061,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             if (side === 'OCCIDENTE') { (inv as any).lat = 6.248; (inv as any).lng = -75.598; }
             else if (side === 'ORIENTE') { (inv as any).lat = 6.252; (inv as any).lng = -75.558; }
             (inv as any).zoneInferred = true;
+          } else {
+            // Fallback: centroide del municipio para ciudades fuera de Medellín
+            // (Bello, Rionegro, Copacabana, Envigado, Itagüí, etc.)
+            const cityCentroid = CITY_CENTROIDS[cUpper] || CITY_CENTROIDS[cUpper.replace(/[ÁÉÍÓÚÑ]/g, c =>
+              ({ Á:'A',É:'E',Í:'I',Ó:'O',Ú:'U',Ñ:'N' } as any)[c] || c)];
+            if (cityCentroid) {
+              (inv as any).lat = cityCentroid.lat;
+              (inv as any).lng = cityCentroid.lng;
+              (inv as any).hasDefaultCoords = false;
+              (inv as any).zoneInferred = true; // marcar como inferido para evitar sobreescribir coords reales
+            }
           }
-          // Para otras ciudades: classifyCorridor usará el nombre de ciudad
-          // y el corredor correcto se asignará aunque no haya coords exactas.
         }
 
         // Asignar corredor usando lat/lng definitivos

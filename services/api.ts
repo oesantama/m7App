@@ -681,6 +681,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+  resolveCustomerCoords: (data: { invoices: { invoiceId: string; customerName: string; city: string }[]; clientId?: string }) =>
+    fetchJson(`${API_URL}/routes/resolve-coords`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
 
   // Horarios de entrega por día de semana
   getDeliverySchedules: (clientId: string, dayOfWeek?: number) => {

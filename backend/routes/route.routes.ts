@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getRoutes, saveRoute, logRouteMovement, getRoutingPatterns, getDeliveryPatterns, updateLocation, getLatestLocations, learnFromCompletedRoute, geocodeAddress, getRoadRoute, getRoadMatrix, reassignRouteVehicle, unassignRouteInvoice, repiceRouteInvoice, getRouteInvoices, getDailyKPIs, failAndReassignInvoice, learnFromFailure } from '../controllers/route.controller.js';
+import { getRoutes, saveRoute, logRouteMovement, getRoutingPatterns, getDeliveryPatterns, updateLocation, getLatestLocations, learnFromCompletedRoute, geocodeAddress, getRoadRoute, getRoadMatrix, reassignRouteVehicle, unassignRouteInvoice, repiceRouteInvoice, getRouteInvoices, getDailyKPIs, failAndReassignInvoice, learnFromFailure, resolveCustomerCoords } from '../controllers/route.controller.js';
 
 const router = Router();
 
@@ -21,6 +21,7 @@ router.post('/unassign-invoice',   unassignRouteInvoice);
 router.post('/repice-invoice',     repiceRouteInvoice);
 router.post('/fail-invoice',       failAndReassignInvoice);
 router.post('/learn-failure',      learnFromFailure);
+router.post('/resolve-coords',     resolveCustomerCoords);
 router.get('/:routeId/invoices',   getRouteInvoices);
 
 export default router;
