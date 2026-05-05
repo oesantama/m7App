@@ -9,10 +9,11 @@ interface ReportRow {
   LOAD_ID: string;
   TRUCK_ID_DESTIN: string;
   DRIVER_ID_DESTIN: string;
+  FECHA_HORA_ASIGNACION?: string;
 }
 
 const COLS: Array<keyof ReportRow> = [
-  'DOCUMENT_ID', 'TRUCK_ID_ORIGIN', 'LOAD_ID', 'TRUCK_ID_DESTIN', 'DRIVER_ID_DESTIN',
+  'DOCUMENT_ID', 'TRUCK_ID_ORIGIN', 'LOAD_ID', 'TRUCK_ID_DESTIN', 'DRIVER_ID_DESTIN', 'FECHA_HORA_ASIGNACION'
 ];
 
 const MastersuiteReport: React.FC = () => {
@@ -54,7 +55,7 @@ const MastersuiteReport: React.FC = () => {
     if (rows.length === 0) return;
 
     const ws = XLSX.utils.json_to_sheet(rows, { header: COLS });
-    ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }];
+    ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 24 }];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
@@ -239,6 +240,12 @@ const MastersuiteReport: React.FC = () => {
                       <div className="flex flex-col">
                         <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Identificación</span>
                         {row.DRIVER_ID_DESTIN || '—'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 font-bold text-slate-600 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Asignación</span>
+                        {row.FECHA_HORA_ASIGNACION || '—'}
                       </div>
                     </td>
                   </tr>

@@ -48,9 +48,19 @@ const GestionDocumental: React.FC = () => {
     // Explore States
     const [exploreYear, setExploreYear] = useState<string>(new Date().getFullYear().toString());
     const [exploreClient, setExploreClient] = useState<string>('');
+    const [exploreMonth, setExploreMonth] = useState<string>('');
+    const [exploreSearch, setExploreSearch] = useState<string>('');
     const [exploreFiles, setExploreFiles] = useState<any[]>([]);
     const [isExploring, setIsExploring] = useState(false);
     const [explorePath, setExplorePath] = useState('');
+
+    // Modals state
+    const [renameModal, setRenameModal] = useState<{isOpen: boolean, doc: DocumentLog | null, newName: string, isSubmitting: boolean}>({
+        isOpen: false, doc: null, newName: '', isSubmitting: false
+    });
+    const [deleteModal, setDeleteModal] = useState<{isOpen: boolean, doc: DocumentLog | null, reason: string, isSubmitting: boolean}>({
+        isOpen: false, doc: null, reason: '', isSubmitting: false
+    });
 
     const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
     const hasEditPermission = isSuper || user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
@@ -172,41 +182,56 @@ const GestionDocumental: React.FC = () => {
         }
     };
 
-    const handleRename = async (doc: DocumentLog) => {
-        const newName = window.prompt("Ingrese el nuevo nombre para el archivo:", doc.fileName);
-        if (!newName || newName.trim() === '' || newName === doc.fileName) return;
+    const handleRename = (doc: DocumentLog) => {
+        setRenameModal({ isOpen: true, doc, newName: doc.fileName, isSubmitting: false });
+    };
 
+    const submitRename = async () => {
+        const { doc, newName } = renameModal;
+        if (!doc || !newName || newName.trim() === '' || newName === doc.fileName) {
+            toast.error("Ingrese un nombre válido y diferente.");
+            return;
+        }
+
+        setRenameModal(prev => ({ ...prev, isSubmitting: true }));
         try {
             const token = user?.token || '';
-            const res = await axios.put(`/api/documents/cumplido/${doc.id}/rename`, { newName }, {
+            await axios.put(`/api/documents/cumplido/${doc.id}/rename`, { newName }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             toast.success("Archivo renombrado exitosamente");
+            setRenameModal({ isOpen: false, doc: null, newName: '', isSubmitting: false });
             fetchHistory();
         } catch (error: any) {
             toast.error(error.response?.data?.error || "Error al renombrar el archivo");
+            setRenameModal(prev => ({ ...prev, isSubmitting: false }));
         }
     };
 
-    const handleDelete = async (doc: DocumentLog) => {
-        const reason = window.prompt("Por favor, ingrese el motivo de la eliminación:");
-        if (!reason || reason.trim() === '') {
+    const handleDelete = (doc: DocumentLog) => {
+        setDeleteModal({ isOpen: true, doc, reason: '', isSubmitting: false });
+    };
+
+    const submitDelete = async () => {
+        const { doc, reason } = deleteModal;
+        if (!doc || !reason || reason.trim() === '') {
             toast.error("Debe ingresar un motivo para eliminar.");
             return;
         }
 
-        if (window.confirm(`¿Está seguro que desea eliminar del drive el archivo: ${doc.fileName}?`)) {
-            try {
-                const token = user?.token || '';
-                await axios.delete(`/api/documents/cumplido/${doc.id}/delete`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                    data: { reason }
-                });
-                toast.success("Archivo eliminado exitosamente");
-                fetchHistory();
-            } catch (error: any) {
-                toast.error(error.response?.data?.error || "Error al eliminar el archivo");
-            }
+        setDeleteModal(prev => ({ ...prev, isSubmitting: true }));
+        try {
+            const token = user?.token || '';
+            await axios.delete(`/api/documents/cumplido/${doc.id}/delete`, {
+                headers: { Authorization: `Bearer ${token}` },
+                data: { reason }
+            });
+            toast.success("Archivo eliminado exitosamente");
+            setDeleteModal({ isOpen: false, doc: null, reason: '', isSubmitting: false });
+            fetchHistory();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || "Error al eliminar el archivo");
+            setDeleteModal(prev => ({ ...prev, isSubmitting: false }));
         }
     };
 
@@ -221,7 +246,7 @@ const GestionDocumental: React.FC = () => {
             const clientObj = authorizedClients.find(c => c.id === exploreClient);
             const res = await axios.get('/api/documents/drive-explorer', {
                 headers: { Authorization: `Bearer ${token}` },
-                params: { year: exploreYear, clientName: clientObj?.name }
+                params: { year: exploreYear, clientName: clientObj?.name, month: exploreMonth }
             });
             setExploreFiles(res.data.files || []);
             setExplorePath(res.data.path || '');
@@ -675,7 +700,7 @@ const GestionDocumental: React.FC = () => {
                     <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-500">
                         {/* Filtros Explorer */}
                         <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-slate-100">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Año</label>
                                     <select 
@@ -687,6 +712,17 @@ const GestionDocumental: React.FC = () => {
                                             const y = new Date().getFullYear() - i;
                                             return <option key={y} value={y}>{y}</option>;
                                         })}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Mes</label>
+                                    <select 
+                                        className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none"
+                                        value={exploreMonth}
+                                        onChange={e => setExploreMonth(e.target.value)}
+                                    >
+                                        <option value="">TODOS</option>
+                                        {MESES_ES.map(m => <option key={m} value={m.toUpperCase()}>{m.toUpperCase()}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-2">
@@ -715,19 +751,36 @@ const GestionDocumental: React.FC = () => {
 
                         {/* Resultados Explorer */}
                         <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[400px]">
-                            <div className="flex justify-between items-center p-8 bg-slate-50/30 border-b border-slate-50">
-                                <h3 className="text-slate-800 font-black uppercase tracking-tight flex items-center gap-3">
-                                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                                    Archivos Encontrados ({exploreFiles.length})
-                                </h3>
-                                {explorePath && (
-                                    <span className="text-xs font-mono text-slate-400 bg-slate-100 px-3 py-1 rounded-lg">{explorePath}</span>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-8 bg-slate-50/30 border-b border-slate-50 gap-4">
+                                <div className="space-y-2">
+                                    <h3 className="text-slate-800 font-black uppercase tracking-tight flex items-center gap-3">
+                                        <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                                        Archivos Encontrados ({exploreFiles.length})
+                                    </h3>
+                                    {explorePath && (
+                                        <span className="text-xs font-mono text-slate-400 bg-slate-100 px-3 py-1 rounded-lg inline-block">{explorePath}</span>
+                                    )}
+                                </div>
+                                
+                                {exploreFiles.length > 0 && (
+                                    <div className="relative w-full md:w-64">
+                                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Filtrar archivos..."
+                                            className="w-full pl-10 pr-4 py-3 bg-white border-2 border-slate-100 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                            value={exploreSearch}
+                                            onChange={e => setExploreSearch(e.target.value)}
+                                        />
+                                    </div>
                                 )}
                             </div>
 
                             {exploreFiles.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-8">
-                                    {exploreFiles.filter((f: any) => !f.IsDir).map((file: any, idx: number) => (
+                                    {exploreFiles
+                                        .filter((f: any) => !f.IsDir && (!exploreSearch || f.Name.toLowerCase().includes(exploreSearch.toLowerCase())))
+                                        .map((file: any, idx: number) => (
                                         <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-300 transition-all group">
                                             <div className="flex items-center gap-3 overflow-hidden">
                                                 <div className="p-2 bg-indigo-100 text-indigo-500 rounded-lg group-hover:bg-indigo-500 group-hover:text-white transition-all">
@@ -772,6 +825,107 @@ const GestionDocumental: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Rename Modal */}
+            {renameModal.isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
+                        <div className="p-8 space-y-6">
+                            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-[1.5rem] flex items-center justify-center mx-auto shadow-inner">
+                                <Edit2 size={32} />
+                            </div>
+                            <div className="text-center space-y-2">
+                                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Renombrar Archivo</h2>
+                                <p className="text-slate-500 text-sm font-medium">Actualizando el archivo directamente en Google Drive.</p>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-2">Nuevo Nombre (PDF)</label>
+                                <div className="relative">
+                                    <FileText size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" />
+                                    <input 
+                                        type="text"
+                                        className="w-full pl-12 pr-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                                        value={renameModal.newName}
+                                        onChange={e => setRenameModal(prev => ({ ...prev, newName: e.target.value }))}
+                                        placeholder="Ej: NUEVO_NOMBRE_CUMPLIDO"
+                                        disabled={renameModal.isSubmitting}
+                                        autoFocus
+                                    />
+                                </div>
+                                <p className="text-[10px] text-slate-400 px-2 font-bold uppercase">* La extensión .pdf se añadirá automáticamente si no se incluye.</p>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-slate-50/50 flex gap-3 border-t border-slate-100">
+                            <button 
+                                onClick={() => setRenameModal({ isOpen: false, doc: null, newName: '', isSubmitting: false })}
+                                disabled={renameModal.isSubmitting}
+                                className="flex-1 py-4 bg-white text-slate-500 font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-slate-100 border-2 border-slate-200 transition-all disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={submitRename}
+                                disabled={renameModal.isSubmitting || !renameModal.newName || renameModal.newName === renameModal.doc?.fileName}
+                                className="flex-1 py-4 bg-indigo-600 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/30 flex justify-center items-center gap-2 disabled:opacity-50 disabled:shadow-none"
+                            >
+                                {renameModal.isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                Guardar Cambios
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Modal */}
+            {deleteModal.isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
+                        <div className="p-8 space-y-6">
+                            <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-[1.5rem] flex items-center justify-center mx-auto shadow-inner">
+                                <Trash2 size={32} />
+                            </div>
+                            <div className="text-center space-y-2">
+                                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Eliminar del Drive</h2>
+                                <p className="text-rose-500 text-sm font-medium">Se eliminará el archivo <strong className="text-rose-700">{deleteModal.doc?.fileName}</strong> físicamente de la nube.</p>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest px-2">Motivo de Eliminación (Obligatorio)</label>
+                                <textarea 
+                                    className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-rose-500 focus:bg-white transition-all shadow-inner min-h-[120px] resize-none"
+                                    value={deleteModal.reason}
+                                    onChange={e => setDeleteModal(prev => ({ ...prev, reason: e.target.value }))}
+                                    placeholder="Explique detalladamente por qué se elimina este archivo..."
+                                    disabled={deleteModal.isSubmitting}
+                                    autoFocus
+                                ></textarea>
+                                <div className="flex items-start gap-2 px-2 text-amber-600 bg-amber-50 p-3 rounded-xl">
+                                    <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                                    <p className="text-[10px] font-bold uppercase leading-tight">Esta acción es irreversible en Google Drive. El registro quedará marcado como eliminado en la base de datos por auditoría.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-slate-50/50 flex gap-3 border-t border-slate-100">
+                            <button 
+                                onClick={() => setDeleteModal({ isOpen: false, doc: null, reason: '', isSubmitting: false })}
+                                disabled={deleteModal.isSubmitting}
+                                className="flex-1 py-4 bg-white text-slate-500 font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-slate-100 border-2 border-slate-200 transition-all disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={submitDelete}
+                                disabled={deleteModal.isSubmitting || !deleteModal.reason.trim()}
+                                className="flex-1 py-4 bg-rose-600 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-rose-500 transition-all shadow-xl shadow-rose-500/30 flex justify-center items-center gap-2 disabled:opacity-50 disabled:shadow-none"
+                            >
+                                {deleteModal.isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                Confirmar Borrado
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1784,7 +1784,8 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
         SELECT DISTINCT ON (ri.invoice_id)
           ri.invoice_id,
           COALESCE(v.plate, r.vehicle_id)    AS truck_plate,
-          COALESCE(drv.document_number, '')  AS driver_doc
+          COALESCE(drv.document_number, '')  AS driver_doc,
+          ri.created_at                      AS assigned_at
         FROM route_invoices ri
         JOIN  routes r   ON r.id::text = ri.route_id::text
         LEFT JOIN vehicles v
@@ -1799,7 +1800,8 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
         SELECT DISTINCT ON (da.invoice_id)
           da.invoice_id,
           COALESCE(v2.plate, '')            AS truck_plate,
-          COALESCE(drv2.document_number, '') AS driver_doc
+          COALESCE(drv2.document_number, '') AS driver_doc,
+          da.created_at                      AS assigned_at
         FROM dispatch_assignments da
         LEFT JOIN assignments asgn
           ON asgn.driver_id::text = da.driver_id::text
@@ -1825,7 +1827,16 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
           WHEN NULLIF(dt.truck_plate, '') IS NOT NULL THEN 
             COALESCE(NULLIF(dt.driver_doc,''), '')
           ELSE ''
-        END AS "DRIVER_ID_DESTIN"
+        END AS "DRIVER_ID_DESTIN",
+
+        TO_CHAR(
+          (CASE 
+            WHEN NULLIF(rt.truck_plate, '') IS NOT NULL THEN rt.assigned_at
+            WHEN NULLIF(dt.truck_plate, '') IS NOT NULL THEN dt.assigned_at
+            ELSE NULL
+          END) AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 
+          'DD/MM/YYYY HH12:MI:SS AM'
+        ) AS "FECHA_HORA_ASIGNACION"
 
       FROM base b
       LEFT JOIN route_truck rt ON (
@@ -2340,13 +2351,18 @@ export const deleteCumplido = async (req: Request, res: Response) => {
 
 export const driveExplorer = async (req: Request, res: Response) => {
     try {
-        const { year, clientName } = req.query;
+        const { year, clientName, month } = req.query;
         if (!year || !clientName) {
             return res.status(400).json({ error: 'Faltan parámetros de búsqueda (año, cliente).' });
         }
 
         const cleanClientName = String(clientName).replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
-        const searchPath = `gdrive_cumplidos:CUMPLIDOS MILLA 7/${year}/${cleanClientName}`;
+        let searchPath = `gdrive_cumplidos:CUMPLIDOS MILLA 7/${year}/${cleanClientName}`;
+        
+        if (month) {
+            const cleanMonth = String(month).trim().toUpperCase();
+            searchPath += `/${cleanMonth}`;
+        }
 
         const results = await new Promise<any[]>((resolve, reject) => {
             // Usamos -R para buscar recursivamente todos los archivos
