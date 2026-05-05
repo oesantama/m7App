@@ -836,22 +836,20 @@ export const updatePaymentMethod = async (req: Request, res: Response) => {
         const oldMethod = currentRes.rows[0]?.metodo_pago || 'DESCONOCIDO';
 
         // 2. Actualizar método de pago
-        // Si no existe el registro en document_l_payments, lo creamos
+        // Intentamos un UPDATE primero para evitar violar el constraint de UNIQUE invoice
         const updRes = await client.query(`
-            INSERT INTO document_l_payments (document_id, invoice, metodo_pago, user_id)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (id) DO UPDATE SET metodo_pago = EXCLUDED.metodo_pago
-            -- Nota: document_l_payments no tiene UNIQUE(document_id, invoice) por defecto en todos los entornos
-            -- Así que usamos una subconsulta si no hay conflicto por ID
-        `, [documentId, invoice, newMethod, userId]);
+            UPDATE document_l_payments 
+            SET metodo_pago = $1, user_id = $2, processed_at = NOW()
+            WHERE document_id = $3 AND invoice = $4
+            RETURNING *
+        `, [newMethod, userId, documentId, invoice]);
 
-        // Si no se insertó/actualizó por ID, intentamos por invoice
+        // Si no se actualizó nada, significa que no existe el registro, procedemos a INSERT
         if (updRes.rowCount === 0) {
             await client.query(`
-                UPDATE document_l_payments 
-                SET metodo_pago = $1 
-                WHERE document_id = $2 AND invoice = $3
-            `, [newMethod, documentId, invoice]);
+                INSERT INTO document_l_payments (document_id, invoice, metodo_pago, user_id, processed_at)
+                VALUES ($1, $2, $3, $4, NOW())
+            `, [documentId, invoice, newMethod, userId]);
         }
 
         // 3. Registrar en historial
