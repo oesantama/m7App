@@ -565,33 +565,73 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const hubIcon = L.divIcon({ html: `<div style="background:#0f172a;color:#10b981;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;border:2px solid #10b981;box-shadow:0 2px 8px rgba(0,0,0,0.5)">M7</div>`, className: '', iconSize: [32,32], iconAnchor: [16,16] });
       L.marker([ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng], { icon: hubIcon }).addTo(map);
       const allPoints: L.LatLng[] = [];
+
+      // Collect ALL invoices: routed + unrouted, using GPS → city centroid → corridor centroid
+      const CORRIDOR_COLORS: Record<string, string> = {
+        MED_CENTRO: '#6366f1', NORTE: '#10b981', NORTE_LEJANO: '#059669',
+        SUR: '#f43f5e', SUR_LEJANO: '#be123c', ORIENTE_ANT: '#f59e0b', OCCIDENTE_ANT: '#8b5cf6',
+      };
+      const DEFAULT_LAT = 6.2518, DEFAULT_LNG = -75.5636;
+
+      // All invoices from all routes
+      const allInvoicesFlat = suggestedRoutes.flatMap(r => r.assignedInvoices.map(inv => ({ inv, plate: r.vehicle.plate, routeIdx: suggestedRoutes.indexOf(r) })));
+
+      // Group by position key — use lat/lng as assigned by algorithm (includes city centroids)
+      const posMap = new Map<string, { lat: number; lng: number; items: { inv: any; plate: string }[]; isApprox: boolean }>();
+      allInvoicesFlat.forEach(({ inv, plate }) => {
+        let lat = Number(inv.lat || 0), lng = Number(inv.lng || 0);
+        const isDefault = Math.abs(lat - DEFAULT_LAT) < 0.002 && Math.abs(lng - DEFAULT_LNG) < 0.002;
+        const isZero = lat === 0 || lng === 0;
+        // If still at default/zero, use CITY_CENTROIDS fallback via corridor
+        if (isDefault || isZero) {
+          const corr: string = (inv as any).corridor || 'MED_CENTRO';
+          const centroid = (window as any).__ORBIT_CITY_CENTROIDS?.[inv.city?.toUpperCase()] || null;
+          if (centroid) { lat = centroid.lat; lng = centroid.lng; }
+          else {
+            const CORR_FALLBACK: Record<string, [number,number]> = {
+              NORTE: [6.337, -75.555], NORTE_LEJANO: [6.38, -75.55],
+              SUR: [6.15, -75.61], SUR_LEJANO: [6.09, -75.63],
+              ORIENTE_ANT: [6.16, -75.37], OCCIDENTE_ANT: [6.25, -75.72],
+              MED_CENTRO: [6.24, -75.573],
+            };
+            const fb = CORR_FALLBACK[corr] || CORR_FALLBACK.MED_CENTRO;
+            lat = fb[0]; lng = fb[1];
+          }
+        }
+        const isApprox = isDefault || isZero;
+        const key = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+        if (!posMap.has(key)) posMap.set(key, { lat, lng, items: [], isApprox });
+        posMap.get(key)!.items.push({ inv, plate });
+      });
+
+      posMap.forEach(({ lat, lng, items, isApprox }) => {
+        allPoints.push(L.latLng(lat, lng));
+        const cnt = items.length;
+        const corr: string = (items[0].inv as any).corridor || 'MED_CENTRO';
+        const color = ROUTE_COLORS[suggestedRoutes.findIndex(r => r.vehicle.plate === items[0].plate) % ROUTE_COLORS.length] || '#94a3b8';
+        const corrColor = CORRIDOR_COLORS[corr] || '#94a3b8';
+        const border = isApprox ? '2px dashed #f59e0b' : `2px solid ${corrColor}`;
+        const badge = cnt > 1 ? `<div style="position:absolute;top:-5px;right:-5px;background:#f43f5e;color:white;width:14px;height:14px;border-radius:50%;font-size:7px;font-weight:900;display:flex;align-items:center;justify-content:center">${cnt}</div>` : '';
+        const approxDot = isApprox ? `<div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:6px;height:6px;background:#f59e0b;border-radius:50%"></div>` : '';
+        const icon = L.divIcon({ html: `<div style="position:relative"><div style="background:${color};color:white;width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:${border}">${cnt}</div>${badge}${approxDot}</div>`, className: '', iconSize: [20,20], iconAnchor: [10,10] });
+        const popLines = items.map(it => `${it.inv.invoiceNumber} · ${it.plate}`).join('<br>');
+        L.marker([lat, lng], { icon }).bindPopup(`<b>${corr}${isApprox ? ' ⚠ coord aproximada' : ''}</b><br>${popLines}<br><small>${items[0].inv.address} · ${items[0].inv.city}</small>`).addTo(map);
+      });
+
+      // Draw route polylines
       suggestedRoutes.forEach((route, ri) => {
         const color = ROUTE_COLORS[ri % ROUTE_COLORS.length];
-        const DEFAULT_LAT = 6.2518, DEFAULT_LNG = -75.5636;
-        const stops = route.assignedInvoices.filter(inv => {
-          const lat = Number(inv.lat), lng = Number(inv.lng);
-          return lat !== 0 && lng !== 0 && !(Math.abs(lat - DEFAULT_LAT) < 0.001 && Math.abs(lng - DEFAULT_LNG) < 0.001);
-        });
-        const stopGroups = new Map<string, typeof stops>();
-        stops.forEach(inv => {
-          const key = `${Number(inv.lat).toFixed(4)}_${Number(inv.lng).toFixed(4)}`;
-          if (!stopGroups.has(key)) stopGroups.set(key, []);
-          stopGroups.get(key)!.push(inv);
-        });
         const pts: L.LatLng[] = [L.latLng(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng)];
-        let seq = 0;
-        stopGroups.forEach((group) => {
-          seq++;
-          const lat = Number(group[0].lat), lng = Number(group[0].lng);
-          pts.push(L.latLng(lat, lng));
-          allPoints.push(L.latLng(lat, lng));
-          const cnt = group.length;
-          const badge = cnt > 1 ? `<div style="position:absolute;top:-5px;right:-5px;background:#f43f5e;color:white;width:14px;height:14px;border-radius:50%;font-size:7px;font-weight:900;display:flex;align-items:center;justify-content:center">${cnt}</div>` : '';
-          const icon = L.divIcon({ html: `<div style="position:relative"><div style="background:${color};color:white;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,0.4)">${seq}</div>${badge}</div>`, className: '', iconSize: [24,24], iconAnchor: [12,12] });
-          L.marker([lat, lng], { icon }).bindPopup(`<b>${route.vehicle.plate}</b> — Parada ${seq}<br>${group.map(i => i.invoiceNumber).join(', ')}<br><small>${group[0].address} · ${group[0].city}</small>`).addTo(map);
+        route.assignedInvoices.forEach(inv => {
+          const lat = Number(inv.lat || 0), lng = Number(inv.lng || 0);
+          if (lat !== 0 && lng !== 0 && !(Math.abs(lat - DEFAULT_LAT) < 0.002 && Math.abs(lng - DEFAULT_LNG) < 0.002)) {
+            pts.push(L.latLng(lat, lng));
+          }
         });
-        if (pts.length > 1) L.polyline(pts, { color, weight: 3, opacity: 0.8 }).addTo(map);
+        pts.push(L.latLng(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng));
+        if (pts.length > 2) L.polyline(pts, { color, weight: 2, opacity: 0.6, dashArray: '6 3' }).addTo(map);
       });
+
       if (allPoints.length > 0) map.fitBounds(L.latLngBounds([L.latLng(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng), ...allPoints]), { padding: [40, 40] });
     };
     init();
@@ -3266,15 +3306,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           </div>
 
           <button
-            onClick={() => setAllRoutesMapOpen(true)}
-            disabled={suggestedRoutes.length === 0}
-            className="bg-slate-800 text-emerald-400 px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-[0.15em] shadow-sm hover:bg-emerald-500 hover:text-slate-950 transition-all flex items-center justify-center gap-2 disabled:opacity-40 active:scale-95 whitespace-nowrap"
-          >
-            <Icons.MapPin className="w-3.5 h-3.5" />
-            MAPA GLOBAL
-          </button>
-
-          <button
             onClick={handleExportRoutesExcel}
             disabled={suggestedRoutes.length === 0}
             className="shrink-0 px-4 py-2.5 bg-teal-50 text-teal-700 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-teal-600 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap flex items-center gap-1.5"
@@ -3455,6 +3486,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     </div>
                   </div>
                 </div>
+                <button onClick={() => setAllRoutesMapOpen(true)} title="Ver diagnóstico geográfico Orbit IQ" className="p-1.5 hover:bg-indigo-500/20 rounded-lg transition-all">
+                  <Icons.MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                </button>
                 <button onClick={() => setLastReadjustmentResult(null)} className="p-1.5 hover:bg-white/10 rounded-lg transition-all">
                   <Icons.X className="w-3.5 h-3.5 text-slate-500" />
                 </button>
@@ -4466,8 +4500,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 <Icons.MapPin className="w-4 h-4 text-slate-950" />
               </div>
               <div>
-                <p className="text-white font-black text-sm uppercase tracking-tight">Mapa Global de Rutas</p>
-                <p className="text-slate-400 text-[10px] font-bold uppercase">{suggestedRoutes.length} rutas · {suggestedRoutes.reduce((a, r) => a + r.assignedInvoices.length, 0)} facturas</p>
+                <p className="text-white font-black text-sm uppercase tracking-tight">Diagnóstico Geográfico — Orbit IQ</p>
+                <p className="text-slate-400 text-[10px] font-bold uppercase">{suggestedRoutes.length} rutas · {suggestedRoutes.reduce((a, r) => a + r.assignedInvoices.length, 0)} facturas · <span className="text-amber-400">⚠ punto naranja = coord. aproximada</span></p>
               </div>
             </div>
             <div className="flex items-center gap-3">
