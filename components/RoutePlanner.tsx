@@ -460,16 +460,33 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       L.marker([ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng], { icon: hubIcon })
         .bindPopup('<b>HUB ORBIT</b><br>Punto de despacho').addTo(map);
 
+      // Agrupar paradas por coordenada única (radio ~11m = 4 decimales)
+      const stopGroups = new Map<string, typeof stops>();
+      stops.forEach(inv => {
+        const key = `${Number(inv.lat).toFixed(4)}_${Number(inv.lng).toFixed(4)}`;
+        if (!stopGroups.has(key)) stopGroups.set(key, []);
+        stopGroups.get(key)!.push(inv);
+      });
+
       const points: L.LatLng[] = [L.latLng(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng)];
-      stops.forEach((inv, i) => {
-        const lat = Number(inv.lat), lng = Number(inv.lng);
+      let stopSeq = 0;
+      stopGroups.forEach((group) => {
+        stopSeq++;
+        const lat = Number(group[0].lat), lng = Number(group[0].lng);
         points.push(L.latLng(lat, lng));
+        const count = group.length;
+        const badge = count > 1
+          ? `<div style="position:absolute;top:-6px;right:-6px;background:#f43f5e;color:white;width:16px;height:16px;border-radius:50%;font-size:8px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1.5px solid white">${count}</div>`
+          : '';
         const stopIcon = L.divIcon({
-          html: `<div style="background:${dotColor};color:white;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,0.35)">${i + 1}</div>`,
-          className: '', iconSize: [26, 26], iconAnchor: [13, 13]
+          html: `<div style="position:relative;display:inline-block"><div style="background:${dotColor};color:white;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,0.35)">${stopSeq}</div>${badge}</div>`,
+          className: '', iconSize: [28, 28], iconAnchor: [14, 14]
         });
+        const popupContent = group.map((inv, gi) =>
+          `<b>${gi === 0 ? stopSeq + '. ' : '&nbsp;&nbsp;&nbsp;'}${inv.invoiceNumber}</b> — ${inv.customerName || ''}<br><small>${inv.address} · ${inv.city}</small>`
+        ).join('<hr style="margin:4px 0">');
         L.marker([lat, lng], { icon: stopIcon })
-          .bindPopup(`<b>${i + 1}. ${inv.invoiceNumber}</b><br>${inv.customerName || ''}<br><small>${inv.address} · ${inv.city}</small>`)
+          .bindPopup(`<div style="min-width:180px">${popupContent}</div>`)
           .addTo(map);
       });
 
@@ -585,9 +602,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const unassignedMetrics = useMemo(() => {
     const count = unassignedInvoices.length;
     const volume = Number(unassignedInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0).toFixed(2));
-    const additionalVehicles = Math.ceil(volume / 10); // Estimación rápida: 1 camión cada 10m3
-    return { count, volume, additionalVehicles };
-  }, [unassignedInvoices]);
+    const additionalVehicles = Math.ceil(volume / 10);
+    let reason = 'Pendientes de ruteo';
+    if (suggestedRoutes.length > 0 && count > 0) reason = 'Cap. insuficiente en flota';
+    else if (suggestedRoutes.length === 0 && count > 0) reason = 'Sin rutas generadas';
+    return { count, volume, additionalVehicles, reason };
+  }, [unassignedInvoices, suggestedRoutes]);
 
   const availableVehicles = useMemo(() => {
     // REGLA M7: Un vehículo es "disponible" si:
@@ -3124,9 +3144,106 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         </div>
       )}
 
-      {/* INDICADORES DE DÉFICIT EN HEADER (RELOCALIZADOS) */}
-      {(unassignedMetrics.count > 0) && (
-        <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 p-2 px-4 rounded-[1.5rem] animate-in slide-in-from-top duration-500 shadow-sm ml-auto relative group">
+      {/* ── BANNER CONSOLIDADO: Sin Ruta + Plan Actual + Resultado Orbit ───────── */}
+      {routePlanKPIs && (
+        <div className="bg-slate-950 rounded-[2rem] border border-slate-800 shadow-xl flex items-stretch animate-in slide-in-from-top duration-300 overflow-hidden">
+
+          {/* LEFT: Facturas sin ruta */}
+          {unassignedMetrics.count > 0 && (
+            <div className="flex items-center gap-3 px-4 py-3 border-r border-white/10 shrink-0 bg-rose-950/40">
+              <div className="flex flex-col">
+                <p className="text-[6px] font-black text-rose-400 uppercase tracking-widest leading-none mb-1">Sin Ruta</p>
+                <p className="text-sm font-black text-white leading-none">{unassignedMetrics.count}<span className="text-[8px] text-slate-500 ml-1">FACTS</span></p>
+              </div>
+              <div className="w-px h-6 bg-white/10" />
+              <div className="flex flex-col">
+                <p className="text-[6px] font-black text-rose-400 uppercase tracking-widest leading-none mb-1">Volumen</p>
+                <p className="text-sm font-black text-white leading-none">{unassignedMetrics.volume}m³</p>
+              </div>
+              <div className="w-px h-6 bg-white/10" />
+              <div className="flex flex-col">
+                <p className="text-[6px] font-black text-rose-400 uppercase tracking-widest leading-none mb-1">Motivo</p>
+                <p className="text-[9px] font-black text-rose-300 leading-none">{unassignedMetrics.reason}</p>
+              </div>
+              <button
+                onClick={() => setIsPendingInvoicesModalOpen(true)}
+                className="flex items-center gap-1.5 ml-1 px-3 py-1.5 bg-rose-500 text-white rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all active:scale-95 whitespace-nowrap">
+                <Icons.Truck className="w-3 h-3" />
+                VER
+              </button>
+            </div>
+          )}
+
+          {/* CENTER: KPIs del plan */}
+          <div className="flex items-center gap-3 px-5 py-3 flex-1 flex-wrap">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="w-5 h-5 bg-emerald-500 rounded-lg flex items-center justify-center">
+                <Icons.Route className="w-3 h-3 text-slate-950" />
+              </div>
+              <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Plan actual</p>
+            </div>
+            {[
+              { label: 'Rutas',    value: routePlanKPIs.routes,          color: 'text-white' },
+              { label: 'Facturas', value: routePlanKPIs.totalInvoices,   color: 'text-white' },
+              { label: 'Km',       value: `${routePlanKPIs.totalKm}`,    color: 'text-emerald-400' },
+              { label: 'Tiempo',   value: routePlanKPIs.timeLabel,       color: 'text-sky-400' },
+              { label: 'Utiliz.',  value: `${routePlanKPIs.avgUtil}%`,   color: routePlanKPIs.avgUtil >= 80 ? 'text-emerald-400' : routePlanKPIs.avgUtil >= 60 ? 'text-amber-400' : 'text-rose-400' },
+              ...(geocodedCount > 0 ? [{ label: 'Geoloc.', value: `+${geocodedCount}`, color: 'text-violet-400' }] : []),
+            ].map((kpi, i, arr) => (
+              <div key={kpi.label} className="flex items-center gap-3">
+                <div className="w-px h-5 bg-slate-700" />
+                <div className="flex flex-col items-center">
+                  <p className={`text-sm font-black leading-none ${kpi.color}`}>{kpi.value}</p>
+                  <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{kpi.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* RIGHT: Barra de capacidad + Resultado Orbit (si aplica) */}
+          <div className="flex items-center gap-3 px-4 py-3 border-l border-white/10 shrink-0">
+            <div className="flex flex-col items-end gap-1">
+              <div className="h-1.5 w-28 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${Math.min(routePlanKPIs.avgUtil, 100)}%`, backgroundColor: routePlanKPIs.avgUtil >= 80 ? '#10b981' : routePlanKPIs.avgUtil >= 60 ? '#f59e0b' : '#f43f5e' }} />
+              </div>
+              <p className="text-[7px] font-black text-slate-500 uppercase">{routePlanKPIs.avgUtil}% cap</p>
+            </div>
+
+            {lastReadjustmentResult && (
+              <>
+                <div className="w-px h-8 bg-white/10" />
+                <div className="flex flex-col shrink-0">
+                  <p className="text-[6px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Orbit Aplicado · DOCS: <span className="text-indigo-300">{lastReadjustmentResult.docIds.join(', ')}</span></p>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-[6px] font-black text-slate-500 uppercase">Proc.</p>
+                      <p className="text-xs font-black text-white">{lastReadjustmentResult.facts}</p>
+                    </div>
+                    <div className="w-px h-4 bg-white/10" />
+                    <div className="text-center">
+                      <p className="text-[6px] font-black text-emerald-400 uppercase">Asig.</p>
+                      <p className="text-xs font-black text-emerald-400">{lastReadjustmentResult.facts - lastReadjustmentResult.unrouted}</p>
+                    </div>
+                    <div className="w-px h-4 bg-white/10" />
+                    <div className="text-center">
+                      <p className="text-[6px] font-black text-amber-400 uppercase">Sin Cap.</p>
+                      <p className="text-xs font-black text-amber-400">{lastReadjustmentResult.unrouted}</p>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setLastReadjustmentResult(null)} className="p-1.5 hover:bg-white/10 rounded-lg transition-all">
+                  <Icons.X className="w-3.5 h-3.5 text-slate-500" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Banner Sin Ruta independiente cuando aún no hay plan generado */}
+      {!routePlanKPIs && unassignedMetrics.count > 0 && (
+        <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 p-2 px-4 rounded-[1.5rem] animate-in slide-in-from-top duration-500 shadow-sm ml-auto">
           <div className="flex flex-col border-r border-rose-200 pr-3">
             <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest">Sin Ruta</p>
             <p className="text-xs font-black text-rose-900 leading-none">{unassignedMetrics.count} <span className="text-[8px] font-bold text-slate-400">FACTS</span></p>
@@ -3135,139 +3252,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest">Volumen</p>
             <p className="text-xs font-black text-rose-900 leading-none">{unassignedMetrics.volume}m³</p>
           </div>
-          <div className="flex items-center gap-2 pl-2">
-            <div className="flex flex-col text-right">
-              <p className="text-[6px] font-black text-rose-500 uppercase tracking-widest">Requeridos</p>
-              <p className="text-xs font-black text-rose-900 leading-none">~{unassignedMetrics.additionalVehicles}</p>
-            </div>
-            <button
-              onClick={() => setIsPendingInvoicesModalOpen(true)}
-              className="flex items-center gap-1.5 ml-2 px-3 py-1.5 bg-rose-500 text-white rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-md shadow-rose-200 active:scale-95 whitespace-nowrap group">
-              <Icons.Truck className="w-3.5 h-3.5 group-hover:animate-bounce" />
-              VER PENDIENTES
-            </button>
-          </div>
-        </div>
-      )}
-      {lastReadjustmentResult && (
-        <div className="bg-slate-900/90 backdrop-blur-md border border-indigo-500/30 p-2 px-4 rounded-2xl shadow-lg flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300 mx-4 border-l-4 border-l-indigo-500">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center border border-indigo-500/30">
-              <Icons.Zap className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="flex flex-col">
-              <p className="text-[7px] font-black text-indigo-300 uppercase tracking-widest leading-none mb-1">Resultado Orbit aplicado</p>
-              <div className="flex items-center gap-2">
-                <p className="text-[10px] font-black text-white uppercase tracking-tighter">
-                  DOCS: <span className="text-indigo-300">{lastReadjustmentResult.docIds.join(', ')}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-4 items-center">
-            <div className="text-center px-3 border-r border-white/10">
-              <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mb-0.5">PROCESADAS</p>
-              <p className="text-xs font-black text-white">{lastReadjustmentResult.facts}</p>
-            </div>
-            <div className="text-center px-3 border-r border-white/10">
-              <p className="text-[6px] font-black text-emerald-400 uppercase tracking-widest mb-0.5">ASIGNADAS</p>
-              <p className="text-xs font-black text-emerald-400 font-bold">{lastReadjustmentResult.facts - lastReadjustmentResult.unrouted}</p>
-            </div>
-            <div className="text-center px-3">
-              <p className="text-[6px] font-black text-amber-400 uppercase tracking-widest mb-0.5">SIN CAPACIDAD</p>
-              <p className="text-xs font-black text-amber-400 font-bold">{lastReadjustmentResult.unrouted}</p>
-            </div>
-
-            <button onClick={() => setLastReadjustmentResult(null)} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg transition-all">
-              <Icons.X className="w-4 h-4 text-slate-400" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── PANEL KPIs DEL DÍA ──────────────────────────────────────────────── */}
-      {dailyKPIs && dailyKPIs.routes_today > 0 && (
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-md px-5 py-3 flex flex-wrap items-center gap-3 animate-in slide-in-from-top duration-300">
-          <div className="flex items-center gap-1.5 mr-2 shrink-0">
-            <div className="w-6 h-6 bg-slate-950 text-emerald-500 rounded-lg flex items-center justify-center">
-              <Icons.Route className="w-3.5 h-3.5" />
-            </div>
-            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">KPIs HOY</p>
-          </div>
-          {[
-            { label: 'Rutas', value: dailyKPIs.routes_today, color: 'text-indigo-600' },
-            { label: 'Vehículos', value: dailyKPIs.vehicles_active, color: 'text-blue-600' },
-            { label: 'Asignadas', value: dailyKPIs.invoices_assigned, color: 'text-slate-900' },
-            { label: 'Entregadas', value: dailyKPIs.invoices_delivered, color: 'text-emerald-600' },
-            { label: 'Devueltas', value: dailyKPIs.invoices_returned, color: 'text-rose-500' },
-            { label: 'Repice', value: dailyKPIs.invoices_repice, color: 'text-amber-500' },
-            { label: 'Utiliz.', value: `${Math.round(Number(dailyKPIs.avg_utilization))}%`, color: Number(dailyKPIs.avg_utilization) >= 85 ? 'text-emerald-600' : 'text-amber-500' },
-            ...(dailyKPIs.shift2_routes > 0 ? [{ label: '2da Vuelta', value: dailyKPIs.shift2_routes, color: 'text-violet-600' }] : []),
-          ].map((kpi, i, arr) => (
-            <div key={kpi.label} className="flex items-center gap-3">
-              <div className="flex flex-col items-center">
-                <p className={`text-sm font-black leading-none ${kpi.color}`}>{kpi.value}</p>
-                <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{kpi.label}</p>
-              </div>
-              {i < arr.length - 1 && <div className="w-px h-4 bg-slate-100" />}
-            </div>
-          ))}
-          {dailyKPIs.invoices_assigned > 0 && (
-            <div className="ml-auto shrink-0 flex items-center gap-1.5">
-              <div className="h-2 w-24 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-700"
-                  style={{ width: `${Math.round((dailyKPIs.invoices_delivered / dailyKPIs.invoices_assigned) * 100)}%` }}
-                />
-              </div>
-              <p className="text-[7px] font-black text-slate-400 uppercase">
-                {Math.round((dailyKPIs.invoices_delivered / dailyKPIs.invoices_assigned) * 100)}% entregado
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── PANEL KPIs DE PLANIFICACIÓN (aparece tras generar rutas) ──────────── */}
-      {routePlanKPIs && (
-        <div className="bg-slate-950 rounded-[2rem] border border-slate-800 shadow-xl px-5 py-3 flex flex-wrap items-center gap-3 animate-in slide-in-from-top duration-300">
-          <div className="flex items-center gap-1.5 mr-2 shrink-0">
-            <div className="w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center">
-              <Icons.Route className="w-3.5 h-3.5 text-slate-950" />
-            </div>
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Plan actual</p>
-          </div>
-          {[
-            { label: 'Rutas',    value: routePlanKPIs.routes,           color: 'text-white' },
-            { label: 'Facturas', value: routePlanKPIs.totalInvoices,    color: 'text-white' },
-            { label: 'Km total', value: `${routePlanKPIs.totalKm} km`,  color: 'text-emerald-400' },
-            { label: 'Tiempo',   value: routePlanKPIs.timeLabel,        color: 'text-sky-400' },
-            { label: 'Utiliz.',  value: `${routePlanKPIs.avgUtil}%`,    color: routePlanKPIs.avgUtil >= 80 ? 'text-emerald-400' : routePlanKPIs.avgUtil >= 60 ? 'text-amber-400' : 'text-rose-400' },
-            ...(geocodedCount > 0 ? [{ label: 'Geoloc.', value: `+${geocodedCount}`, color: 'text-violet-400' }] : []),
-          ].map((kpi, i, arr) => (
-            <div key={kpi.label} className="flex items-center gap-3">
-              <div className="flex flex-col items-center">
-                <p className={`text-sm font-black leading-none ${kpi.color}`}>{kpi.value}</p>
-                <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{kpi.label}</p>
-              </div>
-              {i < arr.length - 1 && <div className="w-px h-4 bg-slate-700" />}
-            </div>
-          ))}
-          <div className="ml-auto shrink-0 flex items-center gap-2">
-            <div className="h-2 w-28 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${Math.min(routePlanKPIs.avgUtil, 100)}%`,
-                  backgroundColor: routePlanKPIs.avgUtil >= 80 ? '#10b981' : routePlanKPIs.avgUtil >= 60 ? '#f59e0b' : '#f43f5e'
-                }}
-              />
-            </div>
-            <p className="text-[7px] font-black text-slate-500 uppercase whitespace-nowrap">
-              {routePlanKPIs.avgUtil}% cap
-            </p>
-          </div>
+          <button onClick={() => setIsPendingInvoicesModalOpen(true)}
+            className="flex items-center gap-1.5 ml-2 px-3 py-1.5 bg-rose-500 text-white rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-md active:scale-95 whitespace-nowrap">
+            <Icons.Truck className="w-3.5 h-3.5" />
+            VER PENDIENTES
+          </button>
         </div>
       )}
 
@@ -3287,29 +3276,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             </div>
           ) : (
 
-            <div className="flex flex-col gap-4">
-              {/* Información de Optimización IA (Compacta) */}
-              <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-2xl flex items-center justify-between px-6">
-                <div className="flex items-center gap-3">
-                  <Icons.Brain className="text-emerald-500 w-5 h-5 animate-pulse" />
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
-                    Plan óptimo generado con {Math.round(suggestedRoutes.reduce((acc, r) => acc + (r.utilization || 0), 0) / (suggestedRoutes.length || 1))}% de eficiencia promedio
-                  </p>
-                </div>
-                <div className="flex gap-4">
-                  <div className="text-center">
-                    <p className="text-[10px] font-black text-slate-900 leading-none">{suggestedRoutes.length}</p>
-                    <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mt-1">Rutas</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] font-black text-slate-900 leading-none">{suggestedRoutes.reduce((acc, r) => acc + (r.assignedInvoices?.length || 0), 0)}</p>
-                    <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mt-1">Facts</p>
-                  </div>
-                </div>
-              </div>
-
+            <div className="flex flex-col gap-3">
               {/* Lista de Rutas Filtrada */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pb-10">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 pb-10">
                 {suggestedRoutes
                   .filter(r =>
                     r.vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -3376,89 +3345,62 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         </div>
                       </div>
 
-                      <div className="p-4 flex-1 overflow-y-auto custom-scrollbar space-y-2 max-h-[300px] bg-slate-50/30">
-                        {route.assignedInvoices.map((inv, iIdx) => {
-                          const isPriority = (inv as any).isPriority;
-                          const estimatedArrival = estimateStopArrival(iIdx);
-                          const hasTimeWindow = !!(inv as any).detectedTime;
-                          return (
-                            <div key={`${inv.id}-${iIdx}`} className={`p-3 bg-white rounded-xl border ${isPriority ? 'border-amber-400 ring-1 ring-amber-100' : 'border-slate-100'} shadow-sm group/item hover:shadow-md transition-all flex flex-col gap-2`}>
-                              <div className="flex justify-between items-start">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className={`w-7 h-7 ${isPriority ? 'bg-amber-500 text-white ring-2 ring-amber-300/50' : 'bg-slate-800 text-white'} rounded-lg flex items-center justify-center font-black text-[9px] shrink-0 shadow-sm`}>{iIdx + 1}</div>
-                                  <div className="min-w-0">
-                                    <p className="font-black text-[10px] text-slate-900 truncate">
-                                      {inv.invoiceNumber}
-                                    </p>
-                                    <p className="text-[8px] text-slate-500 font-bold truncate">
-                                      {inv.customerName}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <p className="text-[9px] font-black text-slate-700">DOC: {inv.externalDocId || 'N/A'}</p>
-                                  <p className="text-[8px] text-slate-400 font-bold">PED: {inv.orderNumber || 'S/N'}</p>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2 text-[8px] text-slate-600 bg-slate-50 p-2 rounded-lg">
-                                <Icons.MapPin className="w-3 h-3 text-slate-400" />
-                                <span className="truncate flex-1 font-bold">{inv.address} • {inv.city}</span>
-                              </div>
-
-                              <div className="flex items-center gap-2 text-[8px]">
-                                <Icons.Clock className="w-3 h-3 text-slate-400" />
-                                <span className="text-slate-500 font-semibold">Est. llegada:</span>
-                                <span className="font-black text-slate-700">{estimatedArrival}</span>
-                                {hasTimeWindow && (() => {
-                                  const urg = getTimeWindowUrgency((inv as any).timeWindowMinutes);
-                                  return (
-                                    <span className={`ml-1 px-1.5 py-0.5 font-black rounded text-[7px] border ${urg === 'critical' ? 'bg-red-100 text-red-700 border-red-200' : urg === 'warning' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>
-                                      {urg === 'critical' ? '🔴' : urg === 'warning' ? '🟡' : '🟢'} {(inv as any).detectedTime}
-                                    </span>
-                                  );
-                                })()}
-                              </div>
-
-                              {inv.notes && (
-                                <div className="text-[8px] text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-100 italic">
-                                  "{inv.notes.substring(0, 60)}{inv.notes.length > 60 ? '...' : ''}"
-                                </div>
-                              )}
-
-                              <div className="flex items-center justify-between border-t pt-2 mt-1">
-                                <div className="flex gap-3">
-                                  <div className="text-center">
-                                    <p className="text-[7px] font-bold text-slate-400 uppercase">VOL</p>
-                                    <p className="text-[10px] font-black text-emerald-600">{(Number(inv.volumeM3) || 0).toFixed(2)}m³</p>
-                                  </div>
-                                  <div className="text-center">
-                                    <p className="text-[7px] font-bold text-slate-400 uppercase">VALOR</p>
-                                    <p className="text-[10px] font-black text-indigo-600">
-                                      {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(inv.invoiceValue || 0)}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => setSelectedInvoiceDetail(inv)}
-                                    className="w-7 h-7 bg-indigo-50 text-indigo-500 rounded-md hover:bg-indigo-500 hover:text-white transition-all flex items-center justify-center border border-indigo-100 shadow-sm"
-                                    title="Ver detalle de items"
-                                  >
-                                    <Icons.Eye className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleAuditAction('REMOVE', rIdx, inv)}
-                                    className="w-7 h-7 bg-rose-50 text-rose-500 rounded-md hover:bg-red-500 hover:text-white transition-all flex items-center justify-center border border-rose-100 shadow-sm"
-                                    title="Remover de ruta"
-                                  >
-                                    <Icons.X className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div className="flex-1 overflow-y-auto custom-scrollbar max-h-[260px] bg-slate-50/30">
+                        <table className="w-full text-[9px]">
+                          <thead className="sticky top-0 bg-slate-100 z-10">
+                            <tr>
+                              <th className="text-left pl-3 py-1.5 font-black text-slate-500 uppercase tracking-wide w-6">#</th>
+                              <th className="text-left pl-2 py-1.5 font-black text-slate-500 uppercase tracking-wide">Factura / Cliente</th>
+                              <th className="text-left py-1.5 font-black text-slate-500 uppercase tracking-wide hidden sm:table-cell">Dirección</th>
+                              <th className="text-right pr-1 py-1.5 font-black text-slate-500 uppercase tracking-wide">m³</th>
+                              <th className="text-right pr-1 py-1.5 font-black text-slate-500 uppercase tracking-wide">Hora</th>
+                              <th className="pr-2 py-1.5 w-14"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {route.assignedInvoices.map((inv, iIdx) => {
+                              const isPriority = (inv as any).isPriority;
+                              const estimatedArrival = estimateStopArrival(iIdx);
+                              const hasTimeWindow = !!(inv as any).detectedTime;
+                              const urg = hasTimeWindow ? getTimeWindowUrgency((inv as any).timeWindowMinutes) : null;
+                              return (
+                                <tr key={`${inv.id}-${iIdx}`} className={`border-b border-slate-100 hover:bg-white transition-colors ${isPriority ? 'bg-amber-50/60' : ''}`}>
+                                  <td className="pl-3 py-1.5">
+                                    <div className={`w-5 h-5 ${isPriority ? 'bg-amber-500' : 'bg-slate-800'} text-white rounded-md flex items-center justify-center font-black text-[8px]`}>{iIdx + 1}</div>
+                                  </td>
+                                  <td className="pl-2 py-1.5 max-w-0">
+                                    <p className="font-black text-slate-900 truncate">{inv.invoiceNumber}</p>
+                                    <p className="text-slate-400 font-bold truncate">{inv.customerName}</p>
+                                  </td>
+                                  <td className="py-1.5 max-w-0 hidden sm:table-cell">
+                                    <p className="text-slate-500 font-bold truncate">{inv.address}</p>
+                                    <p className="text-slate-400 truncate">{inv.city}</p>
+                                  </td>
+                                  <td className="text-right pr-1 py-1.5 font-black text-emerald-600 whitespace-nowrap">{(Number(inv.volumeM3) || 0).toFixed(1)}</td>
+                                  <td className="text-right pr-1 py-1.5 whitespace-nowrap">
+                                    {urg ? (
+                                      <span className={`px-1 py-0.5 rounded font-black text-[7px] ${urg === 'critical' ? 'bg-red-100 text-red-600' : urg === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                        {(inv as any).detectedTime}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 font-bold">{estimatedArrival}</span>
+                                    )}
+                                  </td>
+                                  <td className="pr-2 py-1.5">
+                                    <div className="flex gap-1 justify-end">
+                                      <button onClick={() => setSelectedInvoiceDetail(inv)} className="w-5 h-5 bg-indigo-50 text-indigo-400 rounded hover:bg-indigo-500 hover:text-white transition-all flex items-center justify-center" title="Ver detalle">
+                                        <Icons.Eye className="w-3 h-3" />
+                                      </button>
+                                      <button onClick={() => handleAuditAction('REMOVE', rIdx, inv)} className="w-5 h-5 bg-rose-50 text-rose-400 rounded hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center" title="Remover">
+                                        <Icons.X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
 
                       <div className="p-3 border-t bg-white flex gap-2 shrink-0">
