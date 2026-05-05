@@ -348,10 +348,18 @@ export function classifyCorridor(lat: number, lng: number, cityStr: string): Via
  * Verifica si dos corredores pueden ir en la misma ruta.
  * Las macro-regiones ORIENTE_ANT y OCCIDENTE_ANT nunca se mezclan con nada.
  */
+// NORTE_GROUP and SUR_GROUP are absolute opposites — the río Medellín
+// physically separates them and the viaducts only connect center zones.
+const _NORTE_GROUP = new Set<ViaCorridor>(['NORTE_LEJANO', 'NORTE']);
+const _SUR_GROUP = new Set<ViaCorridor>(['SUR', 'SUR_LEJANO']);
+
 export function corridorsCompatible(a: ViaCorridor, b: ViaCorridor): boolean {
   if (a === b) return true;
   if (a === 'ORIENTE_ANT' || b === 'ORIENTE_ANT') return false;
   if (a === 'OCCIDENTE_ANT' || b === 'OCCIDENTE_ANT') return false;
+  // Hard river rule: NORTE never mixes with SUR regardless of adjacency chain
+  if (_NORTE_GROUP.has(a) && _SUR_GROUP.has(b)) return false;
+  if (_SUR_GROUP.has(a) && _NORTE_GROUP.has(b)) return false;
   return CORRIDOR_ADJACENT[a]?.includes(b) ?? false;
 }
 

@@ -310,6 +310,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   }, [selectedClient]);
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
   const [geocodedCount, setGeocodedCount] = useState(0);
+  const [unroutedReason, setUnroutedReason] = useState('');
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizingProgress, setOptimizingProgress] = useState(0);
   const [optimizingPhase, setOptimizingPhase] = useState('');
@@ -347,6 +348,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ isOpen: boolean; id: string } | null>(null);
   const [routeMapModal, setRouteMapModal] = useState<{ isOpen: boolean; route: SuggestedRoute | null }>({ isOpen: false, route: null });
+  const [allRoutesMapOpen, setAllRoutesMapOpen] = useState(false);
+  const allRoutesMapRef = useRef<L.Map | null>(null);
   const [routeMapStats, setRouteMapStats] = useState<{ km: number; minutes: number } | null>(null);
   const routePreviewMapRef = useRef<L.Map | null>(null);
   const [dailyKPIs, setDailyKPIs] = useState<{
@@ -537,6 +540,64 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return () => { cancelled = true; };
   }, [routeMapModal.isOpen, routeMapModal.route]);
 
+  // All-routes map
+  useEffect(() => {
+    if (!allRoutesMapOpen) {
+      if (allRoutesMapRef.current) {
+        allRoutesMapRef.current.remove();
+        allRoutesMapRef.current = null;
+      }
+      return;
+    }
+    const ROUTE_COLORS = ['#6366f1','#f43f5e','#f59e0b','#10b981','#06b6d4','#8b5cf6','#f97316','#22c55e','#3b82f6','#ec4899'];
+    const init = async () => {
+      let container: HTMLElement | null = null;
+      for (let i = 0; i < 20; i++) {
+        container = document.getElementById('all-routes-map');
+        if (container && container.clientWidth > 0) break;
+        await new Promise(r => setTimeout(r, 50));
+      }
+      if (!container) return;
+      if (allRoutesMapRef.current) { allRoutesMapRef.current.remove(); allRoutesMapRef.current = null; }
+      const map = L.map(container, { zoomControl: true, preferCanvas: true }).setView([ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng], 11);
+      allRoutesMapRef.current = map;
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(map);
+      const hubIcon = L.divIcon({ html: `<div style="background:#0f172a;color:#10b981;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;border:2px solid #10b981;box-shadow:0 2px 8px rgba(0,0,0,0.5)">M7</div>`, className: '', iconSize: [32,32], iconAnchor: [16,16] });
+      L.marker([ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng], { icon: hubIcon }).addTo(map);
+      const allPoints: L.LatLng[] = [];
+      suggestedRoutes.forEach((route, ri) => {
+        const color = ROUTE_COLORS[ri % ROUTE_COLORS.length];
+        const DEFAULT_LAT = 6.2518, DEFAULT_LNG = -75.5636;
+        const stops = route.assignedInvoices.filter(inv => {
+          const lat = Number(inv.lat), lng = Number(inv.lng);
+          return lat !== 0 && lng !== 0 && !(Math.abs(lat - DEFAULT_LAT) < 0.001 && Math.abs(lng - DEFAULT_LNG) < 0.001);
+        });
+        const stopGroups = new Map<string, typeof stops>();
+        stops.forEach(inv => {
+          const key = `${Number(inv.lat).toFixed(4)}_${Number(inv.lng).toFixed(4)}`;
+          if (!stopGroups.has(key)) stopGroups.set(key, []);
+          stopGroups.get(key)!.push(inv);
+        });
+        const pts: L.LatLng[] = [L.latLng(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng)];
+        let seq = 0;
+        stopGroups.forEach((group) => {
+          seq++;
+          const lat = Number(group[0].lat), lng = Number(group[0].lng);
+          pts.push(L.latLng(lat, lng));
+          allPoints.push(L.latLng(lat, lng));
+          const cnt = group.length;
+          const badge = cnt > 1 ? `<div style="position:absolute;top:-5px;right:-5px;background:#f43f5e;color:white;width:14px;height:14px;border-radius:50%;font-size:7px;font-weight:900;display:flex;align-items:center;justify-content:center">${cnt}</div>` : '';
+          const icon = L.divIcon({ html: `<div style="position:relative"><div style="background:${color};color:white;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,0.4)">${seq}</div>${badge}</div>`, className: '', iconSize: [24,24], iconAnchor: [12,12] });
+          L.marker([lat, lng], { icon }).bindPopup(`<b>${route.vehicle.plate}</b> — Parada ${seq}<br>${group.map(i => i.invoiceNumber).join(', ')}<br><small>${group[0].address} · ${group[0].city}</small>`).addTo(map);
+        });
+        if (pts.length > 1) L.polyline(pts, { color, weight: 3, opacity: 0.8 }).addTo(map);
+      });
+      if (allPoints.length > 0) map.fitBounds(L.latLngBounds([L.latLng(ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng), ...allPoints]), { padding: [40, 40] });
+    };
+    init();
+    return () => { if (allRoutesMapRef.current) { allRoutesMapRef.current.remove(); allRoutesMapRef.current = null; } };
+  }, [allRoutesMapOpen, suggestedRoutes]);
+
   // FILTRADO DE FACTURAS APTAS: Real (basado en lo que viene del API de facturas)
   const validInvoices = useMemo(() => {
     // Estados de ítems que indican la factura ya tiene ruta activa — excluir del planificador
@@ -603,11 +664,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const count = unassignedInvoices.length;
     const volume = Number(unassignedInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0).toFixed(2));
     const additionalVehicles = Math.ceil(volume / 10);
-    let reason = 'Pendientes de ruteo';
-    if (suggestedRoutes.length > 0 && count > 0) reason = 'Cap. insuficiente en flota';
-    else if (suggestedRoutes.length === 0 && count > 0) reason = 'Sin rutas generadas';
-    return { count, volume, additionalVehicles, reason };
-  }, [unassignedInvoices, suggestedRoutes]);
+    return { count, volume, additionalVehicles };
+  }, [unassignedInvoices]);
 
   const availableVehicles = useMemo(() => {
     // REGLA M7: Un vehículo es "disponible" si:
@@ -1814,6 +1872,106 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         }
       }
 
+      // ── FASE FORZADA: Asignar TODO lo que quedó sin ruta ──────────────────
+      // Principio M7: ninguna factura puede quedar sin asignar.
+      // Cascada: 1) nuevo vehículo por corredor  2) overflow en ruta compatible  3) distribuir en cualquier ruta
+      if (availableInvoices.length > 0) {
+        setOptimizingProgress(88); setOptimizingPhase(`Forzando ${availableInvoices.length} facturas restantes...`);
+
+        // Agrupar por corredor para no cruzar zonas geográficas
+        const forceGroups = new Map<ViaCorridor, Invoice[]>();
+        availableInvoices.forEach(inv => {
+          const c: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
+          if (!forceGroups.has(c)) forceGroups.set(c, []);
+          forceGroups.get(c)!.push(inv);
+        });
+
+        const forceAssigned = new Set<string>();
+        const freeVehicles = availableVehicles.filter(v => !usedVehicleIds.has(v.id));
+
+        forceGroups.forEach((batch, corridor) => {
+          let remaining = [...batch];
+
+          // Paso A: crear nuevas rutas con vehículos libres
+          while (remaining.length > 0 && freeVehicles.length > 0) {
+            const batchVol = remaining.reduce((s, i) => s + (Number(i.volumeM3) || 0), 0);
+            const bestVehIdx = freeVehicles
+              .map((v, i) => ({ i, diff: Math.abs((Number(v.capacityM3) || 30) * 0.85 - batchVol) }))
+              .sort((a, b) => a.diff - b.diff)[0]?.i ?? 0;
+            const bestVeh = freeVehicles[bestVehIdx];
+            const cap = Number(bestVeh.capacityM3) || 30;
+
+            const toAssign: Invoice[] = [];
+            let assignedVol = 0;
+            for (const inv of remaining) {
+              if (toAssign.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) break;
+              const vol = Number(inv.volumeM3) || 0;
+              if (assignedVol + vol > cap * 1.05) break;
+              toAssign.push(inv);
+              assignedVol += vol;
+            }
+            if (toAssign.length === 0) break;
+
+            const assignedSet = new Set(toAssign.map(i => i.id));
+            remaining = remaining.filter(i => !assignedSet.has(i.id));
+            toAssign.forEach(i => forceAssigned.add(i.id));
+
+            const cityLabel = (toAssign[0] as any).cityKey || toAssign[0].city || corridor;
+            suggestions.push({
+              id: `route-force-${corridor}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              vehicle: bestVeh,
+              assignedInvoices: toAssign.length >= 4
+                ? (twoOptImprove(toAssign, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[])
+                : toAssign,
+              totalVolume: Number(assignedVol.toFixed(4)),
+              utilization: Math.round((assignedVol / cap) * 100),
+              city: cityLabel,
+            });
+            usedVehicleIds.add(bestVeh.id);
+            freeVehicles.splice(bestVehIdx, 1);
+          }
+
+          if (remaining.length === 0) return;
+
+          // Paso B: overflow en rutas compatibles (ordenar de menor a mayor carga)
+          const compatRoutes = suggestions
+            .map((r, idx) => {
+              const rc: ViaCorridor = (r.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+              return { idx, r, compatible: corridorsCompatible(corridor, rc) || rc === corridor };
+            })
+            .filter(x => x.compatible)
+            .sort((a, b) => a.r.totalVolume - b.r.totalVolume);
+
+          // Paso C: si no hay compatibles, usar cualquier ruta (último recurso)
+          const targetRoutes = compatRoutes.length > 0
+            ? compatRoutes
+            : suggestions.map((r, idx) => ({ idx, r, compatible: true })).sort((a, b) => a.r.assignedInvoices.length - b.r.assignedInvoices.length);
+
+          let ri = 0;
+          for (const inv of remaining) {
+            if (targetRoutes.length === 0) break;
+            const { idx } = targetRoutes[ri % targetRoutes.length];
+            const invVol = Number(inv.volumeM3) || 0;
+            const cap = Number(suggestions[idx].vehicle.capacityM3) || 30;
+            const newVol = suggestions[idx].totalVolume + invVol;
+            suggestions[idx] = {
+              ...suggestions[idx],
+              assignedInvoices: [...suggestions[idx].assignedInvoices, inv],
+              totalVolume: Number(newVol.toFixed(4)),
+              utilization: Math.round((newVol / cap) * 100),
+            };
+            forceAssigned.add(inv.id);
+            ri++;
+          }
+          remaining = [];
+        });
+
+        if (forceAssigned.size > 0) {
+          availableInvoices = availableInvoices.filter(i => !forceAssigned.has(i.id));
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
       // ── Or-opt inter-ruta ───────────────────────────────────────────────────
       setOptimizingProgress(80); setOptimizingPhase('Optimizando inter-rutas (Or-opt)...');
       // Mueve paradas individuales entre rutas para minimizar distancia total.
@@ -1911,6 +2069,30 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       }
 
       setSuggestedRoutes(suggestions);
+
+      // ── Calcular motivo real de facturas sin ruta ──────────────────────────
+      if (availableInvoices.length > 0) {
+        const usedCount = usedVehicleIds.size;
+        const totalAvail = availableVehicles.length;
+        const noCoordCount = availableInvoices.filter(inv => {
+          const lat = Number((inv as any).lat || 0), lng = Number((inv as any).lng || 0);
+          return (lat === 0 && lng === 0) || hasDefaultCoords(lat, lng);
+        }).length;
+
+        if (usedCount >= totalAvail) {
+          setUnroutedReason('Todos los vehículos utilizados');
+        } else if (noCoordCount > availableInvoices.length * 0.6) {
+          setUnroutedReason('Sin coordenadas de entrega');
+        } else if (suggestions.length === 0) {
+          setUnroutedReason('No se generaron rutas');
+        } else {
+          // Quedan vehículos disponibles pero el algoritmo no les encontró ancla
+          setUnroutedReason(`Sin ancla geográfica (${totalAvail - usedCount} veh. libres)`);
+        }
+      } else {
+        setUnroutedReason('');
+      }
+      // ──────────────────────────────────────────────────────────────────────
 
       if (specificInvoices) {
         const totalInvoices = specificInvoices.length;
@@ -3054,6 +3236,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           </div>
 
           <button
+            onClick={() => setAllRoutesMapOpen(true)}
+            disabled={suggestedRoutes.length === 0}
+            className="bg-slate-800 text-emerald-400 px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-[0.15em] shadow-sm hover:bg-emerald-500 hover:text-slate-950 transition-all flex items-center justify-center gap-2 disabled:opacity-40 active:scale-95 whitespace-nowrap"
+          >
+            <Icons.MapPin className="w-3.5 h-3.5" />
+            MAPA GLOBAL
+          </button>
+
+          <button
             onClick={handleExportRoutesExcel}
             disabled={suggestedRoutes.length === 0}
             className="shrink-0 px-4 py-2.5 bg-teal-50 text-teal-700 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-teal-600 hover:text-white transition-all shadow-md active:scale-95 disabled:opacity-20 whitespace-nowrap flex items-center gap-1.5"
@@ -3161,10 +3352,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 <p className="text-sm font-black text-white leading-none">{unassignedMetrics.volume}m³</p>
               </div>
               <div className="w-px h-6 bg-white/10" />
-              <div className="flex flex-col">
-                <p className="text-[6px] font-black text-rose-400 uppercase tracking-widest leading-none mb-1">Motivo</p>
-                <p className="text-[9px] font-black text-rose-300 leading-none">{unassignedMetrics.reason}</p>
-              </div>
+              {unroutedReason && (
+                <div className="flex flex-col">
+                  <p className="text-[6px] font-black text-rose-400 uppercase tracking-widest leading-none mb-1">Motivo</p>
+                  <p className="text-[9px] font-black text-rose-300 leading-none">{unroutedReason}</p>
+                </div>
+              )}
               <button
                 onClick={() => setIsPendingInvoicesModalOpen(true)}
                 className="flex items-center gap-1.5 ml-1 px-3 py-1.5 bg-rose-500 text-white rounded-xl text-[8px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all active:scale-95 whitespace-nowrap">
@@ -4231,6 +4424,36 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             </div>
 
             <p className="text-[7px] text-slate-600 font-bold uppercase tracking-widest pt-2">OrbitM7 Data Integrity Protocol</p>
+          </div>
+        </div>
+      )}
+
+      {allRoutesMapOpen && (
+        <div className="fixed inset-0 z-[800] bg-slate-950/95 backdrop-blur-sm flex flex-col animate-in fade-in duration-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                <Icons.MapPin className="w-4 h-4 text-slate-950" />
+              </div>
+              <div>
+                <p className="text-white font-black text-sm uppercase tracking-tight">Mapa Global de Rutas</p>
+                <p className="text-slate-400 text-[10px] font-bold uppercase">{suggestedRoutes.length} rutas · {suggestedRoutes.reduce((a, r) => a + r.assignedInvoices.length, 0)} facturas</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {['#6366f1','#f43f5e','#f59e0b','#10b981','#06b6d4','#8b5cf6','#f97316','#22c55e','#3b82f6','#ec4899'].slice(0, suggestedRoutes.length).map((c, i) => (
+                <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ background: `${c}20`, border: `1px solid ${c}40` }}>
+                  <div className="w-2 h-2 rounded-full" style={{ background: c }} />
+                  <span className="text-[9px] font-black" style={{ color: c }}>{suggestedRoutes[i]?.vehicle.plate}</span>
+                </div>
+              ))}
+              <button onClick={() => setAllRoutesMapOpen(false)} className="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all ml-2">
+                <Icons.X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 relative">
+            <div id="all-routes-map" className="absolute inset-0 w-full h-full" />
           </div>
         </div>
       )}
