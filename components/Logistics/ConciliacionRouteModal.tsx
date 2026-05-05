@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { useAppData } from '../../hooks/useAppData';
-import { hasPermission } from '../../utils/permissions';
+
 import { toast } from 'sonner';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -682,8 +682,8 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     isOpen, onClose, route, invoices, documentId, currentUserId, onSaved,
     initialSurcharges, initialGroupPayments, allRoutes
 }) => {
-    const { user } = useAppData();
-    const canDelete = hasPermission(user, 'CONCILIACION', 'delete');
+    useAppData();
+    const canDelete = false; // permiso gestionado a nivel de padre
     const [tab, setTab]         = useState<ModalTab>('individual');
     const [forms, setForms]     = useState<Map<string, InvoiceFormState>>(new Map());
     const [activeDialog, setActiveDialog] = useState<string | null>(null);
@@ -692,6 +692,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     // Estado consignación grupal
     const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION' }]);
     const [isGrupalUnlocked, setIsGrupalUnlocked] = useState(false);
+    const [savingGrupal, setSavingGrupal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
     // --- NUEVO: Ajuste de Método de Pago ---
@@ -731,13 +732,11 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         }
     };
 
-    const forms = useMemo(() => {
     const [headerFilter, setHeaderFilter]     = useState<string | null>(null);
 
     // Estado sobrecostos
     const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), statusId: 'EST-01', observaciones: '', facturas: '' }]);
     const [savingSobrecosto, setSavingSobrecosto] = useState(false);
-    const [isGrupalUnlocked, setIsGrupalUnlocked] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
