@@ -326,14 +326,19 @@ export function classifyCorridor(lat: number, lng: number, cityStr: string): Via
 
   const dlat = lat - ORBIT_HUB_ORIGIN.lat;
   const dlng = lng - ORBIT_HUB_ORIGIN.lng;
-  // EAST_OFFSET: distancia longitudinal desde el hub hasta la separación este/oeste
-  // Para Medellín = río Medellín (lng ≈ -75.578). En otra ciudad = división este/oeste del hub.
-  const isEast = dlng > 0.063;
+
+  // Separación este/oeste: río Medellín ≈ lng -75.578 → offset 0.063 desde hub.
+  // Reducido a 0.055 para que el corredor norte-occidente (Castilla/Robledo/Bello
+  // sur) quede en MED_OCC en lugar de NORTE cuando dlat está entre 0.095 y 0.155.
+  const isEast = dlng > 0.055;
 
   if (dlat > 0.31)  return 'NORTE_LEJANO';
   if (dlat > 0.20)  return 'NORTE';
+  // Bello sur / Manrique norte (dlat 0.155-0.20): zona de transición
   if (dlat > 0.155) return isEast ? 'MED_ORI'    : 'MED_OCC';
+  // Laureles/Belén/Robledo vs Aranjuez/Argentina (dlat 0.095-0.155)
   if (dlat > 0.095) return isEast ? 'MED_CENTRO' : 'MED_OCC';
+  // Envigado vs Itagüí/Sabaneta (dlat 0.045-0.095)
   if (dlat > 0.045) return isEast ? 'ENVIGADO'   : 'SUR';
   if (dlat > -0.01) return 'SUR';
   return 'SUR_LEJANO';
@@ -524,13 +529,14 @@ export function twoOptImprove(
     hubLng: number,
     distFn?: (lat1: number, lng1: number, lat2: number, lng2: number) => number
 ): typeof stops {
-    if (stops.length < 4) return stops; // No vale la pena con menos de 4 paradas
+    if (stops.length < 4) return stops;
 
     const dist = distFn || haversineKm;
     const getLat = (s: typeof stops[0]) => Number(s.lat || hubLat);
     const getLng = (s: typeof stops[0]) => Number(s.lng || hubLng);
 
-    // Distancia total de una secuencia (hub→primera, inter-paradas, última→hub)
+    const hasTW = stops.some(s => typeof (s as any).timeWindowMinutes === 'number');
+
     const totalDist = (seq: typeof stops): number => {
         let d = dist(hubLat, hubLng, getLat(seq[0]), getLng(seq[0]));
         for (let i = 0; i < seq.length - 1; i++) {
@@ -543,24 +549,22 @@ export function twoOptImprove(
     let best = [...stops];
     let bestDist = totalDist(best);
     let improved = true;
-
-    // Iteramos hasta no encontrar mejoras (convergencia rápida en rutas típicas)
     let iterations = 0;
-    const maxIterations = 50; // Límite para no bloquear el hilo UI
+    const maxIterations = 60;
 
     while (improved && iterations < maxIterations) {
         improved = false;
         iterations++;
         for (let i = 1; i < best.length - 1; i++) {
             for (let k = i + 1; k < best.length; k++) {
-                // Invertir el segmento [i..k]
                 const candidate = [
                     ...best.slice(0, i),
                     ...best.slice(i, k + 1).reverse(),
                     ...best.slice(k + 1)
                 ];
                 const candidateDist = totalDist(candidate);
-                if (candidateDist < bestDist - 0.01) { // Mejora mínima de 10m
+                if (candidateDist < bestDist - 0.01) {
+                    if (hasTW && routeViolatesTimeWindows(candidate, hubLat, hubLng)) continue;
                     best = candidate;
                     bestDist = candidateDist;
                     improved = true;
@@ -642,6 +646,8 @@ export function orOpt1Intra(
     const getLat = (s: typeof stops[0]) => Number(s.lat || hubLat);
     const getLng = (s: typeof stops[0]) => Number(s.lng || hubLng);
 
+    const hasTW = stops.some(s => typeof (s as any).timeWindowMinutes === 'number');
+
     const totalDist = (seq: typeof stops): number => {
         let d = dist(hubLat, hubLng, getLat(seq[0]), getLng(seq[0]));
         for (let i = 0; i < seq.length - 1; i++) {
@@ -663,10 +669,11 @@ export function orOpt1Intra(
             const stop = best[i];
             const without = [...best.slice(0, i), ...best.slice(i + 1)];
             for (let j = 0; j <= without.length; j++) {
-                if (j === i || j === i - 1) continue; // same effective position
+                if (j === i || j === i - 1) continue;
                 const candidate = [...without.slice(0, j), stop, ...without.slice(j)];
                 const candidateDist = totalDist(candidate);
                 if (candidateDist < bestDist - 0.01) {
+                    if (hasTW && routeViolatesTimeWindows(candidate, hubLat, hubLng)) continue;
                     best = candidate;
                     bestDist = candidateDist;
                     improved = true;
@@ -680,17 +687,92 @@ export function orOpt1Intra(
             const pair = [best[i], best[i + 1]];
             const without = [...best.slice(0, i), ...best.slice(i + 2)];
             for (let j = 0; j <= without.length; j++) {
-                // orden original
                 const candidate = [...without.slice(0, j), ...pair, ...without.slice(j)];
                 const d = totalDist(candidate);
                 if (d < bestDist - 0.01) {
+                    if (hasTW && routeViolatesTimeWindows(candidate, hubLat, hubLng)) continue;
                     best = candidate; bestDist = d; improved = true; break outer2;
                 }
-                // orden invertido
                 const candidateRev = [...without.slice(0, j), pair[1], pair[0], ...without.slice(j)];
                 const dRev = totalDist(candidateRev);
                 if (dRev < bestDist - 0.01) {
+                    if (hasTW && routeViolatesTimeWindows(candidateRev, hubLat, hubLng)) continue;
                     best = candidateRev; bestDist = dRev; improved = true; break outer2;
+                }
+            }
+        }
+    }
+
+    return best;
+}
+
+// ─── 3-opt (verdaderos movimientos de relocalización de segmento) ─────────────
+/**
+ * Complementa al 2-opt: encuentra mejoras que requieren romper 3 arcos
+ * simultáneamente. Solo evalúa los 4 movimientos "verdaderos" de 3-opt
+ * (reordenamiento de segmento B↔C) que 2-opt no puede descubrir.
+ * Solo se activa para rutas con ≥12 paradas — por debajo el 2-opt ya converge.
+ */
+export function threeOptImprove(
+    stops: Array<{ lat?: number | null; lng?: number | null; [key: string]: any }>,
+    hubLat: number,
+    hubLng: number,
+    distFn?: (lat1: number, lng1: number, lat2: number, lng2: number) => number
+): typeof stops {
+    if (stops.length < 12) return stops;
+
+    const dist = distFn || haversineKm;
+    const gl = (s: typeof stops[0]) => Number(s.lat || hubLat);
+    const gg = (s: typeof stops[0]) => Number(s.lng || hubLng);
+    const hasTW = stops.some(s => typeof (s as any).timeWindowMinutes === 'number');
+
+    const totalDist = (seq: typeof stops): number => {
+        let d = dist(hubLat, hubLng, gl(seq[0]), gg(seq[0]));
+        for (let i = 0; i < seq.length - 1; i++) d += dist(gl(seq[i]), gg(seq[i]), gl(seq[i + 1]), gg(seq[i + 1]));
+        d += dist(gl(seq[seq.length - 1]), gg(seq[seq.length - 1]), hubLat, hubLng);
+        return d;
+    };
+
+    let best = [...stops];
+    let bestDist = totalDist(best);
+    let improved = true;
+    let iter = 0;
+
+    while (improved && iter < 20) {
+        improved = false;
+        iter++;
+        const n = best.length;
+
+        outer: for (let i = 0; i < n - 2; i++) {
+            for (let j = i + 1; j < n - 1; j++) {
+                for (let k = j + 1; k < n; k++) {
+                    const A = best.slice(0, i + 1);
+                    const B = best.slice(i + 1, j + 1);
+                    const C = best.slice(j + 1, k + 1);
+                    const D = best.slice(k + 1);
+                    const Brev = [...B].reverse();
+                    const Crev = [...C].reverse();
+
+                    // Solo los 4 movimientos verdaderos de 3-opt (B↔C intercambiados)
+                    // que el 2-opt no puede descubrir. Los movimientos de inversión de
+                    // un solo segmento ya los maneja 2-opt.
+                    const candidates: (typeof stops)[] = [
+                        [...A, ...C,    ...B,    ...D],
+                        [...A, ...Crev, ...B,    ...D],
+                        [...A, ...C,    ...Brev, ...D],
+                        [...A, ...Crev, ...Brev, ...D],
+                    ];
+
+                    for (const candidate of candidates) {
+                        const d = totalDist(candidate);
+                        if (d < bestDist - 0.01) {
+                            if (hasTW && routeViolatesTimeWindows(candidate, hubLat, hubLng)) continue;
+                            best = candidate;
+                            bestDist = d;
+                            improved = true;
+                            break outer;
+                        }
+                    }
                 }
             }
         }
@@ -814,33 +896,118 @@ export function orOptInterRoute(
             }
         }
 
+        // ── Or-opt(2): mover pares consecutivos entre rutas si singles no mejoró ──
+        if (!improved) {
+            outerPair: for (let di = 0; di < work.length; di++) {
+                const donor = work[di];
+                if (donor.assignedInvoices.length <= 2) continue;
+                const donorCap = Number(donor.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+
+                for (let ki = 0; ki < donor.assignedInvoices.length - 1; ki++) {
+                    const inv1 = donor.assignedInvoices[ki];
+                    const inv2 = donor.assignedInvoices[ki + 1];
+                    const pairVol = (Number(inv1.volumeM3) || 0) + (Number(inv2.volumeM3) || 0);
+                    const inv1Corridor: ViaCorridor = (inv1 as any).corridor || 'MED_CENTRO';
+                    const inv2Corridor: ViaCorridor = (inv2 as any).corridor || 'MED_CENTRO';
+
+                    const donorWithout = [
+                        ...donor.assignedInvoices.slice(0, ki),
+                        ...donor.assignedInvoices.slice(ki + 2),
+                    ];
+                    const distDonorBefore = routeDist(donor.assignedInvoices);
+                    const distDonorAfter = routeDist(donorWithout);
+
+                    let bestGain = 0.05;
+                    let bestRi = -1;
+                    let bestPos = -1;
+
+                    for (let ri = 0; ri < work.length; ri++) {
+                        if (ri === di) continue;
+                        const receiver = work[ri];
+                        const rCorridor: ViaCorridor = (receiver.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
+                        if (!corridorsCompatible(inv1Corridor, rCorridor)) continue;
+                        if (!corridorsCompatible(inv2Corridor, rCorridor)) continue;
+                        const rCap = Number(receiver.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+                        if (receiver.totalVolume + pairVol > rCap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
+                        if (receiver.assignedInvoices.length + 2 > OPTIMIZATION_CONSTANTS.MAX_INVOICES) continue;
+
+                        const distReceiverBefore = routeDist(receiver.assignedInvoices);
+                        const pairHasTW =
+                            typeof (inv1 as any).timeWindowMinutes === 'number' ||
+                            typeof (inv2 as any).timeWindowMinutes === 'number';
+
+                        for (let pos = 0; pos <= receiver.assignedInvoices.length; pos++) {
+                            const receiverWith = [
+                                ...receiver.assignedInvoices.slice(0, pos),
+                                inv1,
+                                inv2,
+                                ...receiver.assignedInvoices.slice(pos),
+                            ];
+                            if (estimateRouteTotalMinutes(receiverWith, hubLat, hubLng) >= MAX_ROUTE_MINUTES) continue;
+                            if (pairHasTW || receiver.assignedInvoices.some(i => typeof (i as any).timeWindowMinutes === 'number')) {
+                                if (routeViolatesTimeWindows(receiverWith, hubLat, hubLng)) continue;
+                            }
+                            const distReceiverAfter = routeDist(receiverWith);
+                            const gain = (distDonorBefore + distReceiverBefore) - (distDonorAfter + distReceiverAfter);
+                            if (gain > bestGain) {
+                                bestGain = gain;
+                                bestRi = ri;
+                                bestPos = pos;
+                            }
+                        }
+                    }
+
+                    if (bestRi >= 0) {
+                        const receiver = work[bestRi];
+                        const rCap = Number(receiver.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
+                        work[di] = {
+                            ...donor,
+                            assignedInvoices: donorWithout,
+                            totalVolume: Number((donor.totalVolume - pairVol).toFixed(4)),
+                            utilization: Math.round(((donor.totalVolume - pairVol) / donorCap) * 100),
+                        };
+                        work[bestRi] = {
+                            ...receiver,
+                            assignedInvoices: [
+                                ...receiver.assignedInvoices.slice(0, bestPos),
+                                inv1,
+                                inv2,
+                                ...receiver.assignedInvoices.slice(bestPos),
+                            ],
+                            totalVolume: Number((receiver.totalVolume + pairVol).toFixed(4)),
+                            utilization: Math.round(((receiver.totalVolume + pairVol) / rCap) * 100),
+                        };
+                        improved = true;
+                        break outerPair;
+                    }
+                }
+            }
+        }
+
         if (!improved) break;
     }
 
     return work.filter(r => r.assignedInvoices.length > 0);
 }
 
-// ─── ILS — Iterated Local Search (variante GRASP) ────────────────────────────
+// ─── ILS — Iterated Local Search con perturbación adaptiva y memoria tabú ────
 /**
  * Después de Or-opt, ejecuta N rondas de perturbación + reparación para escapar
- * mínimos locales que ningún intercambio local puede superar.
+ * mínimos locales.
  *
- * Cada ronda:
- *   1. DESTROY — extrae aleatoriamente K facturas de K rutas distintas.
- *   2. REPAIR  — reinserta cada factura en la mejor posición disponible
- *                (misma lógica que Or-opt, respetando capacidad/tiempo/corredor/TW).
- *   3. LOCAL   — aplica Or-opt inter-ruta sobre la solución reparada.
- *   4. ACCEPT  — reemplaza la solución actual si la nueva es mejor
- *                (más facturas asignadas, o igual asignadas y menor distancia total).
- *
- * Equivalente práctico a GRASP con RCL: misma calidad de resultado, sin
- * necesidad de refactorizar el 600-línea bloque de construcción de rutas.
+ * Mejoras vs versión anterior:
+ * - 12 rondas por defecto (era 4)
+ * - Perturbación adaptiva: empieza en 20%, sube 5% cada 2 rondas sin mejora,
+ *   cap en 40%. Rutas grandes necesitan más destrucción para salir de mínimos.
+ * - Memoria tabú: IDs de facturas recién perturbadas no se vuelven a destruir
+ *   en la ronda siguiente, forzando exploración de nuevas regiones del espacio.
+ * - LOCAL SEARCH más agresivo en rondas sin mejora (20 rondas de or-opt vs 15).
  */
 export function ilsImprove(
     routes: SuggestedRoute[],
     hubLat: number,
     hubLng: number,
-    rounds: number = 4
+    rounds: number = 12
 ): SuggestedRoute[] {
     if (routes.length < 2) return routes;
 
@@ -865,14 +1032,17 @@ export function ilsImprove(
 
     let best = routes.map(r => ({ ...r, assignedInvoices: [...r.assignedInvoices] }));
     let bestScore = solutionScore(best);
+    let noImprovementStreak = 0;
+    const tabuIds = new Set<string>(); // IDs de facturas tabú (no destruir esta ronda)
 
     for (let round = 0; round < rounds; round++) {
-        // ── DESTROY ─────────────────────────────────────────────────────────────
+        // ── DESTROY — perturbación adaptiva ─────────────────────────────────────
+        const perturbPct = Math.min(0.40, 0.20 + Math.floor(noImprovementStreak / 2) * 0.05);
         const perturbed = best.map(r => ({ ...r, assignedInvoices: [...r.assignedInvoices] }));
         const removed: Invoice[] = [];
+        const removedIds = new Set<string>();
 
-        // Número de facturas a extraer: ~15% de las rutas, mínimo 2
-        const nRemove = Math.max(2, Math.ceil(perturbed.length * 0.2));
+        const nRemove = Math.max(2, Math.ceil(perturbed.length * perturbPct));
         const shuffledIdxs = perturbed
             .map((_, i) => i)
             .sort(() => Math.random() - 0.5)
@@ -881,10 +1051,15 @@ export function ilsImprove(
         for (const ri of shuffledIdxs) {
             const r = perturbed[ri];
             if (r.assignedInvoices.length === 0) continue;
-            const ki = Math.floor(Math.random() * r.assignedInvoices.length);
-            const inv = r.assignedInvoices[ki];
+            // Candidatos que no estén en tabú
+            const candidates = r.assignedInvoices
+                .map((inv, ki) => ({ inv, ki }))
+                .filter(({ inv }) => !tabuIds.has(inv.id));
+            if (candidates.length === 0) continue;
+            const { inv, ki } = candidates[Math.floor(Math.random() * candidates.length)];
             const invVol = Number(inv.volumeM3) || 0;
             removed.push(inv);
+            removedIds.add(inv.id);
             const newInvs = r.assignedInvoices.filter((_, i) => i !== ki);
             const cap = Number(r.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
             perturbed[ri] = {
@@ -899,6 +1074,7 @@ export function ilsImprove(
         for (const inv of removed) {
             const invVol = Number(inv.volumeM3) || 0;
             const invCorridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
+            const invNeighborhood = String((inv as any).neighborhoodKey || '').toUpperCase().trim();
             let bestRi = -1, bestPos = -1, bestDist = Infinity;
 
             for (let ri = 0; ri < perturbed.length; ri++) {
@@ -906,6 +1082,8 @@ export function ilsImprove(
                 if (r.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) continue;
                 const cap = Number(r.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
                 if (r.totalVolume + invVol > cap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
+                // Respetar restricciones de barrio para vehículos grandes
+                if (cap > LARGE_VEHICLE_THRESHOLD_M3 && invNeighborhood && RESTRICTED_NEIGHBORHOODS.includes(invNeighborhood)) continue;
                 const rCorridor: ViaCorridor = (r.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
                 if (!corridorsCompatible(invCorridor, rCorridor)) continue;
 
@@ -931,16 +1109,23 @@ export function ilsImprove(
             }
         }
 
-        // ── LOCAL SEARCH ────────────────────────────────────────────────────────
+        // ── LOCAL SEARCH — más agresivo cuando hay racha sin mejora ─────────────
         const repaired = perturbed.filter(r => r.assignedInvoices.length > 0);
-        const localOpt = orOptInterRoute(repaired, hubLat, hubLng, 15);
+        const orOptRounds = noImprovementStreak >= 3 ? 25 : 15;
+        const localOpt = orOptInterRoute(repaired, hubLat, hubLng, orOptRounds);
 
-        // ── ACCEPT ──────────────────────────────────────────────────────────────
+        // ── ACCEPT + tabú update ─────────────────────────────────────────────────
         const newScore = solutionScore(localOpt);
         if (newScore > bestScore) {
             best = localOpt;
             bestScore = newScore;
+            noImprovementStreak = 0;
+        } else {
+            noImprovementStreak++;
         }
+        // Rotar tabú: las facturas de esta ronda se prohíben en la siguiente
+        tabuIds.clear();
+        removedIds.forEach(id => tabuIds.add(id));
     }
 
     return best;

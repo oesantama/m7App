@@ -123,7 +123,7 @@ export const getDeliveryPatterns = async (_req: Request, res: Response) => {
 };
 
 export const saveRoute = async (req: Request, res: Response) => {
-  const { id, vehicleId, driverId, clientId, invoiceIds, createdBy, totalVolume, utilization, capacityM3 } = req.body;
+  const { id, vehicleId, driverId, clientId, invoiceIds, createdBy, totalVolume, utilization, capacityM3, shift } = req.body;
   const client = await pool.connect();
 
   try {
@@ -145,13 +145,14 @@ export const saveRoute = async (req: Request, res: Response) => {
 
     // 1. Insertar Cabecera de Ruta con datos de eficiencia
     const routeRes = await client.query(`
-      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status_id, total_volume_m3, vehicle_capacity_m3, utilization_pct, created_at)
-      VALUES ($1, $2, $3, $4, 'EST-10', $5, $6, $7, CURRENT_TIMESTAMP)
+      INSERT INTO routes (vehicle_id, driver_id, client_id, created_by, status_id, total_volume_m3, vehicle_capacity_m3, utilization_pct, shift, created_at)
+      VALUES ($1, $2, $3, $4, 'EST-10', $5, $6, $7, $8, CURRENT_TIMESTAMP)
       RETURNING id
     `, [vehicleId, finalDriverId, clientId, createdBy,
         Number(totalVolume) || 0,
         Number(capacityM3) || 0,
-        Number(utilization) || 0]);
+        Number(utilization) || 0,
+        Number(shift) || 1]);
 
     const finalRouteId = routeRes.rows[0].id;
 
@@ -228,7 +229,10 @@ export const logRouteMovement = async (req: Request, res: Response) => {
 };
 
 export const learnFromCompletedRoute = async (req: Request, res: Response) => {
-  const { vehicleId, stops } = req.body;
+  // stops = entregas exitosas (+2 strength)
+  // failedStops = no entregadas, penalty -1
+  // returnedStops = devueltas por cliente, penalty -0.5
+  const { vehicleId, stops, failedStops = [], returnedStops = [] } = req.body;
 
   if (!vehicleId || !Array.isArray(stops) || stops.length === 0) {
     return res.status(400).json({ error: "vehicleId y stops[] son requeridos" });
@@ -238,12 +242,12 @@ export const learnFromCompletedRoute = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
 
+    // ── Aprender de entregas exitosas (+2) ─────────────────────────────────
     for (const stop of stops) {
       const city = String(stop.city || '').toUpperCase().trim();
       const neighborhood = String(stop.neighborhood || '').toUpperCase().trim();
       if (!city) continue;
 
-      // Aprendizaje ciudad+barrio → vehículo (routing_patterns)
       await client.query(`
         INSERT INTO routing_patterns (city, vehicle_id, neighborhood, strength, last_used)
         VALUES ($1, $2, $3, 2, NOW())
@@ -252,7 +256,6 @@ export const learnFromCompletedRoute = async (req: Request, res: Response) => {
           last_used = NOW()
       `, [city, vehicleId, neighborhood]);
 
-      // Aprendizaje dirección exacta → vehículo (delivery_patterns)
       const address = String(stop.address || '').trim();
       if (address && address !== 'S/D') {
         const addrKey = `${address}|${city}`.toLowerCase();
@@ -267,9 +270,39 @@ export const learnFromCompletedRoute = async (req: Request, res: Response) => {
       }
     }
 
+    // ── Penalizar fallos del conductor (-1) ────────────────────────────────
+    for (const stop of (failedStops as any[])) {
+      const city = String(stop.city || '').toUpperCase().trim();
+      const neighborhood = String(stop.neighborhood || '').toUpperCase().trim();
+      if (!city) continue;
+      await client.query(`
+        UPDATE routing_patterns SET strength = GREATEST(0, strength - 1), last_used = NOW()
+        WHERE city = $1 AND vehicle_id = $2 AND neighborhood = $3
+      `, [city, vehicleId, neighborhood]);
+      const address = String(stop.address || '').trim();
+      if (address && address !== 'S/D') {
+        const addrKey = `${address}|${city}`.toLowerCase();
+        await client.query(`
+          UPDATE delivery_patterns SET strength = GREATEST(0, strength - 1), last_used = NOW()
+          WHERE address_key = $1 AND vehicle_id = $2
+        `, [addrKey, vehicleId]);
+      }
+    }
+
+    // ── Penalizar devoluciones del cliente (-0.5) — menor que fallo conductor
+    for (const stop of (returnedStops as any[])) {
+      const city = String(stop.city || '').toUpperCase().trim();
+      const neighborhood = String(stop.neighborhood || '').toUpperCase().trim();
+      if (!city) continue;
+      await client.query(`
+        UPDATE routing_patterns SET strength = GREATEST(0, strength - 0.5), last_used = NOW()
+        WHERE city = $1 AND vehicle_id = $2 AND neighborhood = $3
+      `, [city, vehicleId, neighborhood]);
+    }
+
     await client.query('COMMIT');
-    console.log(`[M7-IQ-ROUTE] Aprendizaje de ruta confirmada: ${stops.length} paradas para vehículo ${vehicleId}`);
-    res.json({ success: true, patternsUpdated: stops.length });
+    console.log(`[M7-IQ-ROUTE] Aprendizaje: +${stops.length} éxitos, -${(failedStops as any[]).length} fallos, -${(returnedStops as any[]).length} devueltas | vehículo ${vehicleId}`);
+    res.json({ success: true, patternsUpdated: stops.length, penalized: (failedStops as any[]).length + (returnedStops as any[]).length });
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[M7-IQ-ROUTE-ERR] DETALLE:', err);
@@ -449,59 +482,122 @@ export const getRoadMatrix = async (req: Request, res: Response) => {
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (i !== j) missingPairs.push([i, j]);
   }
 
-  // ── 2. Llamar OSRM si hay pares no cacheados ────────────────────────────────
+  // ── 2. Resolver pares no cacheados: Google Maps (con tráfico) → OSRM fallback ─
   if (missingPairs.length > 0) {
-    const coords = points.map(p => `${p.lng},${p.lat}`).join(';');
-    let osrmOk = false;
+    const gmKey = process.env.GOOGLE_MAPS_API_KEY;
+    let matrixOk = false;
 
-    for (const server of OSRM_SERVERS) {
+    // ── 2a. Google Maps Distance Matrix (tráfico real) ────────────────────────
+    if (gmKey) {
       try {
-        const url = `${server}/table/v1/driving/${coords}?annotations=distance,duration`;
-        const resp = await fetch(url, {
-          headers: { 'User-Agent': 'OrbitM7-Logistics/1.0' },
-          signal: AbortSignal.timeout(8000),
-        });
-        if (!resp.ok) throw new Error(`status ${resp.status}`);
-        const data = await resp.json() as any;
-        if (data.code !== 'Ok') throw new Error('OSRM code != Ok');
+        // Batches de hasta 10 orígenes × 10 destinos = 100 elementos/request
+        const CHUNK = 10;
+        const filled = new Map<string, { dkm: number; dmin: number }>();
 
-        // data.distances[i][j] en metros, data.durations[i][j] en segundos
-        const distM: number[][] = data.distances;
-        const durS:  number[][] = data.durations;
+        const uniqueOriginIdx  = [...new Set(missingPairs.map(([i]) => i))];
+        const uniqueDestIdx    = [...new Set(missingPairs.map(([, j]) => j))];
 
-        // Llenar matrices y preparar INSERT a caché
-        const insValues: any[] = [];
-        for (const [i, j] of missingPairs) {
-          const dkm  = distM[i][j] / 1000;
-          const dmin = durS[i][j]  / 60;
-          distMatrix[i][j] = dkm;
-          durMatrix[i][j]  = dmin;
-          insValues.push(keys[i], keys[j], dkm, dmin);
+        for (let oi = 0; oi < uniqueOriginIdx.length; oi += CHUNK) {
+          const oChunk = uniqueOriginIdx.slice(oi, oi + CHUNK);
+          for (let di = 0; di < uniqueDestIdx.length; di += CHUNK) {
+            const dChunk = uniqueDestIdx.slice(di, di + CHUNK);
+
+            const origins      = oChunk.map(i => `${points[i].lat},${points[i].lng}`).join('|');
+            const destinations = dChunk.map(j => `${points[j].lat},${points[j].lng}`).join('|');
+            const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origins)}&destinations=${encodeURIComponent(destinations)}&departure_time=now&key=${gmKey}`;
+
+            const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+            if (!resp.ok) throw new Error(`GM status ${resp.status}`);
+            const gm = await resp.json() as any;
+            if (gm.status !== 'OK') throw new Error(`GM status: ${gm.status}`);
+
+            gm.rows.forEach((row: any, ri: number) => {
+              row.elements.forEach((el: any, ci: number) => {
+                if (el.status !== 'OK') return;
+                const i = oChunk[ri];
+                const j = dChunk[ci];
+                const dkm  = el.distance.value / 1000;
+                // Prefer duration_in_traffic (real traffic), fall back to duration
+                const dmin = (el.duration_in_traffic?.value ?? el.duration.value) / 60;
+                filled.set(`${i}:${j}`, { dkm, dmin });
+              });
+            });
+          }
         }
 
-        // Guardar en caché (fire-and-forget)
+        const insValues: any[] = [];
+        const filledPairs: [number, number][] = [];
+        for (const [i, j] of missingPairs) {
+          const v = filled.get(`${i}:${j}`);
+          if (!v) continue;
+          distMatrix[i][j] = v.dkm;
+          durMatrix[i][j]  = v.dmin;
+          insValues.push(keys[i], keys[j], v.dkm, v.dmin);
+          filledPairs.push([i, j]);
+        }
+
         if (insValues.length > 0) {
-          const placeholders = missingPairs
-            .map((_, idx) => `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`)
-            .join(',');
+          const ph = filledPairs.map((_, idx) => `($${idx * 4 + 1},$${idx * 4 + 2},$${idx * 4 + 3},$${idx * 4 + 4})`).join(',');
           pool.query(
-            `INSERT INTO road_distance_cache (from_key, to_key, dist_km, dur_min)
-             VALUES ${placeholders}
-             ON CONFLICT (from_key, to_key) DO UPDATE SET
-               dist_km = EXCLUDED.dist_km, dur_min = EXCLUDED.dur_min, cached_at = NOW()`,
+            `INSERT INTO road_distance_cache (from_key, to_key, dist_km, dur_min) VALUES ${ph}
+             ON CONFLICT (from_key, to_key) DO UPDATE SET dist_km=EXCLUDED.dist_km, dur_min=EXCLUDED.dur_min, cached_at=NOW()`,
             insValues
           ).catch(() => {});
         }
 
-        osrmOk = true;
-        break;
+        matrixOk = true;
+        console.info(`[M7-TRAFFIC] Google Maps matrix (${filledPairs.length} pares, tráfico real)`);
       } catch (err: any) {
-        console.warn(`[M7-ROAD-MATRIX] OSRM ${server} falló: ${err.message}`);
+        console.warn(`[M7-TRAFFIC] Google Maps falló: ${err.message} — usando OSRM`);
       }
     }
 
-    if (!osrmOk) {
-      // Todos los servidores fallaron — frontend usará Haversine como fallback
+    // ── 2b. OSRM fallback ────────────────────────────────────────────────────
+    if (!matrixOk) {
+      const coords = points.map(p => `${p.lng},${p.lat}`).join(';');
+
+      for (const server of OSRM_SERVERS) {
+        try {
+          const url = `${server}/table/v1/driving/${coords}?annotations=distance,duration`;
+          const resp = await fetch(url, {
+            headers: { 'User-Agent': 'OrbitM7-Logistics/1.0' },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!resp.ok) throw new Error(`status ${resp.status}`);
+          const data = await resp.json() as any;
+          if (data.code !== 'Ok') throw new Error('OSRM code != Ok');
+
+          const distM: number[][] = data.distances;
+          const durS:  number[][] = data.durations;
+
+          const insValues: any[] = [];
+          for (const [i, j] of missingPairs) {
+            const dkm  = distM[i][j] / 1000;
+            const dmin = durS[i][j]  / 60;
+            distMatrix[i][j] = dkm;
+            durMatrix[i][j]  = dmin;
+            insValues.push(keys[i], keys[j], dkm, dmin);
+          }
+
+          if (insValues.length > 0) {
+            const ph = missingPairs.map((_, idx) => `($${idx * 4 + 1},$${idx * 4 + 2},$${idx * 4 + 3},$${idx * 4 + 4})`).join(',');
+            pool.query(
+              `INSERT INTO road_distance_cache (from_key, to_key, dist_km, dur_min) VALUES ${ph}
+               ON CONFLICT (from_key, to_key) DO UPDATE SET dist_km=EXCLUDED.dist_km, dur_min=EXCLUDED.dur_min, cached_at=NOW()`,
+              insValues
+            ).catch(() => {});
+          }
+
+          matrixOk = true;
+          break;
+        } catch (err: any) {
+          console.warn(`[M7-ROAD-MATRIX] OSRM ${server} falló: ${err.message}`);
+        }
+      }
+    }
+
+    if (!matrixOk) {
+      // Todos los proveedores fallaron — frontend usará Haversine como fallback
       return res.json({ matrix: null, fallback: true });
     }
   }
@@ -647,6 +743,34 @@ export const repiceRouteInvoice = async (req: Request, res: Response) => {
         );
 
         await client.query('COMMIT');
+
+        // Aprender del fallo: penalizar zona para este vehículo (fire-and-forget)
+        try {
+          const vRes = await pool.query(`SELECT vehicle_id FROM routes WHERE id::text = $1 LIMIT 1`, [routeId]);
+          const vId = vRes.rows[0]?.vehicle_id;
+          if (vId) {
+            const invInfo = await pool.query(`
+              SELECT COALESCE(di.city, '') AS city, COALESCE(di.neighborhood, '') AS neighborhood, COALESCE(di.address, '') AS address
+              FROM document_items di
+              WHERE TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = $1
+                 OR CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = $1
+              LIMIT 1
+            `, [invoiceId]);
+            if (invInfo.rows[0]?.city) {
+              const { city, neighborhood, address } = invInfo.rows[0];
+              pool.query(`UPDATE routing_patterns SET strength = GREATEST(0, strength - 0.5), last_used = NOW()
+                WHERE city = $1 AND vehicle_id = $2 AND neighborhood = $3`,
+                [city.toUpperCase().trim(), vId, neighborhood.toUpperCase().trim()]).catch(() => {});
+              if (address && address !== 'S/D') {
+                const addrKey = `${address.trim()}|${city.toUpperCase().trim()}`.toLowerCase();
+                pool.query(`UPDATE delivery_patterns SET strength = GREATEST(0, strength - 0.5), last_used = NOW()
+                  WHERE address_key = $1 AND vehicle_id = $2`,
+                  [addrKey, vId]).catch(() => {});
+              }
+            }
+          }
+        } catch { /* non-critical */ }
+
         res.json({ success: true });
     } catch (err: any) {
         await client.query('ROLLBACK');
@@ -734,5 +858,254 @@ export const reassignRouteVehicle = async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
+  }
+};
+
+// ─── POST /routes/learn-failure ──────────────────────────────────────────────
+// Penaliza patrones de ruteo cuando una entrega falla (repice, devolución, no encontrado).
+// Decrementa strength con piso en 0 para que el vehículo pierda preferencia por esa zona.
+export const learnFromFailure = async (req: Request, res: Response) => {
+  const { vehicleId, stops, penalty = 1 } = req.body as {
+    vehicleId: string;
+    stops: Array<{ city: string; neighborhood?: string; address?: string; clientId?: string }>;
+    penalty?: number;
+  };
+  if (!vehicleId || !Array.isArray(stops) || stops.length === 0) {
+    return res.status(400).json({ error: 'vehicleId y stops[] son requeridos' });
+  }
+  const p = Math.max(0.5, Math.min(3, Number(penalty) || 1)); // rango [0.5, 3]
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const stop of stops) {
+      const city = String(stop.city || '').toUpperCase().trim();
+      const neighborhood = String(stop.neighborhood || '').toUpperCase().trim();
+      if (!city) continue;
+
+      // Reducir fuerza territorial — piso en 0
+      await client.query(`
+        UPDATE routing_patterns
+        SET strength = GREATEST(0, strength - $3), last_used = NOW()
+        WHERE city = $1 AND vehicle_id = $2 AND neighborhood = $4
+      `, [city, vehicleId, p, neighborhood]);
+
+      // Reducir fuerza de dirección exacta — piso en 0
+      const address = String(stop.address || '').trim();
+      if (address && address !== 'S/D') {
+        const addrKey = `${address}|${city}`.toLowerCase();
+        await client.query(`
+          UPDATE delivery_patterns
+          SET strength = GREATEST(0, strength - $2), last_used = NOW()
+          WHERE address_key = $1 AND vehicle_id = $3
+        `, [addrKey, p, vehicleId]);
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ success: true, penalized: stops.length });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-LEARN-FAIL-ERR]', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+};
+
+// ─── POST /routes/fail-invoice ───────────────────────────────────────────────
+// Marca una factura como fallida en su ruta actual y la redistribuye
+// automáticamente a la ruta activa hoy con más capacidad disponible y
+// más cercana geográficamente. Si no hay ruta que la absorba, la deja
+// libre (EST-03) para que pueda entrar en una 2ª vuelta o turno siguiente.
+export const failAndReassignInvoice = async (req: Request, res: Response) => {
+  const { routeId, invoiceId, reason = 'NO_ENTREGADO', userId } = req.body as {
+    routeId: string;
+    invoiceId: string;
+    reason?: string;
+    userId?: string;
+  };
+  if (!routeId || !invoiceId) {
+    return res.status(400).json({ success: false, error: 'routeId e invoiceId son requeridos' });
+  }
+
+  // Distancia Haversine inline para evaluación de rutas candidatas
+  const haversine = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371, rad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Verificar que la factura pertenece a la ruta indicada
+    const check = await client.query(
+      `SELECT 1 FROM route_invoices WHERE route_id::text = $1::text AND invoice_id = $2`,
+      [routeId, invoiceId]
+    );
+    if (!check.rowCount) throw new Error('La factura no pertenece a esta ruta');
+
+    // 2. Obtener datos de la factura (lat, lng, volumen, ciudad, barrio, dirección)
+    const invData = await client.query(`
+      SELECT
+        CAST(NULLIF(TRIM(di.latitude::text), '') AS FLOAT)   AS lat,
+        CAST(NULLIF(TRIM(di.longitude::text), '')AS FLOAT)   AS lng,
+        COALESCE(NULLIF(TRIM(di.volume::text), ''), '0')     AS vol,
+        COALESCE(di.city, '')                                AS city,
+        COALESCE(di.neighborhood, '')                        AS neighborhood,
+        COALESCE(di.address, '')                             AS address
+      FROM document_items di
+      WHERE TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = $1
+         OR CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = $1
+      LIMIT 1
+    `, [invoiceId]);
+    const inv = invData.rows[0] || {};
+    const invLat = Number(inv.lat) || 0;
+    const invLng = Number(inv.lng) || 0;
+    const invVol = Number(inv.vol) || 0;
+
+    // 3. Quitar de la ruta actual
+    await client.query(
+      `DELETE FROM route_invoices WHERE route_id::text = $1::text AND invoice_id = $2`,
+      [routeId, invoiceId]
+    );
+
+    // 4. Buscar rutas activas hoy (excluir la actual y anuladas)
+    const candidates = await client.query(`
+      SELECT
+        r.id::text                                           AS route_id,
+        COALESCE(v.capacity_m3, 30)::float                  AS capacity_m3,
+        COALESCE(r.total_volume_m3, 0)::float               AS loaded_m3,
+        COALESCE(AVG(CAST(NULLIF(TRIM(di.latitude::text), '') AS FLOAT)), 0)  AS centroid_lat,
+        COALESCE(AVG(CAST(NULLIF(TRIM(di.longitude::text),'') AS FLOAT)), 0)  AS centroid_lng
+      FROM routes r
+      LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+      LEFT JOIN route_invoices ri ON ri.route_id::text = r.id::text
+      LEFT JOIN document_items di ON (
+        TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+      ) AND di.latitude IS NOT NULL AND TRIM(di.latitude::text) != ''
+      WHERE r.created_at >= CURRENT_DATE
+        AND r.id::text != $1::text
+        AND r.status_id NOT IN ('EST-16', 'anulada')
+      GROUP BY r.id, v.capacity_m3, r.total_volume_m3
+    `, [routeId]);
+
+    // 5. Elegir la ruta más cercana con capacidad disponible (≤90% tras agregar)
+    let bestRouteId: string | null = null;
+    let bestDist = Infinity;
+    for (const row of candidates.rows) {
+      const cap = Number(row.capacity_m3);
+      const loaded = Number(row.loaded_m3);
+      if (loaded + invVol > cap * 0.90) continue; // sin capacidad
+      if (Number(row.centroid_lat) === 0) continue; // sin coordenadas
+      const d = haversine(invLat || Number(row.centroid_lat), invLng || Number(row.centroid_lng),
+                           Number(row.centroid_lat), Number(row.centroid_lng));
+      if (d < bestDist) { bestDist = d; bestRouteId = row.route_id; }
+    }
+
+    // 6. Reasignar o liberar
+    if (bestRouteId) {
+      await client.query(
+        `INSERT INTO route_invoices (route_id, invoice_id, assigned_at)
+         VALUES ($1::uuid, $2, NOW())
+         ON CONFLICT (route_id, invoice_id) DO NOTHING`,
+        [bestRouteId, invoiceId]
+      );
+      // Actualizar volumen de la ruta receptora
+      await client.query(
+        `UPDATE routes SET total_volume_m3 = COALESCE(total_volume_m3, 0) + $2
+         WHERE id::text = $1`,
+        [bestRouteId, invVol]
+      );
+    } else {
+      // Sin ruta disponible → liberar para despacho posterior (EST-03)
+      await client.query(`
+        UPDATE document_items SET item_status = 'EST-03'
+        WHERE TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $1
+           OR CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $1
+      `, [invoiceId]);
+    }
+
+    // 7. Log del movimiento
+    const plateRes = await client.query(
+      `SELECT v.plate FROM routes r LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text WHERE r.id::text = $1 LIMIT 1`,
+      [routeId]
+    );
+    await client.query(`
+      INSERT INTO route_modifications_log (route_id, invoice_id, action, user_id, previous_plate, details)
+      VALUES ($1, $2, 'FAIL_INVOICE', $3, $4, $5)
+    `, [routeId, invoiceId, userId || null, plateRes.rows[0]?.plate || null,
+        JSON.stringify({ reason, reassignedTo: bestRouteId, distKm: bestDist < Infinity ? Math.round(bestDist * 10) / 10 : null, timestamp: new Date().toISOString() })
+    ]);
+
+    // 8. Actualizar volumen de la ruta original
+    await client.query(`
+      UPDATE routes SET total_volume_m3 = GREATEST(0, COALESCE(total_volume_m3, 0) - $2)
+      WHERE id::text = $1
+    `, [routeId, invVol]);
+
+    await client.query('COMMIT');
+
+    // 9. Aprender del fallo (fire-and-forget) — penalizar zona para este vehículo
+    if (inv.city) {
+      const vehicleRes = await pool.query(
+        `SELECT vehicle_id FROM routes WHERE id::text = $1 LIMIT 1`, [routeId]
+      );
+      const vehicleId = vehicleRes.rows[0]?.vehicle_id;
+      if (vehicleId) {
+        pool.query(`
+          UPDATE routing_patterns
+          SET strength = GREATEST(0, strength - 1), last_used = NOW()
+          WHERE city = $1 AND vehicle_id = $2 AND neighborhood = $3
+        `, [String(inv.city).toUpperCase().trim(), vehicleId, String(inv.neighborhood).toUpperCase().trim()])
+        .catch(() => {});
+        if (inv.address && inv.address !== 'S/D') {
+          const addrKey = `${String(inv.address).trim()}|${String(inv.city).toUpperCase().trim()}`.toLowerCase();
+          pool.query(`
+            UPDATE delivery_patterns
+            SET strength = GREATEST(0, strength - 1), last_used = NOW()
+            WHERE address_key = $1 AND vehicle_id = $2
+          `, [addrKey, vehicleId]).catch(() => {});
+        }
+      }
+    }
+
+    res.json({ success: true, reassignedTo: bestRouteId, distKm: bestDist < Infinity ? Math.round(bestDist * 10) / 10 : null });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-FAIL-INVOICE-ERR]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+};
+
+export const getDailyKPIs = async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(DISTINCT r.id)::int                                        AS routes_today,
+        COALESCE(SUM(r.total_volume_m3), 0)::numeric                    AS total_volume_m3,
+        COALESCE(AVG(NULLIF(r.utilization_pct, 0)), 0)::numeric         AS avg_utilization,
+        COUNT(DISTINCT ri.invoice_id)::int                               AS invoices_assigned,
+        COUNT(DISTINCT CASE WHEN di.item_status = 'EST-12' THEN ri.invoice_id END)::int  AS invoices_delivered,
+        COUNT(DISTINCT CASE WHEN di.item_status = 'EST-13' THEN ri.invoice_id END)::int  AS invoices_returned,
+        COUNT(DISTINCT CASE WHEN di.item_status = 'EST-15' THEN ri.invoice_id END)::int  AS invoices_repice,
+        COUNT(DISTINCT CASE WHEN r.shift = 2 THEN r.id END)::int        AS shift2_routes,
+        COUNT(DISTINCT r.vehicle_id)::int                                AS vehicles_active
+      FROM routes r
+      LEFT JOIN route_invoices ri ON ri.route_id::text = r.id::text
+      LEFT JOIN document_items di ON (
+        TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+        OR CONCAT(di.document_id::text, '_', COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
+      )
+      WHERE r.created_at >= CURRENT_DATE
+        AND r.status_id NOT IN ('EST-16')
+    `);
+    res.json(result.rows[0] || {});
+  } catch (err: any) {
+    console.error('[M7-KPI-ERR]', err.message);
+    res.status(500).json({ error: 'Error al obtener KPIs' });
   }
 };

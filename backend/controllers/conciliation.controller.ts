@@ -62,6 +62,21 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
             )
         `);
 
+        // [M7-SELF-HEALING] Tabla para Historial de Cambios en Método de Pago
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS document_payment_history (
+                id SERIAL PRIMARY KEY,
+                document_id TEXT,
+                invoice TEXT,
+                old_method TEXT,
+                new_method TEXT,
+                user_id TEXT,
+                user_name TEXT,
+                observations TEXT,
+                changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         // Garantizar columnas opcionales en route_surcharges
         await pool.query(`
             DO $$
@@ -797,6 +812,63 @@ export const getConciliationHistory = async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error('[CONCILIATION] getConciliationHistory error:', err.message);
         res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── POST /conciliation/update-payment-method ────────────────────────────────
+// Actualiza el método de pago en document_l_payments y registra en el historial.
+export const updatePaymentMethod = async (req: Request, res: Response) => {
+    const { documentId, invoice, newMethod, userId, userName, observations } = req.body;
+
+    if (!documentId || !invoice || !newMethod || !userId || !observations) {
+        return res.status(400).json({ success: false, error: 'Faltan campos obligatorios' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Obtener método actual
+        const currentRes = await client.query(
+            `SELECT metodo_pago FROM document_l_payments WHERE document_id = $1 AND invoice = $2 LIMIT 1`,
+            [documentId, invoice]
+        );
+        const oldMethod = currentRes.rows[0]?.metodo_pago || 'DESCONOCIDO';
+
+        // 2. Actualizar método de pago
+        // Si no existe el registro en document_l_payments, lo creamos
+        const updRes = await client.query(`
+            INSERT INTO document_l_payments (document_id, invoice, metodo_pago, user_id)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (id) DO UPDATE SET metodo_pago = EXCLUDED.metodo_pago
+            -- Nota: document_l_payments no tiene UNIQUE(document_id, invoice) por defecto en todos los entornos
+            -- Así que usamos una subconsulta si no hay conflicto por ID
+        `, [documentId, invoice, newMethod, userId]);
+
+        // Si no se insertó/actualizó por ID, intentamos por invoice
+        if (updRes.rowCount === 0) {
+            await client.query(`
+                UPDATE document_l_payments 
+                SET metodo_pago = $1 
+                WHERE document_id = $2 AND invoice = $3
+            `, [newMethod, documentId, invoice]);
+        }
+
+        // 3. Registrar en historial
+        await client.query(`
+            INSERT INTO document_payment_history 
+                (document_id, invoice, old_method, new_method, user_id, user_name, observations)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [documentId, invoice, oldMethod, newMethod, userId, userName || userId, observations]);
+
+        await client.query('COMMIT');
+        res.json({ success: true, oldMethod, newMethod });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[CONCILIATION] updatePaymentMethod error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
     }
 };
 

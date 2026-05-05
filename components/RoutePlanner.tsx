@@ -16,6 +16,7 @@ import {
   haversineKm,
   hasDefaultCoords,
   twoOptImprove,
+  threeOptImprove,
   orOpt1Intra,
   orOptInterRoute,
   ilsImprove,
@@ -197,8 +198,12 @@ const clusterByProximity = (invoices: Invoice[], thresholdKm = 8): Invoice[][] =
     if (assigned.has(inv.id)) continue;
     const cluster = [inv];
     assigned.add(inv.id);
+    const invCorridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
     for (const other of invoices) {
       if (assigned.has(other.id)) continue;
+      // Nunca mezclar macro-regiones incompatibles aunque estén cerca por coords
+      const otherCorridor: ViaCorridor = (other as any).corridor || 'MED_CENTRO';
+      if (!corridorsCompatible(invCorridor, otherCorridor)) continue;
       const d = haversineKm(
         Number(inv.lat || 0), Number(inv.lng || 0),
         Number(other.lat || 0), Number(other.lng || 0)
@@ -250,6 +255,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   // IDs de facturas ya confirmadas en esta sesión — evita que reboten al limpiar suggestedRoutes
   const [confirmedSessionIds, setConfirmedSessionIds] = useState<Set<string>>(new Set());
+  const [currentShift, setCurrentShift] = useState<1 | 2>(1);
+  const [shift1CompletedVehicleIds, setShift1CompletedVehicleIds] = useState<Set<string>>(new Set());
 
   const setInvoices = useAppStore(state => state.setInvoices);
   const setRoutes  = useAppStore(state => state.setRoutes);
@@ -257,6 +264,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   // Al montar: sincronizar rutas activas para que el contador SIN RUTA sea exacto desde el inicio
   useEffect(() => {
     api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
+    api.getDailyKPIs().then((d: any) => { if (d && typeof d === 'object') setDailyKPIs(d); }).catch(() => {});
   }, []);
 
   // Recargar facturas automáticamente cuando el usuario cambia de cliente
@@ -269,6 +277,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       .catch(() => { });
   }, [selectedClient]);
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
+  const [geocodedCount, setGeocodedCount] = useState(0);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizingProgress, setOptimizingProgress] = useState(0);
   const [optimizingPhase, setOptimizingPhase] = useState('');
@@ -277,6 +286,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [auditLogs, setAuditLogs] = useState<RouteLog[]>([]);
   const [learningPatterns, setLearningPatterns] = useState<RoutingPattern[]>([]);
   const [deliveryPatterns, setDeliveryPatterns] = useState<Array<{ address_key: string; vehicle_id: string; plate: string; strength: number }>>([]);
+  const [deliverySchedules, setDeliverySchedules] = useState<Array<{ customer_key: string; day_of_week: number; close_time: string }>>([]);
   const [learningExemptions, setLearningExemptions] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [auditModal, setAuditModal] = useState<{ isOpen: boolean; action: any; data: any } | null>(null);
@@ -286,6 +296,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<Invoice | null>(null);
   const [manualRouteModal, setManualRouteModal] = useState(false);
   const [manualVehicleSearch, setManualVehicleSearch] = useState('');
+  const [scheduleModal, setScheduleModal] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({ customerName: '', city: '', dayOfWeek: new Date().getDay(), closeTime: '10:00', label: '' });
+  const [scheduleSaving, setScheduleSaving] = useState(false);
   const [lastReadjustmentResult, setLastReadjustmentResult] = useState<{ docs: number, facts: number, unrouted: number, docIds: string[] } | null>(null);
   const [dispatchConfirmation, setDispatchConfirmation] = useState<{ isOpen: boolean, route: SuggestedRoute | null, isMass: boolean }>({ isOpen: false, route: null, isMass: false });
   const [modalSearchTerm, setModalSearchTerm] = useState('');
@@ -304,6 +317,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [routeMapModal, setRouteMapModal] = useState<{ isOpen: boolean; route: SuggestedRoute | null }>({ isOpen: false, route: null });
   const [routeMapStats, setRouteMapStats] = useState<{ km: number; minutes: number } | null>(null);
   const routePreviewMapRef = useRef<L.Map | null>(null);
+  const [dailyKPIs, setDailyKPIs] = useState<{
+    routes_today: number; total_volume_m3: number; avg_utilization: number;
+    invoices_assigned: number; invoices_delivered: number; invoices_returned: number;
+    invoices_repice: number; shift2_routes: number; vehicles_active: number;
+  } | null>(null);
   const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addInvoiceInputRef = useRef<HTMLInputElement>(null);
   const [isPendingInvoicesModalOpen, setIsPendingInvoicesModalOpen] = useState(false);
@@ -576,7 +594,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       );
 
       // Regla estricta: Si el vehículo tiene estado ocupado en la BD, no se usa
-      if (['EST-10', 'EST-11', 'OCUPADO'].includes(vStatusId) || isBusy) return null;
+      // En shift 2, vehículos que completaron shift 1 son re-disponibles
+      const isShift2Override = currentShift === 2 && shift1CompletedVehicleIds.has(String(v.id));
+      if (!isShift2Override && (['EST-10', 'EST-11', 'OCUPADO'].includes(vStatusId) || isBusy)) return null;
 
       return {
         ...v,
@@ -588,7 +608,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }).filter(item => item !== null) as (Vehicle & { driverName: string, driverId: string, assignmentId: string })[];
 
     return fleet;
-  }, [assignments, vehicles, drivers, selectedClient, activeRoutes]);
+  }, [assignments, vehicles, drivers, selectedClient, activeRoutes, currentShift, shift1CompletedVehicleIds]);
 
   const remainingVehicles = useMemo(() => {
     const usedIds = new Set(suggestedRoutes.map(r => r.vehicle.id));
@@ -612,6 +632,19 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     return map;
   }, [suggestedRoutes]);
 
+  const routePlanKPIs = useMemo(() => {
+    if (suggestedRoutes.length === 0) return null;
+    const totalKm = Array.from(routeDistancesKm.values()).reduce((a, b) => a + b, 0);
+    const totalMin = suggestedRoutes.reduce((acc, r) => acc + estimateRouteTotalMinutes(r.assignedInvoices, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng), 0);
+    const totalInvoices = suggestedRoutes.reduce((acc, r) => acc + r.assignedInvoices.length, 0);
+    const avgUtil = suggestedRoutes.length > 0
+      ? Math.round(suggestedRoutes.reduce((acc, r) => acc + (r.utilization || 0), 0) / suggestedRoutes.length)
+      : 0;
+    const h = Math.floor(totalMin / 60);
+    const m = Math.round(totalMin % 60);
+    return { totalKm, totalMin, totalInvoices, avgUtil, routes: suggestedRoutes.length, timeLabel: h > 0 ? `${h}h ${m}m` : `${m}m` };
+  }, [suggestedRoutes, routeDistancesKm]);
+
   const preflightWarning = useMemo(() => {
     if (validInvoices.length === 0 || availableVehicles.length === 0) return null;
     const totalDemand = validInvoices.reduce((acc, inv) => acc + (Number(inv.volumeM3) || 0), 0);
@@ -632,7 +665,14 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     api.getDeliveryPatterns().then((data: any) => {
       if (Array.isArray(data)) setDeliveryPatterns(data);
     }).catch(err => { if (import.meta.env.DEV) console.error('[M7-DELIVERY-PATTERNS]', err); });
-  }, [onRefresh]);
+
+    // Horarios de entrega por día de semana — se cargan una vez y se aplican durante optimización
+    if (selectedClient) {
+      api.getDeliverySchedules(selectedClient).then((data: any) => {
+        if (Array.isArray(data)) setDeliverySchedules(data);
+      }).catch(() => {});
+    }
+  }, [onRefresh, selectedClient]);
 
 
 
@@ -732,16 +772,43 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     if (needsGeocode.length === 0) return invoices;
 
     const geocoded = new Map<string, { lat: number; lng: number }>();
+
     for (const inv of needsGeocode) {
-      if (!inv.address || !inv.city) continue;
+      const address   = String(inv.address || '').trim();
+      const city      = String(inv.city || '').trim();
+      const notes     = String(inv.notes || '').trim();
+      const barrio    = String((inv as any).neighborhood || '').trim();
+
+      // Extraer dirección de las notas cuando el campo address está vacío
+      // p.ej. "Entregar en CL 80 #50-23 Laureles" → "CL 80 #50-23 Laureles"
+      const notesAddr = !address
+        ? (notes.match(/(?:CL|CR|CRA|CARRERA|CALLE|AV|AVENIDA|DG|DIAGONAL|TR|TRANSVERSAL)\s*[\d#.\-\/\w\s,]+/i)?.[0]?.trim() ?? '')
+        : '';
+
+      // Construir queries en orden de precisión decreciente
+      const bestAddress = address || notesAddr;
+      const queries: [string, string][] = []; // [address, city] para la API
+
+      if (bestAddress && city)  queries.push([bestAddress, city]);
+      if (bestAddress && !city) queries.push([bestAddress, '']);
+      if (!bestAddress && barrio && city) queries.push([barrio, city]);
+      if (!bestAddress && barrio && !city) queries.push([barrio, '']);
+      if (!bestAddress && !barrio && city) queries.push([city, '']);
+
+      if (queries.length === 0) continue;
+
       try {
-        const geo = await api.geocodeAddress({ address: inv.address, city: inv.city });
-        if (geo?.lat && geo?.lng && !geo.fallback) {
-          geocoded.set(inv.id, { lat: geo.lat, lng: geo.lng });
+        for (const [qAddr, qCity] of queries) {
+          const geo = await api.geocodeAddress({ address: qAddr, city: qCity });
+          if (geo?.lat && geo?.lng && !geo.fallback) {
+            geocoded.set(inv.id, { lat: geo.lat, lng: geo.lng });
+            break;
+          }
         }
       } catch { /* ignorar errores individuales */ }
     }
 
+    setGeocodedCount(geocoded.size);
     if (geocoded.size === 0) return invoices;
 
     return invoices.map(inv => {
@@ -755,6 +822,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     setIsOptimizing(true);
     setOptimizingProgress(0); setOptimizingPhase('Preparando facturas...');
     setSuggestedRoutes([]);
+    setGeocodedCount(0);
     if (!specificInvoices) setLastReadjustmentResult(null);
     setReadjustmentModal({ isOpen: false, selectedDocIds: new Set() });
 
@@ -843,6 +911,25 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           : null;
         // @ts-ignore
         inv.isPriority = priorityKeywords.some(kw => notes.includes(kw)) || !!timeMatch;
+
+        // ── Horarios estructurados por día de semana ────────────────────────────
+        // Si la factura no tiene ventana de notas, buscar en delivery_schedules
+        // usando customer_key = customer_name|city (normalizado lowercase).
+        if (!(inv as any).timeWindowMinutes && deliverySchedules.length > 0) {
+          const dow = new Date().getDay(); // 0=Dom..6=Sáb
+          const custName = String((inv as any).customer_name || (inv as any).customerName || '').toLowerCase().trim();
+          const custCity = String(inv.city || '').toLowerCase().trim();
+          const custKey = `${custName}|${custCity}`;
+          const sched = deliverySchedules.find(s => s.customer_key === custKey && s.day_of_week === dow);
+          if (sched) {
+            const [hh, mm] = sched.close_time.split(':').map(Number);
+            // @ts-ignore
+            inv.timeWindowMinutes = hh * 60 + mm;
+            // @ts-ignore
+            inv.isPriority = true; // cliente con horario definido = entrega prioritaria
+          }
+        }
+
         // Normalizar ciudad: convierte códigos DANE, abreviaciones y variantes al nombre canónico
         const normalizedCity = normalizeCityName(String(inv.city || 'SIN_CIUDAD'));
         if (normalizedCity !== (inv.city || '').trim().toUpperCase()) {
@@ -867,33 +954,43 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const cUpper = (inv as any).cityKey || '';
 
         // Enriquecimiento de barrio desde dirección cuando no hay datos.
-        // Solo aplica si el hub de despacho está en el área de Medellín — para
-        // que el sistema funcione sin modificación en cualquier otra ciudad.
+        // Aplica para Medellín y cualquier ciudad con centroide de barrio registrado.
         const hubIsMedellin = Math.abs(ORBIT_HUB_ORIGIN.lat - 6.24) < 0.18
           && Math.abs(ORBIT_HUB_ORIGIN.lng - (-75.58)) < 0.12;
-        if (hubIsMedellin && cUpper.includes('MEDELL')) {
-          const nKey = (inv as any).neighborhoodKey;
-          if (nKey === 'SIN_BARRIO' || !nKey) {
-            const foundOcc = BARRIOS_OCCIDENTE.find(b => rawAddr.includes(b));
-            const foundOri = BARRIOS_ORIENTE.find(b => rawAddr.includes(b));
-            if (foundOcc) (inv as any).neighborhoodKey = foundOcc;
-            else if (foundOri) (inv as any).neighborhoodKey = foundOri;
+
+        // 1. Intentar extraer barrio del campo address si neighborhoodKey está vacío.
+        //    Muchas facturas traen "CL 80 #50-23, Laureles" o "CR 48 #100, El Poblado".
+        if ((inv as any).neighborhoodKey === 'SIN_BARRIO' || !(inv as any).neighborhoodKey) {
+          // Buscar después de la última coma en la dirección
+          const afterComma = rawAddr.includes(',')
+            ? rawAddr.split(',').pop()!.trim()
+            : '';
+          // Escanear tokens de la dirección contra lista de barrios conocidos
+          const allTokens = (rawAddr + ' ' + afterComma).toUpperCase();
+          const foundOcc = BARRIOS_OCCIDENTE.find(b => allTokens.includes(b));
+          const foundOri = BARRIOS_ORIENTE.find(b => allTokens.includes(b));
+          if (foundOcc) (inv as any).neighborhoodKey = foundOcc;
+          else if (foundOri) (inv as any).neighborhoodKey = foundOri;
+          else if (afterComma.length > 2) (inv as any).neighborhoodKey = afterComma;
+        }
+
+        // 2. Sin coords reales → asignar centroide de barrio si existe
+        if ((inv as any).hasDefaultCoords || (lat === 0 && lng === 0)) {
+          const nk = (inv as any).neighborhoodKey || '';
+          const centroid = getBarrioCentroid(nk);
+          if (centroid) {
+            (inv as any).lat = centroid.lat;
+            (inv as any).lng = centroid.lng;
+            (inv as any).hasDefaultCoords = false;
+          } else if (hubIsMedellin && cUpper.includes('MEDELL')) {
+            // Fallback Medellín: inferir lado por keywords de dirección
+            const side = inferMedellínSide(rawAddr + ' ' + nk);
+            if (side === 'OCCIDENTE') { (inv as any).lat = 6.248; (inv as any).lng = -75.598; }
+            else if (side === 'ORIENTE') { (inv as any).lat = 6.252; (inv as any).lng = -75.558; }
+            (inv as any).zoneInferred = true;
           }
-          // Sin coords: asignar centroide de barrio si existe
-          if ((inv as any).hasDefaultCoords || (lat === 0 && lng === 0)) {
-            const nk = (inv as any).neighborhoodKey || '';
-            const centroid = getBarrioCentroid(nk);
-            if (centroid) {
-              (inv as any).lat = centroid.lat;
-              (inv as any).lng = centroid.lng;
-              (inv as any).hasDefaultCoords = false;
-            } else {
-              const side = inferMedellínSide(rawAddr + ' ' + nk);
-              if (side === 'OCCIDENTE') { (inv as any).lat = 6.248; (inv as any).lng = -75.598; }
-              else if (side === 'ORIENTE') { (inv as any).lat = 6.252; (inv as any).lng = -75.558; }
-              (inv as any).zoneInferred = true;
-            }
-          }
+          // Para otras ciudades: classifyCorridor usará el nombre de ciudad
+          // y el corredor correcto se asignará aunque no haya coords exactas.
         }
 
         // Asignar corredor usando lat/lng definitivos
@@ -957,17 +1054,16 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       //    cercanas hasta agotar capacidad. Overflow → siguiente vehículo.
       // ──────────────────────────────────────────────────────────────────────
 
-      const CELL_SIZE = 0.022; // ~2.4km por celda
-      // Radio máximo del cluster: corredores lineales norte/sur usan 10 km porque
-      // sus municipios se extienden ~15 km a lo largo de la autopista.
-      // Corredores compactos (MED_*) y macro-regiones usan 7 km.
+      const CELL_SIZE = 0.014; // ~1.5km por celda (reducido de 0.022 para mayor precisión geográfica)
+      // Radio máximo del cluster por corredor. Se redujo ligeramente para evitar
+      // que un camión del norte absorba facturas del sur de la zona.
       const SPREAD_KM_BY_CORRIDOR: Partial<Record<ViaCorridor, number>> = {
-        NORTE: 10, NORTE_LEJANO: 14,
-        SUR: 10, SUR_LEJANO: 14,
-        ORIENTE_ANT: 20, OCCIDENTE_ANT: 20,
+        NORTE: 9, NORTE_LEJANO: 13,
+        SUR: 9, SUR_LEJANO: 13,
+        ORIENTE_ANT: 18, OCCIDENTE_ANT: 18,
       };
-      const getMaxSpread = (corridor: ViaCorridor) => SPREAD_KM_BY_CORRIDOR[corridor] ?? 7;
-      const MIN_ANCHOR_SEPARATION_KM = 5; // anclas de distintos vehículos deben estar al menos 5km aparte
+      const getMaxSpread = (corridor: ViaCorridor) => SPREAD_KM_BY_CORRIDOR[corridor] ?? 6;
+      const MIN_ANCHOR_SEPARATION_KM = 8; // anclas más separadas para menos solapamiento entre rutas
 
       interface GeoCell {
         key: string;
@@ -1026,6 +1122,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         .filter(v => !usedVehicleIds.has(v.id))
         .sort((a, b) => (Number(b.capacityM3) || 0) - (Number(a.capacityM3) || 0));
 
+      // ── Análisis de volumen por corredor — corredores con pocas facturas se marcan
+      // como "esparsos" y sus facturas se etiquetan como flexibles para que en el
+      // sweep final puedan ser absorbidas por la ruta más cercana sin restricción
+      // de corredor (solo distancia ≤ MAX_SPARSE_ABSORB_KM).
+      const MIN_CORRIDOR_INVOICES = 4; // menos de 4 facturas = corredor esparso
+      const MAX_SPARSE_ABSORB_KM  = 12; // radio máximo para absorber factura esparsa
+      const corridorInvoiceCount = new Map<string, number>();
+      availableInvoices.forEach(inv => {
+        const c: string = (inv as any).corridor || 'MED_CENTRO';
+        corridorInvoiceCount.set(c, (corridorInvoiceCount.get(c) || 0) + 1);
+      });
+      availableInvoices.forEach(inv => {
+        const c: string = (inv as any).corridor || 'MED_CENTRO';
+        (inv as any).sparseCorridor = (corridorInvoiceCount.get(c) || 0) < MIN_CORRIDOR_INVOICES;
+      });
+
       // Registra las coordenadas del ancla de cada vehículo para evitar solapamiento
       const usedAnchors: { lat: number; lng: number }[] = [];
 
@@ -1046,7 +1158,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const addrToVehicle = new Map<string, string>();
         const addrStrength = new Map<string, number>();
         for (const dp of deliveryPatterns) {
-          if ((dp.strength || 0) < 3) continue; // solo patrones consolidados
+          if ((dp.strength || 0) < 1.5) continue; // patrones desde 2da visita
           const existing = addrStrength.get(dp.address_key) || 0;
           if ((dp.strength || 0) > existing) {
             addrToVehicle.set(dp.address_key, dp.vehicle_id);
@@ -1171,6 +1283,32 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         }
       }
       // ──────────────────────────────────────────────────────────────────────
+
+      // ── OSRM pre-fetch: distancias reales para centroides de celdas ──────────
+      // Antes de construir rutas, pedimos una matriz NxN de centroides vía OSRM.
+      // Así el nearest-neighbor greedy elige celdas por km reales de carretera,
+      // no por distancia en línea recta. Fallback silencioso a Haversine.
+      setOptimizingProgress(38); setOptimizingPhase('Pre-cargando distancias reales (OSRM)...');
+      let cellRoadDistFn: (lat1: number, lng1: number, lat2: number, lng2: number) => number = getDistance;
+      {
+        const validCentroids = remainingCells
+          .filter(c => c.centerLat > 0 && c.centerLng > 0)
+          .map(c => ({ lat: c.centerLat, lng: c.centerLng }));
+        // Hub como punto 0; backend limita a 30 coords en total
+        const matrixPoints = [
+          { lat: ORBIT_HUB_ORIGIN.lat, lng: ORBIT_HUB_ORIGIN.lng },
+          ...validCentroids.slice(0, 29),
+        ];
+        if (matrixPoints.length >= 2) {
+          try {
+            const mr = await api.getRoadMatrix(matrixPoints);
+            if (mr?.distMatrix) {
+              cellRoadDistFn = buildRoadDistFn(matrixPoints, mr.distMatrix);
+            }
+          } catch { /* sin OSRM — usa Haversine */ }
+        }
+      }
+
       setOptimizingProgress(40); setOptimizingPhase('Ejecutando algoritmo cluster-first...');
 
       prioritizedFleet.forEach(vehicle => {
@@ -1193,7 +1331,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const isFarEnoughFromUsedAnchors = (c: GeoCell): boolean => {
           if (c.centerLat === 0 || usedAnchors.length === 0) return true;
           return usedAnchors.every(a =>
-            a.lat === 0 || getDistance(c.centerLat, c.centerLng, a.lat, a.lng) >= MIN_ANCHOR_SEPARATION_KM
+            a.lat === 0 || cellRoadDistFn(c.centerLat, c.centerLng, a.lat, a.lng) >= MIN_ANCHOR_SEPARATION_KM
           );
         };
 
@@ -1208,8 +1346,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const farthestFallback = candidateAnchors.length > 0
           ? candidateAnchors.reduce((best, c) => {
               if (usedAnchors.length === 0 || c.centerLat === 0) return best;
-              const dMin = Math.min(...usedAnchors.map(a => a.lat === 0 ? 999 : getDistance(c.centerLat, c.centerLng, a.lat, a.lng)));
-              const bestDMin = Math.min(...usedAnchors.map(a => a.lat === 0 ? 999 : getDistance(best.centerLat, best.centerLng, a.lat, a.lng)));
+              const dMin = Math.min(...usedAnchors.map(a => a.lat === 0 ? 999 : cellRoadDistFn(c.centerLat, c.centerLng, a.lat, a.lng)));
+              const bestDMin = Math.min(...usedAnchors.map(a => a.lat === 0 ? 999 : cellRoadDistFn(best.centerLat, best.centerLng, a.lat, a.lng)));
               return dMin > bestDMin ? c : best;
             }, candidateAnchors[0])
           : null;
@@ -1225,10 +1363,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // Radio dinámico según corredor: autopistas lineales tienen spread más amplio
         const maxSpreadKm = getMaxSpread(anchorCorridor);
 
-        // Fuerza máxima de este vehículo → escala el bonus de distancia (hasta 10 km)
+        // Fuerza máxima de este vehículo → escala el bonus de distancia (hasta 22 km)
+        // Aumentado de 10 a 22 para que el aprendizaje histórico tenga peso real
+        // y no sea solo un desempate frente a la distancia pura.
         const vTMap = vehicleTerritoryStrength.get(vehicle.id);
         const vehicleMaxStrength = vTMap ? Math.max(0, ...vTMap.values()) : 0;
-        const MAX_OWNED_BONUS_KM = 10;
+        const MAX_OWNED_BONUS_KM = 22;
         const ownedBonus = (vehicleMaxStrength / maxSystemStrength) * MAX_OWNED_BONUS_KM;
         // Umbral para radio expandido: conductor con experiencia sólida (+5 ef. strength)
         const STRONG_TERRITORY_THRESHOLD = 5;
@@ -1237,14 +1377,23 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const candidateCells = remainingCells.filter(c => {
           if (c.invoices.length === 0) return false;
           const cellCorridor = c.zone as ViaCorridor;
-          if (!corridorsCompatible(anchorCorridor, cellCorridor)) return false;
+
+          // Celdas de corredor esparso (<4 facts) se incluyen si están dentro del
+          // radio geográfico del ancla, aunque el corredor sea diferente.
+          const allSparse = c.invoices.every(i => (i as any).sparseCorridor);
+          const corridorOk = corridorsCompatible(anchorCorridor, cellCorridor);
+
+          if (!corridorOk && !allSparse) return false;
+
           const hasOwnedInvoice = c.invoices.some(i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || ''));
           if (anchorCell.centerLat > 0 && c.centerLat > 0) {
-            const distToAnchor = getDistance(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng);
-            if (distToAnchor > maxSpreadKm) {
-              // Conductor con fuerte experiencia puede extenderse hasta 1.5× el radio
+            const distToAnchor = cellRoadDistFn(anchorCell.centerLat, anchorCell.centerLng, c.centerLat, c.centerLng);
+            const effectiveMax = allSparse && !corridorOk
+              ? MAX_SPARSE_ABSORB_KM  // radio para celdas esparsas fuera del corredor
+              : maxSpreadKm;
+            if (distToAnchor > effectiveMax) {
               if (hasOwnedInvoice && canExpandRadius && distToAnchor <= maxSpreadKm * 1.5) return true;
-              return hasOwnedInvoice; // sin experiencia fuerte: solo territorio propio dentro del radio
+              return hasOwnedInvoice;
             }
           }
           return true;
@@ -1275,7 +1424,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || '')
             );
             const dist = (clusterCenterLat > 0 && c.centerLat > 0)
-              ? getDistance(clusterCenterLat, clusterCenterLng, c.centerLat, c.centerLng)
+              ? cellRoadDistFn(clusterCenterLat, clusterCenterLng, c.centerLat, c.centerLng)
               : (isOwned ? 0 : 30);
             const score = isOwned ? Math.max(0, dist - ownedBonus) : dist;
             if (score < nearestScore) { nearestScore = score; nearestIdx = ci; }
@@ -1292,7 +1441,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
           // Chequeo de cohesión: la celda no debe alejar el centroide más allá del radio
           if (clusterCenterLat > 0 && cell.centerLat > 0) {
-            const distToCluster = getDistance(clusterCenterLat, clusterCenterLng, cell.centerLat, cell.centerLng);
+            const distToCluster = cellRoadDistFn(clusterCenterLat, clusterCenterLng, cell.centerLat, cell.centerLng);
             if (distToCluster > maxSpreadKm) continue;
           }
 
@@ -1352,12 +1501,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         const usedIds = new Set(load.map(i => i.id));
         availableInvoices = availableInvoices.filter(i => !usedIds.has(i.id));
 
-        // Optimización 2-opt + Or-opt(1) intra post-cluster
+        // Optimización 2-opt → Or-opt(1) → 3-opt intra post-cluster
         if (load.length >= 4) {
           const opt2 = twoOptImprove(load, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
           const opt3 = orOpt1Intra(opt2, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
+          const opt4 = threeOptImprove(opt3, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
           load.length = 0;
-          load.push(...opt3);
+          load.push(...opt4);
         }
 
         if (load.length > 0) {
@@ -1485,34 +1635,47 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
       // ── Sweep final: absorber facturas sobrantes en rutas existentes ─────────
       setOptimizingProgress(72); setOptimizingPhase('Absorbiendo facturas sobrantes...');
-      // Para cada factura que quedó sin ruta, busca el candidato más cercano que
-      // sea del mismo corredor, tenga capacidad y no supere 8h.
+      // PASO 1: corredor compatible (regla estricta).
+      // PASO 2 (fallback): si la factura es de un corredor esparso (<4 facts) o
+      //   quedó sin ruta, buscar la ruta más cercana por distancia pura
+      //   (≤ MAX_SPARSE_ABSORB_KM) sin importar el corredor.
+      //   Esto garantiza que ninguna factura quede sin ruta por falta de volumen
+      //   en su zona, sin generar rutas mezcladas innecesariamente.
       if (availableInvoices.length > 0 && suggestions.length > 0) {
         const swept = new Set<string>();
-        for (const inv of availableInvoices) {
+
+        const trySweepInvoice = (inv: Invoice, relaxCorridor: boolean) => {
           const invCorridor: ViaCorridor = (inv as any).corridor || 'MED_CENTRO';
           const invVol = Number(inv.volumeM3) || 0;
           const invLat = Number((inv as any).lat || 0);
           const invLng = Number((inv as any).lng || 0);
           let bestIdx = -1;
           let bestDist = Infinity;
+
           for (let ri = 0; ri < suggestions.length; ri++) {
             const r = suggestions[ri];
             if (r.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) continue;
             const cap = Number(r.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
             if (r.totalVolume + invVol > cap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) continue;
             const rCorridor: ViaCorridor = (r.assignedInvoices[0] as any)?.corridor || 'MED_CENTRO';
-            if (!corridorsCompatible(invCorridor, rCorridor)) continue;
-            const withInv = [...r.assignedInvoices, inv];
-            if (estimateRouteTotalMinutes(withInv, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) >= MAX_ROUTE_MINUTES) continue;
+
+            if (!relaxCorridor && !corridorsCompatible(invCorridor, rCorridor)) continue;
+
             const lastInv = r.assignedInvoices[r.assignedInvoices.length - 1];
             const rLat = Number((lastInv as any)?.lat || 0);
             const rLng = Number((lastInv as any)?.lng || 0);
             const dist = (invLat > 0 && rLat > 0)
               ? haversineKm(invLat, invLng, rLat, rLng)
-              : (invCorridor === rCorridor ? 5 : 15);
+              : (invCorridor === rCorridor ? 5 : 20);
+
+            // En modo relaxado: solo aceptar si está dentro del radio máximo
+            if (relaxCorridor && dist > MAX_SPARSE_ABSORB_KM) continue;
+
+            const withInv = [...r.assignedInvoices, inv];
+            if (estimateRouteTotalMinutes(withInv, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) >= MAX_ROUTE_MINUTES) continue;
             if (dist < bestDist) { bestDist = dist; bestIdx = ri; }
           }
+
           if (bestIdx >= 0) {
             const t = suggestions[bestIdx];
             const cap = Number(t.vehicle.capacityM3) || OPTIMIZATION_CONSTANTS.DEFAULT_CAPACITY;
@@ -1524,7 +1687,21 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             };
             swept.add(inv.id);
           }
+        };
+
+        // Paso 1: corredor estricto
+        for (const inv of availableInvoices) trySweepInvoice(inv, false);
+
+        // Paso 2: facturas aún sin ruta y corredor esparso → distancia pura
+        const stillPending = availableInvoices.filter(i => !swept.has(i.id));
+        for (const inv of stillPending) {
+          if ((inv as any).sparseCorridor) trySweepInvoice(inv, true);
         }
+
+        // Paso 3: cualquier sobrante → distancia pura sin restricción de corredor
+        const finalPending = availableInvoices.filter(i => !swept.has(i.id));
+        for (const inv of finalPending) trySweepInvoice(inv, true);
+
         if (swept.size > 0) {
           suggestions.forEach((r, idx) => {
             if (r.assignedInvoices.some(i => swept.has(i.id)) && r.assignedInvoices.length >= 4) {
@@ -1547,17 +1724,17 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           if (r.assignedInvoices.length !== origLengths[idx] && r.assignedInvoices.length >= 4) {
             const opt2 = twoOptImprove(r.assignedInvoices, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
             const opt3 = orOpt1Intra(opt2, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
-            orOptResult[idx] = { ...r, assignedInvoices: opt3 };
+            const opt4 = threeOptImprove(opt3, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng) as Invoice[];
+            orOptResult[idx] = { ...r, assignedInvoices: opt4 };
           }
         });
         suggestions.splice(0, suggestions.length, ...orOptResult);
       }
 
-      // ── ILS: perturbación + reparación para escapar mínimos locales ──────────
-      setOptimizingProgress(87); setOptimizingPhase('Refinando con ILS...');
-      // Ejecuta 4 rondas destroy→repair→oropt, acepta solo si mejora el score.
+      // ── ILS: perturbación adaptiva + tabú + reparación ───────────────────────
+      setOptimizingProgress(87); setOptimizingPhase('Refinando con ILS (12 rondas)...');
       if (suggestions.length > 1) {
-        const ilsResult = ilsImprove(suggestions, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, 4);
+        const ilsResult = ilsImprove(suggestions, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng);
         suggestions.splice(0, suggestions.length, ...ilsResult);
       }
 
@@ -1584,9 +1761,11 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             const timeFn = result.durMatrix ? buildRoadTimeFn(points, result.durMatrix) : undefined;
             const opt2 = twoOptImprove(route.assignedInvoices, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, distFn) as Invoice[];
             const opt3 = orOpt1Intra(opt2, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, distFn) as Invoice[];
+            // 3-opt con distancias reales — máximo impacto en rutas ≥12 paradas
+            const opt4 = threeOptImprove(opt3, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, distFn) as Invoice[];
             // Validate the OSRM-refined route still respects 8h (road times may differ from Haversine)
-            const roadMinutes = estimateRouteTotalMinutes(opt3, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, DISPATCH_DEPARTURE_HOUR, timeFn);
-            suggestions[idx] = { ...route, assignedInvoices: roadMinutes < MAX_ROUTE_MINUTES ? opt3 : route.assignedInvoices };
+            const roadMinutes = estimateRouteTotalMinutes(opt4, ORBIT_HUB_ORIGIN.lat, ORBIT_HUB_ORIGIN.lng, DISPATCH_DEPARTURE_HOUR, timeFn);
+            suggestions[idx] = { ...route, assignedInvoices: roadMinutes < MAX_ROUTE_MINUTES ? opt4 : route.assignedInvoices };
             osrmRefinedCount++;
           } catch { /* OSRM no disponible — conservar orden Haversine */ }
         }));
@@ -1847,7 +2026,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         createdBy: user.name,
         totalVolume: route.totalVolume,
         utilization: route.utilization,
-        capacityM3: Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3 || 0)
+        capacityM3: Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3 || 0),
+        shift: currentShift
       });
 
       if (res.success) {
@@ -1856,6 +2036,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // Registrar IDs confirmados para que no reboten en el contador SIN RUTA
         const confirmedIds = route.assignedInvoices.map(i => i.id || i.invoiceNumber);
         setConfirmedSessionIds(prev => new Set([...prev, ...confirmedIds]));
+        if (currentShift === 1) {
+          setShift1CompletedVehicleIds(prev => new Set([...prev, route.vehicle.id]));
+        }
 
         // M7 IQ: aprender de la ruta confirmada (señal más fuerte que adición manual)
         const stops = route.assignedInvoices.map(inv => ({
@@ -1874,6 +2057,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         setSuggestedRoutes(prev => prev.filter(r => r.id !== route.id));
         // Actualizar rutas en el store inmediatamente (no esperar al onRefresh del padre)
         api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
+        api.getDailyKPIs().then((d: any) => { if (d && typeof d === 'object') setDailyKPIs(d); }).catch(() => {});
         if (onRefresh) onRefresh();
       } else {
         toast.error("Error al confirmar despacho");
@@ -2185,7 +2369,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           createdBy: user.name || 'SISTEMA',
           totalVolume: route.totalVolume,
           utilization: route.utilization,
-          capacityM3: Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3 || 0)
+          capacityM3: Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3 || 0),
+          shift: currentShift
         });
 
         if (res.success) {
@@ -2193,6 +2378,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           // Registrar IDs confirmados para que no reboten en el contador SIN RUTA
           const confirmedIds = route.assignedInvoices.map(i => i.id || i.invoiceNumber);
           setConfirmedSessionIds(prev => new Set([...prev, ...confirmedIds]));
+          if (currentShift === 1) {
+            setShift1CompletedVehicleIds(prev => new Set([...prev, route.vehicle.id]));
+          }
           // M7 IQ: aprender de cada ruta confirmada en despacho masivo
           const stops = route.assignedInvoices.map(inv => ({
             city: (inv as any).cityKey || normalizeCityName(String(inv.city || 'SIN_CIUDAD')),
@@ -2221,9 +2409,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         toast.warning(`${failCount} rutas no pudieron ser confirmadas.`);
       }
       setSuggestedRoutes([]);
+      setCurrentShift(1);
+      setShift1CompletedVehicleIds(new Set());
+      setConfirmedSessionIds(new Set());
       // Refrescar rutas y patrones de aprendizaje para que la próxima sesión ya los use
       api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
       api.getRoutingPatterns().then((d: any[]) => { if (Array.isArray(d)) setLearningPatterns(d); }).catch(() => {});
+      api.getDailyKPIs().then((d: any) => { if (d && typeof d === 'object') setDailyKPIs(d); }).catch(() => {});
       if (onRefresh) onRefresh();
     } else if (failCount > 0) {
       toast.error("Error al procesar el despacho masivo. No se confirmó ninguna ruta.");
@@ -2678,6 +2870,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             <h2 className="text-base sm:text-xl font-black text-slate-900 tracking-tighter uppercase leading-none">OrbitM7 Intelligence</h2>
             <div className="flex flex-wrap items-center gap-2 mt-1">
               <span className="px-2 py-0.5 bg-emerald-500 text-slate-950 rounded-md text-[8px] font-black uppercase tracking-widest shadow-sm">Optimización 90%</span>
+              {currentShift === 2 && (
+                <span className="px-2 py-0.5 bg-violet-600 text-white rounded-md text-[8px] font-black uppercase tracking-widest shadow-sm animate-pulse">2DA VUELTA</span>
+              )}
               <select
                 value={selectedClient}
                 onChange={(e) => { setSelectedClient(e.target.value); setSuggestedRoutes([]); }}
@@ -2790,6 +2985,42 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             <Icons.Plus className="w-3 h-3" />
             RUTA MANUAL
           </button>
+
+          <button
+            onClick={() => setScheduleModal(true)}
+            title={`Horarios de entrega — ${deliverySchedules.length} configurados`}
+            className="shrink-0 px-3 py-2.5 bg-sky-50 text-sky-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-sky-500 hover:text-white transition-all shadow-md active:scale-95 whitespace-nowrap flex items-center gap-1.5 relative"
+          >
+            <Icons.Clock className="w-3.5 h-3.5" />
+            HORARIOS
+            {deliverySchedules.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-sky-500 text-white rounded-full text-[7px] font-black flex items-center justify-center leading-none">{deliverySchedules.length > 9 ? '9+' : deliverySchedules.length}</span>
+            )}
+          </button>
+
+          {/* SEGUNDA VUELTA — disponible cuando hay vehículos que completaron shift 1 */}
+          {shift1CompletedVehicleIds.size > 0 && currentShift === 1 && (
+            <button
+              onClick={() => {
+                setCurrentShift(2);
+                setSuggestedRoutes([]);
+                toast.info(`Segunda vuelta activada · ${shift1CompletedVehicleIds.size} vehículo(s) disponibles`);
+              }}
+              className="shrink-0 px-4 py-2.5 bg-violet-50 text-violet-700 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-violet-600 hover:text-white transition-all shadow-md active:scale-95 whitespace-nowrap flex items-center gap-1.5 border border-violet-200 animate-pulse"
+            >
+              <Icons.RefreshCw className="w-3 h-3" />
+              2DA VUELTA ({shift1CompletedVehicleIds.size})
+            </button>
+          )}
+          {currentShift === 2 && (
+            <button
+              onClick={() => { setCurrentShift(1); setSuggestedRoutes([]); }}
+              className="shrink-0 px-4 py-2.5 bg-violet-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-violet-700 transition-all shadow-md active:scale-95 whitespace-nowrap flex items-center gap-1.5"
+            >
+              <Icons.RefreshCw className="w-3 h-3" />
+              VUELTA 2 ACTIVA
+            </button>
+          )}
         </div>
       </div>
 
@@ -2869,6 +3100,91 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             <button onClick={() => setLastReadjustmentResult(null)} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg transition-all">
               <Icons.X className="w-4 h-4 text-slate-400" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── PANEL KPIs DEL DÍA ──────────────────────────────────────────────── */}
+      {dailyKPIs && dailyKPIs.routes_today > 0 && (
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-md px-5 py-3 flex flex-wrap items-center gap-3 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-1.5 mr-2 shrink-0">
+            <div className="w-6 h-6 bg-slate-950 text-emerald-500 rounded-lg flex items-center justify-center">
+              <Icons.Route className="w-3.5 h-3.5" />
+            </div>
+            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">KPIs HOY</p>
+          </div>
+          {[
+            { label: 'Rutas', value: dailyKPIs.routes_today, color: 'text-indigo-600' },
+            { label: 'Vehículos', value: dailyKPIs.vehicles_active, color: 'text-blue-600' },
+            { label: 'Asignadas', value: dailyKPIs.invoices_assigned, color: 'text-slate-900' },
+            { label: 'Entregadas', value: dailyKPIs.invoices_delivered, color: 'text-emerald-600' },
+            { label: 'Devueltas', value: dailyKPIs.invoices_returned, color: 'text-rose-500' },
+            { label: 'Repice', value: dailyKPIs.invoices_repice, color: 'text-amber-500' },
+            { label: 'Utiliz.', value: `${Math.round(Number(dailyKPIs.avg_utilization))}%`, color: Number(dailyKPIs.avg_utilization) >= 85 ? 'text-emerald-600' : 'text-amber-500' },
+            ...(dailyKPIs.shift2_routes > 0 ? [{ label: '2da Vuelta', value: dailyKPIs.shift2_routes, color: 'text-violet-600' }] : []),
+          ].map((kpi, i, arr) => (
+            <div key={kpi.label} className="flex items-center gap-3">
+              <div className="flex flex-col items-center">
+                <p className={`text-sm font-black leading-none ${kpi.color}`}>{kpi.value}</p>
+                <p className="text-[6px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{kpi.label}</p>
+              </div>
+              {i < arr.length - 1 && <div className="w-px h-4 bg-slate-100" />}
+            </div>
+          ))}
+          {dailyKPIs.invoices_assigned > 0 && (
+            <div className="ml-auto shrink-0 flex items-center gap-1.5">
+              <div className="h-2 w-24 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-700"
+                  style={{ width: `${Math.round((dailyKPIs.invoices_delivered / dailyKPIs.invoices_assigned) * 100)}%` }}
+                />
+              </div>
+              <p className="text-[7px] font-black text-slate-400 uppercase">
+                {Math.round((dailyKPIs.invoices_delivered / dailyKPIs.invoices_assigned) * 100)}% entregado
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── PANEL KPIs DE PLANIFICACIÓN (aparece tras generar rutas) ──────────── */}
+      {routePlanKPIs && (
+        <div className="bg-slate-950 rounded-[2rem] border border-slate-800 shadow-xl px-5 py-3 flex flex-wrap items-center gap-3 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-1.5 mr-2 shrink-0">
+            <div className="w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center">
+              <Icons.Route className="w-3.5 h-3.5 text-slate-950" />
+            </div>
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Plan actual</p>
+          </div>
+          {[
+            { label: 'Rutas',    value: routePlanKPIs.routes,           color: 'text-white' },
+            { label: 'Facturas', value: routePlanKPIs.totalInvoices,    color: 'text-white' },
+            { label: 'Km total', value: `${routePlanKPIs.totalKm} km`,  color: 'text-emerald-400' },
+            { label: 'Tiempo',   value: routePlanKPIs.timeLabel,        color: 'text-sky-400' },
+            { label: 'Utiliz.',  value: `${routePlanKPIs.avgUtil}%`,    color: routePlanKPIs.avgUtil >= 80 ? 'text-emerald-400' : routePlanKPIs.avgUtil >= 60 ? 'text-amber-400' : 'text-rose-400' },
+            ...(geocodedCount > 0 ? [{ label: 'Geoloc.', value: `+${geocodedCount}`, color: 'text-violet-400' }] : []),
+          ].map((kpi, i, arr) => (
+            <div key={kpi.label} className="flex items-center gap-3">
+              <div className="flex flex-col items-center">
+                <p className={`text-sm font-black leading-none ${kpi.color}`}>{kpi.value}</p>
+                <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{kpi.label}</p>
+              </div>
+              {i < arr.length - 1 && <div className="w-px h-4 bg-slate-700" />}
+            </div>
+          ))}
+          <div className="ml-auto shrink-0 flex items-center gap-2">
+            <div className="h-2 w-28 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${Math.min(routePlanKPIs.avgUtil, 100)}%`,
+                  backgroundColor: routePlanKPIs.avgUtil >= 80 ? '#10b981' : routePlanKPIs.avgUtil >= 60 ? '#f59e0b' : '#f43f5e'
+                }}
+              />
+            </div>
+            <p className="text-[7px] font-black text-slate-500 uppercase whitespace-nowrap">
+              {routePlanKPIs.avgUtil}% cap
+            </p>
           </div>
         </div>
       )}
@@ -3961,6 +4277,143 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Horarios de Entrega por Día de Semana */}
+      {scheduleModal && (
+        <div className="fixed inset-0 z-[600] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-sky-50 rounded-t-[2.5rem]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white text-sky-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Icons.Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase tracking-tighter">Horarios de Entrega</h3>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase">Ventanas de tiempo por cliente y día</p>
+                </div>
+              </div>
+              <button onClick={() => setScheduleModal(false)} className="w-9 h-9 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                <Icons.X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 flex flex-col gap-5">
+              {/* Formulario de nuevo horario */}
+              <div className="bg-sky-50 rounded-2xl p-4 flex flex-col gap-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-sky-700">Agregar horario</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8px] font-black uppercase text-slate-400">Cliente / Destinatario</label>
+                    <input
+                      value={scheduleForm.customerName}
+                      onChange={e => setScheduleForm(f => ({ ...f, customerName: e.target.value }))}
+                      placeholder="Nombre del cliente..."
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-semibold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-400/30 focus:border-sky-400"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8px] font-black uppercase text-slate-400">Ciudad</label>
+                    <input
+                      value={scheduleForm.city}
+                      onChange={e => setScheduleForm(f => ({ ...f, city: e.target.value }))}
+                      placeholder="Ciudad..."
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-semibold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-400/30 focus:border-sky-400"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8px] font-black uppercase text-slate-400">Día de semana</label>
+                    <select
+                      value={scheduleForm.dayOfWeek}
+                      onChange={e => setScheduleForm(f => ({ ...f, dayOfWeek: Number(e.target.value) }))}
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-400/30"
+                    >
+                      {['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'].map((d, i) => (
+                        <option key={i} value={i}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8px] font-black uppercase text-slate-400">Hora límite (HH:MM)</label>
+                    <input
+                      type="time"
+                      value={scheduleForm.closeTime}
+                      onChange={e => setScheduleForm(f => ({ ...f, closeTime: e.target.value }))}
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-400/30"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[8px] font-black uppercase text-slate-400">Etiqueta (opcional)</label>
+                  <input
+                    value={scheduleForm.label}
+                    onChange={e => setScheduleForm(f => ({ ...f, label: e.target.value }))}
+                    placeholder="Ej: Solo mañanas, Antes del mediodía..."
+                    className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-semibold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-400/30 focus:border-sky-400"
+                  />
+                </div>
+                <button
+                  disabled={scheduleSaving || !scheduleForm.customerName.trim() || !scheduleForm.closeTime}
+                  onClick={async () => {
+                    if (!selectedClient) return;
+                    setScheduleSaving(true);
+                    try {
+                      await api.upsertDeliverySchedule({
+                        clientId: selectedClient,
+                        customerName: scheduleForm.customerName.trim(),
+                        city: scheduleForm.city.trim(),
+                        dayOfWeek: scheduleForm.dayOfWeek,
+                        closeTime: scheduleForm.closeTime,
+                        label: scheduleForm.label.trim() || undefined,
+                      });
+                      const updated: any[] = await api.getDeliverySchedules(selectedClient);
+                      if (Array.isArray(updated)) setDeliverySchedules(updated);
+                      setScheduleForm(f => ({ ...f, customerName: '', city: '', label: '' }));
+                    } catch { /* non-critical */ }
+                    finally { setScheduleSaving(false); }
+                  }}
+                  className="self-end px-5 py-2 bg-sky-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-sky-400 transition-all active:scale-95 disabled:opacity-40"
+                >
+                  {scheduleSaving ? '...' : '+ Guardar Horario'}
+                </button>
+              </div>
+
+              {/* Lista de horarios existentes */}
+              {deliverySchedules.length === 0 ? (
+                <p className="text-center text-xs text-slate-400 font-semibold py-4">Sin horarios configurados</p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'].map((dayName, dow) => {
+                    const daySchedules = deliverySchedules.filter(s => s.day_of_week === dow);
+                    if (daySchedules.length === 0) return null;
+                    return (
+                      <div key={dow}>
+                        <p className="text-[8px] font-black uppercase text-slate-400 tracking-widest mb-1">{dayName}</p>
+                        {daySchedules.map((s: any) => (
+                          <div key={s.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2 mb-1">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-black text-slate-800">{s.customer_name}</span>
+                              <span className="text-[9px] text-slate-500">{s.city} · hasta {s.close_time}{s.label ? ` · ${s.label}` : ''}</span>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                await api.deleteDeliverySchedule(s.id).catch(() => {});
+                                setDeliverySchedules(prev => prev.filter((x: any) => x.id !== s.id));
+                              }}
+                              className="w-6 h-6 bg-rose-50 text-rose-400 rounded-lg flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all"
+                            >
+                              <Icons.X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

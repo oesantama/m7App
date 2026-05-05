@@ -198,6 +198,14 @@ export const api = {
   },
   getInvoiceStatusHistory: (documentId: string) =>
     fetchJson(`${API_URL}/conciliation/${encodeURIComponent(documentId)}/history`),
+  updatePaymentMethod: (data: {
+    documentId: string;
+    invoice: string;
+    newMethod: string;
+    userId: string;
+    userName?: string;
+    observations: string;
+  }) => fetchJson(`${API_URL}/conciliation/update-payment-method`, { method: 'POST', body: JSON.stringify(data) }),
 
   // ── Devoluciones Bodega ────────────────────────────────────────────────────
   getPendingRouteReturns: (clientId?: string) =>
@@ -608,6 +616,7 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
+  getDailyKPIs: () => fetchJson(`${API_URL}/routes/kpis`),
   logRouteMovement: (data: any) => fetchJson(`${API_URL}/routes/log`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -660,6 +669,33 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+  failAndReassignInvoice: (data: { routeId: string; invoiceId: string; reason?: string; userId?: string }) =>
+    fetchJson(`${API_URL}/routes/fail-invoice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  learnFromFailure: (data: { vehicleId: string; stops: Array<{ city: string; neighborhood?: string; address?: string }>; penalty?: number }) =>
+    fetchJson(`${API_URL}/routes/learn-failure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  // Horarios de entrega por día de semana
+  getDeliverySchedules: (clientId: string, dayOfWeek?: number) => {
+    const qs = new URLSearchParams({ clientId });
+    if (dayOfWeek !== undefined) qs.set('dayOfWeek', String(dayOfWeek));
+    return fetchJson(`${API_URL}/delivery-schedules?${qs.toString()}`);
+  },
+  upsertDeliverySchedule: (data: { clientId: string; customerName: string; city?: string; dayOfWeek: number; closeTime: string; label?: string }) =>
+    fetchJson(`${API_URL}/delivery-schedules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  deleteDeliverySchedule: (id: number) =>
+    fetchJson(`${API_URL}/delivery-schedules/${id}`, { method: 'DELETE' }),
 
   getMastersuiteReport: (params?: { document?: string; plate?: string }) => {
     const qs = new URLSearchParams();

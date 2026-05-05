@@ -1,0 +1,93 @@
+services:
+  backend-podman:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend.dev
+    ports:
+      - "8081:8080"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - TZ=America/Bogota
+      - PORT=8080
+      - DATABASE_URL=postgres://m7_admin:m7_master_password@postgres-podman:5432/m7_logistica
+    volumes:
+      - ./backend:/app/backend:z
+      - ./types.ts:/app/types.ts:z
+      - ./services:/app/services:z
+      - ./utils:/app/utils:z
+      - ./config:/app/config:z
+      - /app/node_modules
+      - ./.env:/app/.env:z
+    restart: unless-stopped
+    depends_on:
+      postgres-podman:
+        condition: service_healthy
+    networks:
+      - m7-podman-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  frontend-podman:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.dev
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    environment:
+      - VITE_API_URL=http://localhost:8081/api
+    volumes:
+      - ./components:/app/components:z
+      - ./pages:/app/pages:z
+      - ./services:/app/services:z
+      - ./stores:/app/stores:z
+      - ./utils:/app/utils:z
+      - ./config:/app/config:z
+      - ./hooks:/app/hooks:z
+      - ./types.ts:/app/types.ts:z
+      - ./constants.tsx:/app/constants.tsx:z
+      - ./vite.config.ts:/app/vite.config.ts:z
+      - ./tailwind.config.ts:/app/tailwind.config.ts:z
+      - ./tsconfig.json:/app/tsconfig.json:z
+      - ./index.html:/app/index.html:z
+      - ./src:/app/src:z
+      - /app/node_modules
+    depends_on:
+      - backend-podman
+    restart: unless-stopped
+    networks:
+      - m7-podman-network
+
+  postgres-podman:
+    image: docker.io/library/postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-m7_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-m7_master_password}
+      - POSTGRES_DB=${POSTGRES_DB:-m7_logistica}
+    volumes:
+      - m7_podman_data:/var/lib/postgresql/data:z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-m7_admin} -d ${POSTGRES_DB:-m7_logistica}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - m7-podman-network
+
+networks:
+  m7-podman-network:
+    driver: bridge
+
+volumes:
+  m7_podman_data:
+    name: m7_logistica_podman_data

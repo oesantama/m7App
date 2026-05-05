@@ -204,17 +204,29 @@ export function normalizeCityName(raw: string): string {
  * Un corredor A puede mezclarse con B si B está en la lista de adyacentes de A.
  * ORIENTE_ANT y OCCIDENTE_ANT NUNCA tienen adyacentes (son macro-regiones duras).
  */
+/**
+ * Solo corredores físicamente contiguos por la misma vía principal.
+ * NORTE ↔ MED_OCC (Autopista Norte → Castilla/Robledo)
+ * MED_OCC ↔ MED_CENTRO (Laureles/Belén → Centro)
+ * MED_CENTRO ↔ MED_ORI / SUR (Centro conecta ambos lados)
+ * MED_ORI ↔ ENVIGADO (Poblado → Envigado)
+ * ENVIGADO ↔ SUR (Envigado → Sabaneta/Itagüí)
+ * Se eliminó NORTE↔MED_CENTRO, NORTE↔MED_ORI, MED_OCC↔SUR
+ * para evitar rutas que mezclen zonas físicamente lejanas.
+ * Cuando un corredor tiene pocas facturas, el sweep relaxes estas restricciones
+ * por proximidad geográfica pura (ver sweep-fallback en RoutePlanner).
+ */
 export const CORRIDOR_ADJACENT: Record<ViaCorridor, ViaCorridor[]> = {
   'NORTE_LEJANO':  ['NORTE'],
-  'NORTE':         ['NORTE_LEJANO', 'MED_OCC', 'MED_CENTRO', 'MED_ORI'],
-  'MED_OCC':       ['NORTE', 'MED_CENTRO', 'SUR'],
-  'MED_CENTRO':    ['NORTE', 'MED_OCC', 'MED_ORI', 'SUR'],
-  'MED_ORI':       ['NORTE', 'MED_CENTRO', 'ENVIGADO'],
+  'NORTE':         ['NORTE_LEJANO', 'MED_OCC'],
+  'MED_OCC':       ['NORTE', 'MED_CENTRO'],
+  'MED_CENTRO':    ['MED_OCC', 'MED_ORI', 'SUR'],
+  'MED_ORI':       ['MED_CENTRO', 'ENVIGADO'],
   'ENVIGADO':      ['MED_ORI', 'SUR'],
-  'SUR':           ['MED_OCC', 'MED_CENTRO', 'ENVIGADO', 'SUR_LEJANO'],
+  'SUR':           ['MED_CENTRO', 'ENVIGADO', 'SUR_LEJANO'],
   'SUR_LEJANO':    ['SUR'],
-  'ORIENTE_ANT':   [], // nunca mezclar
-  'OCCIDENTE_ANT': [], // nunca mezclar
+  'ORIENTE_ANT':   [],
+  'OCCIDENTE_ANT': [],
 };
 
 /** Orden de prioridad de corredores para el sort global (norte→sur, luego oriente) */

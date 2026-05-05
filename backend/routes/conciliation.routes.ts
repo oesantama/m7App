@@ -14,6 +14,7 @@ import {
     importMasterSuite,
     getInvoiceStatusHistory,
     closeConciliationCycle,
+    updatePaymentMethod,
 } from '../controllers/conciliation.controller.js';
 
 const router = Router();
@@ -35,5 +36,6 @@ router.post('/group-payments',            saveRouteGroupPayments);
 router.post('/report',                    generateAndSendReport);
 router.post('/import-mastersuite',        upload.single('file'), importMasterSuite);
 router.post('/close-cycle',               closeConciliationCycle);
+router.post('/update-payment-method',    updatePaymentMethod);
 
 export default router;

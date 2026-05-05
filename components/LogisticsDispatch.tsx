@@ -129,6 +129,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const routeMarkersRef = useRef<L.Marker[]>([]);
     const routePolylineRef = useRef<L.Polyline | null>(null);
     const [fetchStatus, setFetchStatus] = useState<string>('IDLE');
+    const [gpsStatus, setGpsStatus] = useState<'off' | 'acquiring' | 'ok' | 'poor' | 'error'>('off');
+    const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
     
     // MODALES DE INTERACCIÓN MEJORADA
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
@@ -1153,65 +1155,104 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
     }, [selectedActiveRoute]);
 
-    // 5. Auto-reporte de ubicación y WakeLock (Mantener pantalla encendida)
+    // 5. Auto-reporte de ubicación con watchPosition + WakeLock
+    //
+    // watchPosition mantiene el chip GPS caliente en lugar de encenderlo/apagarlo cada 15s.
+    // Eso elimina los errores de timeout por arranque en frío y reduce consumo de batería.
+    // Estrategia de precisión: empieza con red/WiFi (rápido, sin error), luego escala a GPS
+    // si la precisión es pobre. Filtra posiciones con accuracy > 100m para no enviar basura.
     useEffect(() => {
-        if (!navigator.geolocation) return;
+        if (!navigator.geolocation) { setGpsStatus('error'); return; }
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+            setGpsStatus('error');
+            return;
+        }
 
         let wakeLock: any = null;
+        let watchId: number | null = null;
+        let highAccWatchId: number | null = null;
+        let lastSentAt = 0;                    // throttle: no enviar más de 1 vez cada 20s
+        const SEND_INTERVAL_MS = 20_000;
+        const MAX_ACCURACY_M   = 100;          // descartar lecturas peores a 100m
+        const ACCURACY_ESCALATE_M = 50;        // si accuracy > 50m, lanzar también watchPosition high-accuracy
+
         const requestWakeLock = async () => {
             try {
-                if ('wakeLock' in navigator) {
+                if ('wakeLock' in navigator)
                     wakeLock = await (navigator as any).wakeLock.request('screen');
-                }
-            } catch { /* wakeLock no soportado o denegado — no critico */ }
+            } catch { /* no crítico */ }
         };
-
         requestWakeLock();
 
-        const interval = setInterval(() => {
-            if (!navigator.geolocation) {
-                toast.error('El navegador no soporta Geolocation. Verifique su dispositivo.');
-                return;
-            }
-            
-            // Verificación de contexto seguro (HTTPS)
-            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-                console.error('[GPS-ERROR] Geolocation requiere HTTPS.');
-                return;
-            }
+        setGpsStatus('acquiring');
 
-            navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                    const activeLink = assignments.find(a => a.driverId === user.id && a.isActive);
-                    if (activeLink) {
-                        try {
-                            await api.updateVehicleLocation({
-                                vehicleId: activeLink.vehicleId,
-                                driverId: user.id,
-                                latitude: pos.coords.latitude,
-                                longitude: pos.coords.longitude,
-                                accuracy: pos.coords.accuracy,
-                                speed: pos.coords.speed,
-                                heading: pos.coords.heading
-                            });
-                        } catch { /* GPS update failed silently */ }
-                    }
-                },
-                (err) => {
-                    if (err.code === 1) { // Permission Denied
-                        toast.error('Permiso de GPS denegado. Active el GPS en su navegador.');
-                    }
-                    // code 2 = unavailable, code 3 = timeout — ignorar silenciosamente
-                },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
-            );
-        }, 15000); // Reducción a 15 segundos para mayor precisión
+        const handlePosition = async (pos: GeolocationPosition) => {
+            const acc = pos.coords.accuracy;
+            setGpsAccuracy(Math.round(acc));
+            setGpsStatus(acc <= MAX_ACCURACY_M ? 'ok' : 'poor');
+
+            if (acc > MAX_ACCURACY_M) return; // posición demasiado imprecisa — ignorar
+
+            const now = Date.now();
+            if (now - lastSentAt < SEND_INTERVAL_MS) return; // throttle
+            lastSentAt = now;
+
+            const activeLink = assignments.find(a => {
+                const dId = a.driverId || (a as any).driver_id;
+                const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+                return String(dId) === String(user.id) && active;
+            });
+            if (!activeLink) return;
+
+            try {
+                await api.updateVehicleLocation({
+                    vehicleId: activeLink.vehicleId || (activeLink as any).vehicle_id,
+                    driverId: user.id,
+                    latitude:  pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    accuracy:  acc,
+                    speed:     pos.coords.speed,
+                    heading:   pos.coords.heading,
+                });
+            } catch { /* fallo de red — se reintenta en el próximo update */ }
+        };
+
+        const handleError = (err: GeolocationPositionError) => {
+            if (err.code === 1) {
+                // Permiso denegado — no recuperable, mostrar una sola vez
+                setGpsStatus('error');
+                toast.error('GPS denegado. Habilite la ubicación en su navegador.');
+                if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+                if (highAccWatchId !== null) navigator.geolocation.clearWatch(highAccWatchId);
+            } else {
+                // Code 2 (señal no disponible) o 3 (timeout) — transitorio
+                // watchPosition reintenta automáticamente; solo actualizar icono
+                setGpsStatus('poor');
+            }
+        };
+
+        // Fase 1: precisión de red (WiFi/celular) — rápido, sin error en interiores
+        watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
+            enableHighAccuracy: false,
+            timeout: 10_000,
+            maximumAge: 15_000,
+        });
+
+        // Fase 2: en paralelo, GPS de alta precisión — si entrega mejor dato gana
+        highAccWatchId = navigator.geolocation.watchPosition(handlePosition, () => { /* silencioso */ }, {
+            enableHighAccuracy: true,
+            timeout: 20_000,
+            maximumAge: 5_000,
+        });
 
         return () => {
-            clearInterval(interval);
-            if (wakeLock) wakeLock.release();
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            if (highAccWatchId !== null) navigator.geolocation.clearWatch(highAccWatchId);
+            if (wakeLock) wakeLock.release().catch(() => {});
+            setGpsStatus('off');
+            setGpsAccuracy(null);
         };
-    }, [user, assignments]);
+    }, [user.id, assignments]);
 
     const fetchPendingSignatures = async () => {
         if (!user?.id) return;
@@ -1649,6 +1690,33 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* Badge GPS del conductor — solo visible si tiene asignación activa */}
+                    {assignments.some(a => {
+                        const dId = a.driverId || (a as any).driver_id;
+                        const active = a.isActive !== undefined ? a.isActive : (a as any).is_active;
+                        return String(dId) === String(user.id) && active;
+                    }) && (
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-all ${
+                            gpsStatus === 'ok'        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                            gpsStatus === 'acquiring' ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' :
+                            gpsStatus === 'poor'      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
+                            gpsStatus === 'error'     ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
+                                                        'bg-white/5 border-white/5 text-slate-500'
+                        }`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${
+                                gpsStatus === 'ok'        ? 'bg-emerald-400' :
+                                gpsStatus === 'acquiring' ? 'bg-sky-400 animate-pulse' :
+                                gpsStatus === 'poor'      ? 'bg-amber-400 animate-pulse' :
+                                gpsStatus === 'error'     ? 'bg-rose-400' : 'bg-slate-600'
+                            }`} />
+                            <span>
+                                {gpsStatus === 'ok'        ? `GPS ±${gpsAccuracy}m` :
+                                 gpsStatus === 'acquiring' ? 'GPS...' :
+                                 gpsStatus === 'poor'      ? `GPS ±${gpsAccuracy ?? '?'}m` :
+                                 gpsStatus === 'error'     ? 'GPS ERROR' : 'GPS OFF'}
+                            </span>
+                        </div>
+                    )}
                     <button
                         onClick={() => setShowMap(v => !v)}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-all group ${showMap ? 'bg-sky-500/20 text-sky-300 border-sky-500/30 hover:bg-sky-500/30' : 'bg-white/5 text-white border-white/5 hover:bg-white/10'}`}

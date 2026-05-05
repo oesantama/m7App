@@ -27,7 +27,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'estados': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'notificaciones': ['name', 'description', 'notification_email', 'tipo_notificacion_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'tipos_notificacion': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
-  'routes': ['name', 'description', 'vehicle_id', 'driver_id', 'client_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at', 'total_volume_m3', 'vehicle_capacity_m3', 'utilization_pct'],
+  'routes': ['name', 'description', 'vehicle_id', 'driver_id', 'client_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at', 'total_volume_m3', 'vehicle_capacity_m3', 'utilization_pct', 'shift'],
   'picking_assignments': ['invoice_id', 'leader_id', 'helper_ids', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
   'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at'],
   'route_invoices': ['route_id', 'invoice_id', 'created_at'],
@@ -233,6 +233,8 @@ const healSchema = async (client: any) => {
           let type = 'TEXT';
           if (col.includes('_at') || col.includes('_date') || col.endsWith('_expiry') || col === 'fechaparobacion' || col === 'fecha_creacion' || col === 'fecha_actualizacion' || col === 'timestamp' || col === 'last_used' || col === 'updated_at' || col === 'created_at' || col === 'f_ultimo_corte' || col === 'fecha_carge' || col === 'fecha_entregado' || col === 'create_at' || col === 'update_at' || col === 'fecha_control') {
             type = 'TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP';
+          } else if (col === 'shift') {
+            type = 'INTEGER DEFAULT 1';
           } else if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repice' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repice_qty' || col === 'invoice_value' || col === 'collected_value' || col === 'total_volume_m3' || col === 'vehicle_capacity_m3' || col === 'utilization_pct' || col === 'id_departamento') {
             type = 'NUMERIC DEFAULT 0';
           } else if (col === 'client_ids') {
@@ -912,6 +914,34 @@ export const restoreSystem = async () => {
     // Limpiar entradas más viejas de 90 días para evitar crecer indefinidamente
     await client.query(`
       DELETE FROM road_distance_cache WHERE cached_at < NOW() - INTERVAL '90 days';
+    `);
+
+    // ── Fase 3: shift en routes (multi-viaje) ────────────────────────
+    await client.query(`
+      ALTER TABLE routes ADD COLUMN IF NOT EXISTS shift INTEGER DEFAULT 1;
+      UPDATE routes SET shift = 1 WHERE shift IS NULL;
+    `);
+
+    // ── Fase 4: ventanas de tiempo por día de semana ──────────────────
+    // Horarios de recepción de cada cliente/destinatario por día.
+    // customer_key = LOWER(customer_name|city), day_of_week 0=Dom..6=Sáb.
+    // close_time: hora límite de entrega en formato "HH:MM" (24h).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS delivery_schedules (
+        id            BIGSERIAL PRIMARY KEY,
+        client_id     TEXT        NOT NULL,
+        customer_key  TEXT        NOT NULL,
+        customer_name TEXT,
+        city          TEXT,
+        day_of_week   INTEGER     NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+        close_time    TEXT        NOT NULL,
+        label         TEXT,
+        created_at    TIMESTAMPTZ DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT unq_delivery_schedule UNIQUE (client_id, customer_key, day_of_week)
+      );
+      CREATE INDEX IF NOT EXISTS idx_delivery_sched_client
+        ON delivery_schedules (client_id, day_of_week);
     `);
 
     await client.query('COMMIT');

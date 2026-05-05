@@ -691,8 +691,47 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
     // Estado consignación grupal
     const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION' }]);
-    const [savingGrupal, setSavingGrupal]     = useState(false);
-    const [searchTerm, setSearchTerm]         = useState('');
+    const [isGrupalUnlocked, setIsGrupalUnlocked] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // --- NUEVO: Ajuste de Método de Pago ---
+    const [activePaymentModal, setActivePaymentModal] = useState<string | null>(null);
+    const [adjustingPayment, setAdjustingPayment] = useState(false);
+    const [paymentObs, setPaymentObs] = useState('');
+    const [selectedNewMethod, setSelectedNewMethod] = useState('');
+
+    const handleUpdatePaymentMethod = async (inv: InvoiceRow) => {
+        if (!paymentObs.trim()) {
+            toast.error('Las observaciones son obligatorias para registrar el cambio.');
+            return;
+        }
+        if (!selectedNewMethod) {
+            toast.error('Debe seleccionar un nuevo método de pago.');
+            return;
+        }
+
+        setAdjustingPayment(true);
+        try {
+            await api.updatePaymentMethod({
+                documentId,
+                invoice: inv.invoice_number,
+                newMethod: selectedNewMethod,
+                userId: currentUserId,
+                userName: undefined, // Se puede obtener del store si es necesario
+                observations: paymentObs
+            });
+            toast.success(`✅ Método de pago actualizado para ${inv.invoice_number}`);
+            setActivePaymentModal(null);
+            setPaymentObs('');
+            onSaved();
+        } catch (err: any) {
+            toast.error(err.message || 'Error al actualizar método de pago');
+        } finally {
+            setAdjustingPayment(false);
+        }
+    };
+
+    const forms = useMemo(() => {
     const [headerFilter, setHeaderFilter]     = useState<string | null>(null);
 
     // Estado sobrecostos
@@ -1292,9 +1331,21 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 })()}
                                             </div>
                                         </div>
-                                        <button onClick={() => setActiveDialog(inv.invoice_number)} className={`shrink-0 px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all ${isLegalized ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-900/20'}`}>
-                                            {isLegalized ? 'Ver Detalle' : 'Legalizar'}
-                                        </button>
+                                        <div className="flex flex-col gap-2">
+                                            <button onClick={() => setActiveDialog(inv.invoice_number)} className={`shrink-0 px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all ${isLegalized ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-900/20'}`}>
+                                                {isLegalized ? 'Ver Detalle' : 'Legalizar'}
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    setSelectedNewMethod('');
+                                                    setPaymentObs('');
+                                                    setActivePaymentModal(inv.invoice_number);
+                                                }}
+                                                className="shrink-0 px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all bg-slate-800 text-white hover:bg-slate-700"
+                                            >
+                                                💳 Ajustar Pago
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -1590,6 +1641,80 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         onSave={() => handleSave(inv)}
                         allRoutes={allRoutes}
                     />
+                );
+            })()}
+
+            {/* Diálogo de Ajuste de Método de Pago */}
+            {activePaymentModal && (() => {
+                const inv = invoices.find(i => i.invoice_number === activePaymentModal);
+                if (!inv) return null;
+                
+                const currentMethod = (inv.invoice_metodo_pago || 'EF').toUpperCase();
+                const options = currentMethod === 'EF' 
+                    ? ['030D', 'CA030', 'CP010'] 
+                    : ['EF', '030D', 'CA030', 'CP010'].filter(o => o !== currentMethod);
+
+                return (
+                    <div className="fixed inset-0 z-[990] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                        <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
+                            <div className="bg-slate-900 px-6 py-5 text-white">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Ajustar Método de Pago</p>
+                                <h4 className="text-xl font-black">{inv.invoice_number}</h4>
+                            </div>
+                            
+                            <div className="p-6 space-y-5">
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Cliente</p>
+                                    <p className="text-xs font-bold text-slate-700">{inv.customer_name}</p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Actual</p>
+                                        <p className="text-sm font-black text-slate-900">{currentMethod}</p>
+                                    </div>
+                                    <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
+                                        <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Nuevo Método</p>
+                                        <select 
+                                            value={selectedNewMethod}
+                                            onChange={(e) => setSelectedNewMethod(e.target.value)}
+                                            className="w-full bg-transparent outline-none text-sm font-black text-emerald-900 appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Seleccione...</option>
+                                            {options.map(o => <option key={o} value={o}>{o}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Observaciones de Cambio (Obligatorio)</p>
+                                    <textarea 
+                                        value={paymentObs}
+                                        onChange={(e) => setPaymentObs(e.target.value)}
+                                        placeholder="Ej: Cambio solicitado por el cliente por error en despacho..."
+                                        className="w-full h-24 bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-bold outline-none focus:border-slate-400 transition-all resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="px-6 py-5 bg-slate-50 flex gap-3">
+                                <button 
+                                    onClick={() => setActivePaymentModal(null)}
+                                    className="flex-1 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={() => handleUpdatePaymentMethod(inv)}
+                                    disabled={adjustingPayment}
+                                    className={`flex-[1.5] py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-lg transition-all
+                                        ${adjustingPayment ? 'bg-slate-400' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20'}`}
+                                >
+                                    {adjustingPayment ? 'Actualizando...' : 'Guardar Cambio'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 );
             })()}
         </div>

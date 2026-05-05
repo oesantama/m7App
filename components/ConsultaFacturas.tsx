@@ -883,7 +883,8 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
 
   const canDelete = hasPermission(user, 'CONSULTA_FACTURAS', 'delete');
 
-  const [liberarTab, setLiberarTab] = useState<'liberacion' | 'repice'>('liberacion');
+  const [liberarTab, setLiberarTab] = useState<'liberacion' | 'repice' | 'fallo'>('liberacion');
+  const [falloMsg, setFalloMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const handleLiberar = async () => {
     if (!liberarObs.trim()) return;
@@ -901,7 +902,7 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
         });
         setLiberadoMsg({ ok: true, text: 'Factura liberada de la ruta correctamente.' });
         setData(prev => prev ? { ...prev, route: null } : prev);
-      } else {
+      } else if (liberarTab === 'repice') {
         await api.repiceRouteInvoice({
           routeId: data.route.route_id,
           invoiceId,
@@ -913,6 +914,19 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
           ...prev,
           invoice: { ...prev.invoice, item_status: 'EST-15', item_status_name: 'REPICE' },
         } : prev);
+      } else {
+        const res: any = await api.failAndReassignInvoice({
+          routeId: data.route.route_id,
+          invoiceId,
+          reason: liberarObs.trim() || 'NO_ENTREGADO',
+          userId: user?.id,
+        });
+        const msg = res?.reassignedTo
+          ? `Reasignada a ruta activa (${Math.round((res.distKm || 0) * 10) / 10} km). El sistema aprendió del fallo.`
+          : 'Sin ruta disponible — liberada para próximo turno. El sistema aprendió del fallo.';
+        setFalloMsg({ ok: true, text: msg });
+        setLiberadoMsg({ ok: true, text: msg });
+        setData(prev => prev ? { ...prev, route: null } : prev);
       }
       setShowLiberarModal(false);
       setLiberarObs('');
@@ -1019,7 +1033,7 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                   liberarTab === 'liberacion' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'
                 }`}
               >
-                🔓 Liberación Total
+                Liberación
               </button>
               <button
                 onClick={() => setLiberarTab('repice')}
@@ -1027,7 +1041,15 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                   liberarTab === 'repice' ? 'bg-violet-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'
                 }`}
               >
-                🔃 Repice
+                Repice
+              </button>
+              <button
+                onClick={() => setLiberarTab('fallo')}
+                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  liberarTab === 'fallo' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                No Entregado
               </button>
             </div>
 
@@ -1035,29 +1057,39 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
               <p className="text-sm text-slate-500 mb-4">
                 La factura <span className="font-black text-slate-800">{data?.invoice.invoice_number}</span> será <span className="font-bold text-rose-600">desvinculada de la ruta</span>{data?.route?.plate ? ` (${data.route.plate})` : ''} y quedará disponible para reasignar. Se registra en el historial.
               </p>
-            ) : (
+            ) : liberarTab === 'repice' ? (
               <p className="text-sm text-slate-500 mb-4">
                 La factura <span className="font-black text-slate-800">{data?.invoice.invoice_number}</span> quedará en estado <span className="font-bold text-violet-600">REPICE</span> en la ruta{data?.route?.plate ? ` (${data.route.plate})` : ''}. La fecha de asignación se actualiza al momento actual. Se registra en el historial.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500 mb-4">
+                La factura <span className="font-black text-slate-800">{data?.invoice.invoice_number}</span> se marca como <span className="font-bold text-amber-600">no entregada</span>. El sistema buscará automáticamente la ruta activa más cercana con capacidad y la reasignará. Si no existe, quedará libre para el próximo turno. <span className="text-amber-700 font-semibold">El algoritmo aprende del fallo para mejorar futuras rutas.</span>
               </p>
             )}
 
             <div className="flex flex-col gap-2 mb-6">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Observación <span className="text-rose-500">*</span></label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {liberarTab === 'fallo' ? 'Motivo de no entrega' : 'Observación'} <span className="text-rose-500">*</span>
+              </label>
               <textarea
                 value={liberarObs}
                 onChange={e => setLiberarObs(e.target.value)}
-                placeholder={liberarTab === 'liberacion' ? 'Motivo de la liberación...' : 'Motivo del repice...'}
+                placeholder={
+                  liberarTab === 'liberacion' ? 'Motivo de la liberación...' :
+                  liberarTab === 'repice' ? 'Motivo del repice...' :
+                  'Ej: Dirección no encontrada, cliente ausente, acceso restringido...'
+                }
                 rows={3}
                 className={`px-4 py-3 rounded-2xl border bg-slate-50 text-slate-800 text-sm font-semibold placeholder:font-normal placeholder:text-slate-400 focus:outline-none resize-none transition-all ${
-                  liberarTab === 'liberacion'
-                    ? 'border-slate-200 focus:ring-2 focus:ring-rose-400/30 focus:border-rose-400'
-                    : 'border-slate-200 focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400'
+                  liberarTab === 'liberacion' ? 'border-slate-200 focus:ring-2 focus:ring-rose-400/30 focus:border-rose-400' :
+                  liberarTab === 'repice'     ? 'border-slate-200 focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400' :
+                  'border-slate-200 focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400'
                 }`}
               />
             </div>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => { setShowLiberarModal(false); setLiberarObs(''); setLiberarTab('liberacion'); }}
+                onClick={() => { setShowLiberarModal(false); setLiberarObs(''); setLiberarTab('liberacion'); setFalloMsg(null); }}
                 className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
               >
                 Cancelar
@@ -1066,10 +1098,15 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                 onClick={handleLiberar}
                 disabled={liberando || !liberarObs.trim()}
                 className={`px-6 py-2.5 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95 ${
-                  liberarTab === 'liberacion' ? 'bg-rose-500 hover:bg-rose-400' : 'bg-violet-500 hover:bg-violet-400'
+                  liberarTab === 'liberacion' ? 'bg-rose-500 hover:bg-rose-400' :
+                  liberarTab === 'repice'     ? 'bg-violet-500 hover:bg-violet-400' :
+                  'bg-amber-500 hover:bg-amber-400'
                 }`}
               >
-                {liberando ? 'Procesando...' : liberarTab === 'liberacion' ? 'Confirmar Liberación' : 'Confirmar Repice'}
+                {liberando ? 'Procesando...' :
+                 liberarTab === 'liberacion' ? 'Confirmar Liberación' :
+                 liberarTab === 'repice'     ? 'Confirmar Repice' :
+                 'Registrar Fallo + Reasignar'}
               </button>
             </div>
           </div>

@@ -47,6 +47,7 @@ import ghMiscelaneosRoutes from './gh-miscelaneos.routes.js';
 import ghPersonalRoutes from './gh-personal.routes.js';
 import cfgCiudadesRoutes from './cfg-ciudades.routes.js';
 import ghVisitasRoutes from './gh-visitas.routes.js';
+import deliveryScheduleRoutes from './delivery-schedule.routes.js';
 
 
 
@@ -99,6 +100,7 @@ router.use('/gh-miscelaneos', ghMiscelaneosRoutes);
 router.use('/gh-personal', ghPersonalRoutes);
 router.use('/cfg-ciudades', cfgCiudadesRoutes);
 router.use('/gh-visitas', ghVisitasRoutes);
+router.use('/delivery-schedules', deliveryScheduleRoutes);
 
 export default router;
 
