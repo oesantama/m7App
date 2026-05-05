@@ -152,7 +152,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [voucherModal, setVoucherModal]   = useState<{ isOpen: boolean; invoice: any } | null>(null);
     const [showReturnsModal, setShowReturnsModal] = useState(false);
     const [routeSearch, setRouteSearch]     = useState('');
-    const [showMap, setShowMap]             = useState(false);
+    const [showMap, setShowMap]             = useState(false); // legacy — reservado para compatibilidad
+    const [mapDialogOpen, setMapDialogOpen] = useState(false);
     const drawMapRunRef = useRef<number>(0); // cancel concurrent drawRouteOnMap calls
     const [mapRouteInfo, setMapRouteInfo] = useState<{
         plate: string; driverName: string;
@@ -1133,6 +1134,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
     }, [visualizedRoute, selectedActiveRoute, invoices]);
 
+    // Forzar re-cálculo de dimensiones cuando el diálogo del mapa abre
+    useEffect(() => {
+        if (mapDialogOpen && mapRef.current) {
+            setTimeout(() => mapRef.current?.invalidateSize(), 80);
+        }
+    }, [mapDialogOpen]);
+
     // Cleanup effect for map elements on unmount
     useEffect(() => {
         return () => {
@@ -1718,11 +1726,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         </div>
                     )}
                     <button
-                        onClick={() => setShowMap(v => !v)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-all group ${showMap ? 'bg-sky-500/20 text-sky-300 border-sky-500/30 hover:bg-sky-500/30' : 'bg-white/5 text-white border-white/5 hover:bg-white/10'}`}
+                        onClick={() => { setVisualizedRoute(null); setMapDialogOpen(true); }}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-all group bg-white/5 text-white border-white/5 hover:bg-white/10"
                     >
                         <Icons.MapPin className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                        <span>{showMap ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
+                        <span>Ver Mapa</span>
                     </button>
                     <button
                         onClick={() => setShowHistoryModal(true)}
@@ -1753,8 +1761,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             </header>
 
                 <main className="flex-1 flex overflow-hidden">
-                    {/* Lista de Rutas - ancho fijo con mapa, expandida sin mapa */}
-                    <div className={`${showMap ? 'w-[380px] shrink-0' : 'flex-1'} border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar p-4 space-y-3`}>
+                    {/* Lista de Rutas */}
+                    <div className="flex-1 bg-white overflow-y-auto custom-scrollbar p-4 space-y-3">
                         {/* Client selector */}
                         {clientsReady && filteredClients.length !== 1 && (
                             <div className="mb-3">
@@ -1971,7 +1979,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             <div className="flex gap-2">
                                                 <button
                                                     className="flex-1 py-2.5 bg-slate-50 text-slate-600 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-white hover:shadow-md transition-all flex items-center justify-center gap-1.5"
-                                                    onClick={(e) => { e.stopPropagation(); setVisualizedRoute(route); setShowMap(true); }}
+                                                    onClick={(e) => { e.stopPropagation(); setVisualizedRoute(route); setMapDialogOpen(true); }}
                                                 >
                                                     <Icons.MapPin className="w-3 h-3" />
                                                     {visualizedRoute?.id === route.id ? 'Tracker' : 'Mapa'}
@@ -2022,90 +2030,142 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         </>}
                     </div>
 
-                    {/* MAPA EXPANDIDO TOTAL */}
-                    <div className={`flex-1 relative bg-slate-950 ${showMap ? '' : 'hidden'}`}>
-                        <div id="logistics-dispatch-map" className="absolute inset-0 w-full h-full grayscale-[0.1] contrast-[1.05]" />
-                        
-                        {/* Indicador Flotante Sutil */}
-                        <div className="absolute top-4 left-4 z-[400] bg-slate-900/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                </main>
+
+            {/* ── DIALOGO MAPA — siempre en DOM para que Leaflet no se reinicie ───── */}
+            <div
+                className="fixed inset-0 z-[700] flex flex-col transition-all duration-300"
+                style={{ opacity: mapDialogOpen ? 1 : 0, visibility: mapDialogOpen ? 'visible' : 'hidden', pointerEvents: mapDialogOpen ? 'auto' : 'none' }}
+            >
+                {/* Backdrop */}
+                <div
+                    className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                    onClick={() => { setMapDialogOpen(false); setVisualizedRoute(null); }}
+                />
+
+                {/* Contenedor del diálogo */}
+                <div className="relative flex-1 flex m-3 rounded-[2rem] overflow-hidden shadow-2xl border border-white/10">
+
+                    {/* ── MAPA — ocupa todo el espacio restante ── */}
+                    <div className="flex-1 relative bg-slate-950">
+                        <div id="logistics-dispatch-map" className="absolute inset-0 w-full h-full" />
+
+                        {/* Badge live */}
+                        <div className="absolute top-4 left-4 z-[400] bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/10 shadow-xl flex items-center gap-3">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                                 <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Monitor Live</span>
                             </div>
-                            <div className="w-px h-3 bg-white/20"></div>
-                            <div className="text-[9px] font-black text-white">{vehicleLocations.length} Activos</div>
+                            <div className="w-px h-3 bg-white/20" />
+                            <span className="text-[9px] font-black text-white">{vehicleLocations.length} activos</span>
                         </div>
 
-                        {/* ── PANEL FLOTANTE DE RUTA ACTIVA ── */}
-                        {mapRouteInfo && (
-                            <div className="absolute top-4 right-4 z-[400] w-72 bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
-                                {/* Header vehículo */}
-                                <div className="px-4 py-3 bg-slate-800/80 flex items-center justify-between border-b border-white/5">
-                                    <div className="flex items-center gap-2">
-                                        <Icons.Truck className="w-4 h-4 text-emerald-400" />
-                                        <span className="text-sm font-black text-white tracking-wider">{mapRouteInfo.plate || '—'}</span>
+                        {/* Botón cerrar sobre el mapa (mobile) */}
+                        <button
+                            onClick={() => { setMapDialogOpen(false); setVisualizedRoute(null); }}
+                            className="absolute top-4 right-4 z-[400] lg:hidden w-9 h-9 bg-slate-900/90 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 shadow-xl"
+                        >
+                            <Icons.X className="w-4 h-4 text-white" />
+                        </button>
+                    </div>
+
+                    {/* ── PANEL INFO — lateral derecho ── */}
+                    <div className="w-80 lg:w-96 bg-slate-900 flex flex-col border-l border-white/10 shrink-0">
+
+                        {/* Header del panel */}
+                        <div className="px-5 py-4 bg-slate-800 flex items-center justify-between border-b border-white/10 shrink-0">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-9 h-9 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-center shrink-0">
+                                    <Icons.Truck className="w-4.5 h-4.5 text-emerald-400" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-base font-black text-white tracking-wider leading-none">
+                                        {mapRouteInfo?.plate || visualizedRoute?.plate || 'Todas las rutas'}
+                                    </p>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase truncate mt-0.5">
+                                        {mapRouteInfo?.driverName || visualizedRoute?.driver_name || 'Vista general'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { setMapDialogOpen(false); setVisualizedRoute(null); }}
+                                className="w-8 h-8 bg-white/5 hover:bg-white/15 rounded-full flex items-center justify-center transition-all shrink-0 ml-2"
+                            >
+                                <Icons.X className="w-4 h-4 text-slate-400" />
+                            </button>
+                        </div>
+
+                        {/* Stats KPI */}
+                        {mapRouteInfo && mapRouteInfo.distanceKm > 0 && (
+                            <>
+                                <div className="grid grid-cols-3 divide-x divide-white/5 border-b border-white/5 shrink-0">
+                                    <div className="px-3 py-3 text-center">
+                                        <div className="text-lg font-black text-sky-400">{mapRouteInfo.stops.length}</div>
+                                        <div className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Paradas</div>
                                     </div>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[110px]">{mapRouteInfo.driverName || 'Sin conductor'}</span>
+                                    <div className="px-3 py-3 text-center">
+                                        <div className="text-lg font-black text-amber-400">{mapRouteInfo.distanceKm.toFixed(1)}</div>
+                                        <div className="text-[7px] font-black text-slate-500 uppercase tracking-widest">km ruta</div>
+                                    </div>
+                                    <div className="px-3 py-3 text-center">
+                                        <div className="text-lg font-black text-emerald-400">
+                                            {mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin}
+                                        </div>
+                                        <div className="text-[7px] font-black text-slate-500 uppercase tracking-widest">min total</div>
+                                    </div>
                                 </div>
 
-                                {/* Stats de ruta */}
-                                {mapRouteInfo.distanceKm > 0 && (
-                                    <div className="grid grid-cols-3 divide-x divide-white/5 border-b border-white/5">
-                                        <div className="px-3 py-2 text-center">
-                                            <div className="text-base font-black text-sky-400">{mapRouteInfo.stops.length}</div>
-                                            <div className="text-[7px] font-bold text-slate-500 uppercase">Paradas</div>
+                                <div className="px-5 py-2.5 flex gap-4 text-[9px] border-b border-white/5 shrink-0">
+                                    <span className="text-slate-400">🚗 <span className="text-white font-bold">{mapRouteInfo.drivingMin} min</span> conducción</span>
+                                    <span className="text-slate-400">📦 <span className="text-white font-bold">{mapRouteInfo.totalDeliveryMin} min</span> entregas</span>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Lista de paradas */}
+                        {mapRouteInfo && mapRouteInfo.stops.length > 0 ? (
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                {mapRouteInfo.stops.map((st, i) => (
+                                    <div key={i} className="flex items-center gap-3 px-5 py-3 border-b border-white/5 hover:bg-white/5 transition-all">
+                                        <div className="w-6 h-6 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center shrink-0">
+                                            <span className="text-[8px] font-black text-slate-300">{i + 1}</span>
                                         </div>
-                                        <div className="px-3 py-2 text-center">
-                                            <div className="text-base font-black text-amber-400">{mapRouteInfo.distanceKm.toFixed(1)}</div>
-                                            <div className="text-[7px] font-bold text-slate-500 uppercase">km ruta</div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-[10px] font-black text-white truncate">#{st.invNum}</div>
+                                            <div className="text-[9px] text-slate-400 truncate">{st.customer}</div>
                                         </div>
-                                        <div className="px-3 py-2 text-center">
-                                            <div className="text-base font-black text-emerald-400">{mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin}</div>
-                                            <div className="text-[7px] font-bold text-slate-500 uppercase">min total</div>
+                                        <div className="text-right shrink-0">
+                                            <div className="text-[9px] font-black text-amber-400">~{st.estMin} min</div>
+                                            <div className="text-[8px] text-slate-500">{st.items} art.</div>
                                         </div>
                                     </div>
-                                )}
-
-                                {/* Desglose tiempo */}
-                                {mapRouteInfo.distanceKm > 0 && (
-                                    <div className="px-4 py-2 flex gap-3 text-[9px] border-b border-white/5">
-                                        <span className="text-slate-400">🚗 Conducción: <span className="text-white font-bold">{mapRouteInfo.drivingMin} min</span></span>
-                                        <span className="text-slate-400">📦 Entregas: <span className="text-white font-bold">{mapRouteInfo.totalDeliveryMin} min</span></span>
-                                    </div>
-                                )}
-
-                                {/* Lista de paradas con tiempo estimado */}
-                                <div className="max-h-56 overflow-y-auto custom-scrollbar">
-                                    {mapRouteInfo.stops.map((st, i) => (
-                                        <div key={i} className="flex items-center gap-2 px-4 py-2 border-b border-white/5 hover:bg-white/5 transition-all">
-                                            <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
-                                                <span className="text-[8px] font-black text-slate-300">{i + 1}</span>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-[9px] font-black text-white truncate">#{st.invNum}</div>
-                                                <div className="text-[8px] text-slate-400 truncate">{st.customer}</div>
-                                            </div>
-                                            <div className="text-right shrink-0">
-                                                <div className="text-[9px] font-black text-amber-400">~{st.estMin} min</div>
-                                                <div className="text-[7px] text-slate-500">{st.items} art.</div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+                                <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-white/5 flex items-center justify-center">
+                                    <Icons.MapPin className="w-6 h-6 text-slate-600" />
                                 </div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Seleccione una ruta</p>
+                                <p className="text-[9px] text-slate-600">Haga clic en <span className="text-emerald-400 font-bold">Mapa</span> en cualquier tarjeta para ver su trazado</p>
+                            </div>
+                        )}
 
-                                {/* Footer total */}
-                                <div className="px-4 py-2 bg-slate-800/60 flex justify-between items-center">
-                                    <span className="text-[8px] font-bold text-slate-400 uppercase">Tiempo estimado total</span>
-                                    <span className="text-sm font-black text-emerald-400">
-                                        {Math.floor((mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin) / 60) > 0
-                                            ? `${Math.floor((mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin) / 60)}h ${(mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin) % 60}min`
-                                            : `${mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin} min`}
-                                    </span>
-                                </div>
+                        {/* Footer tiempo total */}
+                        {mapRouteInfo && mapRouteInfo.distanceKm > 0 && (
+                            <div className="px-5 py-3 bg-slate-800/60 border-t border-white/5 flex justify-between items-center shrink-0">
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Tiempo estimado total</span>
+                                <span className="text-sm font-black text-emerald-400">
+                                    {(() => {
+                                        const total = mapRouteInfo.drivingMin + mapRouteInfo.totalDeliveryMin;
+                                        return Math.floor(total / 60) > 0 ? `${Math.floor(total / 60)}h ${total % 60}min` : `${total} min`;
+                                    })()}
+                                </span>
                             </div>
                         )}
                     </div>
-                </main>
+                </div>
+            </div>
             </div>
 
             {/* Modal de Detalle Mejorado */}

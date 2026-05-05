@@ -836,21 +836,12 @@ export const updatePaymentMethod = async (req: Request, res: Response) => {
         const oldMethod = currentRes.rows[0]?.metodo_pago || 'DESCONOCIDO';
 
         // 2. Actualizar método de pago
-        // Intentamos un UPDATE primero para evitar violar el constraint de UNIQUE invoice
-        const updRes = await client.query(`
+        // El usuario solicita que SOLO se actualice, no se debe insertar si no existe.
+        await client.query(`
             UPDATE document_l_payments 
             SET metodo_pago = $1, user_id = $2, processed_at = NOW()
             WHERE document_id = $3 AND invoice = $4
-            RETURNING *
         `, [newMethod, userId, documentId, invoice]);
-
-        // Si no se actualizó nada, significa que no existe el registro, procedemos a INSERT
-        if (updRes.rowCount === 0) {
-            await client.query(`
-                INSERT INTO document_l_payments (document_id, invoice, metodo_pago, user_id, processed_at)
-                VALUES ($1, $2, $3, $4, NOW())
-            `, [documentId, invoice, newMethod, userId]);
-        }
 
         // 3. Registrar en historial
         await client.query(`
