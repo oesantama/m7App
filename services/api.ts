@@ -383,7 +383,8 @@ export const api = {
 
   // --- ENCUESTAS PÚBLICAS ---
   validateSurveyAccess: (params: { cedula?: string, id?: string | number }) => {
-    const qs = new URLSearchParams(params as any).toString();
+    const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== undefined && v !== ''));
+    const qs = new URLSearchParams(clean as any).toString();
     return fetchJson(`${API_URL}/gh-personal/public/survey/validate?${qs}`);
   },
   savePublicSurvey: (data: { cedula: string, data: any, familia: any[] }) => fetchJson(`${API_URL}/gh-personal/public/survey/save`, {

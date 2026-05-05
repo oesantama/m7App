@@ -258,7 +258,7 @@ const PublicSurvey: React.FC = () => {
           <p className="text-slate-500 text-sm font-medium mb-10">Ingrese su cédula para validar su autorización</p>
           <div className="space-y-6">
             <input value={cedula} onChange={e => setCedula(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleValidate()} placeholder="Número de Cédula" className="w-full h-16 px-6 rounded-3xl bg-slate-50 border-2 border-slate-100 text-lg font-black text-slate-800 placeholder:text-slate-300 outline-none focus:border-indigo-500 transition-all text-center" />
-            <button onClick={handleValidate} disabled={validating} className="w-full h-16 rounded-3xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest shadow-xl shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3">
+            <button onClick={() => handleValidate()} disabled={validating} className="w-full h-16 rounded-3xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest shadow-xl shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3">
               {validating ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" /> : <Search size={20} strokeWidth={3} />}
               Validar Acceso
             </button>
