@@ -45,6 +45,11 @@ const GestionDocumental: React.FC = () => {
     const [dateFrom, setDateFrom] = useState<string>('');
     const [dateTo, setDateTo] = useState<string>('');
 
+    // Table pagination and search state
+    const [tableSearchTerm, setTableSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(5);
+
     // Explore States
     const [exploreYear, setExploreYear] = useState<string>(new Date().getFullYear().toString());
     const [exploreClient, setExploreClient] = useState<string>('');
@@ -141,6 +146,21 @@ const GestionDocumental: React.FC = () => {
             fetchHistory(); 
         }
     }, [activeTab]);
+
+    // Calcular datos paginados
+    const filteredHistory = history.filter(h => 
+        h.fileName.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
+        h.clientName.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
+        h.userName.toLowerCase().includes(tableSearchTerm.toLowerCase())
+    );
+
+    const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(filteredHistory.length / (rowsPerPage as number)) || 1;
+    const startIndex = rowsPerPage === 'all' ? 0 : (currentPage - 1) * (rowsPerPage as number);
+    const paginatedHistory = rowsPerPage === 'all' ? filteredHistory : filteredHistory.slice(startIndex, startIndex + (rowsPerPage as number));
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [tableSearchTerm, history, rowsPerPage]);
 
     const handleUpload = async () => {
         if (!selectedClient || files.length === 0) {
@@ -569,13 +589,34 @@ const GestionDocumental: React.FC = () => {
 
                         {/* Tabla de Resultados */}
                         <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
-                            <div className="flex justify-between items-center p-8 bg-slate-50/30 border-b border-slate-50">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-8 bg-slate-50/30 border-b border-slate-50 gap-4">
                                 <h3 className="text-slate-800 font-black uppercase tracking-tight flex items-center gap-3">
                                     <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                                    Registros de Trazabilidad ({history.length})
+                                    Registros de Trazabilidad ({filteredHistory.length})
                                 </h3>
-                                <div className="flex gap-3">
-                                    <button onClick={exportToExcel} className="px-5 py-3 bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                                    <div className="relative flex-1 md:flex-none">
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar en tabla..."
+                                            className="w-full md:w-64 pl-10 pr-4 py-2.5 bg-white border-2 border-slate-100 rounded-xl text-[11px] font-black outline-none focus:border-indigo-500 transition-all"
+                                            value={tableSearchTerm}
+                                            onChange={e => setTableSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <select
+                                        className="py-2.5 px-4 bg-white border-2 border-slate-100 rounded-xl text-[11px] font-black outline-none focus:border-indigo-500 transition-all cursor-pointer"
+                                        value={rowsPerPage}
+                                        onChange={e => setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                                    >
+                                        <option value={5}>5 Filas</option>
+                                        <option value={10}>10 Filas</option>
+                                        <option value={20}>20 Filas</option>
+                                        <option value={50}>50 Filas</option>
+                                        <option value="all">Todas</option>
+                                    </select>
+                                    <button onClick={exportToExcel} className="px-5 py-2.5 bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20">
                                         <Download size={16} /> Exportar
                                     </button>
                                 </div>
@@ -595,7 +636,7 @@ const GestionDocumental: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                        {history.map(h => {
+                                        {paginatedHistory.map(h => {
                                             const { diffHours, status } = calculateSLA(h.uploadDate, h.folderDate, h.clientType);
                                             return (
                                                 <tr key={h.id} className={`transition-all group ${h.isDeleted ? 'bg-rose-50/30' : 'hover:bg-slate-50/50'}`}>
@@ -673,7 +714,31 @@ const GestionDocumental: React.FC = () => {
                                 </table>
                             </div>
 
-                            {history.length === 0 && !isConsulting && (
+                            {filteredHistory.length > 0 && rowsPerPage !== 'all' && (
+                                <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+                                    <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                                        Página {currentPage} de {totalPages}
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-all uppercase"
+                                        >
+                                            Anterior
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-all uppercase"
+                                        >
+                                            Siguiente
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {filteredHistory.length === 0 && !isConsulting && (
                                 <div className="flex flex-col items-center justify-center py-32 gap-6 bg-slate-50/20">
                                     <div className="w-32 h-32 bg-white rounded-[3rem] shadow-xl flex items-center justify-center text-slate-100">
                                         <Search size={64} />
