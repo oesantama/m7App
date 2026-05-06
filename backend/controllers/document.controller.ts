@@ -2166,8 +2166,17 @@ export const uploadCumplido = async (req: Request, res: Response) => {
 export const getDocumentStats = async (req: Request, res: Response) => {
     try {
         const { dateFrom, dateTo, clientId, userId, search, folderDate } = req.query;
+        const user = (req as any).user;
+        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+
         const params: any[] = [];
         const conditions: string[] = [];
+
+        if (!isSuper) {
+            const allowedIds = user?.client_ids || [];
+            params.push(allowedIds);
+            conditions.push(`d.client_id = ANY($${params.length}::text[])`);
+        }
 
         if (!dateFrom && !dateTo && !search && !clientId) {
             conditions.push("d.upload_date >= NOW() - INTERVAL '48 hours'");
