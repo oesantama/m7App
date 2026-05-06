@@ -575,14 +575,30 @@ const GestionDocumental: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <button 
-                                        onClick={() => fetchHistory()}
-                                        disabled={isConsulting}
-                                        className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-900/20 disabled:opacity-50"
-                                    >
-                                        {isConsulting ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
-                                        CONSULTAR
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => {
+                                                setDateFrom('');
+                                                setDateTo('');
+                                                setFolderDateFilter('');
+                                                setSelectedClientFilter('');
+                                                setSearchTerm('');
+                                                setTableSearchTerm('');
+                                            }}
+                                            className="w-14 h-[52px] bg-slate-100 text-slate-500 rounded-2xl hover:bg-rose-100 hover:text-rose-600 transition-all flex items-center justify-center shrink-0 shadow-inner"
+                                            title="Limpiar Filtros"
+                                        >
+                                            <RotateCcw size={16} />
+                                        </button>
+                                        <button 
+                                            onClick={() => fetchHistory()}
+                                            disabled={isConsulting}
+                                            className="flex-1 h-[52px] bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-900/20 disabled:opacity-50"
+                                        >
+                                            {isConsulting ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                                            CONSULTAR
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
