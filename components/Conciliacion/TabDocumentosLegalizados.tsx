@@ -388,8 +388,19 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                 'FECHA PAGO':      fmtDateExcel(i.fecha_pago),
             }));
 
-            const wsMain = XLSX.utils.aoa_to_sheet([[`REPORTE CONCILIACIÓN - ${selectedDoc.external_doc_id}`]]);
-            XLSX.utils.sheet_add_aoa(wsMain, [[]], { origin: -1 });
+            const totalDocumentoGlobal = Math.round(invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+            const individualLeg = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
+            const grupalLeg = (groupPayments || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+            const sobrecostosLeg = (routeSurcharges || []).filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+            const totalLegalizadoGlobal = Math.round(individualLeg + grupalLeg + sobrecostosLeg);
+
+            const wsMain = XLSX.utils.aoa_to_sheet([
+                [`REPORTE CONCILIACIÓN - ${selectedDoc.external_doc_id}`, '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
+                ['', '', '', '', 'TOTAL LEGALIZADO:', totalLegalizadoGlobal],
+                []
+            ]);
+            if (wsMain['F1']) wsMain['F1'].z = '#,##0';
+            if (wsMain['F2']) wsMain['F2'].z = '#,##0';
             if (groupPayments.length > 0) {
                 XLSX.utils.sheet_add_aoa(wsMain, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
                 XLSX.utils.sheet_add_json(wsMain, groupPayments.map(g => ({
@@ -406,8 +417,23 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
             const plates = Array.from(new Set(invoices.map(i => i.route_vehicle_plate).filter(Boolean)));
             plates.forEach(p => {
                 if (!p) return;
-                const ws = XLSX.utils.aoa_to_sheet([['PLACA: ' + p]]);
+                const plateInvs = invoices.filter(i => i.route_vehicle_plate === p);
                 const plateGroup = groupPayments.filter(g => g.plate === p);
+                const plateSur = routeSurcharges.filter(s => s.plate === p);
+
+                const plateTotalDoc = Math.round(plateInvs.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+                const plateIndLeg = plateInvs.reduce((s, i) => s + (Number(i.valor) || 0), 0);
+                const plateGrpLeg = plateGroup.reduce((s, g) => s + (Number(g.valor) || 0), 0);
+                const plateSurLeg = plateSur.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+                const plateTotalLeg = Math.round(plateIndLeg + plateGrpLeg + plateSurLeg);
+
+                const ws = XLSX.utils.aoa_to_sheet([
+                    ['PLACA: ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
+                    ['', '', '', '', 'TOTAL LEGALIZADO:', plateTotalLeg],
+                    []
+                ]);
+                if (ws['F1']) ws['F1'].z = '#,##0';
+                if (ws['F2']) ws['F2'].z = '#,##0';
                 if (plateGroup.length > 0) {
                     XLSX.utils.sheet_add_aoa(ws, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
                     XLSX.utils.sheet_add_json(ws, plateGroup.map(g => ({
@@ -417,7 +443,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                     XLSX.utils.sheet_add_aoa(ws, [[]], { origin: -1 });
                 }
                 XLSX.utils.sheet_add_aoa(ws, [['FACTURAS']], { origin: -1 });
-                XLSX.utils.sheet_add_json(ws, mapInvoices(invoices.filter(i => i.route_vehicle_plate === p)), { origin: -1 });
+                XLSX.utils.sheet_add_json(ws, mapInvoices(plateInvs), { origin: -1 });
                 XLSX.utils.book_append_sheet(wb, ws, p.slice(0, 30));
             });
 

@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 const isDev = import.meta.env.DEV;
-const API_URL = isDev ? 'http://localhost:8080/api' : (import.meta.env.VITE_API_URL || '/api');
+const API_URL = import.meta.env.VITE_API_URL || (isDev ? 'http://localhost:8080/api' : '/api');
 
 export const fetchJson = async (url: string, options?: any) => {
   const executeFetch = async (retryCount = 0): Promise<any> => {
@@ -710,6 +710,26 @@ export const api = {
     if (params?.plate) qs.set('plate', params.plate);
     return fetchJson(`${API_URL}/documents/mastersuite-report?${qs.toString()}`);
   },
+
+  // ── Auditoría Factura Bodega 36 ──────────────────────────────────────────
+  uploadAuditoriaB36: (formData: FormData) =>
+    fetchJson(`${API_URL}/ajover-b36/upload`, { method: 'POST', body: formData }),
+
+  getAuditoriaB36Encabezados: (params?: { clientId?: string; from?: string; to?: string; placa?: string; os?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.clientId) qs.set('clientId', params.clientId);
+    if (params?.from)     qs.set('from',     params.from);
+    if (params?.to)       qs.set('to',       params.to);
+    if (params?.placa)    qs.set('placa',    params.placa);
+    if (params?.os)       qs.set('os',       params.os);
+    return fetchJson(`${API_URL}/ajover-b36/encabezados?${qs.toString()}`);
+  },
+
+  getAuditoriaB36Detalle: (encId: number) =>
+    fetchJson(`${API_URL}/ajover-b36/detalle/${encId}`),
+
+  deleteAuditoriaB36: (id: number) =>
+    fetchJson(`${API_URL}/ajover-b36/encabezado/${id}`, { method: 'DELETE' }),
 
   // GPS Tracking (Nueva API dedicada)
   updateVehicleLocation: (data: any) => fetchJson(`${API_URL}/locations/update`, {

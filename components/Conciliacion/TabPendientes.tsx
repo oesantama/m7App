@@ -373,9 +373,20 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
             // --- HOJA 1: CONSOLIDADO GENERAL ---
             const consolidatedData = mapInvoices(invoices);
-            // Iniciamos con un título o vacío para controlar el orden
-            const wsConsolidated = XLSX.utils.aoa_to_sheet([['REPORTE CONSOLIDADO DE CONCILIACIÓN']]);
-            XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
+            
+            const totalDocumentoGlobal = Math.round(invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+            const individualLeg = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
+            const grupalLeg = (groupPayments || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+            const sobrecostosLeg = (routeSurcharges || []).filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+            const totalLegalizadoGlobal = Math.round(individualLeg + grupalLeg + sobrecostosLeg);
+
+            const wsConsolidated = XLSX.utils.aoa_to_sheet([
+                ['REPORTE CONSOLIDADO DE CONCILIACIÓN', '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
+                ['', '', '', '', 'TOTAL LEGALIZADO:', totalLegalizadoGlobal],
+                []
+            ]);
+            if (wsConsolidated['F1']) wsConsolidated['F1'].z = '#,##0';
+            if (wsConsolidated['F2']) wsConsolidated['F2'].z = '#,##0';
 
             // 1. CONSIGNACIONES GRUPALES
             if (groupPayments && groupPayments.length > 0) {
@@ -416,12 +427,24 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 if (!p) return;
                 const plateInvs = invoices.filter(i => i.route_vehicle_plate === p);
                 const plateData = mapInvoices(plateInvs);
+                const plateGroup = groupPayments?.filter(g => g.plate === p) || [];
+                const plateSur = routeSurcharges?.filter(s => s.plate === p) || [];
+
+                const plateTotalDoc = Math.round(plateInvs.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+                const plateIndLeg = plateInvs.reduce((s, i) => s + (Number(i.valor) || 0), 0);
+                const plateGrpLeg = plateGroup.reduce((s, g) => s + (Number(g.valor) || 0), 0);
+                const plateSurLeg = plateSur.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+                const plateTotalLeg = Math.round(plateIndLeg + plateGrpLeg + plateSurLeg);
                 
-                const wsPlate = XLSX.utils.aoa_to_sheet([['REPORTE DE CONCILIACIÓN - PLACA ' + p]]);
-                XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
+                const wsPlate = XLSX.utils.aoa_to_sheet([
+                    ['REPORTE DE CONCILIACIÓN - PLACA ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
+                    ['', '', '', '', 'TOTAL LEGALIZADO:', plateTotalLeg],
+                    []
+                ]);
+                if (wsPlate['F1']) wsPlate['F1'].z = '#,##0';
+                if (wsPlate['F2']) wsPlate['F2'].z = '#,##0';
 
                 // 1. Pagos grupales de esta placa
-                const plateGroup = groupPayments?.filter(g => g.plate === p) || [];
                 if (plateGroup.length > 0) {
                     XLSX.utils.sheet_add_aoa(wsPlate, [['CONSIGNACIONES GRUPALES - ' + p]], { origin: -1 });
                     XLSX.utils.sheet_add_json(wsPlate, plateGroup.map(g => ({
@@ -435,7 +458,6 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 }
 
                 // 2. Sobrecostos de esta placa
-                const plateSur = routeSurcharges?.filter(s => s.plate === p) || [];
                 if (plateSur.length > 0) {
                     XLSX.utils.sheet_add_aoa(wsPlate, [['SOBRECOSTOS DE RUTA - ' + p]], { origin: -1 });
                     XLSX.utils.sheet_add_json(wsPlate, plateSur.map(s => ({

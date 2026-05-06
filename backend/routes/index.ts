@@ -48,8 +48,7 @@ import ghPersonalRoutes from './gh-personal.routes.js';
 import cfgCiudadesRoutes from './cfg-ciudades.routes.js';
 import ghVisitasRoutes from './gh-visitas.routes.js';
 import deliveryScheduleRoutes from './delivery-schedule.routes.js';
-
-
+import ajoverB36Routes from './ajover-b36.routes.js';
 
 const router = Router();
 
@@ -101,6 +100,7 @@ router.use('/gh-personal', ghPersonalRoutes);
 router.use('/cfg-ciudades', cfgCiudadesRoutes);
 router.use('/gh-visitas', ghVisitasRoutes);
 router.use('/delivery-schedules', deliveryScheduleRoutes);
+router.use('/ajover-b36', ajoverB36Routes);
 
 export default router;
 

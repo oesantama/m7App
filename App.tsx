@@ -75,6 +75,7 @@ const GestionDocumental = lazyWithRetry(() => import('./components/documents/Ges
 const ValidacionConciliaciones = lazyWithRetry(() => import('./components/OperacionExito/ValidacionConciliaciones'));
 const FletesConciliacion = lazyWithRetry(() => import('./components/OperacionExito/FletesConciliacion'));
 const InformeDashboardDrive = lazyWithRetry(() => import('./components/documents/InformeDashboardDrive'));
+const AuditoriaFactura = lazyWithRetry(() => import('./components/Logistics/AuditoriaFactura'));
 
 
 // Import Admin Module
@@ -975,6 +976,8 @@ const App: React.FC = () => {
         return <CfgCiudades user={user!} />;
       case 'informe-dashboard-drive':
         return <InformeDashboardDrive user={user!} />;
+      case 'auditoria-factura':
+        return <AuditoriaFactura user={user!} />;
       case 'validacion-conciliaciones':
         return <ValidacionConciliaciones user={user!} />;
       case 'fletes-conciliacion':

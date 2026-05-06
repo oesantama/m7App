@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import { api } from '../../services/api';
 import { User } from '../../types';
 import { Icons } from '../../constants';
@@ -188,6 +189,50 @@ const Personal: React.FC<Props> = ({ user }) => {
   const totalPagesEncuestas = Math.max(1, Math.ceil(filteredEncuestas.length / encuestasLimit)) || 1;
   const totalPagesResultados = Math.max(1, Math.ceil(resultados.length / resultadosLimit)) || 1;
 
+  const exportPersonalExcel = () => {
+    if (filteredPersonal.length === 0) { toast.error('No hay datos para exportar.'); return; }
+    const data = filteredPersonal.map(p => ({
+      NOMBRE:              p.nombre,
+      CÉDULA:              p.cedula,
+      CARGO:               p.cargo || '',
+      ÁREA:                p.area_nombre || '',
+      EPS:                 p.eps || '',
+      AFP:                 p.afp || '',
+      CELULAR:             p.celular_personal || '',
+      CORREO:              p.correo_personal || '',
+      'FECHA INGRESO':     p.fecha_ingreso ? new Date(p.fecha_ingreso).toLocaleDateString('es-CO') : '',
+      ESTADO:              p.estado === 'EST-01' ? 'ACTIVO' : 'INACTIVO',
+      'ES JEFE':           p.es_jefe ? 'SÍ' : 'NO',
+      'JEFE INMEDIATO':    p.jefe_nombre || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [20,14,22,18,16,16,14,28,14,10,8,20].map(w => ({ wch: w }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Personal');
+    XLSX.writeFile(wb, `personal_gh_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast.success(`${data.length} registros exportados.`);
+  };
+
+  const exportEncuestasExcel = () => {
+    if (filteredEncuestas.length === 0) { toast.error('No hay datos para exportar.'); return; }
+    const data = filteredEncuestas.map(e => {
+      const persona = personal.find(p => p.cedula === e.cedula);
+      return {
+        NOMBRE:            persona?.nombre || '',
+        CÉDULA:            e.cedula,
+        'FECHA ACTIVACIÓN': new Date(e.fecha_activacion).toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
+        ESTADO:            e.estado,
+        'ACTIVADO POR':    e.usuario_control || '',
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [28,14,22,14,20].map(w => ({ wch: w }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Encuestas');
+    XLSX.writeFile(wb, `encuestas_asignadas_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast.success(`${data.length} registros exportados.`);
+  };
+
   const handleSave = async () => {
     if (!form.nombre || !form.cedula) {
       toast.error('Nombre y Cédula son obligatorios');
@@ -301,9 +346,16 @@ const Personal: React.FC<Props> = ({ user }) => {
         <div className="p-6">
           {activeTab === 'personal' ? (
             <div className="space-y-4">
-              <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full sm:w-72 border border-slate-100">
-                <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="BUSCAR POR NOMBRE O CÉDULA..." className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 w-full" />
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full sm:w-72 border border-slate-100">
+                  <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="BUSCAR POR NOMBRE O CÉDULA..." className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 w-full" />
+                </div>
+                <button onClick={exportPersonalExcel}
+                  className="h-10 px-4 flex items-center gap-2 border border-emerald-300 text-emerald-700 bg-emerald-50 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all">
+                  <Icons.Download className="w-3.5 h-3.5" />
+                  Exportar Excel ({filteredPersonal.length})
+                </button>
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-slate-100">
@@ -364,9 +416,16 @@ const Personal: React.FC<Props> = ({ user }) => {
             </div>
           ) : activeTab === 'encuestas' ? (
             <div className="space-y-4">
-              <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full sm:w-72 border border-slate-100">
-                <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
-                <input value={encuestasSearch} onChange={e => { setEncuestasSearch(e.target.value); setEncuestasPage(1); }} placeholder="BUSCAR POR CÉDULA O USUARIO..." className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 w-full" />
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full sm:w-72 border border-slate-100">
+                  <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
+                  <input value={encuestasSearch} onChange={e => { setEncuestasSearch(e.target.value); setEncuestasPage(1); }} placeholder="BUSCAR POR CÉDULA O USUARIO..." className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 w-full" />
+                </div>
+                <button onClick={exportEncuestasExcel}
+                  className="h-10 px-4 flex items-center gap-2 border border-emerald-300 text-emerald-700 bg-emerald-50 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all">
+                  <Icons.Download className="w-3.5 h-3.5" />
+                  Exportar Excel ({filteredEncuestas.length})
+                </button>
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-slate-100">
