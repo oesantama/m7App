@@ -748,27 +748,50 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     
     y += dateRowH + 2;
 
-    const drawFormRow = (label1: string, val1: any, label2: string, val2: any, currentY: number) => {
-      const rowH = 12;
+    const drawFormRow = (label1: string, val1: any, label2: string, val2: any, currentY: number): number => {
       const colW = innerWidth / 2;
-      doc.setFontSize(7);
-      doc.setTextColor(0);
+      const labelH = 6;    // altura fija de la sub-fila de etiqueta
+      const lineH = 4.2;   // alto por línea de texto en el valor
+      const minH  = 6;     // mínimo alto del área de valor
+      const pad   = 2;
       const displayVal = (v: any) => (v !== null && v !== undefined && v !== '') ? String(v) : '—';
 
-      doc.setFont("helvetica", "bold");
-      doc.rect(margin, currentY, colW, rowH / 2);
-      doc.text(label1, margin + 2, currentY + 4);
-      doc.setFont("helvetica", "normal");
-      doc.rect(margin, currentY + (rowH / 2), colW, rowH / 2);
-      doc.text(displayVal(val1), margin + 2, currentY + (rowH / 2) + 4, { maxWidth: colW - 4 });
+      doc.setFontSize(7);
 
+      // Pre-dividir el texto para medir cuántas líneas necesita cada columna
+      const txt1 = doc.splitTextToSize(displayVal(val1), colW - pad * 2);
+      const txt2 = doc.splitTextToSize(displayVal(val2), colW - pad * 2);
+      const contentH = Math.max(txt1.length * lineH + pad, txt2.length * lineH + pad, minH);
+      const rowH = labelH + contentH;
+
+      // Salto de página automático si la fila no cabe
+      const pageH = (doc.internal.pageSize as any).height;
+      if (currentY + rowH > pageH - 15) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setTextColor(0);
+
+      // Columna izquierda — etiqueta
+      doc.setFont("helvetica", "bold");
+      doc.rect(margin, currentY, colW, labelH);
+      doc.text(label1, margin + pad, currentY + 4.5);
+      // Columna izquierda — valor (altura dinámica)
+      doc.setFont("helvetica", "normal");
+      doc.rect(margin, currentY + labelH, colW, contentH);
+      doc.text(txt1, margin + pad, currentY + labelH + lineH);
+
+      // Columna derecha — etiqueta
       const col2X = margin + colW;
       doc.setFont("helvetica", "bold");
-      doc.rect(col2X, currentY, colW, rowH / 2);
-      doc.text(label2, col2X + 2, currentY + 4);
+      doc.rect(col2X, currentY, colW, labelH);
+      doc.text(label2, col2X + pad, currentY + 4.5);
+      // Columna derecha — valor (altura dinámica)
       doc.setFont("helvetica", "normal");
-      doc.rect(col2X, currentY + (rowH / 2), colW, rowH / 2);
-      doc.text(displayVal(val2), col2X + 2, currentY + (rowH / 2) + 4, { maxWidth: colW - 4 });
+      doc.rect(col2X, currentY + labelH, colW, contentH);
+      doc.text(txt2, col2X + pad, currentY + labelH + lineH);
+
       return currentY + rowH;
     };
 
@@ -842,8 +865,13 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     }
     
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    const cleanName = (enc.nombre || 'SIN_NOMBRE')
+      .toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^A-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const fechaPdf = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=F-GA-013_${enc.cedula}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=encuesta_${cleanName}_${enc.cedula}_${fechaPdf}.pdf`);
     res.send(pdfBuffer);
   } catch (err: any) {
     console.error('[PDF-ERROR]', err);

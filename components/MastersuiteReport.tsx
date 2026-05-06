@@ -16,6 +16,26 @@ const COLS: Array<keyof ReportRow> = [
   'DOCUMENT_ID', 'TRUCK_ID_ORIGIN', 'LOAD_ID', 'TRUCK_ID_DESTIN', 'DRIVER_ID_DESTIN', 'FECHA_HORA_ASIGNACION'
 ];
 
+const fmtColombianDate = (dateStr?: string): string => {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleString('es-CO', {
+      timeZone: 'America/Bogota',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
 const MastersuiteReport: React.FC = () => {
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,7 +74,11 @@ const MastersuiteReport: React.FC = () => {
   const exportExcel = () => {
     if (rows.length === 0) return;
 
-    const ws = XLSX.utils.json_to_sheet(rows, { header: COLS });
+    const exportRows = rows.map(r => ({
+      ...r,
+      FECHA_HORA_ASIGNACION: fmtColombianDate(r.FECHA_HORA_ASIGNACION),
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportRows, { header: COLS });
     ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 24 }];
 
     const wb = XLSX.utils.book_new();
@@ -245,7 +269,7 @@ const MastersuiteReport: React.FC = () => {
                     <td className="px-4 py-2.5 font-bold text-slate-600 whitespace-nowrap">
                       <div className="flex flex-col">
                         <span className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Asignación</span>
-                        {row.FECHA_HORA_ASIGNACION || '—'}
+                        {fmtColombianDate(row.FECHA_HORA_ASIGNACION)}
                       </div>
                     </td>
                   </tr>

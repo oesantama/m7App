@@ -597,6 +597,10 @@ const healSchema = async (client: any) => {
       INSERT INTO pages (id, name, route, module_id, status_id)
       SELECT 'PAG-45', 'CUMPLIDOS DRIVE', 'cumplidos', 'MOD-10', 'EST-01'
       WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-45');
+
+      INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
+      SELECT 'PAG-48', 'INFORME DASHBOARD DRIVE', 'informe-dashboard-drive', 'MOD-10', 'MOD-10', 'EST-01'
+      WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-48');
     `);
 
     // ── NORMALIZACIÓN document_items.item_status ─────────────────────────────
@@ -804,7 +808,8 @@ export const restoreSystem = async () => {
       ('MOD-06', 'ADMINISTRACIÓN', 'Database', 'EST-01'),
       ('MOD-07', 'GESTIÓN GRUPO INTER', 'Truck', 'EST-01'),
       ('MOD-08', 'CENTRO DE FORMACIÓN', 'Award', 'EST-01'),
-      ('MOD-09', 'GESTIÓN HUMANA', 'Users', 'EST-01')
+      ('MOD-09', 'GESTIÓN HUMANA', 'Users', 'EST-01'),
+      ('MOD-11', 'OPERACIÓN ÉXITO', 'Star', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class, status_id = EXCLUDED.status_id;
     `);
 
@@ -872,9 +877,13 @@ export const restoreSystem = async () => {
       ('PAG-44', 'REGISTRO DE VISITAS', 'gestion-humana-visitas', 'MOD-09', 'MOD-09', 'EST-01'),
 
       -- Configuración Maestros extra (MOD-01)
-      ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01')
+      ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01'),
 
-      ON CONFLICT (id) DO UPDATE SET 
+      -- Operación Éxito (MOD-11)
+      ('PAG-46', 'VALIDACIÓN CONCILIACIONES', 'validacion-conciliaciones', 'MOD-11', 'MOD-11', 'EST-01'),
+      ('PAG-47', 'FLETES DE CONCILIACIÓN',    'fletes-conciliacion',        'MOD-11', 'MOD-11', 'EST-01')
+
+      ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name, 
         route = EXCLUDED.route, 
         module_id = EXCLUDED.module_id, 

@@ -72,6 +72,9 @@ const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/Pu
 const PublicVisitForm = lazyWithRetry(() => import('./components/GestionHumana/PublicVisitForm'));
 const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 const GestionDocumental = lazyWithRetry(() => import('./components/documents/GestionDocumental'));
+const ValidacionConciliaciones = lazyWithRetry(() => import('./components/OperacionExito/ValidacionConciliaciones'));
+const FletesConciliacion = lazyWithRetry(() => import('./components/OperacionExito/FletesConciliacion'));
+const InformeDashboardDrive = lazyWithRetry(() => import('./components/documents/InformeDashboardDrive'));
 
 
 // Import Admin Module
@@ -970,6 +973,12 @@ const App: React.FC = () => {
         return <GestionHumanaVisitas user={user!} />;
       case 'cfg-ciudades':
         return <CfgCiudades user={user!} />;
+      case 'informe-dashboard-drive':
+        return <InformeDashboardDrive user={user!} />;
+      case 'validacion-conciliaciones':
+        return <ValidacionConciliaciones user={user!} />;
+      case 'fletes-conciliacion':
+        return <FletesConciliacion user={user!} />;
       default:
         return (
           <div className="p-10 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
