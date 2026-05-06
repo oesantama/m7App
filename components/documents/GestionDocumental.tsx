@@ -377,24 +377,24 @@ const GestionDocumental: React.FC = () => {
                     </p>
                 </div>
                 
-                <div className="flex bg-slate-100 p-1.5 rounded-[2rem] shadow-inner w-full lg:w-auto">
+                <div className="flex bg-slate-100 p-1.5 rounded-[2rem] shadow-inner w-full lg:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x">
                     <button 
                         onClick={() => setActiveTab('upload')}
-                        className={`flex-1 lg:flex-none px-8 py-3 rounded-[1.75rem] flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all
+                        className={`shrink-0 snap-center flex-1 lg:flex-none px-8 py-3 rounded-[1.75rem] flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all
                             ${activeTab === 'upload' ? 'bg-white text-indigo-600 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <Upload size={18} /> Cargar Soporte
                     </button>
                     <button 
                         onClick={() => setActiveTab('consult')}
-                        className={`flex-1 lg:flex-none px-8 py-3 rounded-[1.75rem] flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all
+                        className={`shrink-0 snap-center flex-1 lg:flex-none px-8 py-3 rounded-[1.75rem] flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all
                             ${activeTab === 'consult' ? 'bg-white text-indigo-600 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <List size={18} /> Consultar Drive
                     </button>
                     <button 
                         onClick={() => setActiveTab('explore')}
-                        className={`flex-1 lg:flex-none px-8 py-3 rounded-[1.75rem] flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all
+                        className={`shrink-0 snap-center flex-1 lg:flex-none px-8 py-3 rounded-[1.75rem] flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all
                             ${activeTab === 'explore' ? 'bg-white text-indigo-600 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <FolderSearch size={18} /> Explorador Remoto
