@@ -391,16 +391,47 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
             const totalDocumentoGlobal = Math.round(invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
             const individualLeg = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
             const grupalLeg = (groupPayments || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
-            const sobrecostosLeg = (routeSurcharges || []).filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+            const sobrecostosLeg = Math.round((routeSurcharges || []).filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0));
             const totalLegalizadoGlobal = Math.round(individualLeg + grupalLeg + sobrecostosLeg);
+
+            const totalCreditoGlobal = Math.round(invoices.filter(i => {
+                const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+                return !(m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '');
+            }).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+
+            const totalDevolucionesGlobal = Math.round(invoices.reduce((s, i) => {
+                const status = (i.item_status || '').toUpperCase();
+                const isDev  = i.es_devolucion || DEVUELTO_STATUS.includes(status);
+                const isPar  = PARCIAL_STATUS.includes(status);
+                if (isDev) return s + (Number(i.invoice_value) || 0);
+                if (isPar) {
+                    const totalQtyItems = i.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
+                    const unitPrice     = (Number(i.invoice_value) || 0) / (totalQtyItems || 1);
+                    const itemsDevVal   = i.items?.reduce((acc: number, it: any) => {
+                        const v = (it.returned_value !== undefined && it.returned_value !== null)
+                            ? Number(it.returned_value)
+                            : (Number(it.returned_qty || 0) * unitPrice);
+                        return acc + v;
+                    }, 0) || 0;
+                    if (itemsDevVal > 0) return s + itemsDevVal;
+                    if (i.forma_pago) return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
+                }
+                return s;
+            }, 0));
 
             const wsMain = XLSX.utils.aoa_to_sheet([
                 [`REPORTE CONCILIACIÓN - ${selectedDoc.external_doc_id}`, '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
+                ['', '', '', '', 'TOTAL CRÉDITO:', totalCreditoGlobal],
+                ['', '', '', '', 'TOTAL DEVOLUCION:', totalDevolucionesGlobal],
+                ['', '', '', '', 'TOTAL SOBRECOSTO:', sobrecostosLeg],
                 ['', '', '', '', 'TOTAL LEGALIZADO:', totalLegalizadoGlobal],
                 []
             ]);
             if (wsMain['F1']) wsMain['F1'].z = '#,##0';
             if (wsMain['F2']) wsMain['F2'].z = '#,##0';
+            if (wsMain['F3']) wsMain['F3'].z = '#,##0';
+            if (wsMain['F4']) wsMain['F4'].z = '#,##0';
+            if (wsMain['F5']) wsMain['F5'].z = '#,##0';
             if (groupPayments.length > 0) {
                 XLSX.utils.sheet_add_aoa(wsMain, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
                 XLSX.utils.sheet_add_json(wsMain, groupPayments.map(g => ({
@@ -424,16 +455,47 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                 const plateTotalDoc = Math.round(plateInvs.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
                 const plateIndLeg = plateInvs.reduce((s, i) => s + (Number(i.valor) || 0), 0);
                 const plateGrpLeg = plateGroup.reduce((s, g) => s + (Number(g.valor) || 0), 0);
-                const plateSurLeg = plateSur.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+                const plateSurLeg = Math.round(plateSur.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0));
                 const plateTotalLeg = Math.round(plateIndLeg + plateGrpLeg + plateSurLeg);
+
+                const plateTotalCredito = Math.round(plateInvs.filter(i => {
+                    const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+                    return !(m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '');
+                }).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+
+                const plateTotalDevolucion = Math.round(plateInvs.reduce((s, i) => {
+                    const status = (i.item_status || '').toUpperCase();
+                    const isDev  = i.es_devolucion || DEVUELTO_STATUS.includes(status);
+                    const isPar  = PARCIAL_STATUS.includes(status);
+                    if (isDev) return s + (Number(i.invoice_value) || 0);
+                    if (isPar) {
+                        const totalQtyItems = i.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
+                        const unitPrice     = (Number(i.invoice_value) || 0) / (totalQtyItems || 1);
+                        const itemsDevVal   = i.items?.reduce((acc: number, it: any) => {
+                            const v = (it.returned_value !== undefined && it.returned_value !== null)
+                                ? Number(it.returned_value)
+                                : (Number(it.returned_qty || 0) * unitPrice);
+                            return acc + v;
+                        }, 0) || 0;
+                        if (itemsDevVal > 0) return s + itemsDevVal;
+                        if (i.forma_pago) return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
+                    }
+                    return s;
+                }, 0));
 
                 const ws = XLSX.utils.aoa_to_sheet([
                     ['PLACA: ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
+                    ['', '', '', '', 'TOTAL CRÉDITO:', plateTotalCredito],
+                    ['', '', '', '', 'TOTAL DEVOLUCION:', plateTotalDevolucion],
+                    ['', '', '', '', 'TOTAL SOBRECOSTO:', plateSurLeg],
                     ['', '', '', '', 'TOTAL LEGALIZADO:', plateTotalLeg],
                     []
                 ]);
                 if (ws['F1']) ws['F1'].z = '#,##0';
                 if (ws['F2']) ws['F2'].z = '#,##0';
+                if (ws['F3']) ws['F3'].z = '#,##0';
+                if (ws['F4']) ws['F4'].z = '#,##0';
+                if (ws['F5']) ws['F5'].z = '#,##0';
                 if (plateGroup.length > 0) {
                     XLSX.utils.sheet_add_aoa(ws, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
                     XLSX.utils.sheet_add_json(ws, plateGroup.map(g => ({

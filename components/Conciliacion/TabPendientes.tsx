@@ -377,16 +377,29 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const totalDocumentoGlobal = Math.round(invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
             const individualLeg = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
             const grupalLeg = (groupPayments || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
-            const sobrecostosLeg = (routeSurcharges || []).filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+            const sobrecostosLeg = Math.round((routeSurcharges || []).filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0));
             const totalLegalizadoGlobal = Math.round(individualLeg + grupalLeg + sobrecostosLeg);
+
+            const totalCreditoGlobal = Math.round(invoices.filter(i => {
+                const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+                return !(m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '');
+            }).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+            
+            const totalDevolucionesGlobal = Math.round(consolidatedData.reduce((s, i) => s + (Number(i['VALOR DEVUELTO']) || 0), 0));
 
             const wsConsolidated = XLSX.utils.aoa_to_sheet([
                 ['REPORTE CONSOLIDADO DE CONCILIACIÓN', '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
+                ['', '', '', '', 'TOTAL CRÉDITO:', totalCreditoGlobal],
+                ['', '', '', '', 'TOTAL DEVOLUCION:', totalDevolucionesGlobal],
+                ['', '', '', '', 'TOTAL SOBRECOSTO:', sobrecostosLeg],
                 ['', '', '', '', 'TOTAL LEGALIZADO:', totalLegalizadoGlobal],
                 []
             ]);
             if (wsConsolidated['F1']) wsConsolidated['F1'].z = '#,##0';
             if (wsConsolidated['F2']) wsConsolidated['F2'].z = '#,##0';
+            if (wsConsolidated['F3']) wsConsolidated['F3'].z = '#,##0';
+            if (wsConsolidated['F4']) wsConsolidated['F4'].z = '#,##0';
+            if (wsConsolidated['F5']) wsConsolidated['F5'].z = '#,##0';
 
             // 1. CONSIGNACIONES GRUPALES
             if (groupPayments && groupPayments.length > 0) {
@@ -433,16 +446,29 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 const plateTotalDoc = Math.round(plateInvs.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
                 const plateIndLeg = plateInvs.reduce((s, i) => s + (Number(i.valor) || 0), 0);
                 const plateGrpLeg = plateGroup.reduce((s, g) => s + (Number(g.valor) || 0), 0);
-                const plateSurLeg = plateSur.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0);
+                const plateSurLeg = Math.round(plateSur.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').reduce((s, r) => s + (Number(r.valor) || 0), 0));
                 const plateTotalLeg = Math.round(plateIndLeg + plateGrpLeg + plateSurLeg);
                 
+                const plateTotalCredito = Math.round(plateInvs.filter(i => {
+                    const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+                    return !(m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '');
+                }).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+                
+                const plateTotalDevolucion = Math.round(plateData.reduce((s, i) => s + (Number(i['VALOR DEVUELTO']) || 0), 0));
+
                 const wsPlate = XLSX.utils.aoa_to_sheet([
                     ['REPORTE DE CONCILIACIÓN - PLACA ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
+                    ['', '', '', '', 'TOTAL CRÉDITO:', plateTotalCredito],
+                    ['', '', '', '', 'TOTAL DEVOLUCION:', plateTotalDevolucion],
+                    ['', '', '', '', 'TOTAL SOBRECOSTO:', plateSurLeg],
                     ['', '', '', '', 'TOTAL LEGALIZADO:', plateTotalLeg],
                     []
                 ]);
                 if (wsPlate['F1']) wsPlate['F1'].z = '#,##0';
                 if (wsPlate['F2']) wsPlate['F2'].z = '#,##0';
+                if (wsPlate['F3']) wsPlate['F3'].z = '#,##0';
+                if (wsPlate['F4']) wsPlate['F4'].z = '#,##0';
+                if (wsPlate['F5']) wsPlate['F5'].z = '#,##0';
 
                 // 1. Pagos grupales de esta placa
                 if (plateGroup.length > 0) {
