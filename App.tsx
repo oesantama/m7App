@@ -537,7 +537,7 @@ const App: React.FC = () => {
       );
     }
 
-    switch (activeTab) {
+    switch (String(activeTab).toLowerCase()) {
       case 'dashboard':
         return (
           <div className="min-h-full flex flex-col p-6 md:p-10 text-center animate-in fade-in duration-700 bg-slate-50">

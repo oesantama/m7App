@@ -191,7 +191,7 @@ export interface DocumentL extends AuditBase {
   inventoryDate?: string;
   inventoryNotes?: string;
   inventory_observation?: string; 
-  codplan?: string;
+  remesaTDM?: string;
   deliveryDate?: string;
   inventoryUser?: string;
   paymentsCount?: number;

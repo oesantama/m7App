@@ -206,6 +206,11 @@ export const api = {
     userName?: string;
     observations: string;
   }) => fetchJson(`${API_URL}/conciliation/update-payment-method`, { method: 'POST', body: JSON.stringify(data) }),
+  updateRemesaTDM: (documentId: string, remesaTDM: string | null) =>
+    fetchJson(`${API_URL}/conciliation/update-remesa-tdm`, {
+      method: 'POST',
+      body: JSON.stringify({ documentId, remesaTDM }),
+    }),
 
   // ── Devoluciones Bodega ────────────────────────────────────────────────────
   getPendingRouteReturns: (clientId?: string) =>
@@ -712,8 +717,16 @@ export const api = {
   },
 
   // ── Auditoría Factura Bodega 36 ──────────────────────────────────────────
-  uploadAuditoriaB36: (formData: FormData) =>
-    fetchJson(`${API_URL}/ajover-b36/upload`, { method: 'POST', body: formData }),
+  uploadAuditoriaB36: (data: any) => {
+    if (data instanceof FormData) {
+      return fetchJson(`${API_URL}/ajover-b36/upload`, { method: 'POST', body: data });
+    }
+    return fetchJson(`${API_URL}/ajover-b36/upload`, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data) 
+    });
+  },
 
   getAuditoriaB36Encabezados: (params?: { clientId?: string; from?: string; to?: string; placa?: string; os?: string }) => {
     const qs = new URLSearchParams();
@@ -727,6 +740,16 @@ export const api = {
 
   getAuditoriaB36Detalle: (encId: number) =>
     fetchJson(`${API_URL}/ajover-b36/detalle/${encId}`),
+
+  getAuditoriaB36Sobrecostos: (encId: number) =>
+    fetchJson(`${API_URL}/ajover-b36/sobrecostos/${encId}`),
+
+  updateAuditoriaB36Planilla: (id: number, data: { valor_flete: number; sobrecostos: any[] }) =>
+    fetchJson(`${API_URL}/ajover-b36/planilla/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
 
   deleteAuditoriaB36: (id: number) =>
     fetchJson(`${API_URL}/ajover-b36/encabezado/${id}`, { method: 'DELETE' }),

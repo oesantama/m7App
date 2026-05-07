@@ -192,7 +192,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         externalDocId: extId,
         vehicleData: plate,
         status: d.status || d.statusId || (d as any).status_id,
-        codplan: d.codplan || (d as any).cod_plan || (d as any).un_orig
+        remesaTDM: d.remesaTDM || (d as any).remesatdm || (d as any).codplan || (d as any).cod_plan || null
       };
 
       if (!uniqueMap.has(key)) {
@@ -401,8 +401,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
              return terms.some(t => normStr(h).includes(normStr(t)));
            });
         };
-
-        const iCodPlan = findIdx(type === 'Plan Normal' ? ['un orig', 'cod plan', 'codplan'] : ['un', 'cod plan', 'codplan']);
         
         // Detección Exacta para Validación Cruzada (Solicitud Usuario)
         const iExactUnOrig = headers.findIndex(h => h.toLowerCase().trim() === 'un orig');
@@ -531,7 +529,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         }
         
         const dataRows = rawData.slice(headerRowIndex + 1);
-        const docsMap = new Map<string, { codplan: string, placa: string, carga: string, city: string, address: string, deliveryDate: string | null, items: any[], consolidatedItems: any[] }>();
+        const docsMap = new Map<string, { remesaTDM: string | null, placa: string, carga: string, city: string, address: string, deliveryDate: string | null, items: any[], consolidatedItems: any[] }>();
 
         dataRows.forEach((row) => {
           if (!row || row.length === 0 || row.every(c => c === '')) return;
@@ -545,7 +543,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
           if (!docsMap.has(groupKey)) {
             docsMap.set(groupKey, { 
-              codplan: val(iCodPlan) || groupKey,
+              remesaTDM: null,
               placa: placa,
               carga: carga,
               city: val(iCiudad) || 'S/D',
@@ -656,7 +654,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             clientId: selectedClientId,
             externalDocId: data.carga,
             vehicleData: data.placa,
-            codplan: data.codplan,
+            remesaTDM: data.remesaTDM,
             deliveryDate: data.deliveryDate || undefined,
             city: data.city,
             address: data.address,
@@ -1400,7 +1398,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               
               <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar flex-1 bg-slate-50/20">
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">UN Orig</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.codplan || 'S/I'}</p></div>
+                    <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">Remesa TDM</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.remesaTDM || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-1">F. Envío</p><p className="font-black text-slate-900 text-xs uppercase">{selectedPendingDoc.deliveryDate || 'S/I'}</p></div>
                     <div className="bg-white p-6 rounded-[1.8rem] border border-slate-100 shadow-sm">
                       <p className="text-[8px] font-black text-slate-400 uppercase mb-1">PLACA</p>

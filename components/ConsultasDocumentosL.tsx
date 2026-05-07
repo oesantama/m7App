@@ -21,7 +21,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [filters, setFilters] = useState({
     plate: '',
     docL: '',
-    codplan: '',
+    remesaTDM: '',
     status: '',
     planType: '',
     deliveryDate: '',
@@ -318,7 +318,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       const matchDocL = !filters.docL || filters.docL.split(',').some(term => 
         doc.externalDocId.toLowerCase().includes(term.trim().toLowerCase())
       );
-      const matchCodPlan = !filters.codplan || (doc.codplan || '').toLowerCase().includes(filters.codplan.toLowerCase());
+      const matchCodPlan = !filters.remesaTDM || (doc.remesaTDM || '').toLowerCase().includes(filters.remesaTDM.toLowerCase());
       const matchStatus = !filters.status || doc.status === filters.status;
       const matchPlanType = !filters.planType || doc.planType === filters.planType;
       const cargueDate = doc.createdAt && !isNaN(new Date(doc.createdAt).getTime())
@@ -350,7 +350,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
 
   const clearFilters = () => {
     setFilters({
-      plate: '', docL: '', codplan: '', status: '',
+      plate: '', docL: '', remesaTDM: '', status: '',
       planType: '', deliveryDate: '', cargueDate: '', inventoryDate: ''
     });
     setCurrentPage(1);
@@ -625,8 +625,8 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                   </span>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Cod. Plan</p>
-                  <p className="font-bold text-slate-900 text-[11px] uppercase">{selectedDoc.codplan || 'S/I'}</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Remesa TDM</p>
+                  <p className="font-bold text-slate-900 text-[11px] uppercase">{selectedDoc.remesaTDM || 'S/I'}</p>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                   <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">Tipo</p>

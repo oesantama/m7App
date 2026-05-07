@@ -112,7 +112,7 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                 dl.id,
                 dl.external_doc_id,
                 dl.vehicle_plate,
-                dl.codplan,
+                dl.remesatdm AS "remesaTDM",
                 dl.plan_type,
                 dl.status,
                 dl.created_at,
@@ -164,7 +164,7 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
 
             FROM documents_l dl
             ${where}
-            GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.codplan, dl.plan_type, dl.status, dl.created_at, dl.delivery_date, dl.client_id
+            GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.remesatdm, dl.plan_type, dl.status, dl.created_at, dl.delivery_date, dl.client_id
             ${havingClause}
             ORDER BY dl.created_at DESC
         `, params);
@@ -243,19 +243,51 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
     const { documentId } = req.params;
     try {
         // Info del documento
-        const docRes = await pool.query(`
-            SELECT dl.*,
-                   u.name AS created_by_name
-            FROM documents_l dl
-            LEFT JOIN users u ON u.id = dl.created_by
-            WHERE dl.id = $1
-        `, [documentId]);
+        let docRes;
+        if (typeof documentId === 'string' && documentId.startsWith('doc-')) {
+            const parts = documentId.split('-');
+            if (parts.length >= 3) {
+                const plate = parts[1];
+                const externalDocId = parts.slice(2).join('-');
+                docRes = await pool.query(`
+                    SELECT dl.*,
+                           u.name AS created_by_name
+                    FROM documents_l dl
+                    LEFT JOIN users u ON u.id = dl.created_by
+                    WHERE TRIM(UPPER(dl.external_doc_id)) = TRIM(UPPER($1))
+                      AND TRIM(UPPER(dl.vehicle_plate)) = TRIM(UPPER($2))
+                    LIMIT 1
+                `, [externalDocId, plate]);
+            }
+        }
+
+        if (!docRes || !docRes.rows.length) {
+            if (/^\d+$/.test(String(documentId))) {
+                docRes = await pool.query(`
+                    SELECT dl.*,
+                           u.name AS created_by_name
+                    FROM documents_l dl
+                    LEFT JOIN users u ON u.id = dl.created_by
+                    WHERE dl.id = $1
+                `, [documentId]);
+            } else {
+                docRes = await pool.query(`
+                    SELECT dl.*,
+                           u.name AS created_by_name
+                    FROM documents_l dl
+                    LEFT JOIN users u ON u.id = dl.created_by
+                    WHERE TRIM(UPPER(dl.external_doc_id)) = TRIM(UPPER($1))
+                    LIMIT 1
+                `, [documentId]);
+            }
+        }
 
         if (!docRes.rows.length) {
             return res.status(404).json({ success: false, error: 'Documento no encontrado' });
         }
 
         const doc = docRes.rows[0];
+        const idNum = doc.id; // Real integer ID
 
         // Base del SELECT para facturas — compartido entre query con/sin MasterSuite
         const baseInvoiceSelect = `
@@ -302,9 +334,9 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                             LIMIT 1
                         ),
                         (
-                            SELECT SUM(dri.quantity_returned)
+                            SELECT SUM(dri.quantity_returned::numeric)
                             FROM delivery_return_items dri
-                            JOIN delivery_returns dr ON dr.id = dri.return_id
+                            JOIN delivery_returns dr ON dr.id::text = dri.return_id::text
                             WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(di2.invoice))
                               AND dri.sku = di2.article_id
                               AND dr.status <> 'CANCELLED'
@@ -319,14 +351,14 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     )
                  )) FROM document_items di2
                     LEFT JOIN articles a ON a.id = di2.article_id
-                    WHERE di2.document_id = $1 AND di2.invoice = di.invoice
+                    WHERE di2.document_id = $2 AND di2.invoice = di.invoice
                 ) AS items`;
 
         const baseInvoiceFrom = `
             FROM document_items di
             INNER JOIN documents_l dl ON dl.id = di.document_id
             LEFT JOIN invoice_conciliations ic
-                ON ic.document_id = $1 AND ic.invoice_number = di.invoice
+                ON (ic.document_id = $1 OR ic.document_id = $2::text) AND ic.invoice_number = di.invoice
             LEFT JOIN users u ON u.id = ic.conciliado_por
             LEFT JOIN document_l_payments p
                 ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(di.invoice))
@@ -341,7 +373,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     OR CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) = ri_lat.invoice_id)
                 ORDER BY ri_lat.id DESC LIMIT 1
             ) ri2 ON true
-            WHERE di.document_id = $1
+            WHERE di.document_id = $2
               AND di.invoice IS NOT NULL
               AND di.invoice <> ''
             GROUP BY di.invoice, di.customer_name, di.city, di.address,
@@ -361,7 +393,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 MAX(di.mastersuite_fecha_entrega::text)  AS mastersuite_fecha_entrega,
                 MAX(di.mastersuite_motivo_dev)           AS mastersuite_motivo_dev`
                 + baseInvoiceFrom,
-                [documentId]
+                [documentId, idNum]
             );
         } catch (e: any) {
             if (e.message?.includes('does not exist')) {
@@ -374,7 +406,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     NULL::text AS mastersuite_fecha_entrega,
                     NULL::text AS mastersuite_motivo_dev`
                     + baseInvoiceFrom,
-                    [documentId]
+                    [documentId, idNum]
                 );
             } else {
                 throw e;
@@ -400,7 +432,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     MAX(p.metodo_pago)                                      AS metodo_pago
                 FROM document_items di
                 LEFT JOIN invoice_conciliations ic
-                    ON ic.document_id = $1
+                    ON (ic.document_id = $1 OR ic.document_id = $2::text)
                     AND TRIM(UPPER(ic.invoice_number)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
                 LEFT JOIN LATERAL (
                     SELECT vmetodo, metodo_pago
@@ -408,7 +440,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     WHERE TRIM(UPPER(invoice)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
                     ORDER BY id DESC LIMIT 1
                 ) p ON true
-                WHERE di.document_id = $1
+                WHERE di.document_id = $2
                   AND di.invoice IS NOT NULL AND di.invoice <> ''
                 GROUP BY TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))
             ),
@@ -422,6 +454,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 FROM inv_base ib
                 JOIN route_invoices ri
                     ON ri.invoice_id = ib.inv_key
+                    OR ri.invoice_id = CONCAT($2::text, '_', ib.inv_key)
                     OR ri.invoice_id = CONCAT($1::text, '_', ib.inv_key)
                 JOIN routes  r ON r.id::text = ri.route_id::text
                 LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
@@ -453,29 +486,30 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
             FROM route_inv
             GROUP BY route_id, plate, driver_name
             ORDER BY invoice_count DESC
-        `, [documentId]);
+        `, [documentId, idNum]);
 
         // ── Facturas sin asignar a ruta ───────────────────────────────────────
         const unassignedRes = await pool.query(`
             SELECT COUNT(DISTINCT di.invoice) AS unassigned
             FROM document_items di
-            WHERE di.document_id = $1
+            WHERE di.document_id = $2
               AND di.invoice IS NOT NULL AND di.invoice <> ''
               AND NOT EXISTS (
                 SELECT 1 FROM route_invoices ri
                 WHERE ri.invoice_id = TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))
-                   OR ri.invoice_id = CONCAT(di.document_id,'_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+                   OR ri.invoice_id = CONCAT($2::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+                   OR ri.invoice_id = CONCAT($1::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)))
               )
-        `, [documentId]);
+        `, [documentId, idNum]);
 
         // ── Extras: Sobrecostos y Consignaciones Grupales ────────────────────
         const surchargesRes = await pool.query(
-            `SELECT * FROM route_surcharges WHERE document_id = $1 ORDER BY created_at ASC`,
-            [documentId]
+            `SELECT * FROM route_surcharges WHERE document_id = $1 OR document_id = $2::text ORDER BY created_at ASC`,
+            [documentId, idNum]
         );
         const paymentsRes = await pool.query(
-            `SELECT * FROM route_group_payments WHERE document_id = $1 ORDER BY created_at ASC`,
-            [documentId]
+            `SELECT * FROM route_group_payments WHERE document_id = $1 OR document_id = $2::text ORDER BY created_at ASC`,
+            [documentId, idNum]
         );
 
         res.json({
@@ -1373,3 +1407,29 @@ export const generateAndSendReport = async (req: Request, res: Response) => {
         res.status(500).json({ success: false, error: err.message });
     }
 };
+
+// --- POST /conciliation/update-remesa-tdm -------------------------------------------
+export const updateRemesaTDM = async (req: Request, res: Response) => {
+    const { documentId, remesaTDM } = req.body;
+    if (!documentId) {
+        return res.status(400).json({ error: 'Falta el id del documento' });
+    }
+
+    try {
+        const query = `
+            UPDATE documents_l
+            SET remesatdm = $1
+            WHERE id = $2
+            RETURNING id, remesatdm AS "remesaTDM"
+        `;
+        const result = await pool.query(query, [remesaTDM ? String(remesaTDM).trim() : null, documentId]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Documento no encontrado' });
+        }
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err: any) {
+        console.error('[CONCILIATION] updateRemesaTDM error:', err.message);
+        res.status(500).json({ error: 'Error interno del servidor al actualizar remesaTDM' });
+    }
+};
+

@@ -15,6 +15,7 @@ import {
     getInvoiceStatusHistory,
     closeConciliationCycle,
     updatePaymentMethod,
+    updateRemesaTDM,
 } from '../controllers/conciliation.controller.js';
 
 const router = Router();
@@ -37,5 +38,6 @@ router.post('/report',                    generateAndSendReport);
 router.post('/import-mastersuite',        upload.single('file'), importMasterSuite);
 router.post('/close-cycle',               closeConciliationCycle);
 router.post('/update-payment-method',    updatePaymentMethod);
+router.post('/update-remesa-tdm',         updateRemesaTDM);
 
 export default router;

@@ -6,6 +6,9 @@ import {
   getEncabezados,
   getDetalle,
   exportAuditoriaExcel,
+  exportAllAuditoriaExcel,
+  getSobrecostos,
+  updatePlanilla,
   deleteEncabezado,
 } from '../controllers/ajover-b36.controller.js';
 
@@ -17,7 +20,10 @@ router.use(authenticateToken);
 router.post('/upload',              upload.single('file'), uploadAuditoriaB36);
 router.get('/encabezados',          getEncabezados);
 router.get('/detalle/:encId',       getDetalle);
+router.get('/export-all',          exportAllAuditoriaExcel);
 router.get('/export/:encId',        exportAuditoriaExcel);
+router.get('/sobrecostos/:encId',   getSobrecostos);
+router.put('/planilla/:id',        updatePlanilla);
 router.delete('/encabezado/:id',    deleteEncabezado);
 
 export default router;

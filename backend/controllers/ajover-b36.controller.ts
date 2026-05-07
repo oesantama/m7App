@@ -239,7 +239,11 @@ export const exportAuditoriaExcel = async (req: Request, res: Response) => {
     const detRes = await pool.query(`SELECT * FROM ajover_b36_detalle WHERE id_enca = $1 ORDER BY id`, [encId]);
 
     const enc = encRes.rows[0];
-    const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('es-CO') : '';
+    const fmtDate = (d: any) => {
+      if (!d) return null;
+      const dateObj = new Date(d);
+      return isNaN(dateObj.getTime()) ? null : dateObj;
+    };
 
     // Hoja Encabezado
     const encData = [{
@@ -264,8 +268,8 @@ export const exportAuditoriaExcel = async (req: Request, res: Response) => {
     }));
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(encData), 'Encabezado');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detData.length ? detData : [{}]), 'Detalle');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(encData, { cellDates: true }), 'Encabezado');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detData.length ? detData : [{}], { cellDates: true }), 'Detalle');
 
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
     const fname = `ajover_b36_${(enc.os || enc.id).toString().replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
@@ -274,6 +278,171 @@ export const exportAuditoriaExcel = async (req: Request, res: Response) => {
     res.send(buf);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── GET /ajover-b36/export-all ──────────────────────────────────────────────
+export const exportAllAuditoriaExcel = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { clientId, from, to, placa, os } = req.query as any;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let p = 1;
+
+    if (clientId) { conditions.push(`e.client_id = $${p++}`); params.push(clientId); }
+    if (from)     { conditions.push(`e.fecha_carge >= $${p++}`); params.push(from); }
+    if (to)       { conditions.push(`e.fecha_carge <= $${p++}`); params.push(to); }
+    if (placa)    { conditions.push(`UPPER(e.placa) LIKE $${p++}`); params.push(`%${String(placa).toUpperCase()}%`); }
+    if (os)       { conditions.push(`UPPER(e.os) LIKE $${p++}`);    params.push(`%${String(os).toUpperCase()}%`); }
+
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    const encRes = await pool.query(
+      `SELECT e.*,
+              u1.name AS inhouse_name,
+              u2.name AS creator_name
+       FROM ajover_b36_encabezado e
+       LEFT JOIN users u1 ON e.inhouse_id = u1.id
+       LEFT JOIN users u2 ON e.usercreated = u2.id
+       ${where}
+       ORDER BY e.uploaded_at DESC, e.id DESC
+       LIMIT 2000`,
+      params
+    );
+
+    if (encRes.rows.length === 0) return res.status(404).json({ error: 'No se encontraron registros para exportar.' });
+
+    const encIds = encRes.rows.map((r: any) => r.id);
+    const detRes = await pool.query(
+      `SELECT d.*, e.os as enc_os FROM ajover_b36_detalle d
+       JOIN ajover_b36_encabezado e ON d.id_enca = e.id
+       WHERE d.id_enca = ANY($1)
+       ORDER BY d.id_enca, d.id`,
+      [encIds]
+    );
+
+    const fmtDate = (d: any) => {
+      if (!d) return null;
+      const dateObj = new Date(d);
+      return isNaN(dateObj.getTime()) ? null : dateObj;
+    };
+
+    // Hoja Encabezados
+    const encData = encRes.rows.map((enc: any) => ({
+      OS: enc.os,
+      'ID VIAJE': enc.id_viaje || '',
+      'FECHA CARGE': fmtDate(enc.fecha_carge),
+      PLACA: enc.placa,
+      CONDUCTOR: enc.conductor,
+      'FECHA PROGRAMADO': fmtDate(enc.fecha_programado),
+      'CANT. CLIENTES': enc.cant_clientes,
+      'NOMBRE RUTA': enc.nombre_ruta,
+      'USUARIO INHOUSE': enc.inhouse_name || enc.inhouse_id || '',
+      'USUARIO CREACIÓN': enc.creator_name || enc.usercreated || '',
+      'FECHA CARGA REGISTRO': fmtDate(enc.uploaded_at),
+      'VALOR FLETE': enc.valor_flete,
+    }));
+
+    // Hoja Detalles
+    const detData = detRes.rows.map((d: any) => ({
+      'OS ENCA': d.enc_os,
+      FACTURA: d.factura,
+      VOLUMEN: d.volumen || 0,
+      PESO: d.peso || 0,
+      CUBICAJE: d.cubicaje || 0,
+      NOTAS: d.notes || d.notas || '',
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(encData, { cellDates: true }), 'Encabezados');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detData.length ? detData : [{}], { cellDates: true }), 'Detalles');
+
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const fname = `auditoria_completa_${new Date().toISOString().slice(0,10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(buf);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── GET /ajover-b36/sobrecostos/:encId ───────────────────────────────────────
+export const getSobrecostos = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { encId } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM ajover_b36_sobrecostos WHERE id_enca = $1 ORDER BY id`,
+      [encId]
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── PUT /ajover-b36/planilla/:id ─────────────────────────────────────────────
+export const updatePlanilla = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    await ensureTables();
+    const { id } = req.params;
+    const { valor_flete, sobrecostos } = req.body;
+
+    await client.query('BEGIN');
+
+    // 1. Actualizar el flete del encabezado
+    await client.query(
+      `UPDATE ajover_b36_encabezado SET valor_flete = $1 WHERE id = $2`,
+      [valor_flete, id]
+    );
+
+    // 2. Si se suministra la lista de sobrecostos
+    if (Array.isArray(sobrecostos)) {
+      const incomingIds = sobrecostos.filter(s => s.id).map(s => s.id);
+
+      // Eliminar los sobrecostos que ya no están en la lista
+      if (incomingIds.length > 0) {
+        await client.query(
+          `DELETE FROM ajover_b36_sobrecostos WHERE id_enca = $1 AND id != ANY($2)`,
+          [id, incomingIds]
+        );
+      } else {
+        await client.query(
+          `DELETE FROM ajover_b36_sobrecostos WHERE id_enca = $1`,
+          [id]
+        );
+      }
+
+      // Insertar o actualizar cada sobrecosto
+      for (const s of sobrecostos) {
+        if (s.id) {
+          await client.query(
+            `UPDATE ajover_b36_sobrecostos 
+             SET valor = $1, observacion = $2, estado = $3 
+             WHERE id = $4 AND id_enca = $5`,
+            [s.valor, s.observacion, s.estado, s.id, id]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO ajover_b36_sobrecostos (id_enca, valor, observacion, estado)
+             VALUES ($1, $2, $3, $4)`,
+            [id, s.valor, s.observacion, s.estado || 'PENDIENTE']
+          );
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 };
 

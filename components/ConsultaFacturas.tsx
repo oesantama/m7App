@@ -37,7 +37,7 @@ interface TraceabilityData {
     doc_status: string | null;
     doc_status_name: string | null;
     vehicle_plate: string | null;
-    codplan: string | null;
+    remesaTDM: string | null;
     delivery_date: string | null;
     total_qty: number;
     received_qty: number | null;

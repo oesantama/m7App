@@ -31,6 +31,7 @@ export interface DocSummary {
     total_pago_grupal?: number;
     total_sobrecosto_ruta?: number;
     client_id?: string;
+    remesaTDM?: string | null;
 }
 
 interface RouteGroup {
@@ -152,6 +153,11 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [closingCycle, setClosingCycle]       = useState(false);
     const [confirmClose, setConfirmClose]       = useState<{ plate?: string } | null>(null);
 
+    // REMESA TDM
+    const [updatingTDMDoc, setUpdatingTDMDoc] = useState<DocSummary | null>(null);
+    const [remesaTDMInput, setRemesaTDMInput] = useState('');
+    const [isSavingTDM, setIsSavingTDM] = useState(false);
+
     // ASIGNACIÓN
     const [vehicles, setVehicles]           = useState<any[]>([]);
     const [assignments, setAssignments]     = useState<any[]>([]);
@@ -268,7 +274,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 documentId: selectedDoc.id,
                 userId: user.id,
                 vehiclePlate: plate
-            });
+            } as any);
             toast.success(`Ciclo cerrado: ${res.closedCount} facturas conciliadas administrativamente.`);
             loadDocDetail(selectedDoc);
             onRefresh();
@@ -290,6 +296,31 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         } catch (err: any) { toast.error(err.message || 'Error enviando informe'); }
         finally { setSendingReport(false); }
     };
+
+    const handleUpdateRemesaTDM = async () => {
+        if (!updatingTDMDoc) return;
+        setIsSavingTDM(true);
+        try {
+            const res = await api.updateRemesaTDM(updatingTDMDoc.id, remesaTDMInput.trim() || null);
+            if (res.success) {
+                toast.success('Remesa TDM actualizada exitosamente');
+                // Update local selectedDoc if it is the one being updated
+                if (selectedDoc && selectedDoc.id === updatingTDMDoc.id) {
+                    setSelectedDoc({ ...selectedDoc, remesaTDM: remesaTDMInput.trim() || null });
+                }
+                onRefresh();
+                setUpdatingTDMDoc(null);
+                setRemesaTDMInput('');
+            } else {
+                toast.error(res.error || 'Error al actualizar Remesa TDM');
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Error al actualizar Remesa TDM');
+        } finally {
+            setIsSavingTDM(false);
+        }
+    };
+
 
     const handleExportExcel = useCallback(() => {
         if (!selectedDoc) return;
@@ -518,26 +549,124 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             return;
         }
         try {
+            const formatLongDateSpanish = (d?: string) => {
+                if (!d) return '—';
+                let date: Date;
+                if (d.includes('T')) {
+                    date = new Date(d);
+                } else {
+                    date = new Date(d + 'T12:00:00');
+                }
+                if (isNaN(date.getTime())) return String(d);
+                const day = String(date.getDate()).padStart(2, '0');
+                const months = [
+                    'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+                    'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
+                ];
+                const month = months[date.getMonth()];
+                const year = date.getFullYear();
+                return `${day} DE ${month} DE ${year}`;
+            };
+
+            const totalClientes = Array.from(new Set(invoices.map(i => i.customer_name).filter(Boolean))).length;
+            const totalVehicles = Math.ceil(totalClientes / 23);
+            const totalPlacas = Array.from(new Set(invoices.map(i => i.route_vehicle_plate || i.vehicle_plate).filter(Boolean))).length;
+
+            const sortedSurcharges = [...routeSurcharges].sort((a, b) => {
+                const plateA = String(a.plate || '').trim().toUpperCase();
+                const plateB = String(b.plate || '').trim().toUpperCase();
+                return plateA.localeCompare(plateB);
+            });
+
+            const plateSums: Record<string, number> = {};
+            sortedSurcharges.forEach(s => {
+                const plate = String(s.plate || '—').trim().toUpperCase();
+                plateSums[plate] = (plateSums[plate] || 0) + (Number(s.valor) || 0);
+            });
+
+            const lastIndexByPlate: Record<string, number> = {};
+            sortedSurcharges.forEach((s, idx) => {
+                const plate = String(s.plate || '—').trim().toUpperCase();
+                lastIndexByPlate[plate] = idx;
+            });
+
+            const rowsArray: any[] = [];
+            // Row 1 (merged title)
+            rowsArray.push([
+                '', '', `CLIENTES    ${totalClientes}  PARA   ${totalVehicles}    VEHICULOS    SE  CARGAN ${totalPlacas}  SE COBRAN   ${totalPlacas}`
+            ]);
+
+            // Row 2 (headers)
+            rowsArray.push([
+                'FECHA DISTRIBUCION',
+                'REMESA TDM',
+                'PLACA MULA',
+                'DOCUMENTO',
+                'PLACA',
+                'VALOR',
+                'FECHA',
+                'TOTAL PLACA',
+                'ESTADO',
+                'OBSERVACIONES',
+                'FACTURAS'
+            ]);
+
+            let totalValorSum = 0;
+            sortedSurcharges.forEach((s, idx) => {
+                const plate = String(s.plate || '—').trim().toUpperCase();
+                const isLastOfGroup = (lastIndexByPlate[plate] === idx);
+                const val = Number(s.valor) || 0;
+                totalValorSum += val;
+
+                rowsArray.push([
+                    formatLongDateSpanish(selectedDoc.delivery_date),
+                    selectedDoc.remesaTDM || '—',
+                    selectedDoc.vehicle_plate || '—',
+                    selectedDoc.external_doc_id,
+                    s.plate || '—',
+                    val,
+                    s.fecha ? String(s.fecha).slice(0, 10) : '—',
+                    isLastOfGroup ? plateSums[plate] : '',
+                    (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente',
+                    s.observaciones || '—',
+                    s.facturas || '—'
+                ]);
+            });
+
+            // Grand Total Row
+            rowsArray.push([
+                '', '', '', '', '', totalValorSum, '', totalValorSum, '', '', ''
+            ]);
+
             const wb = XLSX.utils.book_new();
-            const data = routeSurcharges.map(s => ({
-                'DOCUMENTO':     selectedDoc.external_doc_id,
-                'PLACA':         s.plate || '—',
-                'VALOR':         Number(s.valor) || 0,
-                'REFERENCIA':    s.referencia || '—',
-                'FECHA':         s.fecha ? String(s.fecha).slice(0, 10) : '—',
-                'ESTADO':        (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente',
-                'OBSERVACIONES': s.observaciones || '—',
-                'FACTURAS':      s.facturas || '—',
-                'REGISTRADO':    s.created_at ? String(s.created_at).replace('T', ' ').slice(0, 16) : '—',
-            }));
-            const ws = XLSX.utils.json_to_sheet(data);
+            const ws = XLSX.utils.aoa_to_sheet(rowsArray);
+
+            // Merges
+            ws['!merges'] = [
+                { s: { r: 0, c: 2 }, e: { r: 0, c: 7 } }
+            ];
+
+            // Formats
+            for (let r = 2; r < rowsArray.length; r++) {
+                const cellF = ws[`F${r + 1}`];
+                if (cellF && typeof cellF.v === 'number') {
+                    cellF.t = 'n';
+                    cellF.z = '#,##0';
+                }
+                const cellH = ws[`H${r + 1}`];
+                if (cellH && typeof cellH.v === 'number') {
+                    cellH.t = 'n';
+                    cellH.z = '#,##0';
+                }
+            }
+
             XLSX.utils.book_append_sheet(wb, ws, 'Sobrecostos');
             XLSX.writeFile(wb, `SOBRECOSTOS-${selectedDoc.external_doc_id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
             toast.success('Sobrecostos exportados correctamente');
         } catch (err: any) {
-            toast.error('Error al exportar: ' + err.message);
+            toast.error('Error al exportar sobrecostos: ' + err.message);
         }
-    }, [selectedDoc, routeSurcharges]);
+    }, [selectedDoc, routeSurcharges, invoices]);
 
     // ── Filtros ───────────────────────────────────────────────────────────────
     const filteredDocs = useMemo(() =>
@@ -579,6 +708,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             completadas: number; devueltas: number; parciales: number; legalizadas: number;
             repice_count: number; valor_repice: number;
             valor_grupal: number; valor_total: number; valor_credito: number;
+            total_sobrecosto: number;
         }>();
 
         invoices.forEach(inv => {
@@ -587,7 +717,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const cur = map.get(plate) ?? {
                 valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto_aprobado: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
-                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
+                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0,
+                total_sobrecosto: 0
             };
             const val    = Number(inv.valor) || 0;
             const invVal = Number(inv.invoice_value) || 0;
@@ -649,6 +780,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             if (inv.es_devolucion || DEVUELTO_STATUS.includes(status)) cur.devueltas += 1;
             if (ENTREGADO_STATUS.includes(status)) cur.completadas += 1;
             // Individual surcharge (if any)
+            if (sc > 0) {
+                cur.total_sobrecosto += sc;
+            }
             if (isEfectivo && (inv.item_status === 'APROBADO' || inv.item_status === 'EST-02')) {
                 cur.total_sobrecosto_aprobado += sc;
             }
@@ -662,23 +796,28 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const cur = map.get(plate) ?? {
                 valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto_aprobado: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
-                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
+                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0,
+                total_sobrecosto: 0
             };
             cur.valor_grupal += (Number(p.valor) || 0);
             map.set(plate, cur);
         });
 
-        // Sumar sobrecostos globales aprobados por placa
+        // Sumar sobrecostos globales por placa
         routeSurcharges.forEach(s => {
-            if (s.status_id !== 'APROBADO' && s.status_id !== 'EST-02') return;
             const plate = s.plate || '';
             if (!plate) return;
             const cur = map.get(plate) ?? {
                 valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto_aprobado: 0,
                 efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
-                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0
+                repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0,
+                total_sobrecosto: 0
             };
-            cur.total_sobrecosto_aprobado += (Number(s.valor) || 0);
+            const val = Number(s.valor) || 0;
+            cur.total_sobrecosto += val;
+            if (s.status_id === 'APROBADO' || s.status_id === 'EST-02') {
+                cur.total_sobrecosto_aprobado += val;
+            }
             map.set(plate, cur);
         });
 
@@ -846,22 +985,31 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     ) : filteredDocs
                         .slice(docPageSize === 'all' ? 0 : (docPage - 1) * docPageSize, docPageSize === 'all' ? filteredDocs.length : docPage * docPageSize)
                         .map(doc => {
-                        const complete = doc.pendientes === 0;
+                        const pendingVal = Number(doc.pendientes || 0);
+                        const complete = pendingVal <= 1500;
                         const totalEF = Number(doc.total_efectivo || 0);
                         const totalLeg = Number(doc.total_legalizado_individual || 0) + 
                                        Number(doc.total_pago_grupal || 0) + 
                                        Number(doc.total_sobrecosto_ruta || 0);
                         
                         const pct = totalEF > 0
-                            ? Math.min(100, Math.round((totalLeg / totalEF) * 100)) 
+                            ? (pendingVal <= 1500 ? 100 : Math.min(100, Math.round((totalLeg / totalEF) * 100))) 
                             : (complete ? 100 : 0);
                         const isActive = selectedDoc?.id === doc.id;
                         return (
-                            <button key={doc.id} onClick={() => loadDocDetail(doc)}
-                                className={`w-full text-left px-3 py-3 border-b border-slate-50 transition-all
+                            <div key={doc.id} onClick={() => loadDocDetail(doc)}
+                                className={`w-full text-left px-3 py-3 border-b border-slate-50 transition-all cursor-pointer
                                     ${isActive
                                         ? 'bg-emerald-50 border-l-4 border-l-emerald-500'
-                                        : 'border-l-4 border-l-transparent hover:bg-slate-50'}`}>
+                                        : 'border-l-4 border-l-transparent hover:bg-slate-50'}`}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        loadDocDetail(doc);
+                                    }
+                                }}>
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -874,6 +1022,37 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         </p>
                                         {doc.delivery_date && (
                                             <p className="text-[8px] text-slate-400 mt-0.5">📅 {fmtDate(doc.delivery_date)}</p>
+                                        )}
+                                        {doc.remesaTDM ? (
+                                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                                <span className="text-[8px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-amber-200 shadow-sm">
+                                                    🏷️ Remesa TDM: {doc.remesaTDM}
+                                                </span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setUpdatingTDMDoc(doc);
+                                                        setRemesaTDMInput(doc.remesaTDM || '');
+                                                    }}
+                                                    className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded transition-all"
+                                                    title="Editar Remesa TDM"
+                                                >
+                                                    <Icons.Edit className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-1.5">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setUpdatingTDMDoc(doc);
+                                                        setRemesaTDMInput('');
+                                                    }}
+                                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-amber-50 text-slate-500 hover:text-amber-700 text-[8px] font-black uppercase rounded transition-all border border-slate-200 hover:border-amber-200 shadow-sm"
+                                                >
+                                                    ➕ Anexar Remesa TDM
+                                                </button>
+                                            </div>
                                         )}
                                         {((doc.total_efectivo ?? 0) > 0 || (doc.total_credito ?? 0) > 0) && (
                                             <div className="flex gap-1.5 mt-1">
@@ -905,7 +1084,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                             style={{ width: `${pct}%` }} />
                                     </div>
                                 </div>
-                            </button>
+                            </div>
                         );
                     })}
                 </div>
@@ -1238,11 +1417,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                     const fin = routeFinancials.get(route.plate) ?? {
                                                         valor_legalizado: 0, valor_devuelto: 0, valor_parcial: 0, total_sobrecosto_aprobado: 0,
                                                         efectivo: 0, credito: 0, completadas: 0, devueltas: 0, parciales: 0, legalizadas: 0,
-                                                        valor_grupal: 0, valor_total: 0
+                                                        repice_count: 0, valor_repice: 0, valor_grupal: 0, valor_total: 0, valor_credito: 0,
+                                                        total_sobrecosto: 0
                                                     };
-                                                    const totalLegPlate = fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto_aprobado;
+                                                    const totalLegPlate = fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto_aprobado + fin.valor_devuelto;
+                                                    const pendingVal = fin.valor_total - totalLegPlate;
                                                     const pct = fin.valor_total > 0
-                                                        ? Math.min(100, Math.round((totalLegPlate / fin.valor_total) * 100)) 
+                                                        ? (pendingVal <= 1500 ? 100 : Math.min(100, Math.round((totalLegPlate / fin.valor_total) * 100))) 
                                                         : (fin.legalizadas === route.invoice_count && route.invoice_count > 0 ? 100 : 0);
                                                     
                                                     const hasPendingSurcharge = routeSurcharges.some(s => s.plate === route.plate && (s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id));
@@ -1489,7 +1670,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                                                     {/* Valor de factura */}
                                                                     {inv.invoice_value != null && inv.invoice_value > 0 && (
                                                                         <p className="text-[8px] font-black text-slate-500 mt-0.5">
-                                                                            Valor: {fmtCOP(inv.invoice_value)} | {inv.un_code || '—'} | {inv.invoice_metodo_pago || '—'}
+                                                                            Valor: {fmtCOP(inv.invoice_value)} | {(inv as any).un_code || '—'} | {inv.invoice_metodo_pago || '—'}
                                                                         </p>
                                                                     )}
                                                                     {/* Info de conciliación si ya está legalizada */}
@@ -1991,6 +2172,83 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         onRefresh();
                     }}
                 />
+            )}
+
+            {updatingTDMDoc && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4 border border-slate-100 transform scale-100 transition-all duration-300">
+                        <div className="flex items-center gap-3.5 mb-5 border-b border-slate-50 pb-4">
+                            <div className="w-11 h-11 rounded-2xl bg-amber-50 flex items-center justify-center shrink-0 border border-amber-200">
+                                <Icons.Edit className="w-5 h-5 text-amber-600 animate-pulse" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                                    {updatingTDMDoc.remesaTDM ? 'Actualizar Remesa TDM' : 'Anexar Remesa TDM'}
+                                </h3>
+                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                    Documento: <span className="text-emerald-600">{updatingTDMDoc.external_doc_id}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                                    Código de Remesa TDM
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={remesaTDMInput}
+                                        onChange={(e) => setRemesaTDMInput(e.target.value)}
+                                        placeholder="Ingrese el código de remesa TDM"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:bg-white transition-all shadow-sm"
+                                        autoFocus
+                                    />
+                                    {remesaTDMInput && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setRemesaTDMInput('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-all"
+                                        >
+                                            <Icons.X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">
+                                    Deje vacío o borre el texto para remover el código de remesa TDM del documento.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 justify-end mt-8 pt-4 border-t border-slate-50">
+                            <button
+                                onClick={() => {
+                                    setUpdatingTDMDoc(null);
+                                    setRemesaTDMInput('');
+                                }}
+                                disabled={isSavingTDM}
+                                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleUpdateRemesaTDM}
+                                disabled={isSavingTDM}
+                                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-amber-500/15 hover:shadow-amber-500/25 transition-all flex items-center gap-2 active:scale-95"
+                            >
+                                {isSavingTDM ? (
+                                    <>
+                                        <Icons.Loader className="w-3.5 h-3.5 animate-spin" />
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    'Guardar Cambios'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

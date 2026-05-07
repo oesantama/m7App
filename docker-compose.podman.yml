@@ -57,6 +57,9 @@ services:
       - ./tailwind.config.ts:/app/tailwind.config.ts:z
       - ./tsconfig.json:/app/tsconfig.json:z
       - ./index.html:/app/index.html:z
+      - ./index.tsx:/app/index.tsx:z
+      - ./index.css:/app/index.css:z
+      - ./App.tsx:/app/App.tsx:z
       - ./src:/app/src:z
       - /app/node_modules
     depends_on:

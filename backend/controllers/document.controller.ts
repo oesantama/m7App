@@ -27,6 +27,7 @@ export const getDocuments = async (req: Request, res: Response) => {
   try {
     let query = `
       SELECT d.*, 
+      remesatdm as "remesaTDM",
       plan_type as "planType",
       inventory_notes as "inventoryNotes",
       external_doc_id as "externalDocId",
@@ -574,12 +575,12 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
       const receivingDate = sanitizeDate(doc.receivingDate);
 
       await client.query(`
-        INSERT INTO documents_l (id, client_id, external_doc_id, vehicle_plate, codplan, plan_type, delivery_date, status, created_at, picking_date, receiving_date, picker_user, deliverer_user, receiver_user)
+        INSERT INTO documents_l (id, client_id, external_doc_id, vehicle_plate, remesatdm, plan_type, delivery_date, status, created_at, picking_date, receiving_date, picker_user, deliverer_user, receiver_user)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT (id) DO UPDATE SET
         external_doc_id = EXCLUDED.external_doc_id,
         vehicle_plate = EXCLUDED.vehicle_plate, 
-        codplan = EXCLUDED.codplan, 
+        remesatdm = EXCLUDED.remesatdm, 
         plan_type = EXCLUDED.plan_type,
         status = EXCLUDED.status,
         delivery_date = EXCLUDED.delivery_date,
@@ -593,7 +594,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
         doc.clientId,
         doc.externalDocId || doc.external_doc_id,
         doc.vehicleData || doc.vehicle_plate || doc.plate || 'S/A',
-        doc.codplan || doc.un_orig || 'S/I',
+        doc.remesaTDM || null,
         doc.planType || doc.plan_type || 'N/A',
         deliveryDate,
         (doc.status ? (doc.status.startsWith('EST-') ? doc.status : 'EST-03') : 'EST-03'),
@@ -943,7 +944,7 @@ export const getInvoices = async (req: Request, res: Response) => {
           di.longitude,
           dl.client_id,
           dl.plan_type,
-          dl.codplan,
+          dl.remesatdm,
           dl.vehicle_plate,
           dl.status as doc_status,
           dl.created_by as doc_created_by
@@ -965,7 +966,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         SUM(COALESCE(base_data.peso, 0)) as "weightKg",
         MAX(base_data.document_id) as "docLId",
         MAX(base_data.client_id) as "clientId", 
-        MAX(base_data.codplan) as "codplan",
+        MAX(base_data.remesatdm) as "remesaTDM",
         MAX(base_data.plan_type) as "planType",
         MAX(base_data.vehicle_plate) as "plate",
         MAX(base_data.doc_status) as "status",
@@ -1102,7 +1103,7 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
         dl.status      AS doc_status,
         est_doc.name   AS doc_status_name,
         dl.vehicle_plate,
-        dl.codplan,
+        dl.remesatdm   AS "remesaTDM",
         dl.delivery_date,
         SUM(di.expected_qty) AS total_qty,
         SUM(di.received_qty) AS received_qty
@@ -1118,7 +1119,7 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
         di.document_id, di.item_status, est_item.name,
         dl.external_doc_id, dl.plan_type, dl.client_id, dl.created_at,
         u_recv.name, dl.inventory_date, dl.inventory_user,
-        dl.status, est_doc.name, dl.vehicle_plate, dl.codplan, dl.delivery_date
+        dl.status, est_doc.name, dl.vehicle_plate, dl.remesatdm, dl.delivery_date
       ORDER BY dl.created_at DESC
       LIMIT 1
     `, [inv]);

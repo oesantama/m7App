@@ -519,26 +519,129 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
     }, [selectedDoc, invoices, groupPayments, routeSurcharges]);
 
     const handleExportSobrecostos = useCallback(() => {
-        if (!selectedDoc) return;
+        if (!selectedDoc || routeSurcharges.length === 0) {
+            toast.error('No hay sobrecostos para exportar');
+            return;
+        }
         try {
+            const formatLongDateSpanish = (d?: string) => {
+                if (!d) return '—';
+                let date: Date;
+                if (d.includes('T')) {
+                    date = new Date(d);
+                } else {
+                    date = new Date(d + 'T12:00:00');
+                }
+                if (isNaN(date.getTime())) return String(d);
+                const day = String(date.getDate()).padStart(2, '0');
+                const months = [
+                    'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+                    'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
+                ];
+                const month = months[date.getMonth()];
+                const year = date.getFullYear();
+                return `${day} DE ${month} DE ${year}`;
+            };
+
+            const totalClientes = Array.from(new Set(invoices.map(i => i.customer_name).filter(Boolean))).length;
+            const totalVehicles = Math.ceil(totalClientes / 23);
+            const totalPlacas = Array.from(new Set(invoices.map(i => i.route_vehicle_plate || i.vehicle_plate).filter(Boolean))).length;
+
+            const sortedSurcharges = [...routeSurcharges].sort((a, b) => {
+                const plateA = String(a.plate || '').trim().toUpperCase();
+                const plateB = String(b.plate || '').trim().toUpperCase();
+                return plateA.localeCompare(plateB);
+            });
+
+            const plateSums: Record<string, number> = {};
+            sortedSurcharges.forEach(s => {
+                const plate = String(s.plate || '—').trim().toUpperCase();
+                plateSums[plate] = (plateSums[plate] || 0) + (Number(s.valor) || 0);
+            });
+
+            const lastIndexByPlate: Record<string, number> = {};
+            sortedSurcharges.forEach((s, idx) => {
+                const plate = String(s.plate || '—').trim().toUpperCase();
+                lastIndexByPlate[plate] = idx;
+            });
+
+            const rowsArray: any[] = [];
+            // Row 1 (merged title)
+            rowsArray.push([
+                '', '', `CLIENTES    ${totalClientes}  PARA   ${totalVehicles}    VEHICULOS    SE  CARGAN ${totalPlacas}  SE COBRAN   ${totalPlacas}`
+            ]);
+
+            // Row 2 (headers)
+            rowsArray.push([
+                'FECHA DISTRIBUCION',
+                'REMESA TDM',
+                'PLACA MULA',
+                'DOCUMENTO',
+                'PLACA',
+                'VALOR',
+                'FECHA',
+                'TOTAL PLACA',
+                'ESTADO',
+                'OBSERVACIONES',
+                'FACTURAS'
+            ]);
+
+            let totalValorSum = 0;
+            sortedSurcharges.forEach((s, idx) => {
+                const plate = String(s.plate || '—').trim().toUpperCase();
+                const isLastOfGroup = (lastIndexByPlate[plate] === idx);
+                const val = Number(s.valor) || 0;
+                totalValorSum += val;
+
+                rowsArray.push([
+                    formatLongDateSpanish(selectedDoc.delivery_date),
+                    selectedDoc.remesaTDM || '—',
+                    selectedDoc.vehicle_plate || '—',
+                    selectedDoc.external_doc_id,
+                    s.plate || '—',
+                    val,
+                    s.fecha ? String(s.fecha).slice(0, 10) : '—',
+                    isLastOfGroup ? plateSums[plate] : '',
+                    (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente',
+                    s.observaciones || '—',
+                    s.facturas || '—'
+                ]);
+            });
+
+            // Grand Total Row
+            rowsArray.push([
+                '', '', '', '', '', totalValorSum, '', totalValorSum, '', '', ''
+            ]);
+
             const wb = XLSX.utils.book_new();
-            const data = routeSurcharges.map(s => ({
-                'DOCUMENTO':    selectedDoc.external_doc_id,
-                'PLACA':        s.plate || '—',
-                'VALOR':        Number(s.valor) || 0,
-                'REFERENCIA':   s.referencia || '—',
-                'FECHA':        fmtDateExcel(s.fecha),
-                'ESTADO':       (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'Aprobado' : 'Pendiente',
-                'OBSERVACIONES': s.observaciones || '—',
-                'FACTURAS':     s.facturas || '—',
-                'REGISTRADO':   fmtDateExcel(s.created_at),
-            }));
-            const ws = XLSX.utils.json_to_sheet(data);
+            const ws = XLSX.utils.aoa_to_sheet(rowsArray);
+
+            // Merges
+            ws['!merges'] = [
+                { s: { r: 0, c: 2 }, e: { r: 0, c: 7 } }
+            ];
+
+            // Formats
+            for (let r = 2; r < rowsArray.length; r++) {
+                const cellF = ws[`F${r + 1}`];
+                if (cellF && typeof cellF.v === 'number') {
+                    cellF.t = 'n';
+                    cellF.z = '#,##0';
+                }
+                const cellH = ws[`H${r + 1}`];
+                if (cellH && typeof cellH.v === 'number') {
+                    cellH.t = 'n';
+                    cellH.z = '#,##0';
+                }
+            }
+
             XLSX.utils.book_append_sheet(wb, ws, 'Sobrecostos');
             XLSX.writeFile(wb, `SOBRECOSTOS-${selectedDoc.external_doc_id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
             toast.success('Sobrecostos exportados correctamente');
-        } catch (err: any) { toast.error('Error al exportar sobrecostos: ' + err.message); }
-    }, [selectedDoc, routeSurcharges]);
+        } catch (err: any) {
+            toast.error('Error al exportar sobrecostos: ' + err.message);
+        }
+    }, [selectedDoc, routeSurcharges, invoices]);
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (

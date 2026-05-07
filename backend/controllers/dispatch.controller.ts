@@ -702,7 +702,7 @@ export const getReturnHistory = async (req: Request, res: Response) => {
                 FROM delivery_returns dr
                 LEFT JOIN users u ON u.id = dr.driver_id
                 LEFT JOIN vehicles v ON v.id = dr.vehicle_id
-                LEFT JOIN delivery_return_items dri ON dri.return_id = dr.id
+                LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
                 ${where}
                 GROUP BY dr.id, u.name, v.plate
                 ORDER BY dr.created_at DESC
@@ -824,7 +824,7 @@ export const getPendingReturns = async (req: Request, res: Response) => {
                 )) AS items
             FROM delivery_returns dr
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
-            LEFT JOIN delivery_return_items dri ON dri.return_id = dr.id
+            LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
             LEFT JOIN document_items di ON di.invoice = dr.invoice_id
             LEFT JOIN documents_l dl ON dl.id = di.document_id
             WHERE dr.status = 'PENDING' ${whereClause}
@@ -865,7 +865,7 @@ export const updateReturnStatus = async (req: Request, res: Response) => {
                        )) AS items
                 FROM delivery_returns dr
                 LEFT JOIN delivery_confirmations dc ON dc.id = dr.confirmation_id
-                LEFT JOIN delivery_return_items dri ON dri.return_id = dr.id
+                LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
                 WHERE dr.id = $1
                 GROUP BY dr.invoice_id, dr.vehicle_id, dc.delivery_type
             `, [id]);

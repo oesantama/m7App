@@ -6,6 +6,7 @@ import { Icons, INITIAL_CLIENTS } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { useAppStore } from '../stores/useAppStore';
+import { HistoricoGrouping } from './Logistics/HistoricoGrouping';
 import {
   OPTIMIZATION_CONSTANTS,
   estimateStopArrival,
@@ -328,6 +329,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<Invoice | null>(null);
   const [manualRouteModal, setManualRouteModal] = useState(false);
+  const [historicoModalOpen, setHistoricoModalOpen] = useState(false);
   const [manualVehicleSearch, setManualVehicleSearch] = useState('');
   const [scheduleModal, setScheduleModal] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({ customerName: '', city: '', dayOfWeek: new Date().getDay(), closeTime: '10:00', label: '' });
@@ -361,6 +363,25 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const addInvoiceInputRef = useRef<HTMLInputElement>(null);
   const [isPendingInvoicesModalOpen, setIsPendingInvoicesModalOpen] = useState(false);
   const [pendingInvoicesSearch, setPendingInvoicesSearch] = useState('');
+
+  const handleApplyHistoricalGrouping = (groups: Array<{ vehicle: Vehicle; invoices: Invoice[]; title: string }>) => {
+    const mapped: SuggestedRoute[] = groups.map((g, idx) => {
+      const vol = g.invoices.reduce((sum, item) => sum + (Number(item.volumeM3) || 0), 0);
+      const cap = Number(g.vehicle.capacityM3 || (g.vehicle as any).capacity_m3) || 30;
+      const util = Math.round((vol / cap) * 100);
+
+      return {
+        id: `route-hist-${Date.now()}-${idx}`,
+        vehicle: g.vehicle,
+        assignedInvoices: g.invoices,
+        totalVolume: Number(vol.toFixed(4)),
+        utilization: util,
+        city: g.invoices[0]?.city || 'GLOBAL'
+      };
+    });
+
+    setSuggestedRoutes(mapped);
+  };
 
   const handleDeleteDocument = async (id: string) => {
     setShowDeleteConfirm({ isOpen: true, id });
@@ -1976,7 +1997,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             for (const inv of remaining) {
               if (toAssign.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) break;
               const vol = Number(inv.volumeM3) || 0;
-              if (assignedVol + vol > cap * 1.05) break;
+              if (assignedVol + vol > cap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) break;
               toAssign.push(inv);
               assignedVol += vol;
             }
@@ -2017,22 +2038,38 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
             ? compatRoutes
             : suggestions.map((r, idx) => ({ idx, r, compatible: true })).sort((a, b) => a.r.assignedInvoices.length - b.r.assignedInvoices.length);
 
-          let ri = 0;
           for (const inv of remaining) {
-            if (targetRoutes.length === 0) break;
-            const { idx } = targetRoutes[ri % targetRoutes.length];
             const invVol = Number(inv.volumeM3) || 0;
-            const cap = Number(suggestions[idx].vehicle.capacityM3) || 30;
-            const newVol = suggestions[idx].totalVolume + invVol;
-            suggestions[idx] = {
-              ...suggestions[idx],
-              assignedInvoices: [...suggestions[idx].assignedInvoices, inv],
-              totalVolume: Number(newVol.toFixed(4)),
-              utilization: Math.round((newVol / cap) * 100),
-            };
-            forceAssigned.add(inv.id);
-            ri++;
+            let targetRouteIdx = -1;
+
+            // Encontrar la primera ruta que tenga espacio disponible sin violar restricciones
+            for (const target of targetRoutes) {
+              const rIdx = target.idx;
+              const route = suggestions[rIdx];
+              const cap = Number(route.vehicle.capacityM3) || 30;
+              const newVol = route.totalVolume + invVol;
+
+              if (route.assignedInvoices.length < OPTIMIZATION_CONSTANTS.MAX_INVOICES &&
+                  newVol <= cap * OPTIMIZATION_CONSTANTS.MAX_UTILIZATION) {
+                targetRouteIdx = rIdx;
+                break;
+              }
+            }
+
+            if (targetRouteIdx !== -1) {
+              const cap = Number(suggestions[targetRouteIdx].vehicle.capacityM3) || 30;
+              const newVol = suggestions[targetRouteIdx].totalVolume + invVol;
+              suggestions[targetRouteIdx] = {
+                ...suggestions[targetRouteIdx],
+                assignedInvoices: [...suggestions[targetRouteIdx].assignedInvoices, inv],
+                totalVolume: Number(newVol.toFixed(4)),
+                utilization: Math.round((newVol / cap) * 100),
+              };
+              forceAssigned.add(inv.id);
+            }
           }
+          // Cualquier factura en 'remaining' que no fue asignada por falta de espacio/límites
+          // se queda como 'sin ruta' y regresará al pool de facturas disponibles.
           remaining = [];
         });
 
@@ -2274,15 +2311,29 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const newSuggestions = [...suggestedRoutes];
     const route = newSuggestions[addInvoiceModal.routeIndex];
 
+    if (route.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) {
+      toast.error(`BLOQUEO: Esta ruta ya alcanzó el límite absoluto de ${OPTIMIZATION_CONSTANTS.MAX_INVOICES} facturas.`);
+      return;
+    }
+
+    const realCapacity = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) > 0 ? Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) : 30; // Fallback
+    const invoiceVol = Number(invoice.volumeM3 || (invoice as any).volume_m3 || 0);
+    const currentVol = route.assignedInvoices.reduce((acc, curr) => acc + Number(curr.volumeM3 || (curr as any).volume_m3 || 0), 0);
+    const newVol = currentVol + invoiceVol;
+    const utilization = (newVol / realCapacity) * 100;
+
+    if (utilization > OPTIMIZATION_CONSTANTS.CRITICAL_THRESHOLD * 100) {
+      toast.error(`BLOQUEO: Agregar esta factura superaría el umbral crítico de capacidad (${utilization.toFixed(1)}% de ${realCapacity}m³).`);
+      return;
+    }
+
     // Marcar como repice si viene del tab repice
     const invoiceToAdd = addInvoiceModal.tab === 'repice'
       ? { ...invoice, isRepice: true, status: 'EST-15' } as any
       : invoice;
     route.assignedInvoices.push(invoiceToAdd);
-    const realCapacity = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) > 0 ? Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) : 30; // Fallback
-    const newVol = route.assignedInvoices.reduce((acc, curr) => acc + Number(curr.volumeM3 || (curr as any).volume_m3 || 0), 0);
     route.totalVolume = Number(Number(newVol).toFixed(4));
-    route.utilization = Math.round((Number(newVol) / realCapacity) * 100);
+    route.utilization = Math.round(utilization);
 
     setSuggestedRoutes(newSuggestions);
     setModalSearchTerm('');
@@ -2678,7 +2729,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           'FACTURA': inv.invoiceNumber || inv.id,
           'CLIENTE': inv.customerName || '',
           'CIUDAD': inv.city || '',
-          'BARRIO': (inv as any).neighborhoodKey || inv.neighborhood || '',
+          'BARRIO': (inv as any).neighborhoodKey || (inv as any).neighborhood || '',
           'DIRECCIÓN': inv.address || '',
           'VOLUMEN M3': Number(inv.volumeM3 || (inv as any).volume_m3 || 0),
           'VALOR': inv.invoiceValue || '',
@@ -3341,15 +3392,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           </button>
 
           <button
-            onClick={() => setScheduleModal(true)}
-            title={`Horarios de entrega — ${deliverySchedules.length} configurados`}
-            className="shrink-0 px-3 py-2.5 bg-sky-50 text-sky-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-sky-500 hover:text-white transition-all shadow-md active:scale-95 whitespace-nowrap flex items-center gap-1.5 relative"
+            onClick={() => setHistoricoModalOpen(true)}
+            title="Agrupamiento Histórico de Despacho"
+            className="shrink-0 px-3 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all shadow-md active:scale-95 whitespace-nowrap flex items-center gap-1.5 relative animate-pulse"
           >
-            <Icons.Clock className="w-3.5 h-3.5" />
-            HORARIOS
-            {deliverySchedules.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-sky-500 text-white rounded-full text-[7px] font-black flex items-center justify-center leading-none">{deliverySchedules.length > 9 ? '9+' : deliverySchedules.length}</span>
-            )}
+            <Icons.Clock className="w-3.5 h-3.5 animate-spin-slow" />
+            HISTÓRICO
           </button>
 
           {/* SEGUNDA VUELTA — disponible cuando hay vehículos que completaron shift 1 */}
@@ -4729,6 +4777,16 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           </div>
         </div>
       )}
+      
+      {/* Drawer de Agrupamiento Histórico de Facturas */}
+      <HistoricoGrouping
+        isOpen={historicoModalOpen}
+        onClose={() => setHistoricoModalOpen(false)}
+        pendingInvoices={unassignedInvoices}
+        vehicles={vehicles}
+        clientId={selectedClient}
+        onApplyGrouping={handleApplyHistoricalGrouping}
+      />
 
       {/* Modal Nueva Ruta Manual */}
       {manualRouteModal && (
