@@ -966,11 +966,11 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               <p className="text-[7px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">SISTEMA M7 GLOBAL</p>
             </div>
          </div>
-         <div className="flex bg-slate-50 p-1 rounded-xl shadow-inner border border-slate-100">
-            <button onClick={()=>setActiveTab('cargue')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'cargue' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Cargue Masivo</button>
-            <button onClick={()=>setActiveTab('consultas')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consultas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta Histórica</button>
-            <button onClick={()=>setActiveTab('consulta-facturas')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consulta-facturas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta de Facturas</button>
-            <button onClick={()=>setActiveTab('correccion')} className={`px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'correccion' ? 'bg-white shadow-sm text-orange-700' : 'text-slate-400 hover:text-orange-600'}`}>Corrección Archivos</button>
+         <div className="flex bg-slate-50 p-1 rounded-xl shadow-inner border border-slate-100 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x w-full">
+            <button onClick={()=>setActiveTab('cargue')} className={`shrink-0 snap-center px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'cargue' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Cargue Masivo</button>
+            <button onClick={()=>setActiveTab('consultas')} className={`shrink-0 snap-center px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consultas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta Histórica</button>
+            <button onClick={()=>setActiveTab('consulta-facturas')} className={`shrink-0 snap-center px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'consulta-facturas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Consulta de Facturas</button>
+            <button onClick={()=>setActiveTab('correccion')} className={`shrink-0 snap-center px-4 py-1.5 rounded-lg font-black text-[9px] uppercase transition-all ${activeTab === 'correccion' ? 'bg-white shadow-sm text-orange-700' : 'text-slate-400 hover:text-orange-600'}`}>Corrección Archivos</button>
          </div>
       </div>
 

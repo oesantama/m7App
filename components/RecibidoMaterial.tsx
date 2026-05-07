@@ -479,34 +479,34 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           </div>
 
           {/* TABS DE NAVEGACIÓN */}
-          <div className="flex bg-slate-100/50 p-2 shrink-0 border-b border-slate-200">
+          <div className="flex bg-slate-100/50 p-2 shrink-0 border-b border-slate-200 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x">
             <button
               onClick={() => setActiveTab('recibo')}
-              className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'recibo' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'recibo' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <Icons.Package className="w-4 h-4" />
-              Recibo / Auditoría
+              <Icons.Package className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">Recibo / Auditoría</span>
             </button>
             <button 
               onClick={() => setActiveTab('picking')}
-              className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'picking' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'picking' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <Icons.Audit className="w-4 h-4" />
-              Alistado / Picking
+              <Icons.Audit className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">Alistado / Picking</span>
             </button>
             <button 
               onClick={() => setActiveTab('novedades')}
-              className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'novedades' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'novedades' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <Icons.Alert className="w-4 h-4" />
-              Novedades
+              <Icons.Alert className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">Novedades</span>
             </button>
             <button 
               onClick={() => setActiveTab('historico')}
-              className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'historico' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'historico' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <Icons.History className="w-4 h-4" />
-              Historial de Picking
+              <Icons.History className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">Historial de Picking</span>
             </button>
           </div>
 

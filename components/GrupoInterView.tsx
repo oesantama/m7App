@@ -563,18 +563,18 @@ const GrupoInterView: React.FC = () => {
             <h1 className="text-4xl font-black text-slate-900 tracking-tight">Grupo Inter</h1>
             <p className="text-slate-500 font-medium">Panel de trazabilidad y control de operaciones terrestres</p>
           </div>
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x w-full">
             <button 
               onClick={() => setActiveTab('gestion')}
-              className={`flex items-center gap-2 px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'gestion' ? 'bg-white text-blue-600 shadow-lg shadow-blue-100/50' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 lg:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'gestion' ? 'bg-white text-blue-600 shadow-lg shadow-blue-100/50' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <Clock size={16} /> Gestión Operativa
+              <Clock size={16} className="shrink-0" /> <span className="whitespace-nowrap">Gestión Operativa</span>
             </button>
             <button 
               onClick={() => setActiveTab('carga')}
-              className={`flex items-center gap-2 px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'carga' ? 'bg-white text-blue-600 shadow-lg shadow-blue-100/50' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 lg:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'carga' ? 'bg-white text-blue-600 shadow-lg shadow-blue-100/50' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <Upload size={16} /> Carga Masiva
+              <Upload size={16} className="shrink-0" /> <span className="whitespace-nowrap">Carga Masiva</span>
             </button>
           </div>
         </div>
