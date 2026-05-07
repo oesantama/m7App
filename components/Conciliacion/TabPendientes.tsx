@@ -335,10 +335,10 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     'PLACA': i.route_vehicle_plate || '—',
                     'UN_CODE': i.un_code || '—',
                     'METODO PAGO PLANILLA': i.invoice_metodo_pago || '—',
-                    'VALOR PLANILLA': i.invoice_value || 0,
+                    'VALOR PLANILLA': Math.round(Number(i.invoice_value || 0)),
                     'ESTADO': getStatusName(i.item_status),
-                    'VALOR FACTURA': i.invoice_value || 0,
-                    'VALOR RECAUDADO': i.valor || 0,
+                    'VALOR FACTURA': Math.round(Number(i.invoice_value || 0)),
+                    'VALOR RECAUDADO': Math.round(Number(i.valor || 0)),
                     'VALOR DEVUELTO': (() => {
                         const upperStatus = (i.item_status || '').toUpperCase();
                         const isDev = i.es_devolucion || DEVUELTO_STATUS.includes(upperStatus);
