@@ -386,12 +386,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             }).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
             
             const totalDevolucionesGlobal = Math.round(consolidatedData.reduce((s, i) => s + (Number(i['VALOR DEVUELTO']) || 0), 0));
+            const sobrecostosPendientesGlobal = Math.round((routeSurcharges || []).filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
 
             const wsConsolidated = XLSX.utils.aoa_to_sheet([
                 ['REPORTE CONSOLIDADO DE CONCILIACIÓN', '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
                 ['', '', '', '', 'TOTAL CRÉDITO:', totalCreditoGlobal],
                 ['', '', '', '', 'TOTAL DEVOLUCION:', totalDevolucionesGlobal],
-                ['', '', '', '', 'TOTAL SOBRECOSTO:', sobrecostosLeg],
+                ['', '', '', '', 'TOTAL SOBR. PENDIENTE:', sobrecostosPendientesGlobal],
                 ['', '', '', '', 'TOTAL LEGALIZADO:', totalLegalizadoGlobal],
                 []
             ]);
@@ -455,12 +456,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 }).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
                 
                 const plateTotalDevolucion = Math.round(plateData.reduce((s, i) => s + (Number(i['VALOR DEVUELTO']) || 0), 0));
+                const plateSurPend = Math.round(plateSur.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
 
                 const wsPlate = XLSX.utils.aoa_to_sheet([
                     ['REPORTE DE CONCILIACIÓN - PLACA ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
                     ['', '', '', '', 'TOTAL CRÉDITO:', plateTotalCredito],
                     ['', '', '', '', 'TOTAL DEVOLUCION:', plateTotalDevolucion],
-                    ['', '', '', '', 'TOTAL SOBRECOSTO:', plateSurLeg],
+                    ['', '', '', '', 'TOTAL SOBR. PENDIENTE:', plateSurPend],
                     ['', '', '', '', 'TOTAL LEGALIZADO:', plateTotalLeg],
                     []
                 ]);

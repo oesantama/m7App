@@ -419,11 +419,13 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                 return s;
             }, 0));
 
+            const sobrecostosPendientesGlobal = Math.round((routeSurcharges || []).filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
+
             const wsMain = XLSX.utils.aoa_to_sheet([
                 [`REPORTE CONCILIACIÓN - ${selectedDoc.external_doc_id}`, '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
                 ['', '', '', '', 'TOTAL CRÉDITO:', totalCreditoGlobal],
                 ['', '', '', '', 'TOTAL DEVOLUCION:', totalDevolucionesGlobal],
-                ['', '', '', '', 'TOTAL SOBRECOSTO:', sobrecostosLeg],
+                ['', '', '', '', 'TOTAL SOBR. PENDIENTE:', sobrecostosPendientesGlobal],
                 ['', '', '', '', 'TOTAL LEGALIZADO:', totalLegalizadoGlobal],
                 []
             ]);
@@ -483,11 +485,13 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                     return s;
                 }, 0));
 
+                const plateSurPend = Math.round(plateSur.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
+
                 const ws = XLSX.utils.aoa_to_sheet([
                     ['PLACA: ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
                     ['', '', '', '', 'TOTAL CRÉDITO:', plateTotalCredito],
                     ['', '', '', '', 'TOTAL DEVOLUCION:', plateTotalDevolucion],
-                    ['', '', '', '', 'TOTAL SOBRECOSTO:', plateSurLeg],
+                    ['', '', '', '', 'TOTAL SOBR. PENDIENTE:', plateSurPend],
                     ['', '', '', '', 'TOTAL LEGALIZADO:', plateTotalLeg],
                     []
                 ]);
