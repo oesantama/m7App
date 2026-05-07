@@ -68,19 +68,28 @@ export const uploadAuditoriaB36 = async (req: Request, res: Response) => {
     const clientId   = req.body?.clientId || req.query.clientId;
     const uploadedBy = (req as any).user?.id || 'SYSTEM';
 
-    if (!req.file) return res.status(400).json({ error: 'No se recibió archivo.' });
     if (!clientId)  return res.status(400).json({ error: 'clientId es requerido.' });
 
-    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
+    let encRows: any[] = [];
+    let detRows: any[] = [];
 
-    // Detectar hoja Encabezado (primera que coincida o la primera hoja)
-    const encSheet = wb.Sheets[wb.SheetNames.find(n => /encabezado/i.test(n)) ?? wb.SheetNames[0]];
-    const detSheet = wb.Sheets[wb.SheetNames.find(n => /detalle/i.test(n)) ?? wb.SheetNames[1]] || null;
+    if (req.body.encRows && Array.isArray(req.body.encRows)) {
+      encRows = req.body.encRows;
+      detRows = Array.isArray(req.body.detRows) ? req.body.detRows : [];
+    } else {
+      if (!req.file) return res.status(400).json({ error: 'No se recibió archivo ni datos JSON.' });
 
-    if (!encSheet) return res.status(400).json({ error: 'No se encontró la hoja de Encabezado.' });
+      const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
 
-    const encRows: any[] = XLSX.utils.sheet_to_json(encSheet, { defval: null });
-    const detRows: any[] = detSheet ? XLSX.utils.sheet_to_json(detSheet, { defval: null }) : [];
+      // Detectar hoja Encabezado (primera que coincida o la primera hoja)
+      const encSheet = wb.Sheets[wb.SheetNames.find(n => /encabezado/i.test(n)) ?? wb.SheetNames[0]];
+      const detSheet = wb.Sheets[wb.SheetNames.find(n => /detalle/i.test(n)) ?? wb.SheetNames[1]] || null;
+
+      if (!encSheet) return res.status(400).json({ error: 'No se encontró la hoja de Encabezado.' });
+
+      encRows = XLSX.utils.sheet_to_json(encSheet, { defval: null });
+      detRows = detSheet ? XLSX.utils.sheet_to_json(detSheet, { defval: null }) : [];
+    }
 
     if (encRows.length === 0) return res.status(400).json({ error: 'La hoja de Encabezado está vacía.' });
 

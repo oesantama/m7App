@@ -48,6 +48,14 @@ const TabSubir: React.FC<{ user: User; clients: Client[] }> = ({ user, clients }
   const [error, setError]           = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Preview state
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [encRowsPreview, setEncRowsPreview] = useState<any[]>([]);
+  const [detRowsPreview, setDetRowsPreview] = useState<any[]>([]);
+  const [previewSearch, setPreviewSearch] = useState('');
+  const [editingRowIdx, setEditingRowIdx] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+
   useEffect(() => { if (clients.length > 0 && !clientId) setClientId(clients[0].id); }, [clients]);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,54 +64,125 @@ const TabSubir: React.FC<{ user: User; clients: Client[] }> = ({ user, clients }
     setError('');
   };
 
-  const handleUpload = async () => {
+  const handleProcessFile = () => {
     if (!file)     { toast.error('Seleccione un archivo Excel.'); return; }
     if (!clientId) { toast.error('Seleccione un cliente.'); return; }
 
     setUploading(true);
     setError('');
     setResult(null);
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const XLSXmod = await import('xlsx');
+        const bstr = evt.target?.result;
+        const wb = XLSXmod.read(bstr, { type: 'binary', cellDates: false });
+        
+        const sheetName = wb.SheetNames.find(n => /control entregas/i.test(n)) || wb.SheetNames[0];
+        if (!sheetName) {
+          throw new Error('No se encontraron hojas en el archivo.');
+        }
+
+        const ws = wb.Sheets[sheetName];
+        const rows: any[] = XLSXmod.utils.sheet_to_json(ws, { defval: null });
+
+        if (!rows.length) throw new Error('La hoja está vacía.');
+
+        const encMap = new Map<string, any>();
+        const dets: any[] = [];
+        
+        rows.forEach(r => {
+            const os = r['OS'] || r['os'] || 'SIN_OS';
+            if (!encMap.has(os)) {
+                encMap.set(os, {
+                    os: os,
+                    fecha_carge: r['FECHA CARGUE'] || r['FECHA CARGE'] || null,
+                    placa: r['PLACA'] || r['placa'] || null,
+                    conductor: r['CONDUCTOR'] || r['conductor'] || null,
+                    fecha_programado: r['FECHA ENTREGA'] || r['FECHA PROGRAMADO'] || null,
+                    cant_clientes: r['CLIENTES'] || r['CANT_CLIENTES'] || 1,
+                    nombre_ruta: r['RUTA'] || r['ZONA'] || r['NOMBRE_RUTA'] || null,
+                    coordinador: r['COORDINADOR'] || r['coordinador'] || null,
+                    usuariocontrol: r['USUARIOCONTROL'] || null,
+                    fechacontrol: r['FECHACONTROL'] || null,
+                    valor_flete: r['VALOR FLETE'] || r['VALOR_FLETE'] || 0
+                });
+            }
+            if (r['FACTURA'] || r['factura']) {
+                dets.push({
+                    _enc_os: os,
+                    factura: r['FACTURA'] || r['factura'],
+                    notas: r['OBSERVACIONES'] || r['NOTAS'] || null
+                });
+            }
+        });
+
+        const encArray = Array.from(encMap.values());
+        const finalDets = dets.map(d => {
+            const idx = encArray.findIndex(e => e.os === d._enc_os);
+            return {
+                id_enca: idx + 1,
+                factura: d.factura,
+                notas: d.notas
+            };
+        });
+
+        setEncRowsPreview(encArray);
+        setDetRowsPreview(finalDets);
+        setPreviewModalOpen(true);
+      } catch (e: any) {
+        setError(e?.message || 'Error al procesar el archivo Excel.');
+        toast.error('Error procesando el archivo.');
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const exportPreview = async () => {
+    const XLSXmod = await import('xlsx');
+    const wb = XLSXmod.utils.book_new();
+    XLSXmod.utils.book_append_sheet(wb, XLSXmod.utils.json_to_sheet(encRowsPreview), 'Encabezado');
+    XLSXmod.utils.book_append_sheet(wb, XLSXmod.utils.json_to_sheet(detRowsPreview), 'Detalle');
+    XLSXmod.writeFile(wb, 'previsualizacion_auditoria.xlsx');
+  };
+
+  const submitPreview = async () => {
+    setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('clientId', clientId);
-      const res = await (api as any).uploadAuditoriaB36(formData);
+      const res = await (api as any).uploadAuditoriaB36({
+        clientId,
+        encRows: encRowsPreview,
+        detRows: detRowsPreview
+      });
       setResult(res);
+      setPreviewModalOpen(false);
       setFile(null);
       if (fileRef.current) fileRef.current.value = '';
       toast.success(`Cargado: ${res.encabezados} encabezado(s), ${res.detalles} detalle(s)`);
     } catch (e: any) {
-      setError(e?.message || 'Error al cargar el archivo.');
-      toast.error('Error al cargar el archivo.');
+      toast.error('Error al guardar en base de datos.');
     } finally {
       setUploading(false);
     }
   };
 
-  const downloadTemplate = () => {
-    const XLSX = (window as any).XLSX;
-    if (!XLSX) { toast.error('Librería no disponible.'); return; }
-
-    import('xlsx').then(XLSXmod => {
-      const encHeaders = [['OS','FECHA_CARGE','PLACA','CONDUCTOR','FECHA_PROGRAMADO','CANT_CLIENTES','NOMBRE_RUTA','COORDINADOR','USUARIOCONTROL','FECHACONTROL','VALOR_FLETE']];
-      const detHeaders = [['ID_ENCA','FACTURA','NOTAS']];
-      const wb = XLSXmod.utils.book_new();
-      XLSXmod.utils.book_append_sheet(wb, XLSXmod.utils.aoa_to_sheet(encHeaders), 'Encabezado');
-      XLSXmod.utils.book_append_sheet(wb, XLSXmod.utils.aoa_to_sheet(detHeaders), 'Detalle');
-      XLSXmod.writeFile(wb, 'plantilla_auditoria_b36.xlsx');
-    });
-  };
+  const filteredEncRows = encRowsPreview.filter(r => 
+      !previewSearch || 
+      (r.os && r.os.toString().toLowerCase().includes(previewSearch.toLowerCase())) ||
+      (r.placa && r.placa.toLowerCase().includes(previewSearch.toLowerCase()))
+  );
 
   return (
     <div className="space-y-5 max-w-2xl">
       {/* Instrucciones */}
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl text-[11px] text-blue-700 space-y-1">
-        <p className="font-black uppercase tracking-widest mb-2">Formato esperado del archivo</p>
-        <p>• Hoja <strong>"Encabezado"</strong>: columnas OS, FECHA_CARGE, PLACA, CONDUCTOR, FECHA_PROGRAMADO, CANT_CLIENTES, NOMBRE_RUTA, COORDINADOR, USUARIOCONTROL, FECHACONTROL, VALOR_FLETE</p>
-        <p>• Hoja <strong>"Detalle"</strong>: columnas ID_ENCA (posición del encabezado), FACTURA, NOTAS</p>
-        <button onClick={downloadTemplate} className="mt-2 flex items-center gap-1.5 text-blue-600 font-black hover:underline">
-          <Download size={12} /> Descargar plantilla vacía
-        </button>
+        <p className="font-black uppercase tracking-widest mb-2">Proceso Automático</p>
+        <p>• Sube el archivo base de logística directamente.</p>
+        <p>• El sistema buscará la hoja <strong>"Control entregas"</strong> y extraerá automáticamente los agrupamientos por OS y sus facturas asociadas.</p>
+        <p>• Se abrirá una previsualización para validar o editar antes de guardar.</p>
       </div>
 
       {/* Selector cliente */}
@@ -120,7 +199,7 @@ const TabSubir: React.FC<{ user: User; clients: Client[] }> = ({ user, clients }
 
       {/* File input */}
       <div>
-        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Archivo Excel (.xlsx)</label>
+        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Archivo Excel (.xlsx / .xlsm)</label>
         <div
           onClick={() => fileRef.current?.click()}
           className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center gap-3 cursor-pointer transition-all ${
@@ -137,10 +216,10 @@ const TabSubir: React.FC<{ user: User; clients: Client[] }> = ({ user, clients }
             <>
               <FileSpreadsheet size={28} className="text-slate-300" />
               <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Haga clic para seleccionar</p>
-              <p className="text-[10px] text-slate-300">Formato .xlsx — máx. 10 MB</p>
+              <p className="text-[10px] text-slate-300">Formato .xlsx o .xlsm — máx. 20 MB</p>
             </>
           )}
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" />
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.xlsm" onChange={handleFile} className="hidden" />
         </div>
         {file && (
           <button onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}
@@ -169,15 +248,98 @@ const TabSubir: React.FC<{ user: User; clients: Client[] }> = ({ user, clients }
         </div>
       )}
 
-      {/* Botón subir */}
+      {/* Botón previsualizar */}
       <button
-        onClick={handleUpload}
+        onClick={handleProcessFile}
         disabled={uploading || !file}
         className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all disabled:opacity-40"
       >
-        {uploading ? <RefreshCw size={13} className="animate-spin" /> : <Upload size={13} />}
-        {uploading ? 'Cargando...' : 'Subir Planilla'}
+        {uploading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
+        {uploading ? 'Procesando...' : 'Previsualizar y Extraer'}
       </button>
+
+      {/* Modal Previsualización */}
+      {previewModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-7xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                 <h3 className="text-lg font-black text-slate-900 uppercase">Previsualización de Carga ({filteredEncRows.length} Rutas)</h3>
+                 <button onClick={() => setPreviewModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={18} /></button>
+             </div>
+             
+             <div className="px-6 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                 <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input type="text" placeholder="Buscar OS o Placa..." value={previewSearch} onChange={e => setPreviewSearch(e.target.value)} 
+                           className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-[11px] font-medium focus:outline-none focus:border-emerald-400 bg-white w-64" />
+                 </div>
+                 <button onClick={exportPreview} className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-200 transition-colors">
+                    <Download size={13} /> Exportar Excel
+                 </button>
+             </div>
+             
+             <div className="flex-1 overflow-auto bg-slate-50 p-6">
+                  <table className="w-full text-[11px] bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                    <thead className="bg-slate-100 text-slate-500 border-b border-slate-200 text-left">
+                       <tr>
+                          <th className="px-3 py-2 font-black uppercase">OS</th>
+                          <th className="px-3 py-2 font-black uppercase">Placa</th>
+                          <th className="px-3 py-2 font-black uppercase">Conductor</th>
+                          <th className="px-3 py-2 font-black uppercase">Flete</th>
+                          <th className="px-3 py-2 font-black uppercase text-center">Facturas</th>
+                          <th className="px-3 py-2 font-black uppercase text-center">Acción</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                       {filteredEncRows.map((r, i) => (
+                           <tr key={i} className="hover:bg-slate-50">
+                               {editingRowIdx === i ? (
+                                  <>
+                                     <td className="px-3 py-2"><input type="text" className="w-20 border rounded px-1" value={editForm.os || ''} onChange={e => setEditForm({...editForm, os: e.target.value})} /></td>
+                                     <td className="px-3 py-2"><input type="text" className="w-20 border rounded px-1" value={editForm.placa || ''} onChange={e => setEditForm({...editForm, placa: e.target.value})} /></td>
+                                     <td className="px-3 py-2"><input type="text" className="w-32 border rounded px-1" value={editForm.conductor || ''} onChange={e => setEditForm({...editForm, conductor: e.target.value})} /></td>
+                                     <td className="px-3 py-2"><input type="number" className="w-24 border rounded px-1" value={editForm.valor_flete || 0} onChange={e => setEditForm({...editForm, valor_flete: e.target.value})} /></td>
+                                     <td className="px-3 py-2 text-center text-slate-400">{detRowsPreview.filter(d => d.id_enca === (encRowsPreview.indexOf(r) + 1)).length}</td>
+                                     <td className="px-3 py-2 text-center">
+                                         <button className="text-emerald-600 font-bold hover:underline" onClick={() => {
+                                             const newRows = [...encRowsPreview];
+                                             newRows[encRowsPreview.indexOf(r)] = { ...r, ...editForm };
+                                             setEncRowsPreview(newRows);
+                                             setEditingRowIdx(null);
+                                         }}>Guardar</button>
+                                     </td>
+                                  </>
+                               ) : (
+                                  <>
+                                    <td className="px-3 py-2 font-black text-slate-800">{r.os}</td>
+                                    <td className="px-3 py-2 font-bold text-slate-600">{r.placa}</td>
+                                    <td className="px-3 py-2 text-slate-500">{r.conductor}</td>
+                                    <td className="px-3 py-2 font-bold text-emerald-600">{fmtMoney(r.valor_flete)}</td>
+                                    <td className="px-3 py-2 text-center">
+                                       <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black text-[10px]">
+                                          {detRowsPreview.filter(d => d.id_enca === (encRowsPreview.indexOf(r) + 1)).length}
+                                       </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                       <button className="text-blue-600 font-bold hover:underline" onClick={() => { setEditingRowIdx(i); setEditForm(r); }}>Editar</button>
+                                    </td>
+                                  </>
+                               )}
+                           </tr>
+                       ))}
+                    </tbody>
+                  </table>
+             </div>
+             
+             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-white">
+                  <button onClick={() => setPreviewModalOpen(false)} className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">Cancelar</button>
+                  <button onClick={submitPreview} disabled={uploading} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-colors disabled:opacity-50">
+                     {uploading ? 'Guardando...' : 'Aprobar y Guardar'}
+                  </button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
