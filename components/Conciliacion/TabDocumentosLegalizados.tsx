@@ -139,6 +139,27 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
     const [detailRoute, setDetailRoute]       = useState<RouteGroup | null>(null);
     const [activeDetailCard, setActiveDetailCard] = useState<string | null>(null);
 
+    const [historyPlate, setHistoryPlate]     = useState<string | null>(null);
+    const [plateHistoryList, setPlateHistoryList] = useState<any[]>([]);
+    const [loadingPlateHistory, setLoadingPlateHistory] = useState(false);
+
+    const handleShowPlateHistory = useCallback(async (plate: string) => {
+        setHistoryPlate(plate);
+        setLoadingPlateHistory(true);
+        try {
+            const res = await api.getPlateMovementHistory(plate);
+            if (res.success) {
+                setPlateHistoryList(res.data || []);
+            } else {
+                toast.error(res.error || 'Error al cargar el historial de la placa');
+            }
+        } catch (err: any) {
+            toast.error('Error al cargar historial: ' + err.message);
+        } finally {
+            setLoadingPlateHistory(false);
+        }
+    }, []);
+
     const handleSearch = async () => {
         if (!searchId.trim()) return;
         setLoading(true);
@@ -369,6 +390,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
     };
 
     // ── Export Excel ──────────────────────────────────────────────────────────
+    // ── Export Excel ──────────────────────────────────────────────────────────
     const handleExportExcel = useCallback(() => {
         if (!selectedDoc) return;
         try {
@@ -387,6 +409,64 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                 'COMPROBANTE':     i.comprobante || '—',
                 'FECHA PAGO':      fmtDateExcel(i.fecha_pago),
             }));
+
+            const getConsignacionesData = (plateFilter?: string) => {
+                const list: any[] = [];
+
+                // 1. Consignaciones Grupales
+                let filteredGroups = groupPayments || [];
+                if (plateFilter) {
+                    filteredGroups = filteredGroups.filter(g => g.plate === plateFilter);
+                }
+                filteredGroups.forEach(g => {
+                    list.push({
+                        'PLACA': g.plate || '—',
+                        'METODO': g.metodo_pago || g.metodo || '—',
+                        'VALOR': Number(g.valor) || 0,
+                        'REFERENCIA': g.referencia || g.nro_aprobacion || g.nroAprobacion || '—',
+                        'FECHA CONSIGNACION': g.fecha ? String(g.fecha).slice(0, 10) : '—',
+                        'OBSERVACION': g.observaciones || g.observacion || 'GRUPAL'
+                    });
+                });
+
+                // 2. Consignaciones Individuales (from invoices)
+                let filteredInvs = invoices || [];
+                if (plateFilter) {
+                    filteredInvs = filteredInvs.filter(i => i.route_vehicle_plate === plateFilter);
+                }
+                filteredInvs.forEach(i => {
+                    const payMethod = (i.forma_pago || '').toUpperCase();
+                    if (payMethod === 'CONSIGNACION' || payMethod === 'TRANSFERENCIA') {
+                        list.push({
+                            'PLACA': i.route_vehicle_plate || i.vehicle_plate || '—',
+                            'METODO': i.forma_pago || '—',
+                            'VALOR': Number(i.valor) || 0,
+                            'REFERENCIA': i.comprobante || '—',
+                            'FECHA CONSIGNACION': i.fecha_pago ? String(i.fecha_pago).slice(0, 10) : '—',
+                            'OBSERVACION': `INDIVIDUAL: FACTURA ${i.invoice_number}`
+                        });
+                    }
+                });
+
+                // 3. Sobrecostos de Ruta
+                let filteredSurcharges = routeSurcharges || [];
+                if (plateFilter) {
+                    filteredSurcharges = filteredSurcharges.filter(s => s.plate === plateFilter);
+                }
+                filteredSurcharges.forEach(s => {
+                    const stateStr = (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'APROBADO' : 'PENDIENTE';
+                    list.push({
+                        'PLACA': s.plate || '—',
+                        'METODO': 'TRANSFERENCIA', // el metodo se pone transferencia
+                        'VALOR': Number(s.valor) || 0,
+                        'REFERENCIA': s.facturas || s.referencia || '—',
+                        'FECHA CONSIGNACION': s.fecha ? String(s.fecha).slice(0, 10) : '—',
+                        'OBSERVACION': `SOBRECOSTO [${stateStr}]` // el estado lo posiciona donde van las observaciones de la tabla
+                    });
+                });
+
+                return list;
+            };
 
             const totalDocumentoGlobal = Math.round(invoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
             const individualLeg = invoices.reduce((s, i) => s + (Number(i.valor) || 0), 0);
@@ -421,12 +501,17 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
 
             const sobrecostosPendientesGlobal = Math.round((routeSurcharges || []).filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
 
+            const totalEfectivoGlobal = Math.round(totalDocumentoGlobal - totalCreditoGlobal);
+            const diferenciaGlobal = Math.round(totalEfectivoGlobal - totalLegalizadoGlobal);
+
             const wsMain = XLSX.utils.aoa_to_sheet([
                 [`REPORTE CONCILIACIÓN - ${selectedDoc.external_doc_id}`, '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
                 ['', '', '', '', 'TOTAL CRÉDITO:', totalCreditoGlobal],
+                ['', '', '', '', 'TOTAL EFECTIVO:', totalEfectivoGlobal],
                 ['', '', '', '', 'TOTAL DEVOLUCION:', totalDevolucionesGlobal],
                 ['', '', '', '', 'TOTAL SOBR. PENDIENTE:', sobrecostosPendientesGlobal],
                 ['', '', '', '', 'TOTAL LEGALIZADO:', totalLegalizadoGlobal],
+                ['', '', '', '', 'DIFERENCIA:', diferenciaGlobal],
                 []
             ]);
             if (wsMain['F1']) wsMain['F1'].z = '#,##0';
@@ -434,13 +519,13 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
             if (wsMain['F3']) wsMain['F3'].z = '#,##0';
             if (wsMain['F4']) wsMain['F4'].z = '#,##0';
             if (wsMain['F5']) wsMain['F5'].z = '#,##0';
-            if (groupPayments.length > 0) {
-                XLSX.utils.sheet_add_aoa(wsMain, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
-                XLSX.utils.sheet_add_json(wsMain, groupPayments.map(g => ({
-                    'PLACA': g.plate || '—', 'METODO': g.metodo_pago || '—',
-                    'VALOR': Number(g.valor) || 0, 'REFERENCIA': g.referencia || '—',
-                    'FECHA': g.fecha ? String(g.fecha).slice(0, 10) : '—',
-                })), { origin: -1 });
+            if (wsMain['F6']) wsMain['F6'].z = '#,##0';
+            if (wsMain['F7']) wsMain['F7'].z = '#,##0';
+
+            const mainConsignaciones = getConsignacionesData();
+            if (mainConsignaciones.length > 0) {
+                XLSX.utils.sheet_add_aoa(wsMain, [['CONSIGNACIONES']], { origin: -1 });
+                XLSX.utils.sheet_add_json(wsMain, mainConsignaciones, { origin: -1 });
                 XLSX.utils.sheet_add_aoa(wsMain, [[]], { origin: -1 });
             }
             XLSX.utils.sheet_add_aoa(wsMain, [['DETALLE DE FACTURAS']], { origin: -1 });
@@ -487,12 +572,17 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
 
                 const plateSurPend = Math.round(plateSur.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
 
+                const plateTotalEfectivo = Math.round(plateTotalDoc - plateTotalCredito);
+                const plateDiferencia = Math.round(plateTotalEfectivo - plateTotalLeg);
+
                 const ws = XLSX.utils.aoa_to_sheet([
                     ['PLACA: ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
                     ['', '', '', '', 'TOTAL CRÉDITO:', plateTotalCredito],
+                    ['', '', '', '', 'TOTAL EFECTIVO:', plateTotalEfectivo],
                     ['', '', '', '', 'TOTAL DEVOLUCION:', plateTotalDevolucion],
                     ['', '', '', '', 'TOTAL SOBR. PENDIENTE:', plateSurPend],
                     ['', '', '', '', 'TOTAL LEGALIZADO:', plateTotalLeg],
+                    ['', '', '', '', 'DIFERENCIA:', plateDiferencia],
                     []
                 ]);
                 if (ws['F1']) ws['F1'].z = '#,##0';
@@ -500,12 +590,13 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                 if (ws['F3']) ws['F3'].z = '#,##0';
                 if (ws['F4']) ws['F4'].z = '#,##0';
                 if (ws['F5']) ws['F5'].z = '#,##0';
-                if (plateGroup.length > 0) {
-                    XLSX.utils.sheet_add_aoa(ws, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
-                    XLSX.utils.sheet_add_json(ws, plateGroup.map(g => ({
-                        'METODO': g.metodo_pago || '—', 'VALOR': Number(g.valor) || 0,
-                        'REFERENCIA': g.referencia || '—', 'FECHA': g.fecha ? String(g.fecha).slice(0, 10) : '—',
-                    })), { origin: -1 });
+                if (ws['F6']) ws['F6'].z = '#,##0';
+                if (ws['F7']) ws['F7'].z = '#,##0';
+
+                const plateConsignaciones = getConsignacionesData(p);
+                if (plateConsignaciones.length > 0) {
+                    XLSX.utils.sheet_add_aoa(ws, [['CONSIGNACIONES']], { origin: -1 });
+                    XLSX.utils.sheet_add_json(ws, plateConsignaciones, { origin: -1 });
                     XLSX.utils.sheet_add_aoa(ws, [[]], { origin: -1 });
                 }
                 XLSX.utils.sheet_add_aoa(ws, [['FACTURAS']], { origin: -1 });
@@ -595,7 +686,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
 
                 rowsArray.push([
                     formatLongDateSpanish(selectedDoc.delivery_date),
-                    selectedDoc.remesaTDM || '—',
+                    (selectedDoc as any).remesaTDM || '—',
                     selectedDoc.vehicle_plate || '—',
                     selectedDoc.external_doc_id,
                     s.plate || '—',
@@ -1020,12 +1111,17 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                                                             )}
                                                         </div>
 
-                                                        {/* Solo botón Ver detalle */}
-                                                        <div className="px-4 pb-3 pt-2">
+                                                        {/* Solo botón Ver detalle y Historial */}
+                                                        <div className="px-4 pb-3 pt-2 flex gap-2">
                                                             <button
                                                                 onClick={() => setDetailRoute(route)}
-                                                                className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
+                                                                className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
                                                                 Ver detalle →
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleShowPlateHistory(route.plate)}
+                                                                className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 transition-all flex items-center justify-center gap-1 font-bold">
+                                                                📜 Historial
                                                             </button>
                                                         </div>
                                                     </div>
@@ -1355,6 +1451,119 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                     </div>
                 );
             })()}
+
+            {historyPlate && (
+                <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-4xl h-[80vh] rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col">
+                        
+                        {/* Cabecera del historial */}
+                        <div className="bg-slate-900 px-6 py-5 text-white flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Historial General de Movimientos</p>
+                                <h4 className="text-xl font-black flex items-center gap-2">
+                                    🚛 Placa: {historyPlate}
+                                </h4>
+                            </div>
+                            <button 
+                                onClick={() => { setHistoryPlate(null); setPlateHistoryList([]); }}
+                                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center font-bold text-sm transition-all"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Listado de movimientos */}
+                        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-slate-50">
+                            {loadingPlateHistory ? (
+                                <div className="flex flex-col items-center justify-center h-full gap-3">
+                                    <Icons.Loader className="w-8 h-8 animate-spin text-emerald-500" />
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cargando movimientos...</p>
+                                </div>
+                            ) : plateHistoryList.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
+                                    <p className="text-4xl">📜</p>
+                                    <p className="text-xs font-black uppercase tracking-tight">Sin registros encontrados</p>
+                                    <p className="text-[9px] font-semibold text-slate-400">Esta placa no tiene conciliaciones ni reversiones registradas en el sistema.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-[10px]">
+                                                <thead>
+                                                    <tr className="bg-slate-900 text-white">
+                                                        {['Documento L', 'Factura', 'Cliente', 'Ciudad', 'Forma Pago', 'Valor', 'Banco', 'Comprobante', 'Estado', 'Operador', 'Fecha Movimiento', 'Justificación / Obs.'].map(h => (
+                                                            <th key={h} className="px-3 py-2.5 text-left font-black uppercase tracking-wide text-[8px] whitespace-nowrap">{h}</th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {plateHistoryList.map((row, idx) => {
+                                                        const isRev = row.status === 'REVERSADO';
+                                                        const cfg = FORMA_COLOR[row.forma_pago] || { bg: 'bg-slate-100', text: 'text-slate-700', label: row.forma_pago };
+                                                        
+                                                        return (
+                                                            <tr key={row.id || idx} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50/30'}`}>
+                                                                <td className="px-3 py-3 font-bold text-slate-900 whitespace-nowrap">{row.external_doc_id}</td>
+                                                                <td className="px-3 py-3 font-black text-slate-800 whitespace-nowrap">{row.invoice_number}</td>
+                                                                <td className="px-3 py-3 text-slate-600 max-w-[150px] truncate">{row.customer_name || '—'}</td>
+                                                                <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{row.city || '—'}</td>
+                                                                <td className="px-3 py-3">
+                                                                    <span className={`${cfg.bg} ${cfg.text} px-2 py-0.5 rounded-full text-[8px] font-black whitespace-nowrap`}>
+                                                                        {cfg.label}
+                                                                    </span>
+                                                                </td>
+                                                                <td className={`px-3 py-3 font-black text-right whitespace-nowrap ${isRev ? 'text-rose-600 line-through' : 'text-emerald-700'}`}>
+                                                                    {fmtCOP(row.valor)}
+                                                                </td>
+                                                                <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{row.banco || '—'}</td>
+                                                                <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
+                                                                    {row.comprobante ? (
+                                                                        <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg font-bold text-slate-700 text-[9px]">{row.comprobante}</span>
+                                                                    ) : '—'}
+                                                                </td>
+                                                                <td className="px-3 py-3 whitespace-nowrap">
+                                                                    <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider
+                                                                        ${isRev ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
+                                                                        {row.status}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-3 py-3 text-slate-600 font-bold whitespace-nowrap">{row.action_by_name || 'Sistema'}</td>
+                                                                <td className="px-3 py-3 text-slate-400 whitespace-nowrap">{fmtDate(row.action_at)}</td>
+                                                                <td className="px-3 py-3 text-slate-500 max-w-[200px] font-semibold break-words leading-relaxed">
+                                                                    {row.observations ? (
+                                                                        <p className="bg-rose-50/50 text-rose-700 border border-rose-100 rounded-xl px-2.5 py-1 text-[9px] font-bold">
+                                                                            💬 {row.observations}
+                                                                        </p>
+                                                                    ) : '—'}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer del historial */}
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">
+                                Total: {plateHistoryList.length} movimientos de conciliación
+                            </p>
+                            <button 
+                                onClick={() => { setHistoryPlate(null); setPlateHistoryList([]); }}
+                                className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

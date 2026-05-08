@@ -419,12 +419,17 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             const totalDevolucionesGlobal = Math.round(consolidatedData.reduce((s, i) => s + (Number(i['VALOR DEVUELTO']) || 0), 0));
             const sobrecostosPendientesGlobal = Math.round((routeSurcharges || []).filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
 
+            const totalEfectivoGlobal = Math.round(totalDocumentoGlobal - totalCreditoGlobal);
+            const diferenciaGlobal = Math.round(totalEfectivoGlobal - totalLegalizadoGlobal);
+
             const wsConsolidated = XLSX.utils.aoa_to_sheet([
                 ['REPORTE CONSOLIDADO DE CONCILIACIÓN', '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
                 ['', '', '', '', 'TOTAL CRÉDITO:', totalCreditoGlobal],
+                ['', '', '', '', 'TOTAL EFECTIVO:', totalEfectivoGlobal],
                 ['', '', '', '', 'TOTAL DEVOLUCION:', totalDevolucionesGlobal],
                 ['', '', '', '', 'TOTAL SOBR. PENDIENTE:', sobrecostosPendientesGlobal],
                 ['', '', '', '', 'TOTAL LEGALIZADO:', totalLegalizadoGlobal],
+                ['', '', '', '', 'DIFERENCIA:', diferenciaGlobal],
                 []
             ]);
             if (wsConsolidated['F1']) wsConsolidated['F1'].z = '#,##0';
@@ -432,31 +437,71 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             if (wsConsolidated['F3']) wsConsolidated['F3'].z = '#,##0';
             if (wsConsolidated['F4']) wsConsolidated['F4'].z = '#,##0';
             if (wsConsolidated['F5']) wsConsolidated['F5'].z = '#,##0';
+            if (wsConsolidated['F6']) wsConsolidated['F6'].z = '#,##0';
+            if (wsConsolidated['F7']) wsConsolidated['F7'].z = '#,##0';
 
-            // 1. CONSIGNACIONES GRUPALES
-            if (groupPayments && groupPayments.length > 0) {
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [['CONSIGNACIONES GRUPALES']], { origin: -1 });
-                XLSX.utils.sheet_add_json(wsConsolidated, groupPayments.map(p => ({
-                    'PLACA': p.plate || '—',
-                    'METODO': p.metodo_pago || p.metodo || '—',
-                    'VALOR': Number(p.valor) || 0,
-                    'REFERENCIA': p.referencia || p.nro_aprobacion || p.nroAprobacion || '—',
-                    'FECHA CONSIGNACION': p.fecha ? String(p.fecha).slice(0, 10) : '—',
-                    'OBSERVACION': p.observacion || '—'
-                })), { origin: -1 });
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
-            }
+            const getConsignacionesData = (plateFilter?: string) => {
+                const list: any[] = [];
 
-            // 2. SOBRECOSTOS DE RUTA
-            if (routeSurcharges && routeSurcharges.length > 0) {
-                XLSX.utils.sheet_add_aoa(wsConsolidated, [['SOBRECOSTOS DE RUTA']], { origin: -1 });
-                XLSX.utils.sheet_add_json(wsConsolidated, routeSurcharges.map(s => ({
-                    'PLACA': s.plate || '—',
-                    'VALOR': Number(s.valor) || 0,
-                    'REFERENCIA': s.referencia || s.nro_aprobacion || s.nroAprobacion || '—',
-                    'FECHA': s.fecha ? String(s.fecha).slice(0, 10) : '—',
-                    'ESTADO': getScStatusName(s.status_id || s.statusId)
-                })), { origin: -1 });
+                // 1. Consignaciones Grupales
+                let filteredGroups = groupPayments || [];
+                if (plateFilter) {
+                    filteredGroups = filteredGroups.filter(g => g.plate === plateFilter);
+                }
+                filteredGroups.forEach(g => {
+                    list.push({
+                        'PLACA': g.plate || '—',
+                        'METODO': g.metodo_pago || g.metodo || '—',
+                        'VALOR': Number(g.valor) || 0,
+                        'REFERENCIA': g.referencia || g.nro_aprobacion || g.nroAprobacion || '—',
+                        'FECHA CONSIGNACION': g.fecha ? String(g.fecha).slice(0, 10) : '—',
+                        'OBSERVACION': g.observaciones || g.observacion || 'GRUPAL'
+                    });
+                });
+
+                // 2. Consignaciones Individuales (from invoices)
+                let filteredInvs = invoices || [];
+                if (plateFilter) {
+                    filteredInvs = filteredInvs.filter(i => i.route_vehicle_plate === plateFilter);
+                }
+                filteredInvs.forEach(i => {
+                    const payMethod = (i.forma_pago || '').toUpperCase();
+                    if (payMethod === 'CONSIGNACION' || payMethod === 'TRANSFERENCIA') {
+                        list.push({
+                            'PLACA': i.route_vehicle_plate || i.vehicle_plate || '—',
+                            'METODO': i.forma_pago || '—',
+                            'VALOR': Number(i.valor) || 0,
+                            'REFERENCIA': i.comprobante || '—',
+                            'FECHA CONSIGNACION': i.fecha_pago ? String(i.fecha_pago).slice(0, 10) : '—',
+                            'OBSERVACION': `INDIVIDUAL: FACTURA ${i.invoice_number}`
+                        });
+                    }
+                });
+
+                // 3. Sobrecostos de Ruta
+                let filteredSurcharges = routeSurcharges || [];
+                if (plateFilter) {
+                    filteredSurcharges = filteredSurcharges.filter(s => s.plate === plateFilter);
+                }
+                filteredSurcharges.forEach(s => {
+                    const stateStr = (s.status_id === 'APROBADO' || s.status_id === 'EST-02') ? 'APROBADO' : 'PENDIENTE';
+                    list.push({
+                        'PLACA': s.plate || '—',
+                        'METODO': 'TRANSFERENCIA', // el metodo se pone transferencia
+                        'VALOR': Number(s.valor) || 0,
+                        'REFERENCIA': s.facturas || s.referencia || '—',
+                        'FECHA CONSIGNACION': s.fecha ? String(s.fecha).slice(0, 10) : '—',
+                        'OBSERVACION': `SOBRECOSTO [${stateStr}]` // el estado lo posiciona donde van las observaciones de la tabla
+                    });
+                });
+
+                return list;
+            };
+
+            const mainConsignaciones = getConsignacionesData();
+            if (mainConsignaciones.length > 0) {
+                XLSX.utils.sheet_add_aoa(wsConsolidated, [['CONSIGNACIONES']], { origin: -1 });
+                XLSX.utils.sheet_add_json(wsConsolidated, mainConsignaciones, { origin: -1 });
                 XLSX.utils.sheet_add_aoa(wsConsolidated, [[]], { origin: -1 });
             }
 
@@ -489,12 +534,17 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 const plateTotalDevolucion = Math.round(plateData.reduce((s, i) => s + (Number(i['VALOR DEVUELTO']) || 0), 0));
                 const plateSurPend = Math.round(plateSur.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
 
+                const plateTotalEfectivo = Math.round(plateTotalDoc - plateTotalCredito);
+                const plateDiferencia = Math.round(plateTotalEfectivo - plateTotalLeg);
+
                 const wsPlate = XLSX.utils.aoa_to_sheet([
                     ['REPORTE DE CONCILIACIÓN - PLACA ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
                     ['', '', '', '', 'TOTAL CRÉDITO:', plateTotalCredito],
+                    ['', '', '', '', 'TOTAL EFECTIVO:', plateTotalEfectivo],
                     ['', '', '', '', 'TOTAL DEVOLUCION:', plateTotalDevolucion],
                     ['', '', '', '', 'TOTAL SOBR. PENDIENTE:', plateSurPend],
                     ['', '', '', '', 'TOTAL LEGALIZADO:', plateTotalLeg],
+                    ['', '', '', '', 'DIFERENCIA:', plateDiferencia],
                     []
                 ]);
                 if (wsPlate['F1']) wsPlate['F1'].z = '#,##0';
@@ -502,29 +552,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 if (wsPlate['F3']) wsPlate['F3'].z = '#,##0';
                 if (wsPlate['F4']) wsPlate['F4'].z = '#,##0';
                 if (wsPlate['F5']) wsPlate['F5'].z = '#,##0';
+                if (wsPlate['F6']) wsPlate['F6'].z = '#,##0';
+                if (wsPlate['F7']) wsPlate['F7'].z = '#,##0';
 
-                // 1. Pagos grupales de esta placa
-                if (plateGroup.length > 0) {
-                    XLSX.utils.sheet_add_aoa(wsPlate, [['CONSIGNACIONES GRUPALES - ' + p]], { origin: -1 });
-                    XLSX.utils.sheet_add_json(wsPlate, plateGroup.map(g => ({
-                        'METODO': g.metodo_pago || g.metodo || '—',
-                        'VALOR': Number(g.valor) || 0,
-                        'REFERENCIA': g.referencia || g.nro_aprobacion || g.nroAprobacion || '—',
-                        'FECHA CONSIGNACION': g.fecha ? String(g.fecha).slice(0, 10) : '—',
-                        'OBSERVACION': g.observacion || '—'
-                    })), { origin: -1 });
-                    XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
-                }
-
-                // 2. Sobrecostos de esta placa
-                if (plateSur.length > 0) {
-                    XLSX.utils.sheet_add_aoa(wsPlate, [['SOBRECOSTOS DE RUTA - ' + p]], { origin: -1 });
-                    XLSX.utils.sheet_add_json(wsPlate, plateSur.map(s => ({
-                        'VALOR': Number(s.valor) || 0,
-                        'REFERENCIA': s.referencia || s.nro_aprobacion || s.nroAprobacion || '—',
-                        'FECHA': s.fecha ? String(s.fecha).slice(0, 10) : '—',
-                        'ESTADO': getScStatusName(s.status_id || s.statusId)
-                    })), { origin: -1 });
+                const plateConsignaciones = getConsignacionesData(p);
+                if (plateConsignaciones.length > 0) {
+                    XLSX.utils.sheet_add_aoa(wsPlate, [['CONSIGNACIONES']], { origin: -1 });
+                    XLSX.utils.sheet_add_json(wsPlate, plateConsignaciones, { origin: -1 });
                     XLSX.utils.sheet_add_aoa(wsPlate, [[]], { origin: -1 });
                 }
 
@@ -986,14 +1020,15 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         .slice(docPageSize === 'all' ? 0 : (docPage - 1) * docPageSize, docPageSize === 'all' ? filteredDocs.length : docPage * docPageSize)
                         .map(doc => {
                         const pendingVal = Number(doc.pendientes || 0);
-                        const complete = pendingVal <= 1500;
                         const totalEF = Number(doc.total_efectivo || 0);
                         const totalLeg = Number(doc.total_legalizado_individual || 0) + 
                                        Number(doc.total_pago_grupal || 0) + 
                                        Number(doc.total_sobrecosto_ruta || 0);
+                        const pendingMoney = totalEF - totalLeg;
+                        const complete = pendingMoney <= 1500;
                         
                         const pct = totalEF > 0
-                            ? (pendingVal <= 1500 ? 100 : Math.min(100, Math.round((totalLeg / totalEF) * 100))) 
+                            ? (pendingMoney <= 1500 ? 100 : Math.min(100, Math.round((totalLeg / totalEF) * 100))) 
                             : (complete ? 100 : 0);
                         const isActive = selectedDoc?.id === doc.id;
                         return (

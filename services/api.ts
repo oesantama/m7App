@@ -176,6 +176,8 @@ export const api = {
     const qs = '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v) as [string, string][])).toString();
     return fetchJson(`${API_URL}/conciliation/history${qs}`);
   },
+  getPlateMovementHistory: (plate: string) =>
+    fetchJson(`${API_URL}/conciliation/plate-history?plate=${encodeURIComponent(plate)}`),
   getConciliationByDocument: (documentId: string) =>
     fetchJson(`${API_URL}/conciliation/${encodeURIComponent(documentId)}`),
   saveConciliation: (data: {
@@ -211,6 +213,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ documentId, remesaTDM }),
     }),
+  reverseConciliation: (data: {
+    documentId: string;
+    invoiceNumber: string;
+    userId: string;
+    userName?: string;
+    observations: string;
+  }) => fetchJson(`${API_URL}/conciliation/reverse`, { method: 'POST', body: JSON.stringify(data) }),
 
   // ── Devoluciones Bodega ────────────────────────────────────────────────────
   getPendingRouteReturns: (clientId?: string) =>

@@ -18,6 +18,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   const { allMasterData, setAllMasterData, updateMasterCategory } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [permissionSearch, setPermissionSearch] = useState(''); // NEW STATE
+  const [userClientSearch, setUserClientSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -26,6 +27,57 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
   const [formData, setFormData] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [instantErrors, setInstantErrors] = useState<Record<string, string>>({});
+
+  const handleInstantCheck = (field: 'email' | 'documentNumber' | 'phone', value: string) => {
+    if (activeMaster !== 'masterUsuarios') return;
+    if (!value || value.trim() === '') {
+      setInstantErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+      return;
+    }
+
+    const cleanVal = value.trim().toLowerCase();
+    const isDuplicate = (allMasterData['masterUsuarios'] || []).some((u: any) => {
+      if (editingRecord && u.id === editingRecord.id) return false;
+
+      if (field === 'email') {
+        return u.email?.trim().toLowerCase() === cleanVal;
+      }
+      if (field === 'documentNumber') {
+        const uDoc = u.documentNumber || u.document_number || '';
+        return uDoc.trim().toLowerCase() === cleanVal;
+      }
+      if (field === 'phone') {
+        const uPhoneClean = (u.phone || '').replace(/[\s-]/g, '');
+        const inputPhoneClean = cleanVal.replace(/[\s-]/g, '');
+        return uPhoneClean !== '' && uPhoneClean === inputPhoneClean;
+      }
+      return false;
+    });
+
+    setInstantErrors(prev => {
+      const next = { ...prev };
+      if (isDuplicate) {
+        let fieldName = 'correo';
+        if (field === 'documentNumber') fieldName = 'documento/cédula';
+        if (field === 'phone') fieldName = 'teléfono';
+        next[field] = `El ${fieldName} ya existe registrado con otro usuario.`;
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
+  };
+
+  React.useEffect(() => {
+    if (!isModalOpen) {
+      setInstantErrors({});
+    }
+  }, [isModalOpen]);
 
   const [displayMode, setDisplayMode] = useState<'table' | 'grid'>('table');
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
@@ -261,6 +313,16 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       ...record,
       statusId: record.statusId || record.status_id || 'EST-01',
       clientId: record.clientId || record.client_id || '',
+      clientIds: (() => {
+        let val = record.clientIds || record.client_ids;
+        if (typeof val === 'string') {
+          return val.replace(/[{}]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+        }
+        return Array.isArray(val) ? val : [];
+      })(),
+      phone: record.phone || record.phone_number || '',
+      documentType: record.documentType || record.document_type || '',
+      documentNumber: record.documentNumber || record.document_number || '',
       roleId: record.roleId || record.role_id || '',
       parentId: record.parentId || record.parent_id || '',
       iconClass: record.iconClass || record.icon_class || '',
@@ -400,11 +462,19 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     setIsSaving(true);
 
     if (activeMaster === 'masterUsuarios') {
+      // 1. Validar errores instantáneos pendientes
+      if (Object.keys(instantErrors).length > 0) {
+        setError(`M7 CRITICAL: No se puede guardar. Hay campos con datos duplicados: ${Object.keys(instantErrors).map(k => k === 'email' ? 'correo' : k === 'phone' ? 'teléfono' : 'documento').join(', ')}.`);
+        setIsSaving(false);
+        return;
+      }
+
       // RFC 5322 Email Regex
       const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
       if (formData.email && !emailRegex.test(formData.email)) {
         setError("M7 ERROR: Formato de correo inválido (RFC 5322).");
         toast.error("Validación Fallida", { description: "Revise el formato del email." });
+        setIsSaving(false);
         return;
       }
 
@@ -413,16 +483,48 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         const phoneClean = formData.phone.replace(/[\s-]/g, '');
         if (phoneClean.length < 8) {
           setError("M7 ERROR: El teléfono debe tener al menos 8 dígitos.");
+          setIsSaving(false);
           return;
         }
       }
 
-      const emailExists = (allMasterData['masterUsuarios'] || []).some(u =>
-        u.email?.toLowerCase() === formData.email?.toLowerCase() && u.id !== editingRecord?.id
-      );
-      if (emailExists) {
-        setError("M7 CRITICAL: El correo electrónico ya pertenece a otro usuario registrado.");
-        return;
+      // Validación de Correo Duplicado (Excluyendo al usuario actual)
+      if (formData.email) {
+        const emailExists = (allMasterData['masterUsuarios'] || []).some(u =>
+          u.email?.trim().toLowerCase() === formData.email.trim().toLowerCase() && u.id !== editingRecord?.id
+        );
+        if (emailExists) {
+          setError("M7 CRITICAL: El correo electrónico ya pertenece a otro usuario registrado.");
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Validación de Cédula / Documento Duplicado (Excluyendo al usuario actual)
+      if (formData.documentNumber) {
+        const docExists = (allMasterData['masterUsuarios'] || []).some(u => {
+          const uDoc = u.documentNumber || u.document_number || '';
+          return uDoc.trim().toLowerCase() === formData.documentNumber.trim().toLowerCase() && u.id !== editingRecord?.id;
+        });
+        if (docExists) {
+          setError("M7 CRITICAL: El número de documento (cédula) ya pertenece a otro usuario registrado.");
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Validación de Teléfono Duplicado (Excluyendo al usuario actual)
+      if (formData.phone) {
+        const phoneClean = formData.phone.replace(/[\s-]/g, '');
+        const phoneExists = (allMasterData['masterUsuarios'] || []).some(u => {
+          const uPhoneClean = (u.phone || '').replace(/[\s-]/g, '');
+          return uPhoneClean !== '' && uPhoneClean === phoneClean && u.id !== editingRecord?.id;
+        });
+        if (phoneExists) {
+          setError("M7 CRITICAL: El número telefónico ya pertenece a otro usuario registrado.");
+          setIsSaving(false);
+          return;
+        }
       }
     }
 
@@ -430,6 +532,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     if (activeMaster === 'masterArticulo' && !formData.categoryArticuloId) {
       setError("M7 ERROR: Debe seleccionar una categoría para el artículo.");
       toast.error("Validación de Accesibilidad", { description: "La categoría del artículo es obligatoria (WCAG AA)." });
+      setIsSaving(false);
       return;
     }
 
@@ -1016,10 +1119,22 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
               </div>
               <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Email Corporativo</label>
-                <input type="email" value={formData.email || ''} onChange={e => {
+                <input 
+                  type="email" 
+                  value={formData.email || ''} 
+                  onChange={e => {
                     const lowEmail = e.target.value.toLowerCase().trim();
                     setFormData({ ...formData, email: lowEmail });
-                }} className={commonInputStyle} required />
+                  }} 
+                  onBlur={e => handleInstantCheck('email', e.target.value)}
+                  className={`${commonInputStyle} ${instantErrors.email ? 'border-red-500 bg-red-50/50 text-red-900 focus:border-red-600 focus:ring-red-500/10' : ''}`} 
+                  required 
+                />
+                {instantErrors.email && (
+                  <p className="text-[10px] font-bold text-red-600 ml-2 mt-1 animate-pulse flex items-center gap-1">
+                    <span>⚠️</span> {instantErrors.email}
+                  </p>
+                )}
               </div>
 
               {/* Password Fields - Only for New Users or Explicit Change */}
@@ -1083,10 +1198,16 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                         const val = e.target.value.replace(/\D/g, '');
                         if (val.length <= 15) setFormData({ ...formData, phone: val });
                     }} 
-                    className={commonInputStyle} 
+                    onBlur={e => handleInstantCheck('phone', e.target.value)}
+                    className={`${commonInputStyle} ${instantErrors.phone ? 'border-red-500 bg-red-50/50 text-red-900 focus:border-red-600 focus:ring-red-500/10' : ''}`} 
                     placeholder="Solo números"
                 />
-                {formData.phone && formData.phone.length < 7 && <p className="text-[9px] font-bold text-amber-500 ml-2">Número parece incompleto</p>}
+                {instantErrors.phone && (
+                  <p className="text-[10px] font-bold text-red-600 ml-2 mt-1 animate-pulse flex items-center gap-1">
+                    <span>⚠️</span> {instantErrors.phone}
+                  </p>
+                )}
+                {formData.phone && formData.phone.length < 7 && !instantErrors.phone && <p className="text-[9px] font-bold text-amber-500 ml-2">Número parece incompleto</p>}
               </div>
               <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo Documento</label>
                 <select value={formData.documentType || ''} onChange={e => setFormData({ ...formData, documentType: e.target.value })} className={commonInputStyle}>
@@ -1094,22 +1215,116 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 </select>
               </div>
               <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nro Documento</label>
-                <input type="text" value={formData.documentNumber || ''} onChange={e => setFormData({ ...formData, documentNumber: e.target.value })} className={commonInputStyle} />
+                <input 
+                  type="text" 
+                  value={formData.documentNumber || ''} 
+                  onChange={e => setFormData({ ...formData, documentNumber: e.target.value })} 
+                  onBlur={e => handleInstantCheck('documentNumber', e.target.value)}
+                  className={`${commonInputStyle} ${instantErrors.documentNumber ? 'border-red-500 bg-red-50/50 text-red-900 focus:border-red-600 focus:ring-red-500/10' : ''}`} 
+                />
+                {instantErrors.documentNumber && (
+                  <p className="text-[10px] font-bold text-red-600 ml-2 mt-1 animate-pulse flex items-center gap-1">
+                    <span>⚠️</span> {instantErrors.documentNumber}
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 ml-2">Multicliente M7 (Seleccione Clientes Permitidos)</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {clients.map(c => (
-                  <label key={c.id} className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${formData.clientIds?.includes(c.id) ? 'bg-emerald-50 border-emerald-500' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
-                    <input type="checkbox" checked={formData.clientIds?.includes(c.id)} onChange={e => {
-                      const ids = formData.clientIds || [];
-                      setFormData({ ...formData, clientIds: e.target.checked ? [...ids, c.id] : ids.filter((id: string) => id !== c.id) });
-                    }} className="w-5 h-5 accent-emerald-500 rounded-lg" />
-                    <span className="text-[10px] font-black uppercase text-slate-900">{c.name}</span>
-                  </label>
-                ))}
+              
+              {/* Controles de Acción Rápida y Buscador */}
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-6 px-2">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allClientIds = clients.map(c => c.id);
+                      setFormData({ ...formData, clientIds: allClientIds });
+                      toast.success("Todos los clientes seleccionados");
+                    }}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 border-slate-200 hover:border-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>✓</span> Seleccionar Todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, clientIds: [] });
+                      toast.success("Se han desmarcado todos los clientes");
+                    }}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-[9px] font-black uppercase tracking-wider border-2 border-slate-200 hover:border-rose-200 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>✗</span> Quitar Todos
+                  </button>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <input
+                    type="text"
+                    placeholder="BUSCAR CLIENTE..."
+                    value={userClientSearch}
+                    onChange={(e) => setUserClientSearch(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-[10px] font-black outline-none focus:border-emerald-500 placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/5 transition-all shadow-sm uppercase"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">🔍</span>
+                  {userClientSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setUserClientSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Clientes seleccionados actualmente como chips */}
+              {formData.clientIds && formData.clientIds.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-6 p-4 bg-emerald-50/50 border border-emerald-100 rounded-[1.5rem] animate-in fade-in slide-in-from-top-1">
+                  <span className="text-[9px] font-black uppercase text-emerald-600 tracking-wider w-full mb-1 ml-1 flex items-center gap-1">
+                    <span>👥</span> Clientes Autorizados ({formData.clientIds.length}):
+                  </span>
+                  {clients
+                    .filter(c => formData.clientIds.includes(c.id))
+                    .map(c => (
+                      <span key={c.id} className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-slate-900 rounded-xl font-black text-[9px] uppercase tracking-wide shadow-sm border border-emerald-400">
+                        {c.name}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              clientIds: formData.clientIds.filter((id: string) => id !== c.id)
+                            });
+                          }}
+                          className="hover:text-red-700 font-black ml-1 text-[11px] leading-none cursor-pointer transition-colors"
+                          title="Eliminar permiso"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2 p-1">
+                {clients
+                  .filter(c => {
+                    const term = userClientSearch.trim().toLowerCase();
+                    const isSelected = formData.clientIds?.includes(c.id);
+                    if (!term) return true;
+                    return c.name?.toLowerCase().includes(term) || isSelected;
+                  })
+                  .map(c => (
+                    <label key={c.id} className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${formData.clientIds?.includes(c.id) ? 'bg-emerald-50 border-emerald-500 shadow-sm' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
+                      <input type="checkbox" checked={formData.clientIds?.includes(c.id)} onChange={e => {
+                        const ids = formData.clientIds || [];
+                        setFormData({ ...formData, clientIds: e.target.checked ? [...ids, c.id] : ids.filter((id: string) => id !== c.id) });
+                      }} className="w-5 h-5 accent-emerald-500 rounded-lg cursor-pointer animate-none" />
+                      <span className="text-[10px] font-black uppercase text-slate-900">{c.name}</span>
+                    </label>
+                  ))}
               </div>
             </div>
 
@@ -1119,35 +1334,74 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                   <option value="">Seleccione Rol...</option>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
-              {formData.roleId && (
-                <div className="bg-slate-950 rounded-[2.5rem] overflow-hidden shadow-2xl">
-                  <div className="p-6 bg-white/5 border-b border-white/10 flex justify-between items-center">
-                    <h4 className="text-white font-black text-[10px] uppercase tracking-widest leading-none">Matriz de Permisos</h4>
-                    <span className="text-emerald-500 text-[8px] font-black uppercase px-4 py-1 bg-emerald-500/10 rounded-full">Vista Informativa</span>
+              {formData.roleId && (() => {
+                const getDisplayedUserPerm = (pageId: string, action: string) => {
+                  const key = `page_${pageId}_${action}`;
+
+                  // Caso 1: Se ha modificado el rol y se ha seleccionado "Heredar del Rol"
+                  if (formData.inheritRolePerms === true) {
+                    const rolePerm = rolePermissions.find(rp => rp.roleId === formData.roleId);
+                    return !!rolePerm?.[key];
+                  }
+
+                  // Caso 2: Se ha modificado el rol y se ha seleccionado "Conservar Actuales"
+                  if (formData.inheritRolePerms === false) {
+                    const userCustomPerms = (allMasterData['masterPermisosUsuario'] || []).find(up => up.userId === editingRecord?.id);
+                    if (userCustomPerms) {
+                      return !!userCustomPerms[key];
+                    }
+                    // Si no tenía permisos de usuario personalizados previamente, heredaba de su rol ORIGINAL
+                    const originalRolePerm = rolePermissions.find(rp => rp.roleId === editingRecord?.roleId);
+                    return !!originalRolePerm?.[key];
+                  }
+
+                  // Caso 3: Vista normal inicial (al abrir el modal)
+                  // 1. Verificamos si tiene permisos personalizados en la base de datos
+                  if (editingRecord) {
+                    const userCustomPerms = (allMasterData['masterPermisosUsuario'] || []).find(up => up.userId === editingRecord.id);
+                    if (userCustomPerms) {
+                      return !!userCustomPerms[key];
+                    }
+                  }
+
+                  // 2. Si no tiene permisos de usuario personalizados, hereda del rol actual en el formulario
+                  const currentRolePerm = rolePermissions.find(rp => rp.roleId === formData.roleId);
+                  return !!currentRolePerm?.[key];
+                };
+
+                return (
+                  <div className="bg-slate-950 rounded-[2.5rem] overflow-hidden shadow-2xl">
+                    <div className="p-6 bg-white/5 border-b border-white/10 flex justify-between items-center">
+                      <h4 className="text-white font-black text-[10px] uppercase tracking-widest leading-none">Matriz de Permisos</h4>
+                      <span className="text-emerald-500 text-[8px] font-black uppercase px-4 py-1 bg-emerald-500/10 rounded-full">Vista Informativa</span>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                      <table className="w-full text-left text-[9px]">
+                        <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0">
+                          <tr><th className="p-4 bg-slate-950">Página</th>{['VER', 'CREAR', 'EDITAR', 'BORRAR', 'ACT'].map(a => <th key={a} className="p-4 text-center bg-slate-950">{a}</th>)}</tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {pages.map(p => (
+                            <tr key={p.id} className="hover:bg-white/5 transition-all">
+                              <td className="p-4 text-slate-300 font-bold uppercase">{p.name}</td>
+                              {['view', 'create', 'edit', 'delete', 'active'].map(a => {
+                                const hasPerm = getDisplayedUserPerm(p.id, a);
+                                return (
+                                  <td key={a} className="p-4 text-center">
+                                    <div className={`w-4 h-4 mx-auto rounded flex items-center justify-center ${hasPerm ? 'text-emerald-500' : 'text-red-500/20'}`}>
+                                      {hasPerm ? <Icons.Check /> : <Icons.X />}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                    <table className="w-full text-left text-[9px]">
-                      <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0">
-                        <tr><th className="p-4 bg-slate-950">Página</th>{['VER', 'CREAR', 'EDITAR', 'BORRAR', 'ACT'].map(a => <th key={a} className="p-4 text-center bg-slate-950">{a}</th>)}</tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {pages.map(p => (
-                          <tr key={p.id} className="hover:bg-white/5 transition-all">
-                            <td className="p-4 text-slate-300 font-bold uppercase">{p.name}</td>
-                            {['view', 'create', 'edit', 'delete', 'active'].map(a => (
-                              <td key={a} className="p-4 text-center">
-                                <div className={`w-4 h-4 mx-auto rounded flex items-center justify-center ${currentRolePerms?.[`page_${p.id}_${a}`] ? 'text-emerald-500' : 'text-red-500/20'}`}>
-                                  {currentRolePerms?.[`page_${p.id}_${a}`] ? <Icons.Check /> : <Icons.X />}
-                                </div>
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* SECCIÓN SEGURIDAD AVANZADA (2FA) - SOLO USUARIOS */}

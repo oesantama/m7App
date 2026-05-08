@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { 
     Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, 
-    Search, Calendar, RotateCcw, Download, X, Loader2, LayoutGrid, List, Edit2, Trash2, FolderSearch, Link
+    Search, Calendar, RotateCcw, Download, X, Loader2, LayoutGrid, List, Edit2, Trash2, FolderSearch, Link, Image
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -162,6 +162,29 @@ const GestionDocumental: React.FC = () => {
         setCurrentPage(1);
     }, [tableSearchTerm, history, rowsPerPage]);
 
+    const handleAddFiles = (newFiles: FileList | null) => {
+        if (!newFiles) return;
+        const array = Array.from(newFiles);
+        const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
+        const allowedMimes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+
+        const validFiles = array.filter(f => {
+            const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
+            const isValid = allowedExtensions.includes(ext) || allowedMimes.includes(f.type);
+            if (!isValid) {
+                toast.error(`El archivo "${f.name}" no es un PDF ni una imagen válida y fue descartado.`);
+            }
+            return isValid;
+        });
+        setFiles(prev => {
+            const combined = [...prev, ...validFiles];
+            if (combined.length > 20) {
+                toast.warning('Se ha alcanzado el límite de 20 archivos por subida.');
+            }
+            return combined.slice(0, 20);
+        });
+    };
+
     const handleUpload = async () => {
         if (!selectedClient || files.length === 0) {
             toast.error('Seleccione un cliente y al menos un archivo');
@@ -299,18 +322,151 @@ const GestionDocumental: React.FC = () => {
 
     const calculateSLA = (uploadStr: string, folderStr: string, type: string) => {
         if (!uploadStr || !folderStr) return { diffHours: 0, status: 'SUCCESS', limit: 24 };
-        
+
         const upload = new Date(uploadStr);
-        // Si folder date viene como YYYY-MM-DD, añadir T12 para evitar desfases
+        // folderStr typically comes as "YYYY-MM-DD"
         const folder = folderStr.includes('T') ? new Date(folderStr) : new Date(`${folderStr}T12:00:00`);
-        
+
         const uploadMs = isNaN(upload.getTime()) ? Date.now() : upload.getTime();
         const folderMs = isNaN(folder.getTime()) ? uploadMs : folder.getTime();
-        
-        const diffMs = uploadMs - folderMs;
-        const diffHours = diffMs / (1000 * 60 * 60);
-        
+
+        if (uploadMs <= folderMs) {
+            return { diffHours: 0, status: 'SUCCESS', limit: (type || '').toUpperCase() === 'NACIONAL' ? 72 : 24 };
+        }
+
+        // Determinar festivos de Colombia para los años involucrados
+        const years = new Set<number>([new Date(folderMs).getFullYear(), new Date(uploadMs).getFullYear()]);
+        const colombianHolidays = new Set<string>();
+
+        const getColombiaHolidays = (year: number): Set<string> => {
+            const holidays = new Set<string>();
+            const add = (month: number, day: number) => {
+                holidays.add(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+            };
+            const addMovable = (month: number, day: number) => {
+                const date = new Date(year, month - 1, day);
+                const dayOfWeek = date.getDay();
+                if (dayOfWeek === 1) {
+                    add(month, day);
+                } else {
+                    const daysToAdd = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+                    const movedDate = new Date(year, month - 1, day + daysToAdd);
+                    add(movedDate.getMonth() + 1, movedDate.getDate());
+                }
+            };
+
+            add(1, 1);    // Año Nuevo
+            add(5, 1);    // Día del Trabajo
+            add(7, 20);   // Independencia de Colombia
+            add(8, 7);    // Batalla de Boyacá
+            add(12, 8);   // Inmaculada Concepción
+            add(12, 25);  // Navidad
+
+            addMovable(1, 6);   // Reyes Magos
+            addMovable(3, 19);  // San José
+            addMovable(6, 29);  // San Pedro y San Pablo
+            addMovable(8, 15);  // Asunción de la Virgen
+            addMovable(10, 12); // Día de la Raza
+            addMovable(11, 1);  // Todos los Santos
+            addMovable(11, 11); // Independencia de Cartagena
+
+            // Algoritmo de Meeus/Jones/Butcher para Domingo de Ramos/Pascua
+            const a = year % 19;
+            const b = Math.floor(year / 100);
+            const c = year % 100;
+            const d = Math.floor(b / 4);
+            const e = b % 4;
+            const f = Math.floor((b + 8) / 25);
+            const g = Math.floor((b - f + 1) / 3);
+            const h = (19 * a + b - d - g + 15) % 30;
+            const i = Math.floor(c / 4);
+            const k = c % 4;
+            const L = (32 + 2 * e + 2 * i - h - k) % 7;
+            const m = Math.floor((a + 11 * h + 22 * L) / 451);
+            const month = Math.floor((h + L - 7 * m + 114) / 31);
+            const day = ((h + L - 7 * m + 114) % 31) + 1;
+
+            const easter = new Date(year, month - 1, day);
+            const addFromEaster = (days: number, isMovable = false) => {
+                const d = new Date(easter);
+                d.setDate(easter.getDate() + days);
+                if (isMovable) {
+                    const dayOfWeek = d.getDay();
+                    if (dayOfWeek !== 1) {
+                        const daysToAdd = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+                        d.setDate(d.getDate() + daysToAdd);
+                    }
+                }
+                add(d.getMonth() + 1, d.getDate());
+            };
+
+            addFromEaster(-3); // Jueves Santo
+            addFromEaster(-2); // Viernes Santo
+            addFromEaster(39, true); // Ascensión del Señor
+            addFromEaster(60, true); // Corpus Christi
+            addFromEaster(68, true); // Sagrado Corazón
+
+            return holidays;
+        };
+
+        years.forEach(y => {
+            const yHols = getColombiaHolidays(y);
+            yHols.forEach(h => colombianHolidays.add(h));
+        });
+
+        // Loop día a día desde folderMs hasta uploadMs
+        let totalMs = 0;
+        const currentDay = new Date(folderMs);
+        const endDay = new Date(uploadMs);
+
+        // Formato de cadena de fecha para comparación rápida con festivos
+        const toYMD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+        // Truncar fechas para iterar a nivel de día
+        const startTrunc = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate());
+        const endTrunc = new Date(endDay.getFullYear(), endDay.getMonth(), endDay.getDate());
+
+        for (let t = startTrunc.getTime(); t <= endTrunc.getTime(); t += 24 * 60 * 60 * 1000) {
+            const d = new Date(t);
+            const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+            const ymd = toYMD(d);
+
+            // Domingo = 0. Excluir domingos y festivos colombianos.
+            if (dayOfWeek === 0 || colombianHolidays.has(ymd)) {
+                continue;
+            }
+
+            // Si es el mismo día de inicio y fin
+            if (startTrunc.getTime() === endTrunc.getTime()) {
+                const startHour = 7;
+                const endHour = 17;
+
+                const uploadHour = endDay.getHours() + endDay.getMinutes() / 60;
+                const activeStart = startHour;
+                const activeEnd = Math.min(endHour, Math.max(startHour, uploadHour));
+                totalMs += (activeEnd - activeStart) * 60 * 60 * 1000;
+            } else if (t === startTrunc.getTime()) {
+                // Primer día: se cuenta completo (10 horas) según el ejemplo del usuario,
+                // ya que se asume que la carpeta fue seleccionada para representar ese día hábil completo.
+                totalMs += 10 * 60 * 60 * 1000;
+            } else if (t === endTrunc.getTime()) {
+                // Último día (hoy): medimos desde las 07:00 AM hasta la hora del upload
+                const startHour = 7;
+                const endHour = 17;
+
+                const uploadHour = endDay.getHours() + endDay.getMinutes() / 60;
+                const activeStart = startHour;
+                const activeEnd = Math.min(endHour, Math.max(startHour, uploadHour));
+                totalMs += (activeEnd - activeStart) * 60 * 60 * 1000;
+            } else {
+                // Día intermedio: se suman las 10 horas completas
+                totalMs += 10 * 60 * 60 * 1000;
+            }
+        }
+
+        const diffHours = totalMs / (1000 * 60 * 60);
         const limit = (type || '').toUpperCase() === 'NACIONAL' ? 72 : 24;
+
         return {
             diffHours: isNaN(diffHours) ? 0 : diffHours,
             status: diffHours <= limit ? 'SUCCESS' : 'LATE',
@@ -362,7 +518,7 @@ const GestionDocumental: React.FC = () => {
     const cleanClientName = selectedClientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
 
     const currentPathPreview = selectedClient
-        ? `CUMPLIDOS MILLA 7/${refDate.getFullYear()}/${cleanClientName}/${(MESES_ES[refDate.getMonth()] || 'MES').toUpperCase()}/DIA ${refDate.getDate()}`
+        ? `CUMPLIDOS MILLA 7/${refDate.getFullYear()}/${cleanClientName}/${(MESES_ES[refDate.getMonth()] || 'MES').toUpperCase()}/DIA ${String(refDate.getDate()).padStart(2, '0')}`
         : 'Seleccione un cliente para ver la ruta';
 
     return (
@@ -485,18 +641,18 @@ const GestionDocumental: React.FC = () => {
                                     onDragOver={e => e.preventDefault()}
                                     onDrop={e => {
                                         e.preventDefault();
-                                        if (e.dataTransfer.files) setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)].slice(0, 10));
+                                        if (e.dataTransfer.files) handleAddFiles(e.dataTransfer.files);
                                     }}
                                 >
-                                    <input type="file" id="file-upload" className="hidden" accept=".pdf" multiple onChange={e => e.target.files && setFiles(prev => [...prev, ...Array.from(e.target.files)].slice(0, 10))} />
+                                    <input type="file" id="file-upload" className="hidden" accept=".pdf, .png, .jpg, .jpeg, .webp" multiple onChange={e => handleAddFiles(e.target.files)} />
                                     <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-6">
                                         <div className={`w-24 h-24 rounded-[2.5rem] flex items-center justify-center transition-all shadow-2xl
                                             ${files.length > 0 ? 'bg-emerald-500 text-white scale-110' : 'bg-white text-slate-300 group-hover:text-indigo-500'}`}>
                                             <Upload size={40} />
                                         </div>
                                         <div className="space-y-2">
-                                            <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">Suelta tus PDFs aquí</h4>
-                                            <p className="text-sm text-slate-500 font-medium">Hasta 10 archivos simultáneos para procesamiento paralelo</p>
+                                            <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">Suelta tus PDFs o fotos aquí</h4>
+                                            <p className="text-sm text-slate-500 font-medium">Hasta 20 archivos simultáneos para procesamiento paralelo</p>
                                         </div>
                                     </label>
                                 </div>
@@ -506,7 +662,11 @@ const GestionDocumental: React.FC = () => {
                                         {files.map((f, i) => (
                                             <div key={i} className="flex justify-between items-center p-4 bg-white border-2 border-slate-50 rounded-2xl animate-in zoom-in-95 duration-200">
                                                 <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="bg-rose-50 p-2 rounded-lg text-rose-500"><FileText size={16}/></div>
+                                                    {f.name.toLowerCase().endsWith('.pdf') ? (
+                                                        <div className="bg-rose-50 p-2 rounded-lg text-rose-500"><FileText size={16}/></div>
+                                                    ) : (
+                                                        <div className="bg-indigo-50 p-2 rounded-lg text-indigo-500"><Image size={16}/></div>
+                                                    )}
                                                     <span className="text-xs font-black text-slate-700 truncate">{f.name}</span>
                                                 </div>
                                                 <button onClick={() => setFiles(files.filter((_, idx) => idx !== i))} className="text-slate-300 hover:text-rose-500 p-2 transition-colors"><X size={18}/></button>

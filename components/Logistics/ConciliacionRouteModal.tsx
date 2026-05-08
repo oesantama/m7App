@@ -701,6 +701,48 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [paymentObs, setPaymentObs] = useState('');
     const [selectedNewMethod, setSelectedNewMethod] = useState('');
 
+    // --- NUEVO: Reverso de Conciliación ---
+    const [showReverseModal, setShowReverseModal] = useState(false);
+    const [reverseInvoice, setReverseInvoice] = useState<InvoiceRow | null>(null);
+    const [reverseObservations, setReverseObservations] = useState('');
+    const [reversingState, setReversingState] = useState(false);
+
+    const handleExecuteReverse = async () => {
+        if (!reverseInvoice) return;
+        if (!reverseObservations.trim()) {
+            toast.error('Las observaciones son obligatorias para reversar el movimiento.');
+            return;
+        }
+
+        setReversingState(true);
+        try {
+            const res = await api.reverseConciliation({
+                documentId,
+                invoiceNumber: reverseInvoice.invoice_number,
+                userId: currentUserId,
+                userName: undefined,
+                observations: reverseObservations
+            });
+
+            if (res.success) {
+                toast.success(`Movimiento de la factura ${reverseInvoice.invoice_number} reversado con éxito.`);
+                setShowReverseModal(false);
+                setReverseInvoice(null);
+                setReverseObservations('');
+                if (onSaved) {
+                    onSaved();
+                }
+            } else {
+                toast.error(res.error || 'No se pudo reversar el movimiento.');
+            }
+        } catch (err: any) {
+            console.error('[REVERSE] error:', err);
+            toast.error(err.message || 'Error de conexión al reversar el movimiento.');
+        } finally {
+            setReversingState(false);
+        }
+    };
+
     const handleUpdatePaymentMethod = async (inv: InvoiceRow) => {
         if (!paymentObs.trim()) {
             toast.error('Las observaciones son obligatorias para registrar el cambio.');
@@ -737,6 +779,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     // Estado sobrecostos
     const [sobrecostos, setSobrecostos]       = useState<SobrecostoRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), statusId: 'EST-01', observaciones: '', facturas: '' }]);
     const [savingSobrecosto, setSavingSobrecosto] = useState(false);
+    const [surchargeSearch, setSurchargeSearch]   = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!isOpen) return;
@@ -1291,6 +1334,25 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                 <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${isLegalized ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                                                     {isLegalized ? 'Legalizada' : 'Pendiente'}
                                                 </span>
+                                                {(() => {
+                                                    const status = (inv.item_status || '').toUpperCase();
+                                                    const isDev = inv.es_devolucion || DEVUELTO_STATUS.includes(status);
+                                                    const isPar = PARCIAL_STATUS.includes(status);
+                                                    const isDevOrPar = isDev || isPar;
+                                                    
+                                                    return isLegalized && isDevOrPar && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                setReverseInvoice(inv);
+                                                                setReverseObservations('');
+                                                                setShowReverseModal(true);
+                                                            }}
+                                                            className="text-[8px] font-black px-2 py-0.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-all hover:scale-105 active:scale-95 duration-150 uppercase tracking-wider flex items-center gap-1"
+                                                        >
+                                                            ↩ Reversar Cambio
+                                                        </button>
+                                                    );
+                                                })()}
                                                 <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${inv.invoice_metodo_pago?.toUpperCase().includes('EFE') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
                                                     {inv.invoice_metodo_pago || 'EFECTIVO'}
                                                 </span>
@@ -1542,33 +1604,85 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                     {invoices.length === 0 ? (
                                                         <p className="text-[9px] text-slate-400 italic">Sin facturas en esta placa</p>
                                                     ) : (
-                                                        <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto custom-scrollbar pr-1">
-                                                            {invoices.map(inv => {
-                                                                const selected = (s.facturas || '').split(',').map(f => f.trim()).filter(Boolean).includes(inv.invoice_number);
-                                                                const canToggle = isPending;
-                                                                return (
-                                                                    <button key={inv.invoice_number}
-                                                                        disabled={!canToggle}
+                                                        <>
+                                                            {/* Botones de acción rápida y buscador para facturas de sobrecosto */}
+                                                            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                                                                <div className="flex gap-2">
+                                                                    <button 
+                                                                        type="button"
+                                                                        disabled={!isPending}
                                                                         onClick={() => {
-                                                                            if (!canToggle) return;
-                                                                            const current = (s.facturas || '').split(',').map(f => f.trim()).filter(Boolean);
-                                                                            const updated = selected
-                                                                                ? current.filter(f => f !== inv.invoice_number)
-                                                                                : [...current, inv.invoice_number];
+                                                                            const allInvoices = invoices.map(i => i.invoice_number);
                                                                             const next = [...sobrecostos];
-                                                                            next[idx].facturas = updated.join(', ');
+                                                                            next[idx].facturas = allInvoices.join(', ');
                                                                             setSobrecostos(next);
                                                                         }}
-                                                                        className={`px-2 py-0.5 rounded-lg text-[8px] font-black transition-all border
-                                                                            ${selected
-                                                                                ? 'bg-orange-500 text-white border-orange-600'
-                                                                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:border-orange-300 hover:text-orange-600'
-                                                                            } ${!canToggle ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}>
-                                                                        {inv.invoice_number}
+                                                                        className="px-3 py-1.5 bg-slate-100 hover:bg-orange-50 hover:text-orange-600 rounded-xl text-[8px] font-black uppercase tracking-wider border-2 border-slate-200 hover:border-orange-200 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                                    >
+                                                                        <span>✓</span> Seleccionar Todas
                                                                     </button>
-                                                                );
-                                                            })}
-                                                        </div>
+                                                                    <button 
+                                                                        type="button"
+                                                                        disabled={!isPending}
+                                                                        onClick={() => {
+                                                                            const next = [...sobrecostos];
+                                                                            next[idx].facturas = '';
+                                                                            setSobrecostos(next);
+                                                                        }}
+                                                                        className="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-[8px] font-black uppercase tracking-wider border-2 border-slate-200 hover:border-rose-200 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                                    >
+                                                                        <span>✗</span> Deseleccionar Todas
+                                                                    </button>
+                                                                </div>
+                                                                <div className="relative">
+                                                                    <input 
+                                                                        type="text"
+                                                                        placeholder="Buscar factura..."
+                                                                        value={surchargeSearch[s.id] || ''}
+                                                                        onChange={(e) => setSurchargeSearch({ ...surchargeSearch, [s.id]: e.target.value })}
+                                                                        disabled={!isPending}
+                                                                        className="pl-7 pr-3 py-1.5 bg-white border-2 border-slate-200 rounded-xl text-[9px] font-bold outline-none focus:border-orange-500 w-36 placeholder:text-slate-400 focus:ring-4 focus:ring-orange-500/5 transition-all shadow-sm"
+                                                                    />
+                                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">🔍</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto custom-scrollbar pr-1 border-2 border-slate-100/50 p-2 rounded-2xl bg-slate-50/50">
+                                                                {invoices
+                                                                    .filter(inv => {
+                                                                        const term = (surchargeSearch[s.id] || '').toLowerCase().trim();
+                                                                        if (!term) return true;
+                                                                        return inv.invoice_number.toLowerCase().includes(term);
+                                                                    })
+                                                                    .map(inv => {
+                                                                        const selected = (s.facturas || '').split(',').map(f => f.trim()).filter(Boolean).includes(inv.invoice_number);
+                                                                        const canToggle = isPending;
+                                                                        return (
+                                                                            <button key={inv.invoice_number}
+                                                                                type="button"
+                                                                                disabled={!canToggle}
+                                                                                onClick={() => {
+                                                                                    if (!canToggle) return;
+                                                                                    const current = (s.facturas || '').split(',').map(f => f.trim()).filter(Boolean);
+                                                                                    const updated = selected
+                                                                                        ? current.filter(f => f !== inv.invoice_number)
+                                                                                        : [...current, inv.invoice_number];
+                                                                                    const next = [...sobrecostos];
+                                                                                    next[idx].facturas = updated.join(', ');
+                                                                                    setSobrecostos(next);
+                                                                                }}
+                                                                                className={`px-3 py-1.5 rounded-xl text-[9px] font-black transition-all border-2 flex items-center gap-1
+                                                                                    ${selected
+                                                                                        ? 'bg-orange-500 text-white border-orange-600 shadow-sm shadow-orange-500/30'
+                                                                                        : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300 hover:text-orange-600'
+                                                                                    } ${!canToggle ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}>
+                                                                                {selected && <span className="text-[10px]">✓</span>}
+                                                                                {inv.invoice_number}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                            </div>
+                                                        </>
                                                     )}
                                                     {(s.facturas || '').trim() && (
                                                         <p className="text-[8px] text-orange-600 font-bold mt-1">
@@ -1716,6 +1830,52 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     </div>
                 );
             })()}
+
+            {showReverseModal && reverseInvoice && (
+                <div className="fixed inset-0 z-[995] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-rose-600 to-red-500 px-6 py-5 text-white">
+                            <p className="text-[10px] font-black text-rose-100 uppercase tracking-[0.2em] mb-1">Peligro: Reversar Movimiento</p>
+                            <h4 className="text-xl font-black">{reverseInvoice.invoice_number}</h4>
+                        </div>
+                        
+                        <div className="p-6 space-y-4">
+                            <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl">
+                                <p className="text-xs font-bold text-rose-700 leading-relaxed">
+                                    ⚠️ <strong>Atención:</strong> Está a punto de deshacer y eliminar la legalización de esta factura. El estado del ítem en la ruta volverá a ser "Pendiente (Asignado)". Esta acción quedará registrada en la bitácora de auditoría de M7.
+                                </p>
+                            </div>
+
+                            <div>
+                                <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Justificación / Observaciones (Obligatorio)</p>
+                                <textarea 
+                                    value={reverseObservations}
+                                    onChange={(e) => setReverseObservations(e.target.value)}
+                                    placeholder="Indique la razón para reversar la conciliación de esta factura..."
+                                    className="w-full h-24 bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-semibold outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-500/5 transition-all resize-none text-slate-700"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-5 bg-slate-50 flex gap-3 border-t border-slate-100">
+                            <button 
+                                onClick={() => { setShowReverseModal(false); setReverseInvoice(null); }}
+                                className="flex-1 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleExecuteReverse}
+                                disabled={reversingState || !reverseObservations.trim()}
+                                className={`flex-[1.5] py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-lg transition-all
+                                    ${reversingState || !reverseObservations.trim() ? 'bg-slate-300 shadow-none cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'}`}
+                            >
+                                {reversingState ? 'Reversando...' : 'Reversar Ahora'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -49,7 +49,18 @@ export const normalizeData = (data: any) => {
       uomStdId: getVal('uomStdId', 'uom_std'),
       factorInter: getVal('factorInter', 'factor_inter'),
       factorStd: getVal('factorStd', 'factor_std'),
-      clientId: getVal('clientId', 'client_id')
+      clientId: getVal('clientId', 'client_id'),
+      // Campos de Usuario M7
+      phone: getVal('phone', 'phone_number') || getVal('telefono', 'telefono') || '',
+      documentType: getVal('documentType', 'document_type') || getVal('tipoDocumento', 'tipo_documento') || '',
+      documentNumber: getVal('documentNumber', 'document_number') || getVal('nroDocumento', 'nro_documento') || '',
+      clientIds: (() => {
+        let val = getVal('clientIds', 'client_ids');
+        if (typeof val === 'string') {
+          return val.replace(/[{}]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+        }
+        return Array.isArray(val) ? val : [];
+      })()
     };
   });
 };

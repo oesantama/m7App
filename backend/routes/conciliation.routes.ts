@@ -16,6 +16,8 @@ import {
     closeConciliationCycle,
     updatePaymentMethod,
     updateRemesaTDM,
+    reverseConciliation,
+    getPlateMovementHistory,
 } from '../controllers/conciliation.controller.js';
 
 const router = Router();
@@ -28,6 +30,7 @@ const upload = multer({
 router.get('/pending',                    getPendingConciliations);
 router.get('/search-routes',              searchRoutesForPlanilla);
 router.get('/history',                    getConciliationHistory);
+router.get('/plate-history',              getPlateMovementHistory);
 router.get('/planilla',                   downloadPlanilla);
 router.get('/:documentId/history',        getInvoiceStatusHistory);
 router.get('/:documentId',                getConciliationByDocument);
@@ -39,5 +42,6 @@ router.post('/import-mastersuite',        upload.single('file'), importMasterSui
 router.post('/close-cycle',               closeConciliationCycle);
 router.post('/update-payment-method',    updatePaymentMethod);
 router.post('/update-remesa-tdm',         updateRemesaTDM);
+router.post('/reverse',                   reverseConciliation);
 
 export default router;

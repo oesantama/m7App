@@ -2055,38 +2055,86 @@ export const uploadCumplido = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Faltan datos obligatorios (archivos, cliente)' });
     }
 
+    // Validar que TODOS los archivos sean estrictamente PDF o imágenes
+    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
+    const allowedMimeTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+
+    for (const file of files) {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (!allowedExtensions.includes(ext) && !allowedMimeTypes.includes(file.mimetype)) {
+            return res.status(400).json({ error: `Solo se permiten archivos en formato PDF o imágenes (PNG, JPG, JPEG, WEBP). El archivo "${file.originalname}" no es válido.` });
+        }
+    }
+
     const results: any[] = [];
     const ref = uploadDate ? new Date(`${uploadDate}T12:00:00`) : new Date();
     const year = ref.getFullYear();
     const month = MESES[ref.getMonth()].toUpperCase();
-    const day = `DIA ${ref.getDate()}`;
+    const day = `DIA ${String(ref.getDate()).padStart(2, '0')}`;
     const cleanClientName = clientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
     const drivePath = `CUMPLIDOS MILLA 7/${year}/${cleanClientName}/${month}/${day}`;
+
+    // Limitador de concurrencia nativo para paralelizar la subida y compresión
+    const pLimit = (concurrency: number) => {
+        const queue: any[] = [];
+        let activeCount = 0;
+        const next = () => {
+            if (queue.length === 0) return;
+            if (activeCount >= concurrency) return;
+            activeCount++;
+            const { fn, resolve, reject } = queue.shift();
+            fn().then(resolve).catch(reject).finally(() => {
+                activeCount--;
+                next();
+            });
+        };
+        return (fn: () => Promise<any>) => new Promise((resolve, reject) => {
+            queue.push({ fn, resolve, reject });
+            next();
+        });
+    };
 
     try {
         const clientRes = await pool.query('SELECT name, client_type FROM clients WHERE id = $1', [clientId]);
         const isNational = clientRes.rows[0]?.client_type === 'NACIONAL';
         const fullClientName = clientRes.rows[0]?.name || clientName;
 
-        for (const file of files) {
+        const limit = pLimit(5); // Procesar hasta 5 archivos en paralelo para no ahogar el CPU ni la red
+        const uploadTasks = files.map(file => limit(async () => {
             const timestamp = Date.now();
-            const safeOriginalName = file.originalname.replace(/\s+/g, '_');
-            const tmpPath = path.join('/tmp', `cumplido_${timestamp}_${safeOriginalName}`);
-            const compressedPath = `${tmpPath}_compressed.pdf`;
-            const fileName = `${timestamp}_${safeOriginalName}`;
+            const ext = path.extname(file.originalname).toLowerCase();
+            // Limpiar espacios y caracteres que rompan la shell sin alterar el nombre original
+            const cleanName = file.originalname.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+            const tmpPath = path.join('/tmp', `cumplido_${timestamp}_${cleanName}`);
+            const compressedPath = `${tmpPath}_compressed${ext}`;
+            const fileName = cleanName; // Conservar el nombre original limpio sin timestamps ni prefijos adicionales
 
             fs.writeFileSync(tmpPath, file.buffer);
 
-            await new Promise<void>((resolve) => {
-                const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
-                exec(compressCmd, (err) => {
-                    if (err) console.error(`[CUMPLIDOS] Error comprimiendo ${file.originalname}:`, err);
-                    resolve();
+            // Compresión inteligente según tipo de archivo
+            if (ext === '.pdf') {
+                // Intentar compresión del PDF con Ghostscript
+                await new Promise<void>((resolve) => {
+                    const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
+                    exec(compressCmd, (err) => {
+                        if (err) console.error(`[CUMPLIDOS] Error comprimiendo PDF ${file.originalname}:`, err);
+                        resolve();
+                    });
                 });
-            });
+            } else {
+                // Intentar compresión de Imagen con ImageMagick (convert)
+                await new Promise<void>((resolve) => {
+                    const compressCmd = `convert "${tmpPath}" -resize "2048x2048>" -quality 82 -strip "${compressedPath}"`;
+                    exec(compressCmd, (err) => {
+                        if (err) console.error(`[CUMPLIDOS] Error comprimiendo imagen ${file.originalname}:`, err);
+                        resolve();
+                    });
+                });
+            }
 
             const finalFile = fs.existsSync(compressedPath) ? compressedPath : tmpPath;
 
+            // Subir a Google Drive mediante rclone copyto
             await new Promise<void>((resolve, reject) => {
                 const uploadCmd = `rclone copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
                 exec(uploadCmd, (err, stdout, stderr) => {
@@ -2097,11 +2145,13 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                 });
             });
 
+            // Generar enlace público/compartido de Google Drive
             const driveLink = await new Promise<string>((resolve) => {
                 const linkCmd = `rclone link "gdrive_cumplidos:${drivePath}/${fileName}"`;
                 exec(linkCmd, (err, stdout) => resolve(stdout ? stdout.trim() : ''));
             });
 
+            // Registrar en base de datos
             await pool.query(
                 `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category, folder_date)
                  VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -2110,9 +2160,13 @@ export const uploadCumplido = async (req: Request, res: Response) => {
 
             results.push({ fileName, link: driveLink });
 
+            // Limpieza de archivos temporales
             if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
             if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
-        }
+        }));
+
+        // Esperar a que se procesen y suban todos los archivos de manera concurrente
+        await Promise.all(uploadTasks);
 
         if (isNational) {
             const [notifRes, userRes] = await Promise.all([
@@ -2218,6 +2272,8 @@ export const getDocumentStats = async (req: Request, res: Response) => {
                 d.drive_link as "driveLink",
                 d.upload_date as "uploadDate",
                 d.folder_date as "folderDate",
+                d.status as "status",
+                d.category as "category",
                 c.name as "clientName",
                 c.client_type as "clientType",
                 u.name as "userName",
@@ -2260,14 +2316,17 @@ export const renameCumplido = async (req: Request, res: Response) => {
         const doc = rows[0];
         if (doc.is_deleted) return res.status(400).json({ error: 'El archivo está eliminado.' });
 
-        // Force .pdf extension to avoid breaking links or format
+        // Detectar la extensión original del archivo (ej: .pdf o .png)
+        const originalExt = path.extname(doc.file_name).toLowerCase();
         let finalNewName = newName.trim();
-        if (!finalNewName.toLowerCase().endsWith('.pdf')) {
-            finalNewName += '.pdf';
+        if (!finalNewName.toLowerCase().endsWith(originalExt)) {
+            // Remover cualquier otra extensión que el usuario haya puesto por error y añadir la correcta
+            const baseWithoutExt = path.basename(finalNewName, path.extname(finalNewName));
+            finalNewName = `${baseWithoutExt}${originalExt}`;
         }
         
-        // Remove spaces
-        finalNewName = finalNewName.replace(/\s+/g, '_');
+        // Limpiar espacios y caracteres que rompan la shell
+        finalNewName = finalNewName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
 
         if (finalNewName === doc.file_name) {
             return res.json({ success: true, message: 'El nombre es el mismo.' });

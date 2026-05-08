@@ -895,6 +895,90 @@ export const updatePaymentMethod = async (req: Request, res: Response) => {
     }
 };
 
+// ─── POST /conciliation/reverse ───────────────────────────────────────────────
+// Copia el registro original a logs, lo elimina de invoice_conciliations y devuelve el document_item a EST-10.
+export const reverseConciliation = async (req: Request, res: Response) => {
+    const { documentId, invoiceNumber, userId, userName, observations } = req.body;
+
+    if (!documentId || !invoiceNumber || !userId || !observations || observations.trim() === '') {
+        return res.status(400).json({ success: false, error: 'Todos los campos son requeridos (documentId, invoiceNumber, userId, observations)' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Consultar el registro original en invoice_conciliations
+        const origRes = await client.query(
+            `SELECT * FROM invoice_conciliations WHERE document_id = $1 AND invoice_number = $2`,
+            [documentId, invoiceNumber]
+        );
+
+        if (origRes.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, error: 'No se encontró un registro de conciliación activo para esta factura.' });
+        }
+
+        const orig = origRes.rows[0];
+
+        // 2. Insertar el registro de copia en invoice_conciliation_reversal_logs
+        await client.query(`
+            INSERT INTO invoice_conciliation_reversal_logs (
+                document_id, invoice_number, banco, valor, comprobante, fecha_pago,
+                forma_pago, numero_cheque, es_devolucion, conciliado_por,
+                vehicle_plate, conductor_id, conductor_name,
+                original_created_at, original_updated_at,
+                reversed_by, reversed_at, observations
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), $17)
+        `, [
+            orig.document_id, orig.invoice_number, orig.banco, orig.valor, orig.comprobante, orig.fecha_pago,
+            orig.forma_pago, orig.numero_cheque, orig.es_devolucion, orig.conciliado_por,
+            orig.vehicle_plate, orig.conductor_id, orig.conductor_name,
+            orig.created_at, orig.updated_at,
+            userId, observations
+        ]);
+
+        // 3. Eliminar la factura de invoice_conciliations
+        await client.query(
+            `DELETE FROM invoice_conciliations WHERE document_id = $1 AND invoice_number = $2`,
+            [documentId, invoiceNumber]
+        );
+
+        // 4. Actualizar estado de document_items a 'EST-10' (Asignado)
+        await client.query(
+            `UPDATE document_items SET item_status = 'EST-10' WHERE document_id = $1 AND invoice = $2`,
+            [documentId, invoiceNumber]
+        );
+
+        // 5. Registrar en el historial de estados de facturas
+        await client.query(`
+            INSERT INTO invoice_status_history
+                (document_id, invoice_number, evento, estado_anterior, estado_nuevo,
+                 valor_factura, valor_entregado, valor_devuelto,
+                 banco, comprobante,
+                 usuario_id, usuario_nombre, created_at)
+            VALUES ($1, $2, 'REVERSADO_CONCILIACION', $3, 'EST-10', $4, $5, $6, $7, $8, $9, $10, NOW())
+        `, [
+            documentId, invoiceNumber, orig.forma_pago,
+            orig.valor ? Number(orig.valor) : null,
+            null, null,
+            orig.banco || null,
+            orig.comprobante || null,
+            userId, userName || userId
+        ]);
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'Movimiento reversado exitosamente' });
+
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[CONCILIATION] reverseConciliation error:', err.message);
+        res.status(500).json({ success: false, error: 'Error en servidor: ' + err.message });
+    } finally {
+        client.release();
+    }
+};
+
 // ─── GET /conciliation/planilla ───────────────────────────────────────────────
 // Recibe routeId (routes.id), consulta route_invoices y genera Excel de 1 hoja.
 export const downloadPlanilla = async (req: Request, res: Response) => {
@@ -1430,6 +1514,85 @@ export const updateRemesaTDM = async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error('[CONCILIATION] updateRemesaTDM error:', err.message);
         res.status(500).json({ error: 'Error interno del servidor al actualizar remesaTDM' });
+    }
+};
+
+// ─── GET /conciliation/plate-history ──────────────────────────────────────────
+// Consulta el historial completo (conciliaciones activas y reversos) de una placa.
+export const getPlateMovementHistory = async (req: Request, res: Response) => {
+    try {
+        const { plate } = req.query;
+        if (!plate) {
+            return res.status(400).json({ success: false, error: 'La placa es requerida' });
+        }
+
+        // 1. Obtener conciliaciones activas para esta placa
+        const activeRes = await pool.query(`
+            SELECT
+                ic.id,
+                ic.invoice_number,
+                dl.external_doc_id,
+                ic.vehicle_plate,
+                ic.conductor_name,
+                ic.forma_pago,
+                ic.valor,
+                ic.banco,
+                ic.comprobante,
+                ic.created_at          AS action_at,
+                'CONCILIADO'           AS status,
+                u.name                 AS action_by_name,
+                di.customer_name,
+                di.city,
+                ''                     AS observations
+            FROM invoice_conciliations ic
+            JOIN documents_l dl ON dl.id = ic.document_id
+            LEFT JOIN users u ON u.id = ic.conciliado_por
+            LEFT JOIN (
+                SELECT DISTINCT ON (document_id, invoice) document_id, invoice, customer_name, city
+                FROM document_items WHERE invoice IS NOT NULL
+            ) di ON di.document_id = ic.document_id AND di.invoice = ic.invoice_number
+            WHERE ic.vehicle_plate ILIKE $1
+        `, [plate]);
+
+        // 2. Obtener reversos registrados para esta placa
+        const reversedRes = await pool.query(`
+            SELECT
+                rl.id,
+                rl.invoice_number,
+                dl.external_doc_id,
+                rl.vehicle_plate,
+                rl.conductor_name,
+                rl.forma_pago,
+                rl.valor,
+                rl.banco,
+                rl.comprobante,
+                rl.reversed_at         AS action_at,
+                'REVERSADO'            AS status,
+                u.name                 AS action_by_name,
+                di.customer_name,
+                di.city,
+                rl.observations
+            FROM invoice_conciliation_reversal_logs rl
+            JOIN documents_l dl ON dl.id = rl.document_id
+            LEFT JOIN users u ON u.id = rl.reversed_by
+            LEFT JOIN (
+                SELECT DISTINCT ON (document_id, invoice) document_id, invoice, customer_name, city
+                FROM document_items WHERE invoice IS NOT NULL
+            ) di ON di.document_id = rl.document_id AND di.invoice = rl.invoice_number
+            WHERE rl.vehicle_plate ILIKE $1
+        `, [plate]);
+
+        // Combinar y ordenar por fecha descendente
+        const activeRows = activeRes.rows;
+        const reversedRows = reversedRes.rows;
+        const combined = [...activeRows, ...reversedRows].sort((a, b) => 
+            new Date(b.action_at).getTime() - new Date(a.action_at).getTime()
+        );
+
+        res.json({ success: true, data: combined });
+    } catch (err: any) {
+        console.error('[CONCILIATION] getPlateMovementHistory error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
     }
 };
 
