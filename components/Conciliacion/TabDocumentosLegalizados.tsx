@@ -502,7 +502,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
             const sobrecostosPendientesGlobal = Math.round((routeSurcharges || []).filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
 
             const totalEfectivoGlobal = Math.round(totalDocumentoGlobal - totalCreditoGlobal);
-            const diferenciaGlobal = Math.round(totalEfectivoGlobal - totalLegalizadoGlobal);
+            const diferenciaGlobal = Math.round(totalEfectivoGlobal - totalLegalizadoGlobal - totalDevolucionesGlobal);
 
             const wsMain = XLSX.utils.aoa_to_sheet([
                 [`REPORTE CONCILIACIÓN - ${selectedDoc.external_doc_id}`, '', '', '', 'TOTAL DOCUMENTO:', totalDocumentoGlobal],
@@ -573,7 +573,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                 const plateSurPend = Math.round(plateSur.filter(s => s.status_id === 'PENDIENTE' || s.status_id === 'EST-01').reduce((s, r) => s + (Number(r.valor) || 0), 0));
 
                 const plateTotalEfectivo = Math.round(plateTotalDoc - plateTotalCredito);
-                const plateDiferencia = Math.round(plateTotalEfectivo - plateTotalLeg);
+                const plateDiferencia = Math.round(plateTotalEfectivo - plateTotalLeg - plateTotalDevolucion);
 
                 const ws = XLSX.utils.aoa_to_sheet([
                     ['PLACA: ' + p, '', '', '', 'TOTAL DOCUMENTO:', plateTotalDoc],
