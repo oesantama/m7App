@@ -33,6 +33,15 @@ const ensureTables = async () => {
     )
   `);
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS ajover_b36_sobrecostos (
+      id          SERIAL PRIMARY KEY,
+      id_enca     INTEGER REFERENCES ajover_b36_encabezado(id) ON DELETE CASCADE,
+      valor       NUMERIC DEFAULT 0,
+      observacion TEXT,
+      estado      TEXT DEFAULT 'PENDIENTE'
+    )
+  `);
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_b36_enc_client  ON ajover_b36_encabezado (client_id);
     CREATE INDEX IF NOT EXISTS idx_b36_enc_fecha   ON ajover_b36_encabezado (fecha_carge DESC);
     CREATE INDEX IF NOT EXISTS idx_b36_det_id_enca ON ajover_b36_detalle (id_enca);
