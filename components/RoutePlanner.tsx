@@ -1637,11 +1637,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           const cellCorridor = c.zone as ViaCorridor;
 
           // Celdas de corredor esparso (<4 facts) se incluyen si están dentro del
-          // radio geográfico del ancla, aunque el corredor sea diferente.
+          // radio geográfico del ancla, pero NUNCA si viola la regla dura NORTE↔SUR.
           const allSparse = c.invoices.every(i => (i as any).sparseCorridor);
           const corridorOk = corridorsCompatible(anchorCorridor, cellCorridor);
 
-          if (!corridorOk && !allSparse) return false;
+          // La excepción sparse nunca aplica para la separación NORTE↔SUR (regla del río).
+          const NORTE_SIDE = new Set(['NORTE', 'NORTE_LEJANO']);
+          const SUR_SIDE   = new Set(['SUR', 'SUR_LEJANO']);
+          const isHardRuleViolation =
+            (NORTE_SIDE.has(anchorCorridor) && SUR_SIDE.has(cellCorridor)) ||
+            (SUR_SIDE.has(anchorCorridor)   && NORTE_SIDE.has(cellCorridor));
+
+          if (!corridorOk && (!allSparse || isHardRuleViolation)) return false;
 
           const hasOwnedInvoice = c.invoices.some(i => ownedCities.has((i as any).neighborhoodKey || (i as any).cityKey || ''));
           if (anchorCell.centerLat > 0 && c.centerLat > 0) {
