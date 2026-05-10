@@ -704,11 +704,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
         setShowEmailInput(true);
         return;
       }
-      finalizeProcess(normalize(fallback).email);
+      finalizeProcess(normalize(fallback).email, true);
     } else {
       // Enviar a TODOS los activos — backend también consultará su propia lista
       const allEmails = activeNotifs.map(n => normalize(n).email).filter(Boolean).join(',');
-      finalizeProcess(allEmails);
+      finalizeProcess(allEmails, true);
     }
   };
 
@@ -968,11 +968,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
     setIncidents(prev => prev.filter(inc => inc.id !== incidentId));
   };
 
-  const finalizeProcess = async (email: string) => {
+  const finalizeProcess = async (email: string, emailFromMaster = false) => {
     setIsProcessing(true);
 
-    const emailInMaster = masterNotificaciones.some(n => n.notificationEmail === email && n.name?.toLowerCase().includes('ajover'));
-    if (!emailInMaster) {
+    // Solo guardar si el correo fue ingresado manualmente (no viene del maestro ya configurado)
+    if (!emailFromMaster) {
       onAddNotificationToMaster({
         id: `not-ajover-${Date.now()}`,
         name: `inventario ajover`,

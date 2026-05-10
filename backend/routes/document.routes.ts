@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2, getInvoiceTraceability, getConciliationHistory, uploadCumplido, getDocumentStats, correctDocumentItems, renameCumplido, deleteCumplido, driveExplorer, generateDriveLink } from '../controllers/document.controller.js';
+import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2, updateItemInvoice, getInvoiceTraceability, getConciliationHistory, uploadCumplido, getDocumentStats, correctDocumentItems, renameCumplido, deleteCumplido, driveExplorer, generateDriveLink } from '../controllers/document.controller.js';
 import multer from 'multer';
 
 import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
@@ -72,6 +72,7 @@ router.get('/mastersuite-report', (req, res, next) => {
 
 router.post('/parse-pdf', authenticateToken, upload.single('file'), parsePdfRemisiones);
 router.patch('/consolidated-count2', requireAuditEdit, updateConsolidatedCount2);
+router.patch('/items/invoice', requireAuditEdit, updateItemInvoice);
 router.get('/conciliations/:docId/:articleId', requireAuditEdit, getConciliationHistory);
 
 router.get('/invoice-traceability', (req, res, next) => {

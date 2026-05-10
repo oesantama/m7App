@@ -815,6 +815,18 @@ export const api = {
       body: JSON.stringify(data)
     }),
 
+  updateItemInvoice: (data: { itemId: number | string; newInvoice: string }) =>
+    fetchJson(`${API_URL}/documents/items/invoice`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    }),
+
+  updateConsolidatedCount2: (data: { docId: string; articleId: string; newCount2: number; observation: string }) =>
+    fetchJson(`${API_URL}/documents/consolidated-count2`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    }),
+
   getWhatsAppStatus: (userId: string) => fetchJson(`${API_URL}/whatsapp/status?userId=${userId}`),
   connectWhatsApp: (userId: string) => fetchJson(`${API_URL}/whatsapp/connect`, {
     method: 'POST',

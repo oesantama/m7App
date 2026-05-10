@@ -658,8 +658,10 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
                 city = $5, address = $6, observation = $7,
                 batch = $8, peso = $9, un_code = $10, client_ref = $11,
                 customer_name = $12, neighborhood = COALESCE($13, neighborhood),
+                latitude  = COALESCE($14, latitude),
+                longitude = COALESCE($15, longitude),
                 item_status = COALESCE(item_status, 'EST-03')
-              WHERE document_id = $14 AND article_id = $15 AND invoice = $16
+              WHERE document_id = $16 AND article_id = $17 AND invoice = $18
             `, [
               item.expectedQty || 0,
               item.unit || 'und',
@@ -674,12 +676,14 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.clientRef || null,
               itemCustomerName,
               itemNeighborhood,
+              itemLat,
+              itemLng,
               doc.id, artId, invoice
             ]);
           } else {
             await client.query(`
-              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name, neighborhood, item_status)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'EST-03')
+              INSERT INTO document_items (document_id, article_id, expected_qty, received_qty, order_number, unit, invoice, volume, unit_volume, city, address, observation, batch, peso, un_code, client_ref, customer_name, neighborhood, latitude, longitude, item_status)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'EST-03')
             `, [
               doc.id,
               artId,
@@ -698,7 +702,9 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.unCode || null,
               item.clientRef || null,
               itemCustomerName,
-              itemNeighborhood
+              itemNeighborhood,
+              itemLat,
+              itemLng
             ]);
           }
 
@@ -1969,6 +1975,70 @@ export const updateConsolidatedCount2 = async (req: any, res: Response) => {
     res.status(500).json({ error: 'Error al actualizar conteo: ' + err.message });
   } finally {
     client.release();
+  }
+};
+
+// ─── Editar factura de un item (solo si no tiene, viene null, vacía o 'S/I') ───
+export const updateItemInvoice = async (req: any, res: Response) => {
+  const { itemId, newInvoice } = req.body;
+  if (!itemId || !newInvoice || !String(newInvoice).trim()) {
+    return res.status(400).json({ error: 'Faltan parámetros obligatorios: itemId, newInvoice' });
+  }
+
+  const invoiceVal = String(newInvoice).trim().toUpperCase();
+  const user = req.user?.name || req.user?.email || 'Sistema';
+
+  try {
+    // 1. Obtener el item actual para verificar que existe y es modificable
+    const itemRes = await pool.query(
+      'SELECT id, document_id, article_id, invoice FROM document_items WHERE id = $1',
+      [itemId]
+    );
+
+    if (itemRes.rowCount === 0) {
+      return res.status(404).json({ error: 'Ítem no encontrado.' });
+    }
+
+    const item = itemRes.rows[0];
+    const currentInvoice = String(item.invoice || '').trim().toUpperCase();
+
+    // Validar si la factura actual es modificable (null, vacía, o 'S/I')
+    const isModifiable = !item.invoice || currentInvoice === '' || currentInvoice === 'S/I';
+    if (!isModifiable) {
+      return res.status(400).json({ error: 'Este ítem ya cuenta con una factura asignada y no puede ser modificada.' });
+    }
+
+    // 2. Actualizar la factura
+    await pool.query(
+      'UPDATE document_items SET invoice = $1 WHERE id = $2',
+      [invoiceVal, itemId]
+    );
+
+    // 3. Registrar en el log de correcciones para auditoría
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS document_items_correction_log (
+        id SERIAL PRIMARY KEY,
+        document_id VARCHAR(255) NOT NULL,
+        article_id  VARCHAR(255) NOT NULL,
+        invoice     VARCHAR(255) NOT NULL,
+        field_name  VARCHAR(100) NOT NULL,
+        old_value   TEXT,
+        new_value   TEXT,
+        changed_by  VARCHAR(255),
+        changed_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(
+      `INSERT INTO document_items_correction_log (document_id, article_id, invoice, field_name, old_value, new_value, changed_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [item.document_id, item.article_id, invoiceVal, 'invoice', item.invoice, invoiceVal, user]
+    );
+
+    res.json({ success: true, message: 'Factura actualizada exitosamente.', newInvoice: invoiceVal });
+  } catch (err: any) {
+    console.error('[M7-UPDATE-ITEM-INVOICE-ERR]', err.message);
+    res.status(500).json({ error: 'Error al actualizar la factura: ' + err.message });
   }
 };
 

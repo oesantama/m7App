@@ -709,6 +709,7 @@ const App: React.FC = () => {
           <RecibidoMaterial
             documents={documents}
             onUpdateDocuments={setDocuments}
+            onRefresh={() => refreshAppData()}
             user={user!}
             masterEstados={allMasterData.masterEstados || []}
             masterNotificaciones={allMasterData.masterNotificaciones || []}

@@ -18,6 +18,7 @@ interface RecibidoMaterialProps {
   masterTipoNotificacion: MasterRecord[];
   masterArticulo: MasterRecord[];
   onUpdateDocuments: (docs: DocumentL[]) => void;
+  onRefresh?: () => void;
   onAddArticleToMaster: (article: Article) => void;
   onAddNotificationToMaster: (notif: Partial<MasterRecord>) => void;
   onUpdateNotificationEmail?: (email: string) => void;
@@ -209,18 +210,8 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
         setSelectedDocForCount(null);
 
-        // Re-consultar DB para reflejar cambios reales (otros usuarios, estados actualizados)
-        try {
-          const freshDocs = await api.getDocuments();
-          onUpdateDocuments(freshDocs);
-        } catch (_) {
-          // Fallback local si falla el refresh
-          onUpdateDocuments(documents.map(d =>
-            d.id === selectedDocForCount!.id
-              ? { ...d, items: finalItems, status: DocStatus.INVENTORED, inventoryDate: new Date().toISOString(), inventoryUser: user.name, inventoryNotes: generalObs, updatedBy: user.name, updatedAt: new Date().toISOString() }
-              : d
-          ));
-        }
+        // Recargar la lista local filtrada por estado para que desaparezca el doc procesado
+        loadReciboList(selectedClientId, showHistory);
       } else {
         throw new Error(res.error || "Error al sincronizar");
       }
@@ -297,9 +288,9 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         const iVol = findIdx(isPlanR ? ['volumen'] : ['vol. total', 'total volume']);
         const iBarrio = findIdx(['barrio', 'neighborhood', 'sector']);
         const iCustomer = findIdx(['nombre destinatario', 'destinatario', 'cliente destino', 'nombre cliente', 'empresa', 'razon social', 'customer']);
-        // Solo Plan R: coordenadas vienen en el archivo
-        const iLat = isPlanR ? findIdx(['latitud', 'lat', 'coordinada y']) : -1;
-        const iLng = isPlanR ? findIdx(['longitud', 'lon', 'lng', 'coordinada x']) : -1;
+        // Coordenadas: se leen si la columna existe, tanto en Plan R como en Plan Normal
+        const iLat = findIdx(['latitud', 'lat', 'latitude', 'coordinada y', 'coord y']);
+        const iLng = findIdx(['longitud', 'lon', 'lng', 'longitude', 'coordinada x', 'coord x']);
 
         // Extrae barrio del texto de la dirección cuando no hay columna dedicada
         const extractBarrioFromAddress = (addr: string): string => {

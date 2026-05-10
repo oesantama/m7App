@@ -88,6 +88,48 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [editAuditLoading, setEditAuditLoading] = useState(false);
   const [editAuditError, setEditAuditError] = useState<string | null>(null);
 
+  // Estados para edición de factura de un item
+  const [editingInvoiceItem, setEditingInvoiceItem] = useState<any | null>(null);
+  const [newInvoiceValue, setNewInvoiceValue] = useState<string>('');
+  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
+
+  const handleSaveItemInvoice = async () => {
+    if (!editingInvoiceItem || !selectedPendingDoc) return;
+    const val = newInvoiceValue.trim();
+    if (!val) {
+      setSaveInvoiceError('El número de factura es obligatorio');
+      return;
+    }
+
+    setIsSavingInvoice(true);
+    setSaveInvoiceError(null);
+
+    try {
+      const data = await api.updateItemInvoice({
+        itemId: editingInvoiceItem.id,
+        newInvoice: val
+      });
+
+      // Actualizar localmente el item en selectedPendingDoc.items
+      const updated = { ...selectedPendingDoc };
+      updated.items = (updated.items || []).map((it: any) => {
+        return it.id === editingInvoiceItem.id ? { ...it, invoice: val } : it;
+      });
+      setSelectedPendingDoc(updated);
+
+      toast.success('Factura asignada correctamente');
+      setEditingInvoiceItem(null);
+      setNewInvoiceValue('');
+
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      setSaveInvoiceError(err.message || 'Error desconocido');
+    } finally {
+      setIsSavingInvoice(false);
+    }
+  };
+
   const canEditAudit = user.roleId === 'ROL-01' || (user.role as string) === 'ADMIN' ||
     user.permissions?.some((p: any) =>
       (p.module === 'PAG-17' || p.module === 'PAG-16' || p.module === 'PAG-30') &&
@@ -111,15 +153,13 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     setEditAuditLoading(true);
     setEditAuditError(null);
     try {
-      const token = localStorage.getItem('token') || '';
       const articleId = editingAuditItem.article_id || editingAuditItem.articleId || editingAuditItem.sku;
-      const resp = await fetch('/api/documents/consolidated-count2', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ docId: selectedPendingDoc.id, articleId, newCount2: newVal, observation: obs }),
+      const data = await api.updateConsolidatedCount2({
+        docId: selectedPendingDoc.id,
+        articleId,
+        newCount2: newVal,
+        observation: obs
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Error al guardar');
       // Actualizar localmente el item en consolidatedItems
       const updated = { ...selectedPendingDoc };
       (updated as any).consolidatedItems = ((updated as any).consolidatedItems || []).map((it: any) => {
@@ -756,8 +796,8 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iVolTotal = isPlanR ? findIdx(['volumen', 'total volume', 'volumen total']) : findIdx(['vol. total', 'total volume', 'volumen total']);
         const iVolUnit  = isPlanR ? -1 : findIdx(['volumen']);
         const iPeso     = findIdx(['peso', 'weight', 'kgs', 'kilogramos']);
-        const iLat      = isPlanR ? findIdx(['latitud', 'lat', 'latitude', 'coord y']) : -1;
-        const iLng      = isPlanR ? findIdx(['longitud', 'lng', 'longitude', 'coord x']) : -1;
+        const iLat      = findIdx(['latitud', 'lat', 'latitude', 'coord y', 'coordinada y']);
+        const iLng      = findIdx(['longitud', 'lng', 'longitude', 'coord x', 'coordinada x']);
 
         if (iPlaca === -1 || iCarga === -1) {
           toast.error('No se detectaron columnas PLACA o CARGA en el archivo.');
@@ -1479,7 +1519,28 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                     <td className="py-2 px-4 text-right text-slate-400 font-black">{it.volume || 0}</td>
                                     <td className="py-2 px-4 text-center font-black text-orange-600 italic bg-orange-50/10 font-mono text-[8px]">{formatCurrency(it.peso)}</td>
                                     <td className="py-2 px-4 text-right font-black text-emerald-600 font-mono">{it.orderNumber || '-'}</td>
-                                    <td className="py-2 px-4 text-right font-black text-slate-900 font-mono">{it.invoice || '-'}</td>
+                                    <td className="py-2 px-4 text-right font-black text-slate-900 font-mono">
+                                      {(!it.invoice || String(it.invoice).trim() === '' || String(it.invoice).trim().toUpperCase() === 'S/I') ? (
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          <span className="text-slate-400 italic font-black text-[8px]">S/I</span>
+                                          {canEditAudit && (
+                                            <button
+                                              onClick={() => {
+                                                setEditingInvoiceItem(it);
+                                                setNewInvoiceValue('');
+                                                setSaveInvoiceError(null);
+                                              }}
+                                              className="p-1 bg-amber-500 hover:bg-amber-600 text-white rounded transition-all active:scale-90"
+                                              title="Asignar Factura"
+                                            >
+                                              <Icons.Edit className="w-2.5 h-2.5" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-900 font-black">{it.invoice}</span>
+                                      )}
+                                    </td>
                                     <td className="py-2 px-4 text-right text-slate-500 truncate max-w-[100px]" title={it.city}>{it.city || '-'}</td>
                                     <td className="py-2 px-4 text-right text-slate-400 italic truncate max-w-[150px]" title={it.driverNote}>{it.driverNote || '-'}</td>
                                   </tr>
@@ -1651,6 +1712,50 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                 <button onClick={()=>setSelectedPendingDoc(null)} className="px-12 py-5 bg-slate-900 text-white rounded-[1.8rem] font-black text-xs uppercase hover:bg-emerald-600 transition-all shadow-xl">Cerrar Auditorí­a</button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Modal Edición Factura Recepción */}
+      {editingInvoiceItem && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => !isSavingInvoice && setEditingInvoiceItem(null)} />
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
+            <div className="h-2 bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500" />
+            <div className="p-8 flex flex-col gap-5">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-1">Asignación de Factura</p>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{editingInvoiceItem.articleId}</h3>
+                <p className="text-[10px] text-slate-400 mt-1">Pedido: <span className="font-black text-slate-700">{editingInvoiceItem.orderNumber || 'S/I'}</span> · Cliente: <span className="font-black text-slate-700">{selectedPendingDoc?.client_name || selectedPendingDoc?.clientName || 'S/I'}</span></p>
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block mb-1">Número de Factura</label>
+                <input
+                  type="text"
+                  value={newInvoiceValue}
+                  onChange={e => setNewInvoiceValue(e.target.value.toUpperCase())}
+                  placeholder="Escriba el número de factura..."
+                  className="w-full border-2 border-emerald-200 rounded-xl px-4 py-3 text-sm font-black text-emerald-700 focus:outline-none focus:border-emerald-500 bg-emerald-50/30 uppercase"
+                  disabled={isSavingInvoice}
+                />
+              </div>
+              {saveInvoiceError && <p className="text-[10px] font-black text-red-500 bg-red-50 px-4 py-2 rounded-xl">{saveInvoiceError}</p>}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEditingInvoiceItem(null)} disabled={isSavingInvoice}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-slate-200 transition-colors disabled:opacity-50">
+                  Cancelar
+                </button>
+                <button onClick={handleSaveItemInvoice} disabled={isSavingInvoice}
+                  className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-emerald-600 transition-colors shadow-lg active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {isSavingInvoice ? (
+                    <>
+                      <Icons.RefreshCw className="w-3 h-3 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
