@@ -67,7 +67,11 @@ export const HistoricoGrouping: React.FC<HistoricoGroupingProps> = ({
     if (!isOpen || pendingInvoices.length === 0 || vehicles.length === 0) return;
 
     // 1. Organizar vehículos por capacidad descendente
-    const activeVehicles = [...vehicles].filter(v => (v.status as any) === 'EST-02' || (v.status as any) === 'on_base' || (v as any).status === 'on_base');
+    const activeVehicles = [...vehicles].filter(v => {
+      const vStatus = String(v.status || '').toUpperCase();
+      const vStatusId = String((v as any).statusId || (v as any).status_id || '').toUpperCase();
+      return vStatus === 'DISPONIBLE' || vStatusId === 'EST-01';
+    });
     if (activeVehicles.length === 0) {
       setProposedGroups([]);
       return;

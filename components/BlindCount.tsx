@@ -670,38 +670,45 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const proceedToFinalize = () => {
     setShowConfirmDialog(false);
     
-    // 1. Identificar todos los IDs posibles del tipo de notificación "INVENTARIO AJOVER"
-    // Usamos filter en lugar de find para capturar múltiples coincidencias y añadimos TGN-01 por requisito
-    const matchedTypes = masterTipoNotificacion.filter(t => 
+    // 1. Identificar IDs del tipo de notificación — soporta snake_case y camelCase del backend
+    const matchedTypes = masterTipoNotificacion.filter(t =>
       t.name?.trim().toUpperCase() === 'INVENTARIO AJOVER' ||
-      t.id === 'TGN-01'
+      String(t.id || '').toUpperCase() === 'TGN-01'
     );
     const typeIds = matchedTypes.map(t => t.id);
 
-    // 2. Buscar si hay alertas activas vinculadas a cualquiera de esos IDs
-    const activeNotifs = masterNotificaciones.filter(n => {
-      const typeId = n.tipo_notificacion_id || n.tipoNotificacionId;
-      const isCorrectType = typeIds.includes(typeId);
-      const isActive = n.statusId === 'EST-01' || n.status?.toUpperCase() === 'ACTIVO' || n.statusId === 'ACTIVO';
-      return isCorrectType && isActive && n.notificationEmail;
+    // 2. Buscar TODAS las notificaciones activas — manejar snake_case (notification_email, status_id)
+    const normalize = (n: any) => ({
+      email:    n.notification_email  || n.notificationEmail  || '',
+      statusId: n.status_id           || n.statusId           || '',
+      typeId:   n.tipo_notificacion_id || n.tipoNotificacionId || '',
+      name:     n.name || '',
+    });
+
+    const activeNotifs = masterNotificaciones.filter(raw => {
+      const n = normalize(raw);
+      const isCorrectType = typeIds.length > 0 ? typeIds.includes(n.typeId) : true;
+      const isActive = n.statusId === 'EST-01' || n.statusId.toUpperCase() === 'ACTIVO';
+      return isCorrectType && isActive && n.email;
     });
 
     if (activeNotifs.length === 0) {
-      // Fallback: búsqueda por nombre si no se encontró por ID técnico
-      const fallbackNotif = masterNotificaciones.find(n =>
-        n.name?.trim().toUpperCase().includes('INVENTARIO') &&
-        n.notificationEmail &&
-        (n.statusId === 'EST-01' || n.status?.toUpperCase() === 'ACTIVO')
-      );
+      // Fallback: búsqueda flexible por nombre
+      const fallback = masterNotificaciones.find(raw => {
+        const n = normalize(raw);
+        const isActive = n.statusId === 'EST-01' || n.statusId.toUpperCase() === 'ACTIVO';
+        return n.name.toUpperCase().includes('INVENTARIO') && n.email && isActive;
+      });
 
-      if (!fallbackNotif) {
+      if (!fallback) {
         setShowEmailInput(true);
         return;
       }
-      finalizeProcess(fallbackNotif.notificationEmail);
+      finalizeProcess(normalize(fallback).email);
     } else {
-      // Si hay activas, enviamos la primera (el backend se encargará de notificar al grupo configurado)
-      finalizeProcess(activeNotifs[0].notificationEmail!);
+      // Enviar a TODOS los activos — backend también consultará su propia lista
+      const allEmails = activeNotifs.map(n => normalize(n).email).filter(Boolean).join(',');
+      finalizeProcess(allEmails);
     }
   };
 

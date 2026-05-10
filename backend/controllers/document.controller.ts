@@ -314,19 +314,30 @@ export const syncInventory = async (req: Request, res: Response) => {
     // 4. ENVÍO DE NOTIFICACIÓN INTELIGENTE (Solo si no es parcial / Cierre Final)
     if (!isPartial) {
       try {
-        // A. Consultar TODOS los correos activos para el tipo 'INVENTARIO AJOVER'
+        // A. Consultar TODOS los correos activos — tabla notificaciones (principal) + fallback master_records
         const configRes = await pool.query(`
+          SELECT n.notification_email, n.tipo_notificacion_id
+          FROM notificaciones n
+          JOIN tipos_notificacion tn ON n.tipo_notificacion_id = tn.id
+          WHERE (tn.name ILIKE 'INVENTARIO AJOVER' OR tn.id ILIKE 'TGN-01')
+          AND n.status_id = 'EST-01'
+          UNION
           SELECT mr.notification_email, mr.tipo_notificacion_id
           FROM master_records mr
           JOIN tipos_notificacion tn ON mr.tipo_notificacion_id = tn.id
-          WHERE tn.name ILIKE 'INVENTARIO AJOVER' 
+          WHERE (tn.name ILIKE 'INVENTARIO AJOVER' OR tn.id ILIKE 'TGN-01')
           AND mr.status_id = 'EST-01'
           AND mr.category = 'masterNotificaciones'
         `);
 
         const configs = configRes.rows;
-        const targetEmails: string[] = configs.map(c => c.notification_email).filter(e => e);
-        if (driverEmail && !targetEmails.includes(driverEmail)) targetEmails.push(driverEmail);
+        const targetEmails: string[] = configs.map((c: any) => c.notification_email).filter((e: any) => e);
+        // driverEmail puede ser comma-separated si el front envió varios
+        if (driverEmail) {
+          driverEmail.split(',').map((e: string) => e.trim()).filter(Boolean).forEach((e: string) => {
+            if (!targetEmails.includes(e)) targetEmails.push(e);
+          });
+        }
 
         const tipoId = configs[0]?.tipo_notificacion_id || 'TGN-EMAIL';
 

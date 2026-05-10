@@ -205,14 +205,22 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
       if (res.success) {
         toast.success("Inventario finalizado y sincronizado.");
         localStorage.removeItem(`m7_offline_count_${selectedDocForCount.id}`);
-        localStorage.removeItem(`m7_extras_${selectedDocForCount.id}`); // M7 V18: Limpiar también los extras
-        
-        onUpdateDocuments(documents.map(d =>
-          d.id === selectedDocForCount.id
-            ? { ...d, items: finalItems, status: DocStatus.INVENTORED, inventoryDate: new Date().toISOString(), inventoryUser: user.name, inventoryNotes: generalObs, updatedBy: user.name, updatedAt: new Date().toISOString() }
-            : d
-        ));
+        localStorage.removeItem(`m7_extras_${selectedDocForCount.id}`);
+
         setSelectedDocForCount(null);
+
+        // Re-consultar DB para reflejar cambios reales (otros usuarios, estados actualizados)
+        try {
+          const freshDocs = await api.getDocuments();
+          onUpdateDocuments(freshDocs);
+        } catch (_) {
+          // Fallback local si falla el refresh
+          onUpdateDocuments(documents.map(d =>
+            d.id === selectedDocForCount!.id
+              ? { ...d, items: finalItems, status: DocStatus.INVENTORED, inventoryDate: new Date().toISOString(), inventoryUser: user.name, inventoryNotes: generalObs, updatedBy: user.name, updatedAt: new Date().toISOString() }
+              : d
+          ));
+        }
       } else {
         throw new Error(res.error || "Error al sincronizar");
       }
