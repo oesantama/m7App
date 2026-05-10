@@ -475,6 +475,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         subdomains: 'abcd',
         maxZoom: 20
       }).addTo(map);
+      // Forzar recálculo de tamaño por si el contenedor estaba oculto al montar
+      setTimeout(() => map.invalidateSize(), 0);
 
       // Hub marker
       const hubIcon = L.divIcon({
@@ -535,9 +537,14 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               totalDurS = rd.duration || 0;
             }
           } else {
+            // Construir chunks con solapamiento para continuidad de la polilínea
+            const chunks: { lat: number; lng: number }[][] = [];
             for (let ci = 0; ci < wpArray.length - 1; ci += MAX_WP) {
-              const chunk = wpArray.slice(ci, ci + MAX_WP + 1);
-              const rd = await api.getRoadRoute(chunk);
+              chunks.push(wpArray.slice(ci, ci + MAX_WP + 1));
+            }
+            // Llamar todos los chunks en paralelo en lugar de secuencial
+            const results = await Promise.all(chunks.map(c => api.getRoadRoute(c).catch(() => null)));
+            for (const rd of results) {
               if (rd?.coordinates?.length > 1) {
                 allCoords = [...allCoords, ...rd.coordinates];
                 totalDistM += rd.distance || 0;
@@ -2312,8 +2319,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const route = newSuggestions[addInvoiceModal.routeIndex];
 
     if (route.assignedInvoices.length >= OPTIMIZATION_CONSTANTS.MAX_INVOICES) {
-      toast.error(`BLOQUEO: Esta ruta ya alcanzó el límite absoluto de ${OPTIMIZATION_CONSTANTS.MAX_INVOICES} facturas.`);
-      return;
+      toast.warning(`Advertencia: Esta ruta supera el límite sugerido de ${OPTIMIZATION_CONSTANTS.MAX_INVOICES} facturas. Continúa bajo tu criterio.`);
     }
 
     const realCapacity = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) > 0 ? Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) : 30; // Fallback
