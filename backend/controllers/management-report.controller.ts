@@ -1,6 +1,56 @@
 import pool from '../config/database.js';
 import { Request, Response } from 'express';
 
+// Shared Helper functions for cleaning and parsing values
+const parseDate = (val: any): Date | null => {
+  if (val === null || val === undefined || val === '') return null;
+  
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : val;
+  }
+  
+  if (typeof val === 'number') {
+    if (val > 10000 && val < 100000) {
+      return new Date(Math.round((val - 25569) * 86400 * 1000));
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  
+  const str = String(val).trim();
+  if (!str || str.toLowerCase() === 's/i' || str.toLowerCase() === 'null') return null;
+
+  const dmyRegex = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?/;
+  const match = str.match(dmyRegex);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1; // Month is 0-indexed
+    const year = parseInt(match[3], 10);
+    const hour = match[4] ? parseInt(match[4], 10) : 0;
+    const minute = match[5] ? parseInt(match[5], 10) : 0;
+    const second = match[6] ? parseInt(match[6], 10) : 0;
+    
+    const d = new Date(year, month, day, hour, minute, second);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const parseNum = (val: any) => {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return val;
+  const clean = String(val).replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(clean);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+const cleanStr = (val: any) => {
+  if (val === null || val === undefined) return '';
+  return String(val).trim();
+};
+
 /**
  * Controller to handle Excel row parsing and UPSERTing inside a transaction
  */
@@ -49,61 +99,6 @@ export const uploadReports = async (req: Request, res: Response) => {
         total_cxp = EXCLUDED.total_cxp,
         updated_at = CURRENT_TIMESTAMP;
     `;
-
-    // Helper functions for cleaning and parsing values
-    const parseDate = (val: any): Date | null => {
-      if (val === null || val === undefined || val === '') return null;
-      
-      // If it's already a JS Date object
-      if (val instanceof Date) {
-        return isNaN(val.getTime()) ? null : val;
-      }
-      
-      // If it's a number (Excel Serial Number or Timestamp)
-      if (typeof val === 'number') {
-        // If it's a realistic Excel date serial (between 10000 and 100000)
-        if (val > 10000 && val < 100000) {
-          return new Date(Math.round((val - 25569) * 86400 * 1000));
-        }
-        const d = new Date(val);
-        return isNaN(d.getTime()) ? null : d;
-      }
-      
-      const str = String(val).trim();
-      if (!str || str.toLowerCase() === 's/i' || str.toLowerCase() === 'null') return null;
-
-      // Matches DD/MM/YYYY HH:MM:SS or DD/MM/YYYY or D/M/YYYY
-      const dmyRegex = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?/;
-      const match = str.match(dmyRegex);
-      if (match) {
-        const day = parseInt(match[1], 10);
-        const month = parseInt(match[2], 10) - 1; // Month is 0-indexed
-        const year = parseInt(match[3], 10);
-        const hour = match[4] ? parseInt(match[4], 10) : 0;
-        const minute = match[5] ? parseInt(match[5], 10) : 0;
-        const second = match[6] ? parseInt(match[6], 10) : 0;
-        
-        const d = new Date(year, month, day, hour, minute, second);
-        return isNaN(d.getTime()) ? null : d;
-      }
-
-      // Fallback to native ISO/String parsing
-      const d = new Date(str);
-      return isNaN(d.getTime()) ? null : d;
-    };
-
-    const parseNum = (val: any) => {
-      if (val === null || val === undefined) return 0;
-      if (typeof val === 'number') return val;
-      const clean = String(val).replace(/[^0-9.-]/g, '');
-      const parsed = parseFloat(clean);
-      return isNaN(parsed) ? 0 : parsed;
-    };
-
-    const cleanStr = (val: any) => {
-      if (val === null || val === undefined) return '';
-      return String(val).trim();
-    };
 
     let insertedCount = 0;
     for (const row of records) {
@@ -218,5 +213,87 @@ export const getReports = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[M7-MGT-GET-ERR]', err);
     res.status(500).json({ error: 'Error al consultar el reporte de gerencia', details: err.message });
+  }
+};
+
+/**
+ * Controller to handle mass receipt date updates by matching Consecutivo to receipt
+ */
+export const uploadReceiptDates = async (req: Request, res: Response) => {
+  const { records } = req.body;
+  if (!Array.isArray(records) || records.length === 0) {
+    return res.status(400).json({ error: 'No se recibieron registros para importar' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const updateQuery = `
+      UPDATE management_orders 
+      SET fecha_recibo = $1, updated_at = CURRENT_TIMESTAMP 
+      WHERE receipt = $2;
+    `;
+
+    let updatedCount = 0;
+    for (const row of records) {
+      const receiptNum = cleanStr(row.consecutive || row['Consecutivo']);
+      const receiptDate = parseDate(row.date || row['Fecha']);
+
+      if (!receiptNum || !receiptDate) continue;
+
+      const result = await client.query(updateQuery, [receiptDate, receiptNum]);
+      updatedCount += result.rowCount || 0;
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, count: updatedCount, message: `Se actualizaron ${updatedCount} fechas de recibido con éxito` });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-MGT-RECEIPT-UPDATE-ERR]', err);
+    res.status(500).json({ error: 'Error al actualizar las fechas de recibido', details: err.message });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Controller to handle mass egress date updates by matching Consecutivo to egress
+ */
+export const uploadEgressDates = async (req: Request, res: Response) => {
+  const { records } = req.body;
+  if (!Array.isArray(records) || records.length === 0) {
+    return res.status(400).json({ error: 'No se recibieron registros para importar' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const updateQuery = `
+      UPDATE management_orders 
+      SET fecha_egreso = $1, updated_at = CURRENT_TIMESTAMP 
+      WHERE egress = $2;
+    `;
+
+    let updatedCount = 0;
+    for (const row of records) {
+      const egressNum = cleanStr(row.consecutive || row['Consecutivo']);
+      const egressDate = parseDate(row.date || row['Fecha']);
+
+      if (!egressNum || !egressDate) continue;
+
+      const result = await client.query(updateQuery, [egressDate, egressNum]);
+      updatedCount += result.rowCount || 0;
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, count: updatedCount, message: `Se actualizaron ${updatedCount} fechas de egreso con éxito` });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[M7-MGT-EGRESS-UPDATE-ERR]', err);
+    res.status(500).json({ error: 'Error al actualizar las fechas de egreso', details: err.message });
+  } finally {
+    client.release();
   }
 };

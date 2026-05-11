@@ -1600,7 +1600,7 @@ export const getPlateMovementHistory = async (req: Request, res: Response) => {
 // Valida si una referencia de pago ya existe en el sistema en individual o grupal.
 export const checkReferenceExists = async (req: Request, res: Response) => {
     try {
-        const { reference } = req.params;
+        const reference = String(req.params.reference ?? '');
         if (!reference || reference.trim() === '') {
             return res.status(400).json({ success: false, error: 'La referencia es requerida' });
         }

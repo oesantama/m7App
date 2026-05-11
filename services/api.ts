@@ -871,6 +871,18 @@ export const api = {
       body: JSON.stringify({ records })
     }),
 
+  uploadReceiptDates: (records: any[]) =>
+    fetchJson(`${API_URL}/management-reports/upload-receipt-dates`, {
+      method: 'POST',
+      body: JSON.stringify({ records })
+    }),
+
+  uploadEgressDates: (records: any[]) =>
+    fetchJson(`${API_URL}/management-reports/upload-egress-dates`, {
+      method: 'POST',
+      body: JSON.stringify({ records })
+    }),
+
   getWhatsAppStatus: (userId: string) => fetchJson(`${API_URL}/whatsapp/status?userId=${userId}`),
   connectWhatsApp: (userId: string) => fetchJson(`${API_URL}/whatsapp/connect`, {
     method: 'POST',
