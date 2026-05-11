@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Download, Search, RefreshCw, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertCircle, CheckCircle, X, Pencil, Plus, AlertTriangle } from 'lucide-react';
+import { Upload, Download, Search, RefreshCw, FileSpreadsheet, ChevronDown, ChevronRight, Trash2, AlertCircle, CheckCircle, X, Pencil, Plus, AlertTriangle, History } from 'lucide-react';
 import { User } from '../../types';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
@@ -725,9 +725,87 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
   const [expanded, setExpanded]     = useState<Record<number, Detalle[]>>({});
   const [loadingDet, setLoadingDet] = useState<number | null>(null);
 
+  // Estados para adicionar factura manual
+  const [addingDetToEncId, setAddingDetToEncId] = useState<number | null>(null);
+  const [newDetForm, setNewDetForm] = useState({ factura: '', volumen: '', peso: '', cubicaje: '', notas: '' });
+
+  // Estados para eliminación con observación
+  const [deletingDet, setDeletingDet] = useState<{ id: number, encId: number, factura: string } | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+
+  // Estados para historial de movimientos (logs)
+  const [viewingLogsForPlanilla, setViewingLogsForPlanilla] = useState<Encabezado | null>(null);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const handleDeleteDetalleRow = async () => {
+    if (!deletingDet) return;
+    if (!deleteReason.trim()) {
+      toast.error('La observación de eliminación es obligatoria.');
+      return;
+    }
+    try {
+      await (api as any).deleteAuditoriaB36Detalle(deletingDet.id, deleteReason.trim());
+      toast.success('Factura eliminada de la planilla.');
+      const encId = deletingDet.encId;
+      setDeletingDet(null);
+      setDeleteReason('');
+      const det = await (api as any).getAuditoriaB36Detalle(encId);
+      setExpanded(prev => ({ ...prev, [encId]: Array.isArray(det) ? det : [] }));
+      const data = await (api as any).getAuditoriaB36Encabezados({ clientId, from: dateFrom, to: dateTo, placa: searchPlaca, os: searchOs });
+      setRows(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error('Error al eliminar la factura.');
+    }
+  };
+
+  const openLogsModal = async (row: Encabezado) => {
+    setViewingLogsForPlanilla(row);
+    setLoadingLogs(true);
+    try {
+      const res = await (api as any).getAuditoriaB36Logs(row.id);
+      setLogs(Array.isArray(res) ? res : []);
+    } catch {
+      setLogs([]);
+      toast.error('Error al cargar el historial de movimientos.');
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const handleSaveDetalleRow = async (encId: number) => {
+    if (!newDetForm.factura.trim()) {
+      toast.error('El número de factura es obligatorio.');
+      return;
+    }
+    try {
+      await (api as any).addAuditoriaB36Detalle({
+        id_enca: encId,
+        factura: newDetForm.factura.trim(),
+        volumen: parseFloat(newDetForm.volumen) || 0,
+        peso: parseFloat(newDetForm.peso) || 0,
+        cubicaje: parseFloat(newDetForm.cubicaje) || 0,
+        notas: newDetForm.notas.trim(),
+        client_id: clientId,
+      });
+      toast.success('Factura adicionada correctamente.');
+      setAddingDetToEncId(null);
+      setNewDetForm({ factura: '', volumen: '', peso: '', cubicaje: '', notas: '' });
+      const det = await (api as any).getAuditoriaB36Detalle(encId);
+      setExpanded(prev => ({ ...prev, [encId]: Array.isArray(det) ? det : [] }));
+      const data = await (api as any).getAuditoriaB36Encabezados({ clientId, from: dateFrom, to: dateTo, placa: searchPlaca, os: searchOs });
+      setRows(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error('Error al adicionar la factura.');
+    }
+  };
+
   // Modal de edición de flete y sobrecostos
   const [editingPlanilla, setEditingPlanilla] = useState<Encabezado | null>(null);
   const [editingFlete, setEditingFlete] = useState<number>(0);
+  const [editingPlaca, setEditingPlaca] = useState<string>('');
+  const [editingConductor, setEditingConductor] = useState<string>('');
+  const [editChangeNotes, setEditChangeNotes] = useState<string>('');
   const [editingSobrecostos, setEditingSobrecostos] = useState<Array<{ id?: number, valor: number, observacion: string, estado: string }>>([]);
   const [loadingEditData, setLoadingEditData] = useState(false);
   const [savingPlanilla, setSavingPlanilla] = useState(false);
@@ -783,6 +861,9 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
   const openEditModal = async (row: Encabezado) => {
     setEditingPlanilla(row);
     setEditingFlete(row.valor_flete || 0);
+    setEditingPlaca(row.placa || '');
+    setEditingConductor(row.conductor || '');
+    setEditChangeNotes('');
     setLoadingEditData(true);
     try {
       const data = await (api as any).getAuditoriaB36Sobrecostos(row.id);
@@ -796,11 +877,30 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
 
   const handleSavePlanilla = async () => {
     if (!editingPlanilla) return;
+
+    const hasPlacaChanged = editingPlaca.trim() !== (editingPlanilla.placa || '');
+    const hasConductorChanged = editingConductor.trim() !== (editingPlanilla.conductor || '');
+
+    // 1. Si cambia la placa, es obligatorio que cambie el conductor
+    if (hasPlacaChanged && !hasConductorChanged) {
+      toast.error('Si cambia la placa del vehículo, debe obligatoriamente cambiar el conductor.');
+      return;
+    }
+
+    // 2. Si cambia placa o conductor, es obligatorio poner notas/motivos
+    if ((hasPlacaChanged || hasConductorChanged) && !editChangeNotes.trim()) {
+      toast.error('Debe ingresar un motivo o notas para registrar el cambio de placa y/o conductor.');
+      return;
+    }
+
     setSavingPlanilla(true);
     try {
       await (api as any).updateAuditoriaB36Planilla(editingPlanilla.id, {
         valor_flete: editingFlete,
-        sobrecostos: editingSobrecostos
+        sobrecostos: editingSobrecostos,
+        placa: editingPlaca.trim(),
+        conductor: editingConductor.trim(),
+        change_notes: editChangeNotes.trim()
       });
       toast.success('Planilla actualizada con éxito.');
       setEditingPlanilla(null);
@@ -1146,41 +1246,138 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
                           className="p-1.5 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors">
                           <Pencil size={12} />
                         </button>
+                        <button onClick={() => openLogsModal(row)} title="Ver Historial de Movimientos"
+                          className="p-1.5 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">
+                          <History size={12} />
+                        </button>
                       </div>
                     </td>
                   </tr>
                   {/* Detalle expandido */}
                   {expanded[row.id] && (
                     <tr>
-                      <td colSpan={12} className="bg-slate-50 px-8 py-3 border-b border-slate-200">
-                        {expanded[row.id].length === 0 ? (
-                          <p className="text-[10px] text-slate-400 italic">Sin facturas de detalle registradas.</p>
-                        ) : (
-                          <table className="w-full text-[10px] bg-white border border-slate-200 rounded-lg overflow-hidden">
-                            <thead className="bg-slate-100">
+                      <td colSpan={12} className="bg-slate-50 px-8 py-4 border-b border-slate-200">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                              Facturas de Detalle ({expanded[row.id].length})
+                            </span>
+                            {addingDetToEncId !== row.id && (
+                              <button
+                                onClick={() => {
+                                  setAddingDetToEncId(row.id);
+                                  setNewDetForm({ factura: '', volumen: '', peso: '', cubicaje: '', notas: '' });
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-[9px] font-black uppercase tracking-wider rounded-lg border border-emerald-200 shadow-sm"
+                              >
+                                <Plus size={10} /> Adicionar Factura
+                              </button>
+                            )}
+                          </div>
+
+                          <table className="w-full text-[10px] bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                            <thead className="bg-slate-100 border-b border-slate-200">
                               <tr className="text-slate-500 font-black uppercase tracking-wider">
-                                <th className="py-1.5 px-3 text-left">#</th>
-                                <th className="py-1.5 px-3 text-left">Factura</th>
-                                <th className="py-1.5 px-3 text-left">Volumen</th>
-                                <th className="py-1.5 px-3 text-left">Peso</th>
-                                <th className="py-1.5 px-3 text-left">Cubicaje</th>
-                                <th className="py-1.5 px-3 text-left">Notas</th>
+                                <th className="py-2 px-3 text-left w-8">#</th>
+                                <th className="py-2 px-3 text-left">Factura</th>
+                                <th className="py-2 px-3 text-left">Volumen</th>
+                                <th className="py-2 px-3 text-left">Peso</th>
+                                <th className="py-2 px-3 text-left">Cubicaje</th>
+                                <th className="py-2 px-3 text-left">Notas</th>
+                                <th className="py-2 px-3 text-center w-24">Acciones</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {expanded[row.id].map((d, i) => (
-                                <tr key={d.id}>
-                                  <td className="py-1.5 px-3 text-slate-400">{i + 1}</td>
-                                  <td className="py-1.5 px-3 font-black text-slate-800">{d.factura || '—'}</td>
-                                  <td className="py-1.5 px-3 font-bold text-slate-600">{d.volumen || 0}</td>
-                                  <td className="py-1.5 px-3 font-bold text-slate-600">{d.peso || 0}</td>
-                                  <td className="py-1.5 px-3 font-bold text-slate-600">{d.cubicaje || 0}</td>
-                                  <td className="py-1.5 px-3 text-slate-500">{d.notas || '—'}</td>
+                                <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="py-2 px-3 text-slate-400 font-bold">{i + 1}</td>
+                                  <td className="py-2 px-3 font-black text-slate-800">{d.factura || '—'}</td>
+                                  <td className="py-2 px-3 font-bold text-slate-600">{d.volumen || 0}</td>
+                                  <td className="py-2 px-3 font-bold text-slate-600">{d.peso || 0}</td>
+                                  <td className="py-2 px-3 font-bold text-slate-600">{d.cubicaje || 0}</td>
+                                  <td className="py-2 px-3 text-slate-500">{d.notas || '—'}</td>
+                                  <td className="py-2 px-3 text-center">
+                                    <button
+                                      onClick={() => { setDeletingDet({ id: d.id, encId: row.id, factura: d.factura || '' }); setDeleteReason(''); }}
+                                      className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors inline-flex items-center"
+                                      title="Eliminar factura"
+                                    >
+                                      <Trash2 size={11} />
+                                    </button>
+                                  </td>
                                 </tr>
                               ))}
+
+                              {addingDetToEncId === row.id && (
+                                <tr className="bg-emerald-50/30">
+                                  <td className="py-2 px-3 text-emerald-600 font-black">+</td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="text"
+                                      placeholder="Número Factura"
+                                      value={newDetForm.factura}
+                                      onChange={e => setNewDetForm({ ...newDetForm, factura: e.target.value })}
+                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-black text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="number"
+                                      placeholder="Volumen"
+                                      value={newDetForm.volumen}
+                                      onChange={e => setNewDetForm({ ...newDetForm, volumen: e.target.value })}
+                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="number"
+                                      placeholder="Peso"
+                                      value={newDetForm.peso}
+                                      onChange={e => setNewDetForm({ ...newDetForm, peso: e.target.value })}
+                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="number"
+                                      placeholder="Cubicaje"
+                                      value={newDetForm.cubicaje}
+                                      onChange={e => setNewDetForm({ ...newDetForm, cubicaje: e.target.value })}
+                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <input
+                                      type="text"
+                                      placeholder="Notas..."
+                                      value={newDetForm.notas}
+                                      onChange={e => setNewDetForm({ ...newDetForm, notas: e.target.value })}
+                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3 text-center whitespace-nowrap space-x-1.5">
+                                    <button
+                                      onClick={() => handleSaveDetalleRow(row.id)}
+                                      className="px-2 py-0.5 bg-emerald-600 text-white font-black text-[9px] uppercase tracking-wider rounded shadow-sm hover:bg-emerald-700 transition-colors"
+                                    >
+                                      Guardar
+                                    </button>
+                                    <button
+                                      onClick={() => setAddingDetToEncId(null)}
+                                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-[9px] uppercase rounded transition-colors"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </td>
+                                </tr>
+                              )}
                             </tbody>
                           </table>
-                        )}
+                          {expanded[row.id].length === 0 && addingDetToEncId !== row.id && (
+                            <p className="text-[10px] text-slate-400 italic">Sin facturas de detalle registradas.</p>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -1282,15 +1479,56 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
                 </div>
               ) : (
                 <>
-                  {/* Flete Principal */}
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Valor de Flete Principal</label>
-                    <input
-                      type="number"
-                      value={editingFlete}
-                      onChange={e => setEditingFlete(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[11px] font-black text-slate-800 focus:outline-none focus:border-emerald-400 bg-white"
-                    />
+                  {/* Datos Principales de Planilla */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Placa Vehículo</label>
+                        <input
+                          type="text"
+                          value={editingPlaca}
+                          onChange={e => setEditingPlaca(e.target.value.toUpperCase())}
+                          placeholder="Placa..."
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[11px] font-black text-slate-800 focus:outline-none focus:border-emerald-400 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Nombre Conductor</label>
+                        <input
+                          type="text"
+                          value={editingConductor}
+                          onChange={e => setEditingConductor(e.target.value)}
+                          placeholder="Conductor..."
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:border-emerald-400 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Valor Flete Principal</label>
+                        <input
+                          type="number"
+                          value={editingFlete}
+                          onChange={e => setEditingFlete(parseFloat(e.target.value) || 0)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[11px] font-black text-slate-800 focus:outline-none focus:border-emerald-400 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Nota del Cambio (Requerida si hay modificaciones de placa o conductor) */}
+                    {(editingPlaca.trim() !== (editingPlanilla.placa || '') ||
+                      editingConductor.trim() !== (editingPlanilla.conductor || '')) && (
+                      <div className="pt-2 border-t border-slate-200/60 animate-in fade-in duration-200">
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-rose-500 mb-1.5 flex items-center gap-1">
+                          <AlertCircle size={10} /> Notas del Cambio / Motivo de la Modificación *
+                        </label>
+                        <textarea
+                          value={editChangeNotes}
+                          onChange={e => setEditChangeNotes(e.target.value)}
+                          placeholder="Describa brevemente por qué se modifica la placa y/o el conductor..."
+                          rows={2}
+                          className="w-full px-3 py-1.5 border border-rose-200 rounded-lg text-[10px] font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-rose-400 bg-white"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Sección Sobrecostos */}
@@ -1382,6 +1620,137 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
               <button onClick={() => setEditingPlanilla(null)} className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">Cancelar</button>
               <button onClick={handleSavePlanilla} disabled={savingPlanilla || loadingEditData} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-colors disabled:opacity-50">
                 {savingPlanilla ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación con Observación */}
+      {deletingDet && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-rose-50/50">
+              <div className="flex items-center gap-2 text-rose-600">
+                <AlertTriangle size={18} />
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Eliminar Factura</h3>
+              </div>
+              <button onClick={() => setDeletingDet(null)} className="p-1 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 bg-white">
+              <p className="text-[11px] text-slate-600 font-bold">
+                ¿Está completamente seguro de eliminar la factura <span className="font-black text-rose-600">{deletingDet.factura}</span> de esta planilla?
+              </p>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                  Motivo / Observación de la eliminación *
+                </label>
+                <textarea
+                  value={deleteReason}
+                  onChange={e => setDeleteReason(e.target.value)}
+                  placeholder="Escriba el motivo por el cual se elimina esta factura de la planilla..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[11px] focus:outline-none focus:border-rose-400 bg-slate-50 focus:bg-white transition-colors placeholder:text-slate-400 text-slate-800 font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setDeletingDet(null)}
+                className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase text-slate-500 hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteDetalleRow}
+                disabled={!deleteReason.trim()}
+                className="px-4 py-1.5 bg-rose-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-rose-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                Confirmar Eliminación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal del Historial de Movimientos */}
+      {viewingLogsForPlanilla && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl flex flex-col overflow-hidden max-h-[85vh] animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-purple-50/50">
+              <div className="flex items-center gap-2 text-purple-700">
+                <History size={18} />
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Historial de Movimientos</h3>
+                  <p className="text-[10px] text-purple-600 font-bold">Planilla OS: {viewingLogsForPlanilla.os}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewingLogsForPlanilla(null)} className="p-1 rounded-lg hover:bg-purple-100 text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 bg-white">
+              {loadingLogs ? (
+                <div className="py-12 text-center bg-white">
+                  <RefreshCw size={24} className="animate-spin text-purple-400 mx-auto" />
+                  <p className="text-[10px] text-slate-400 mt-2">Cargando movimientos de la planilla...</p>
+                </div>
+              ) : logs.length === 0 ? (
+                <div className="py-12 text-center bg-white">
+                  <p className="text-[11px] text-slate-400 italic">No hay registros de movimientos para esta planilla.</p>
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                  <table className="w-full text-[10px]">
+                    <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+                      <tr className="text-slate-500 font-black uppercase tracking-wider text-left">
+                        <th className="py-2.5 px-4">Fecha / Hora</th>
+                        <th className="py-2.5 px-4">Usuario</th>
+                        <th className="py-2.5 px-4 text-center">Acción</th>
+                        <th className="py-2.5 px-4">Factura</th>
+                        <th className="py-2.5 px-4">Observación / Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {logs.map((log: any) => (
+                        <tr key={log.id} className="hover:bg-slate-50/40 transition-colors">
+                          <td className="py-2.5 px-4 text-slate-500 font-medium">
+                            {new Date(log.fecha).toLocaleString('es-CO')}
+                          </td>
+                          <td className="py-2.5 px-4 font-bold text-slate-600">{log.usuario}</td>
+                          <td className="py-2.5 px-4 text-center">
+                            {log.accion === 'ADICION' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-black uppercase text-[8px] tracking-wider border border-emerald-100">
+                                <CheckCircle size={8} /> Adición
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-black uppercase text-[8px] tracking-wider border border-rose-100">
+                                <X size={8} /> Eliminación
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4 font-black text-slate-800">{log.factura}</td>
+                          <td className="py-2.5 px-4 text-slate-500 font-medium">{log.observacion}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+              <button
+                onClick={() => setViewingLogsForPlanilla(null)}
+                className="px-4 py-1.5 bg-slate-800 text-white hover:bg-slate-900 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors shadow-sm"
+              >
+                Cerrar
               </button>
             </div>
           </div>

@@ -10,6 +10,9 @@ import {
   getSobrecostos,
   updatePlanilla,
   deleteEncabezado,
+  addDetalle,
+  deleteDetalle,
+  getLogs,
 } from '../controllers/ajover-b36.controller.js';
 
 const router = Router();
@@ -25,5 +28,8 @@ router.get('/export/:encId',        exportAuditoriaExcel);
 router.get('/sobrecostos/:encId',   getSobrecostos);
 router.put('/planilla/:id',        updatePlanilla);
 router.delete('/encabezado/:id',    deleteEncabezado);
+router.post('/detalle',             addDetalle);
+router.delete('/detalle/:id',       deleteDetalle);
+router.get('/logs/:encId',          getLogs);
 
 export default router;

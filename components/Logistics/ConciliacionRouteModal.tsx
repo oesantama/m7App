@@ -297,7 +297,8 @@ const LegalizationDialog: React.FC<{
     onUpdateItem: (itemId: string | number, rq: number, rv?: number) => void;
     onSave: () => void;
     allRoutes?: RouteGroup[];
-}> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes }) => {
+    onCheckReference?: (ref: string) => void;
+}> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes, onCheckReference }) => {
     const isLegalized   = !!inv.forma_pago;
     const isRepice      = (inv.item_status || '').toUpperCase() === 'EST-15' || (inv.item_status || '').toUpperCase() === 'REPICE';
     const invoiceVal    = Number(inv.invoice_value) || 0;
@@ -621,7 +622,13 @@ const LegalizationDialog: React.FC<{
                                                 <div className="space-y-1.5">
                                                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">No. Comprobante / Ref.</label>
                                                     <input type="text" value={form.numConsignacion}
-                                                        onChange={e => onUpdate({ numConsignacion: e.target.value })} placeholder="Ref. del pago"
+                                                        onChange={e => onUpdate({ numConsignacion: e.target.value })} 
+                                                        onBlur={e => {
+                                                            if (e.target.value && onCheckReference) {
+                                                                onCheckReference(e.target.value);
+                                                            }
+                                                        }}
+                                                        placeholder="Ref. del pago"
                                                         className="w-full px-4 py-3 bg-white border border-slate-200 focus:border-emerald-500 rounded-2xl text-sm font-black outline-none transition-all placeholder:text-slate-300" />
                                                 </div>
                                             </div>
@@ -706,6 +713,43 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [reverseInvoice, setReverseInvoice] = useState<InvoiceRow | null>(null);
     const [reverseObservations, setReverseObservations] = useState('');
     const [reversingState, setReversingState] = useState(false);
+
+    // Estado para alerta de referencia duplicada
+    const [duplicateAlert, setDuplicateAlert] = useState<{
+        reference: string;
+        sourceType: 'individual' | 'grupal';
+        groupIndex?: number;
+        invoiceNumber?: string;
+        details: Array<{
+            type: 'individual' | 'grupal';
+            document_id: string;
+            invoice_number?: string;
+            vehicle_plate: string;
+            conductor_name?: string;
+            external_doc_id?: string;
+            valor?: number;
+            fecha?: string;
+        }>;
+    } | null>(null);
+
+    const handleCheckReference = async (ref: string, sourceType: 'individual' | 'grupal', groupIndex?: number, invoiceNumber?: string) => {
+        if (!ref || ref.trim() === '') return;
+        try {
+            const res = await api.checkReferenceExists(ref);
+            if (res.success && res.exists) {
+                setDuplicateAlert({
+                    reference: ref,
+                    sourceType,
+                    groupIndex,
+                    invoiceNumber,
+                    details: res.data
+                });
+            }
+        } catch (error) {
+            console.error('Error checking reference:', error);
+        }
+    };
+
 
     const handleExecuteReverse = async () => {
         if (!reverseInvoice) return;
@@ -1455,6 +1499,11 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                             next[idx].nroAprobacion = e.target.value;
                                                             setConsignaciones(next);
                                                         }}
+                                                        onBlur={e => {
+                                                            if (e.target.value) {
+                                                                handleCheckReference(e.target.value, 'grupal', idx);
+                                                            }
+                                                        }}
                                                         placeholder="N°" className="w-full bg-white px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent disabled:bg-transparent" />
                                                 </div>
                                                 <div className="col-span-2">
@@ -1753,6 +1802,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         onUpdateItem={(itemId, rq, rv) => updateItem(inv.invoice_number, itemId, rq, rv)}
                         onSave={() => handleSave(inv)}
                         allRoutes={allRoutes}
+                        onCheckReference={(ref) => handleCheckReference(ref, 'individual', undefined, inv.invoice_number)}
                     />
                 );
             })()}
@@ -1871,6 +1921,115 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     ${reversingState || !reverseObservations.trim() ? 'bg-slate-300 shadow-none cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'}`}
                             >
                                 {reversingState ? 'Reversando...' : 'Reversar Ahora'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Advertencia de Referencia Duplicada */}
+            {duplicateAlert && (
+                <div className="fixed inset-0 z-[1050] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden border border-rose-100 animate-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-rose-600 to-red-500 px-6 py-5 text-white flex items-center gap-3">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                                <p className="text-[10px] font-black text-rose-100 uppercase tracking-[0.2em] mb-0.5">Advertencia de Duplicado</p>
+                                <h4 className="text-base font-black">Referencia ya Registrada</h4>
+                            </div>
+                        </div>
+                        
+                        <div className="p-6 space-y-4">
+                            <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl text-center">
+                                <p className="text-xs font-semibold text-slate-500">La referencia / número de aprobación</p>
+                                <p className="text-lg font-black text-rose-600 mt-1">"{duplicateAlert.reference}"</p>
+                                <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mt-1.5">ya existe en el sistema</p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Detalles del Registro Previo:</p>
+                                <div className="max-h-[160px] overflow-y-auto custom-scrollbar space-y-2">
+                                    {duplicateAlert.details.map((detail, idx) => (
+                                        <div key={idx} className="bg-slate-50 border border-slate-100 p-3.5 rounded-xl space-y-1.5 text-left">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase">Tipo</span>
+                                                <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${detail.type === 'individual' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}`}>
+                                                    {detail.type === 'individual' ? 'Individual' : 'Consignación Grupal'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase">Documento / Plan</span>
+                                                <span className="text-[10px] font-bold text-slate-700">{detail.external_doc_id || detail.document_id}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase">Placa Vehículo</span>
+                                                <span className="text-[10px] font-black text-slate-800">🚗 {detail.vehicle_plate || '—'}</span>
+                                            </div>
+                                            {detail.type === 'individual' && detail.invoice_number && (
+                                                <div className="flex justify-between items-center bg-white p-1 px-2 rounded-lg border border-slate-100">
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase">Factura Asociada</span>
+                                                    <span className="text-[10px] font-black text-emerald-600">{detail.invoice_number}</span>
+                                                </div>
+                                            )}
+                                            {detail.conductor_name && (
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase">Conductor</span>
+                                                    <span className="text-[10px] font-semibold text-slate-500">{detail.conductor_name}</span>
+                                                </div>
+                                            )}
+                                            {detail.valor !== undefined && detail.valor !== null && (
+                                                <div className="flex justify-between items-center border-t border-slate-200/50 pt-1 mt-1">
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase">Valor Recaudado</span>
+                                                    <span className="text-[10px] font-black text-emerald-700">${Number(detail.valor).toLocaleString('es-CO')}</span>
+                                                </div>
+                                            )}
+                                            {detail.fecha && (
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase">Fecha Registro</span>
+                                                    <span className="text-[10px] font-semibold text-slate-600">📅 {detail.fecha.slice(0, 10)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="pt-2 border-t border-slate-100 text-center">
+                                <p className="text-xs font-black text-slate-800">¿Desea continuar con esta referencia?</p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">Si cancela, el campo se limpiará para ingresar un nuevo dato.</p>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-5 bg-slate-50 flex gap-3 border-t border-slate-100">
+                            <button 
+                                onClick={() => {
+                                    // CANCEL: Limpiar el campo
+                                    if (duplicateAlert.sourceType === 'individual') {
+                                        const activeInvNum = duplicateAlert.invoiceNumber || activeDialog;
+                                        if (activeInvNum) {
+                                            updateForm(activeInvNum, { numConsignacion: '' });
+                                        }
+                                    } else if (duplicateAlert.sourceType === 'grupal' && duplicateAlert.groupIndex !== undefined) {
+                                        const next = [...consignaciones];
+                                        next[duplicateAlert.groupIndex].nroAprobacion = '';
+                                        setConsignaciones(next);
+                                    }
+                                    setDuplicateAlert(null);
+                                    toast.info('Se ha limpiado el número de referencia para ingresar uno nuevo.');
+                                }}
+                                className="flex-1 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all shadow-sm"
+                            >
+                                ❌ No, Cancelar
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    // SI/CONTINUAR: Mantener el valor
+                                    setDuplicateAlert(null);
+                                    toast.success('Se ha permitido el uso de la referencia duplicada.');
+                                }}
+                                className="flex-[1.2] py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all"
+                            >
+                                Sí, Continuar
                             </button>
                         </div>
                     </div>

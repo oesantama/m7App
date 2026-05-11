@@ -184,11 +184,11 @@ export const getReports = async (req: Request, res: Response) => {
       values.push(`%${clientName}%`);
     }
     if (fromDate) {
-      conditions.push(`oc_date >= $${counter++}`);
+      conditions.push(`(manifest_date AT TIME ZONE 'America/Bogota')::date >= $${counter++}`);
       values.push(fromDate);
     }
     if (toDate) {
-      conditions.push(`oc_date <= $${counter++}`);
+      conditions.push(`(manifest_date AT TIME ZONE 'America/Bogota')::date <= $${counter++}`);
       values.push(toDate);
     }
 
@@ -204,7 +204,7 @@ export const getReports = async (req: Request, res: Response) => {
     const dataQuery = `
       SELECT * FROM management_orders 
       ${whereClause} 
-      ORDER BY oc_date DESC, created_at DESC 
+      ORDER BY manifest_date DESC, created_at DESC 
       LIMIT $${counter++} OFFSET $${counter++}
     `;
     const dataResult = await pool.query(dataQuery, dataValues);

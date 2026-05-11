@@ -753,7 +753,7 @@ export const api = {
   getAuditoriaB36Sobrecostos: (encId: number) =>
     fetchJson(`${API_URL}/ajover-b36/sobrecostos/${encId}`),
 
-  updateAuditoriaB36Planilla: (id: number, data: { valor_flete: number; sobrecostos: any[] }) =>
+  updateAuditoriaB36Planilla: (id: number, data: { valor_flete: number; sobrecostos: any[]; placa?: string; conductor?: string; change_notes?: string }) =>
     fetchJson(`${API_URL}/ajover-b36/planilla/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -762,6 +762,22 @@ export const api = {
 
   deleteAuditoriaB36: (id: number) =>
     fetchJson(`${API_URL}/ajover-b36/encabezado/${id}`, { method: 'DELETE' }),
+
+  addAuditoriaB36Detalle: (data: { id_enca: number; factura: string; volumen?: number; peso?: number; cubicaje?: number; notas?: string; client_id?: string }) =>
+    fetchJson(`${API_URL}/ajover-b36/detalle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  deleteAuditoriaB36Detalle: (id: number, reason?: string) => {
+    const qs = new URLSearchParams();
+    if (reason) qs.set('reason', reason);
+    return fetchJson(`${API_URL}/ajover-b36/detalle/${id}?${qs.toString()}`, { method: 'DELETE' });
+  },
+
+  getAuditoriaB36Logs: (encId: number) =>
+    fetchJson(`${API_URL}/ajover-b36/logs/${encId}`),
 
   // GPS Tracking (Nueva API dedicada)
   updateVehicleLocation: (data: any) => fetchJson(`${API_URL}/locations/update`, {
@@ -987,6 +1003,9 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
+
+  checkReferenceExists: (reference: string) => fetchJson(`${API_URL}/conciliation/check-reference/${encodeURIComponent(reference)}`),
+
 
   saveSobrecostos: (data: { documentId: string, plate: string, items: any[], userId: string }) => fetchJson(`${API_URL}/conciliation/sobrecostos`, {
     method: 'POST',

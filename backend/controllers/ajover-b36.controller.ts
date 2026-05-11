@@ -8,6 +8,7 @@ const ensureTables = async () => {
     CREATE TABLE IF NOT EXISTS ajover_b36_encabezado (
       id          SERIAL PRIMARY KEY,
       os          TEXT,
+      id_viaje    TEXT,
       fecha_carge DATE,
       placa       TEXT,
       conductor   TEXT,
@@ -20,9 +21,15 @@ const ensureTables = async () => {
       valor_flete      NUMERIC DEFAULT 0,
       client_id        TEXT,
       uploaded_by      TEXT,
-      uploaded_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      uploaded_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      inhouse_id       TEXT
     )
   `);
+  await pool.query(`
+    ALTER TABLE ajover_b36_encabezado ADD COLUMN IF NOT EXISTS id_viaje TEXT;
+    ALTER TABLE ajover_b36_encabezado ADD COLUMN IF NOT EXISTS inhouse_id TEXT;
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ajover_b36_detalle (
       id       SERIAL PRIMARY KEY,
@@ -33,6 +40,12 @@ const ensureTables = async () => {
     )
   `);
   await pool.query(`
+    ALTER TABLE ajover_b36_detalle ADD COLUMN IF NOT EXISTS volumen NUMERIC DEFAULT 0;
+    ALTER TABLE ajover_b36_detalle ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;
+    ALTER TABLE ajover_b36_detalle ADD COLUMN IF NOT EXISTS cubicaje NUMERIC DEFAULT 0;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS ajover_b36_sobrecostos (
       id          SERIAL PRIMARY KEY,
       id_enca     INTEGER REFERENCES ajover_b36_encabezado(id) ON DELETE CASCADE,
@@ -42,9 +55,21 @@ const ensureTables = async () => {
     )
   `);
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS ajover_b36_log (
+      id           SERIAL PRIMARY KEY,
+      id_enca      INTEGER REFERENCES ajover_b36_encabezado(id) ON DELETE CASCADE,
+      factura      TEXT,
+      accion       TEXT,
+      observacion  TEXT,
+      usuario      TEXT,
+      fecha        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_b36_enc_client  ON ajover_b36_encabezado (client_id);
     CREATE INDEX IF NOT EXISTS idx_b36_enc_fecha   ON ajover_b36_encabezado (fecha_carge DESC);
     CREATE INDEX IF NOT EXISTS idx_b36_det_id_enca ON ajover_b36_detalle (id_enca);
+    CREATE INDEX IF NOT EXISTS idx_b36_log_id_enca ON ajover_b36_log (id_enca);
   `);
 };
 
@@ -116,13 +141,14 @@ export const uploadAuditoriaB36 = async (req: Request, res: Response) => {
 
         const result = await client.query(`
           INSERT INTO ajover_b36_encabezado
-            (os, fecha_carge, placa, conductor, fecha_programado, cant_clientes,
+            (os, id_viaje, fecha_carge, placa, conductor, fecha_programado, cant_clientes,
              nombre_ruta, coordinador, usuariocontrol, fechacontrol, valor_flete,
-             client_id, uploaded_by, uploaded_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+             client_id, uploaded_by, uploaded_at, inhouse_id)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),$15)
           RETURNING id
         `, [
           r.os          || r['os']           || null,
+          r.id_viaje     || null,
           parseDate(r.fecha_carge || r.fecha_carge || null),
           r.placa        || null,
           r.conductor    || null,
@@ -135,6 +161,7 @@ export const uploadAuditoriaB36 = async (req: Request, res: Response) => {
           parseFloat(String(r.valor_flete || '0').replace(/[^0-9.]/g, '')) || 0,
           clientId,
           uploadedBy,
+          r.inhouse_id   || null,
         ]);
         const encId = result.rows[0].id;
         insertedIds.push(encId);
@@ -162,9 +189,17 @@ export const uploadAuditoriaB36 = async (req: Request, res: Response) => {
           if (!encId) continue;
 
           await client.query(`
-            INSERT INTO ajover_b36_detalle (id_enca, factura, notas, client_id)
-            VALUES ($1, $2, $3, $4)
-          `, [encId, dr.factura || null, dr.notas || null, clientId]);
+            INSERT INTO ajover_b36_detalle (id_enca, factura, notas, volumen, peso, cubicaje, client_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `, [
+            encId, 
+            dr.factura || null, 
+            dr.notas || dr.notes || null, 
+            parseFloat(dr.volumen) || 0, 
+            parseFloat(dr.peso) || 0, 
+            parseFloat(dr.cubicaje) || 0, 
+            clientId
+          ]);
           detInserted++;
         }
       }
@@ -313,8 +348,8 @@ export const exportAllAuditoriaExcel = async (req: Request, res: Response) => {
               u1.name AS inhouse_name,
               u2.name AS creator_name
        FROM ajover_b36_encabezado e
-       LEFT JOIN users u1 ON e.inhouse_id = u1.id
-       LEFT JOIN users u2 ON e.usercreated = u2.id
+       LEFT JOIN users u1 ON e.inhouse_id = u1.id::text OR e.inhouse_id = u1.username
+       LEFT JOIN users u2 ON e.uploaded_by = u2.id::text OR e.uploaded_by = u2.username
        ${where}
        ORDER BY e.uploaded_at DESC, e.id DESC
        LIMIT 2000`,
@@ -399,17 +434,76 @@ export const updatePlanilla = async (req: Request, res: Response) => {
   try {
     await ensureTables();
     const { id } = req.params;
-    const { valor_flete, sobrecostos } = req.body;
+    const { valor_flete, sobrecostos, placa, conductor, change_notes } = req.body;
 
     await client.query('BEGIN');
 
-    // 1. Actualizar el flete del encabezado
+    // Obtener datos actuales para comparar y auditar
+    const currentRes = await client.query(
+      `SELECT placa, conductor, valor_flete FROM ajover_b36_encabezado WHERE id = $1`,
+      [id]
+    );
+    if (currentRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Planilla no encontrada.' });
+    }
+    const current = currentRes.rows[0];
+    const user = (req as any).user?.username || (req as any).user?.email || 'sistema';
+
+    // 1. Obtener valores destino
+    const targetPlaca = placa !== undefined ? String(placa).trim() : current.placa;
+    const targetConductor = conductor !== undefined ? String(conductor).trim() : current.conductor;
+
+    const hasPlacaChanged = targetPlaca !== current.placa;
+    const hasConductorChanged = targetConductor !== current.conductor;
+
+    // 2. Validaciones de Reglas de Negocio
+    if (hasPlacaChanged && !hasConductorChanged) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Si cambia la placa del vehículo, debe obligatoriamente cambiar el conductor.' });
+    }
+
+    if ((hasPlacaChanged || hasConductorChanged) && (!change_notes || !String(change_notes).trim())) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Debe ingresar un motivo o notas para registrar el cambio de placa y/o conductor.' });
+    }
+
+    // 3. Actualizar el flete, placa y conductor del encabezado
     await client.query(
-      `UPDATE ajover_b36_encabezado SET valor_flete = $1 WHERE id = $2`,
-      [valor_flete, id]
+      `UPDATE ajover_b36_encabezado 
+       SET valor_flete = $1, placa = $2, conductor = $3 
+       WHERE id = $4`,
+      [valor_flete, targetPlaca, targetConductor, id]
     );
 
-    // 2. Si se suministra la lista de sobrecostos
+    // 4. Registrar logs de auditoría según corresponda
+    const notes = change_notes && String(change_notes).trim() ? ` Motivo: ${String(change_notes).trim()}` : '';
+    
+    if (hasPlacaChanged) {
+      await client.query(
+        `INSERT INTO ajover_b36_log (id_enca, factura, accion, observacion, usuario)
+         VALUES ($1, NULL, 'CAMBIO_PLACA', $2, $3)`,
+        [id, `Placa cambió de "${current.placa}" a "${targetPlaca}".${notes}`, user]
+      );
+    }
+
+    if (hasConductorChanged) {
+      await client.query(
+        `INSERT INTO ajover_b36_log (id_enca, factura, accion, observacion, usuario)
+         VALUES ($1, NULL, 'CAMBIO_CONDUCTOR', $2, $3)`,
+        [id, `Conductor cambió de "${current.conductor}" a "${targetConductor}".${notes}`, user]
+      );
+    }
+
+    // El flete y sobrecostos se guardan de manera independiente sin requerir notas
+    if (parseFloat(valor_flete) !== parseFloat(current.valor_flete)) {
+      await client.query(
+        `INSERT INTO ajover_b36_log (id_enca, factura, accion, observacion, usuario)
+         VALUES ($1, NULL, 'CAMBIO_FLETE', $2, $3)`,
+        [id, `Valor de flete cambió de $${current.valor_flete} a $${valor_flete}.${notes || ' (Cambio independiente)'}`, user]
+      );
+    }
+
+    // 4. Si se suministra la lista de sobrecostos
     if (Array.isArray(sobrecostos)) {
       const incomingIds = sobrecostos.filter(s => s.id).map(s => s.id);
 
@@ -466,3 +560,97 @@ export const deleteEncabezado = async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// ─── POST /ajover-b36/detalle ─────────────────────────────────────────────────
+export const addDetalle = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { id_enca, factura, volumen, peso, cubicaje, notas, client_id } = req.body;
+    if (!id_enca || !factura) {
+      return res.status(400).json({ error: 'id_enca y factura son requeridos.' });
+    }
+    const result = await pool.query(`
+      INSERT INTO ajover_b36_detalle (id_enca, factura, volumen, peso, cubicaje, notas, client_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `, [
+      id_enca,
+      factura,
+      parseFloat(volumen) || 0,
+      parseFloat(peso) || 0,
+      parseFloat(cubicaje) || 0,
+      notas || null,
+      client_id || null
+    ]);
+
+    // Actualizar cant_clientes en el encabezado
+    await pool.query(`
+      UPDATE ajover_b36_encabezado
+      SET cant_clientes = (SELECT COUNT(*) FROM ajover_b36_detalle WHERE id_enca = $1)
+      WHERE id = $1
+    `, [id_enca]);
+
+    // Registrar log
+    const user = (req as any).user?.username || (req as any).user?.email || 'sistema';
+    await pool.query(`
+      INSERT INTO ajover_b36_log (id_enca, factura, accion, observacion, usuario)
+      VALUES ($1, $2, 'ADICION', $3, $4)
+    `, [id_enca, factura, 'Adición manual de factura', user]);
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── DELETE /ajover-b36/detalle/:id ───────────────────────────────────────────
+export const deleteDetalle = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { id } = req.params;
+    const reason = String(req.query.reason || 'Sin observación');
+
+    const detRes = await pool.query(`SELECT id_enca, factura FROM ajover_b36_detalle WHERE id = $1`, [id]);
+    if (detRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Factura no encontrada.' });
+    }
+    const { id_enca, factura } = detRes.rows[0];
+
+    // Registrar log
+    const user = (req as any).user?.username || (req as any).user?.email || 'sistema';
+    await pool.query(`
+      INSERT INTO ajover_b36_log (id_enca, factura, accion, observacion, usuario)
+      VALUES ($1, $2, 'ELIMINACION', $3, $4)
+    `, [id_enca, factura, reason, user]);
+
+    await pool.query(`DELETE FROM ajover_b36_detalle WHERE id = $1`, [id]);
+
+    // Actualizar cant_clientes en el encabezado
+    await pool.query(`
+      UPDATE ajover_b36_encabezado
+      SET cant_clientes = (SELECT COUNT(*) FROM ajover_b36_detalle WHERE id_enca = $1)
+      WHERE id = $1
+    `, [id_enca]);
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── GET /ajover-b36/logs/:encId ──────────────────────────────────────────────
+export const getLogs = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { encId } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM ajover_b36_log WHERE id_enca = $1 ORDER BY fecha DESC`,
+      [encId]
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+

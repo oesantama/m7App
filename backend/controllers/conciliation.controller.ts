@@ -1596,3 +1596,58 @@ export const getPlateMovementHistory = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET /conciliation/check-reference/:reference ─────────────────────────────
+// Valida si una referencia de pago ya existe en el sistema en individual o grupal.
+export const checkReferenceExists = async (req: Request, res: Response) => {
+    try {
+        const { reference } = req.params;
+        if (!reference || reference.trim() === '') {
+            return res.status(400).json({ success: false, error: 'La referencia es requerida' });
+        }
+
+        const cleanRef = reference.trim();
+
+        const query = `
+            SELECT 
+              'individual' AS type,
+              ic.document_id,
+              ic.invoice_number,
+              ic.vehicle_plate,
+              ic.conductor_name,
+              dl.external_doc_id,
+              ic.valor::text AS valor,
+              ic.fecha_pago::text AS fecha
+            FROM invoice_conciliations ic
+            LEFT JOIN documents_l dl ON dl.id::text = ic.document_id::text OR dl.external_doc_id = ic.document_id
+            WHERE TRIM(UPPER(ic.comprobante)) = TRIM(UPPER($1))
+
+            UNION ALL
+
+            SELECT 
+              'grupal' AS type,
+              rgp.document_id,
+              NULL AS invoice_number,
+              rgp.plate AS vehicle_plate,
+              NULL AS conductor_name,
+              dl.external_doc_id,
+              rgp.valor::text AS valor,
+              rgp.fecha::text AS fecha
+            FROM route_group_payments rgp
+            LEFT JOIN documents_l dl ON dl.id::text = rgp.document_id::text OR dl.external_doc_id = rgp.document_id
+            WHERE TRIM(UPPER(rgp.referencia)) = TRIM(UPPER($1))
+        `;
+
+        const result = await pool.query(query, [cleanRef]);
+
+        res.json({ 
+            success: true, 
+            exists: result.rows.length > 0, 
+            data: result.rows 
+        });
+    } catch (err: any) {
+        console.error('[CONCILIATION] checkReferenceExists error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+

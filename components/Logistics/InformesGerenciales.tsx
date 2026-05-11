@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, X, Search, Calendar, Filter, 
   CheckCircle2, RefreshCw, ChevronLeft, ChevronRight, 
-  FileSpreadsheet, HelpCircle, BarChart3, ChevronDown
+  FileSpreadsheet, HelpCircle, BarChart3, ChevronDown, AlertCircle,
+  Download, Eye, Truck
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 
 interface ManagementOrder {
   oc_number: string;
@@ -79,7 +80,12 @@ export const InformesGerenciales: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'informes' | 'consultas' | 'cargar'>('informes');
 
   // Sub-reports tab: 'estados' | 'clientes'
-  const [subReportTab, setSubReportTab] = useState<'estados' | 'clientes'>('estados');
+  const [subReportTab, setSubReportTab] = useState<'estados' | 'clientes' | 'tdmVentas'>('estados');
+  const [rightChartLimit, setRightChartLimit] = useState<'top10' | 'all'>('top10');
+  const [rightChartGroupBy, setRightChartGroupBy] = useState<'oc' | 'manifiesto'>('manifiesto');
+  const [tdmSearchQuery, setTdmSearchQuery] = useState('');
+  const [tdmSortField, setTdmSortField] = useState<'clientName' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int' | 'participation' | 'invoicedSameMonthVal' | 'invoicedSameMonthPct' | 'averagePaymentDays'>('ventaTotal');
+  const [tdmSortDirection, setTdmSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // DB Records state
   const [records, setRecords] = useState<ManagementOrder[]>([]);
@@ -102,6 +108,10 @@ export const InformesGerenciales: React.FC = () => {
 
   // Excel parsing & upload states
   const [excelData, setExcelData] = useState<any[]>([]);
+  const [selectedClientForVehiclesInt, setSelectedClientForVehiclesInt] = useState<string | null>(null);
+  const [vehiclesSearchQuery, setVehiclesSearchQuery] = useState('');
+  const [vehiclesSortField, setVehiclesSortField] = useState<'plate' | 'manifestCount' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int'>('ventaTotal');
+  const [vehiclesSortDirection, setVehiclesSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,6 +122,8 @@ export const InformesGerenciales: React.FC = () => {
   const [reportData, setReportData] = useState<{ [ocStatus: string]: HierarchicalReportNode }>({});
   const [clientReportData, setClientReportData] = useState<{ [clientName: string]: ClientPlateNode }>({});
   const [reportLoading, setReportLoading] = useState(false);
+  const [reportRecords, setReportRecords] = useState<ManagementOrder[]>([]);
+  const [selectedClientChartName, setSelectedClientChartName] = useState<string | null>(null);
 
   // Expanded tree states
   const [expandedOcs, setExpandedOcs] = useState<{ [key: string]: boolean }>({});
@@ -230,6 +242,7 @@ export const InformesGerenciales: React.FC = () => {
 
       setReportData(tree);
       setClientReportData(clientTree);
+      setReportRecords(recordsList);
       
       // Auto-expand Level 1 and Level 2 nodes on initial generation
       const initialOcs: { [key: string]: boolean } = {};
@@ -360,7 +373,40 @@ export const InformesGerenciales: React.FC = () => {
           return;
         }
 
-        const firstRow = rawJson[0] as any;
+        // Apply custom TDM TRANSPORTES S.A.S clients mapping logic before displaying/storing
+        const transformedJson = rawJson.map((row: any) => {
+          const clientKey = Object.keys(row).find(k => k.toLowerCase() === 'nombre cliente' || k.toLowerCase() === 'clientname') || 'Nombre Cliente';
+          const origenKey = Object.keys(row).find(k => k.toLowerCase() === 'origen') || 'Origen';
+          const descKey = Object.keys(row).find(k => k.toLowerCase() === 'descripcion cxc' || k.toLowerCase() === 'descripcion_cxc' || k.toLowerCase().replace(/ó/g, 'o') === 'descripcion cxc') || 'Descripción CXC';
+
+          let clientName = String(row[clientKey] || '').trim();
+          const origenVal = String(row[origenKey] || '').trim();
+          const descVal = String(row[descKey] || '').trim();
+
+          if (clientName.toUpperCase() === 'TDM TRANSPORTES S.A.S') {
+            const originUpper = origenVal.toUpperCase();
+            const descLower = descVal.toLowerCase();
+
+            if (originUpper === 'CALI') {
+              clientName = 'TDM (DIANA - CALI)';
+            } else if (originUpper === 'GIRARDOTA') {
+              clientName = 'TDM (PREBEL)';
+            } else if (originUpper === 'LA ESTRELLA') {
+              if (descLower.includes('plan normal medellin')) {
+                clientName = 'TDM (MULAS - MEDELLIN)';
+              } else {
+                clientName = 'TDM (BOG 10 - MEDELLIN)';
+              }
+            }
+            
+            row[clientKey] = clientName;
+            row['Nombre Cliente'] = clientName;
+            row.clientName = clientName;
+          }
+          return row;
+        });
+
+        const firstRow = transformedJson[0] as any;
         const keys = Object.keys(firstRow);
         const hasOcKey = keys.some(k => k.toLowerCase().replace(/ú/g, 'u').includes('numero oc') || k.toLowerCase().includes('ocnumber'));
 
@@ -369,7 +415,7 @@ export const InformesGerenciales: React.FC = () => {
           return;
         }
 
-        setExcelData(rawJson);
+        setExcelData(transformedJson);
         toast.success(`Archivo cargado: ${rawJson.length} filas detectadas para previsualizar.`);
       } catch (err: any) {
         console.error('[M7-PARSE-EXCEL-ERR]', err);
@@ -443,21 +489,64 @@ export const InformesGerenciales: React.FC = () => {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(num);
   };
 
-  // Helper to format dates cleanly as DD/MM/YYYY HH:MM:SS
+  // Helper to format dates cleanly as DD/MM/YYYY strictly in America/Bogota timezone
+  const formatColombianDateStr = (val: any): string => {
+    if (!val) return '';
+    const parsed = parseCustomDate(val);
+    if (!parsed) return String(val);
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Bogota',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const parts = formatter.formatToParts(parsed);
+      const year = parts.find(p => p.type === 'year')?.value || '';
+      const month = parts.find(p => p.type === 'month')?.value || '';
+      const day = parts.find(p => p.type === 'day')?.value || '';
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      return String(val);
+    }
+  };
+
+  // Helper to format dates cleanly as DD/MM/YYYY HH:MM:SS strictly in America/Bogota timezone
   const formatDate = (val: any) => {
     if (!val) return 'S/I';
     const parsed = parseCustomDate(val);
     if (!parsed) return String(val);
 
-    const day = String(parsed.getDate()).padStart(2, '0');
-    const month = String(parsed.getMonth() + 1).padStart(2, '0');
-    const year = parsed.getFullYear();
-    
-    const hh = String(parsed.getHours()).padStart(2, '0');
-    const mm = String(parsed.getMinutes()).padStart(2, '0');
-    const ss = String(parsed.getSeconds()).padStart(2, '0');
-    
-    return `${day}/${month}/${year} ${hh}:${mm}:${ss}`;
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Bogota',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(parsed);
+      const year = parts.find(p => p.type === 'year')?.value || '';
+      const month = parts.find(p => p.type === 'month')?.value || '';
+      const day = parts.find(p => p.type === 'day')?.value || '';
+      const hour = parts.find(p => p.type === 'hour')?.value || '00';
+      const minute = parts.find(p => p.type === 'minute')?.value || '00';
+      const second = parts.find(p => p.type === 'second')?.value || '00';
+      return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+    } catch (e) {
+      const day = String(parsed.getDate()).padStart(2, '0');
+      const month = String(parsed.getMonth() + 1).padStart(2, '0');
+      const year = parsed.getFullYear();
+      
+      const hh = String(parsed.getHours()).padStart(2, '0');
+      const mm = String(parsed.getMinutes()).padStart(2, '0');
+      const ss = String(parsed.getSeconds()).padStart(2, '0');
+      
+      return `${day}/${month}/${year} ${hh}:${mm}:${ss}`;
+    }
   };
 
   // SheetJS Export to Excel implementation
@@ -534,6 +623,477 @@ export const InformesGerenciales: React.FC = () => {
     const othersVal = sorted.slice(4).reduce((sum, curr) => sum + curr.value, 0);
     top.push({ name: 'OTROS CLIENTES', value: othersVal });
     return top;
+  };
+
+  const getOcBarDataByMonth = () => {
+    const monthsMap: { [monthKey: string]: { [status: string]: number; sortKey: number } } = {};
+    const allStatuses = new Set<string>();
+    
+    const MONTHS_SPANISH = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    reportRecords.forEach(r => {
+      const parsed = parseCustomDate(r.manifest_date);
+      if (!parsed) return;
+      
+      const year = parsed.getFullYear();
+      const monthIndex = parsed.getMonth();
+      const monthName = MONTHS_SPANISH[monthIndex];
+      const monthStr = `${monthName} ${year}`;
+      const sortKey = year * 12 + monthIndex;
+
+      const status = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I';
+      allStatuses.add(status);
+
+      if (!monthsMap[monthStr]) {
+        monthsMap[monthStr] = { sortKey };
+      }
+      if (!monthsMap[monthStr][status]) {
+        monthsMap[monthStr][status] = 0;
+      }
+      monthsMap[monthStr][status]++;
+    });
+
+    const sortedMonths = Object.keys(monthsMap).sort((a, b) => monthsMap[a].sortKey - monthsMap[b].sortKey);
+
+    return {
+      data: sortedMonths.map(monthStr => {
+        const obj: any = { month: monthStr };
+        allStatuses.forEach(st => {
+          obj[st] = monthsMap[monthStr][st] || 0;
+        });
+        return obj;
+      }),
+      statuses: Array.from(allStatuses)
+    };
+  };
+
+  const getDynamicClientBarData = (groupBy: 'oc' | 'manifiesto', limitMode: 'top10' | 'all') => {
+    const clientsMap: { [clientName: string]: { [status: string]: number; totalCount: number } } = {};
+    const allStatuses = new Set<string>();
+
+    reportRecords.forEach(r => {
+      const client = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
+      const status = groupBy === 'oc'
+        ? (r.oc_status ? String(r.oc_status).trim().toUpperCase() : 'S/I')
+        : (r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I');
+
+      allStatuses.add(status);
+
+      if (!clientsMap[client]) {
+        clientsMap[client] = { totalCount: 0 };
+      }
+      if (!clientsMap[client][status]) {
+        clientsMap[client][status] = 0;
+      }
+      clientsMap[client][status]++;
+      clientsMap[client].totalCount++;
+    });
+
+    let clientList = Object.keys(clientsMap).map(client => ({
+      client,
+      totalCount: clientsMap[client].totalCount,
+      ...clientsMap[client]
+    })).sort((a, b) => b.totalCount - a.totalCount);
+
+    if (limitMode === 'top10') {
+      clientList = clientList.slice(0, 10);
+    }
+
+    // Map to recharts data format
+    const chartData = clientList.map(item => {
+      const obj: any = { client: item.client };
+      allStatuses.forEach(st => {
+        obj[st] = item[st] || 0;
+      });
+      return obj;
+    });
+
+    return {
+      data: chartData,
+      statuses: Array.from(allStatuses)
+    };
+  };
+
+  const parseValNum = (val: any): number => {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return val;
+    const clean = String(val).replace(/[^0-9.-]/g, '');
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const getClientTdmTableData = () => {
+    const clientsMap: { 
+      [clientName: string]: { 
+        ventaTotal: number; 
+        ingTerceros: number; 
+        vehicles: Set<string>; 
+        workedDates: Set<string>;
+        vehicleDays: Set<string>;
+        invoicedSameMonth: number;
+        totalPaymentDays: number;
+        paymentDaysCount: number;
+      } 
+    } = {};
+
+    reportRecords.forEach(r => {
+      const manifestStatus = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : '';
+      if (manifestStatus === 'ANULADO' || manifestStatus === 'ANULADA') {
+        return;
+      }
+
+      const client = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
+
+      const cxc = parseValNum(r.total_cxc);
+      const cxcFinal = parseValNum(r.total_value_cxc_final);
+      const ventaRecord = cxc === 0 ? cxcFinal : cxc;
+
+      const ingTercerosRecord = parseValNum(r.total_value_cxp_final);
+
+      const plate = r.plate ? String(r.plate).trim().toUpperCase() : '';
+      const date = r.manifest_date ? String(r.manifest_date).trim() : '';
+
+      if (!clientsMap[client]) {
+        clientsMap[client] = {
+          ventaTotal: 0,
+          ingTerceros: 0,
+          vehicles: new Set<string>(),
+          workedDates: new Set<string>(),
+          vehicleDays: new Set<string>(),
+          invoicedSameMonth: 0,
+          totalPaymentDays: 0,
+          paymentDaysCount: 0
+        };
+      }
+
+      clientsMap[client].ventaTotal += ventaRecord;
+      clientsMap[client].ingTerceros += ingTercerosRecord;
+
+      // Calculate same month invoicing & payment speed days
+      let invoicedInSameMonth = 0;
+      const dMan = parseCustomDate(r.manifest_date);
+      const dInv = parseCustomDate(r.invoice_date);
+
+      if (dMan && dInv) {
+        const diffMs = dInv.getTime() - dMan.getTime();
+        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+        clientsMap[client].totalPaymentDays += diffDays;
+        clientsMap[client].paymentDaysCount += 1;
+
+        const hasInvoice = r.invoice_cxc && String(r.invoice_cxc).trim() !== '' && String(r.invoice_cxc).trim() !== '0';
+        if (hasInvoice) {
+          if (dMan.getFullYear() === dInv.getFullYear() && dMan.getMonth() === dInv.getMonth()) {
+            invoicedInSameMonth = ventaRecord;
+          }
+        }
+      }
+      clientsMap[client].invoicedSameMonth += invoicedInSameMonth;
+
+      if (plate) {
+        clientsMap[client].vehicles.add(plate);
+      }
+      if (date) {
+        clientsMap[client].workedDates.add(date);
+        if (plate) {
+          clientsMap[client].vehicleDays.add(`${plate}_${date}`);
+        }
+      }
+    });
+
+    // Calculate total sales of all clients combined
+    let grandTotalSales = 0;
+    Object.values(clientsMap).forEach(node => {
+      grandTotalSales += node.ventaTotal;
+    });
+
+    return Object.keys(clientsMap).map(clientName => {
+      const node = clientsMap[clientName];
+      const ventaTotal = node.ventaTotal;
+      const ingTerceros = node.ingTerceros;
+      const ingresosPropios = ventaTotal - ingTerceros;
+      const int = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
+      const vehiculosCount = node.vehicles.size;
+      const workedDaysCount = node.workedDates.size;
+      const totalVehicleUtilizations = node.vehicleDays.size;
+      const averageVehiclesPerDay = workedDaysCount > 0 ? totalVehicleUtilizations / workedDaysCount : 0;
+      const participation = grandTotalSales > 0 ? (ventaTotal / grandTotalSales) * 100 : 0;
+      
+      const invoicedSameMonthVal = node.invoicedSameMonth;
+      const invoicedSameMonthPct = ventaTotal > 0 ? (invoicedSameMonthVal / ventaTotal) * 100 : 0;
+
+      const averagePaymentDays = node.paymentDaysCount > 0 ? node.totalPaymentDays / node.paymentDaysCount : 0;
+
+      return {
+        clientName,
+        ventaTotal,
+        ingTerceros,
+        ingresosPropios,
+        int,
+        vehiculosCount,
+        uniquePlates: node.vehicles,
+        workedDaysCount,
+        totalVehicleUtilizations,
+        averageVehiclesPerDay,
+        workedDates: node.workedDates,
+        vehicleDays: node.vehicleDays,
+        participation,
+        invoicedSameMonthVal,
+        invoicedSameMonthPct,
+        averagePaymentDays,
+        totalPaymentDays: node.totalPaymentDays,
+        paymentDaysCount: node.paymentDaysCount
+      };
+    }).sort((a, b) => {
+      const valA = a[tdmSortField];
+      const valB = b[tdmSortField];
+      
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return tdmSortDirection === 'asc' 
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      } else {
+        return tdmSortDirection === 'asc'
+          ? (valA as number) - (valB as number)
+          : (valB as number) - (valA as number);
+      }
+    });
+  };
+
+  // Calculation for vehicle INT detail of the selected client
+  const getVehiclesIntDetails = () => {
+    if (!selectedClientForVehiclesInt) return [];
+
+    const targetClient = selectedClientForVehiclesInt.toUpperCase();
+    const platesMap: {
+      [plate: string]: {
+        plate: string;
+        ventaTotal: number;
+        ingTerceros: number;
+        manifestCount: number;
+      }
+    } = {};
+
+    reportRecords.forEach(r => {
+      const manifestStatus = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : '';
+      if (manifestStatus === 'ANULADO' || manifestStatus === 'ANULADA') {
+        return;
+      }
+
+      const client = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
+      if (client !== targetClient) {
+        return;
+      }
+
+      const plate = r.plate ? String(r.plate).trim().toUpperCase() : 'SIN PLACA';
+
+      const cxc = parseValNum(r.total_cxc);
+      const cxcFinal = parseValNum(r.total_value_cxc_final);
+      const ventaRecord = cxc === 0 ? cxcFinal : cxc;
+
+      const ingTercerosRecord = parseValNum(r.total_value_cxp_final);
+
+      if (!platesMap[plate]) {
+        platesMap[plate] = {
+          plate,
+          ventaTotal: 0,
+          ingTerceros: 0,
+          manifestCount: 0
+        };
+      }
+
+      platesMap[plate].ventaTotal += ventaRecord;
+      platesMap[plate].ingTerceros += ingTercerosRecord;
+      platesMap[plate].manifestCount += 1;
+    });
+
+    const rawPlates = Object.values(platesMap).map(p => {
+      const ingresosPropios = p.ventaTotal - p.ingTerceros;
+      const int = p.ventaTotal > 0 ? (ingresosPropios / p.ventaTotal) * 100 : 0;
+      return {
+        ...p,
+        ingresosPropios,
+        int
+      };
+    });
+
+    const filtered = vehiclesSearchQuery.trim() === ''
+      ? rawPlates
+      : rawPlates.filter(p => p.plate.toLowerCase().includes(vehiclesSearchQuery.toLowerCase()));
+
+    return filtered.sort((a, b) => {
+      const valA = a[vehiclesSortField];
+      const valB = b[vehiclesSortField];
+      
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return vehiclesSortDirection === 'asc' 
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      } else {
+        return vehiclesSortDirection === 'asc'
+          ? (valA as number) - (valB as number)
+          : (valB as number) - (valA as number);
+      }
+    });
+  };
+
+  const exportTdmToExcel = () => {
+    try {
+      const tdmTableData = getClientTdmTableData();
+      
+      // Sheet 1: Resumen Ventas TDM (with real numbers)
+      const summaryRows = tdmTableData.map(row => ({
+        "CLIENTE": row.clientName,
+        "VENTA": row.ventaTotal,
+        "ING TERCEROS": row.ingTerceros,
+        "INGRESOS PROPIOS": row.ingresosPropios,
+        "INT (%)": Math.round(row.int * 10) / 10,
+        "PARTICIPACIÓN (%)": Math.round(row.participation),
+        "FACT. MISMO MES": row.invoicedSameMonthVal,
+        "% FACT. MISMO MES": Math.round(row.invoicedSameMonthPct * 10) / 10,
+        "PROM DÍA PAGO (DÍAS)": Math.round(row.averagePaymentDays * 10) / 10,
+        "DÍAS LABORADOS": row.workedDaysCount,
+        "VEHÍCULOS UTILIZADOS": row.totalVehicleUtilizations,
+        "PROMEDIO DÍA": Math.round(row.averageVehiclesPerDay * 10) / 10
+      }));
+
+      // Calculate totals for summary
+      const totalVenta = tdmTableData.reduce((sum, item) => sum + item.ventaTotal, 0);
+      const totalIngTerceros = tdmTableData.reduce((sum, item) => sum + item.ingTerceros, 0);
+      const totalIngresosPropios = tdmTableData.reduce((sum, item) => sum + item.ingresosPropios, 0);
+      const overallInt = totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0;
+      
+      const totalInvoicedSameMonth = tdmTableData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
+      const overallInvoicedSameMonthPct = totalVenta > 0 ? (totalInvoicedSameMonth / totalVenta) * 100 : 0;
+
+      const totalPaymentDaysVal = tdmTableData.reduce((sum, item) => sum + item.totalPaymentDays, 0);
+      const totalPaymentDaysCount = tdmTableData.reduce((sum, item) => sum + item.paymentDaysCount, 0);
+      const overallAveragePaymentDays = totalPaymentDaysCount > 0 ? totalPaymentDaysVal / totalPaymentDaysCount : 0;
+
+      const allPlates = new Set<string>();
+      const allDates = new Set<string>();
+      const allVehicleDays = new Set<string>();
+
+      tdmTableData.forEach(item => {
+        item.uniquePlates.forEach(p => allPlates.add(p));
+        item.workedDates.forEach(d => allDates.add(d));
+        item.vehicleDays.forEach(vd => allVehicleDays.add(vd));
+      });
+
+      const totalWorkedDays = allDates.size;
+      const totalVehicleDaysCount = allVehicleDays.size;
+      const totalAvgVehiclesPerDay = totalWorkedDays > 0 ? totalVehicleDaysCount / totalWorkedDays : 0;
+
+      summaryRows.push({
+        "CLIENTE": "TOTAL GENERAL",
+        "VENTA": totalVenta,
+        "ING TERCEROS": totalIngTerceros,
+        "INGRESOS PROPIOS": totalIngresosPropios,
+        "INT (%)": Math.round(overallInt * 10) / 10,
+        "PARTICIPACIÓN (%)": 100,
+        "FACT. MISMO MES": totalInvoicedSameMonth,
+        "% FACT. MISMO MES": Math.round(overallInvoicedSameMonthPct * 10) / 10,
+        "PROM DÍA PAGO (DÍAS)": Math.round(overallAveragePaymentDays * 10) / 10,
+        "DÍAS LABORADOS": totalWorkedDays,
+        "VEHÍCULOS UTILIZADOS": totalVehicleDaysCount,
+        "PROMEDIO DÍA": Math.round(totalAvgVehiclesPerDay * 10) / 10
+      });
+
+      const worksheetSummary = XLSX.utils.json_to_sheet(summaryRows);
+
+      // Sheet 2: Detalle Transacciones (exclude ANULADO)
+      const detailRecords = reportRecords.filter(r => {
+        const st = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : '';
+        return st !== 'ANULADO' && st !== 'ANULADA';
+      });
+
+      const detailRows = detailRecords.map(r => ({
+        "ORDEN DE COMPRA": r.oc_number || '',
+        "MANIFIESTO": r.manifest_number || '',
+        "FECHA MANIFIESTO": formatColombianDateStr(r.manifest_date),
+        "ESTADO MANIFIESTO": r.manifest_status || '',
+        "CLIENTE": r.client_name || '',
+        "TOTAL CXC": parseValNum(r.total_cxc),
+        "VALOR TOTAL CXC FINAL": parseValNum(r.total_value_cxc_final),
+        "VALOR TOT CXP FINAL": parseValNum(r.total_value_cxp_final),
+        "PLACA": r.plate || '',
+        "CONDUCTOR": r.driver_name || ''
+      }));
+
+      const worksheetDetail = XLSX.utils.json_to_sheet(detailRows);
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheetSummary, "Resumen Ventas TDM");
+      XLSX.utils.book_append_sheet(workbook, worksheetDetail, "Detalle Transacciones");
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `Resumen_Ventas_100_TDM_${dateStr}.xlsx`);
+      toast.success('Reporte Excel de Ventas TDM descargado con éxito.');
+    } catch (err) {
+      console.error('[EXPORT-TDM-XLSX-ERR]', err);
+      toast.error('Hubo un error al exportar el reporte a Excel.');
+    }
+  };
+
+  const handleTdmSort = (field: typeof tdmSortField) => {
+    if (tdmSortField === field) {
+      setTdmSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setTdmSortField(field);
+      setTdmSortDirection('desc');
+    }
+  };
+
+  const handleVehiclesSort = (field: typeof vehiclesSortField) => {
+    if (vehiclesSortField === field) {
+      setVehiclesSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setVehiclesSortField(field);
+      setVehiclesSortDirection('desc');
+    }
+  };
+
+  const exportVehiclesToExcel = () => {
+    try {
+      if (!selectedClientForVehiclesInt) return;
+
+      const vehiclesData = getVehiclesIntDetails();
+      const exportRows = vehiclesData.map(v => ({
+        "PLACA / VEHÍCULO": v.plate,
+        "CANTIDAD MANIFIESTOS": v.manifestCount,
+        "VALOR CXC CXP INICIAL (VENTA)": v.ventaTotal,
+        "ING TERCEROS": v.ingTerceros,
+        "INGRESOS PROPIOS": v.ingresosPropios,
+        "INT (%)": Math.round(v.int * 10) / 10
+      }));
+
+      // Calculate totals
+      const totalVentas = vehiclesData.reduce((sum, item) => sum + item.ventaTotal, 0);
+      const totalIngTerceros = vehiclesData.reduce((sum, item) => sum + item.ingTerceros, 0);
+      const totalIngresosPropios = vehiclesData.reduce((sum, item) => sum + item.ingresosPropios, 0);
+      const overallInt = totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0;
+      const totalManifests = vehiclesData.reduce((sum, item) => sum + item.manifestCount, 0);
+
+      exportRows.push({
+        "PLACA / VEHÍCULO": "TOTAL GENERAL",
+        "CANTIDAD MANIFIESTOS": totalManifests,
+        "VALOR CXC CXP INICIAL (VENTA)": totalVentas,
+        "ING TERCEROS": totalIngTerceros,
+        "INGRESOS PROPIOS": totalIngresosPropios,
+        "INT (%)": Math.round(overallInt * 10) / 10
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Vehículos INT");
+      XLSX.writeFile(workbook, `Vehiculos_INT_${selectedClientForVehiclesInt.replace(/\s+/g, '_')}.xlsx`);
+      toast.success('Detalle de vehículos exportado con éxito.');
+    } catch (err) {
+      console.error('[EXPORT-VEHICLES-XLSX-ERR]', err);
+      toast.error('Hubo un error al exportar el detalle a Excel.');
+    }
   };
 
   return (
@@ -706,7 +1266,7 @@ export const InformesGerenciales: React.FC = () => {
           <div className="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex flex-col space-y-1">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha Desde (OC) <span className="text-red-500">*</span></span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha Desde (MANIFIESTO) <span className="text-red-500">*</span></span>
                 <input 
                   type="date"
                   value={reportFromDate}
@@ -716,7 +1276,7 @@ export const InformesGerenciales: React.FC = () => {
               </div>
 
               <div className="flex flex-col space-y-1">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha Hasta (OC) <span className="text-red-500">*</span></span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha Hasta (MANIFIESTO) <span className="text-red-500">*</span></span>
                 <input 
                   type="date"
                   value={reportToDate}
@@ -779,79 +1339,293 @@ export const InformesGerenciales: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              
-              {/* PROFESSIONAL PIE CHARTS ROW (Side-by-side on desktop) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                {/* Chart 1: Estado OC distribution */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
-                  <div className="border-b border-slate-100 pb-3 mb-4">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Distribución de Órdenes por Estado de OC</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                      <Pie
-                        data={getOcPieData()}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {getOcPieData().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '11px' }} 
-                        itemStyle={{ color: '#fff' }}
-                      />
-                      <Legend 
-                        verticalAlign="bottom" 
-                        height={36} 
-                        iconType="circle"
-                        formatter={(value) => <span className="text-[9px] font-black text-slate-500 uppercase">{value}</span>}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
+              {(() => {
+                const ocBarData = getOcBarDataByMonth();
+                const clientBarData = getDynamicClientBarData(rightChartGroupBy, rightChartLimit);
+                return (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* Chart 1: Estado Manifiesto distribution (Grouped by Month) */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col">
+                      <div className="border-b border-slate-100 pb-3 mb-3">
+                        <span className="text-[9px] font-black tracking-widest text-indigo-600 uppercase font-mono">Volúmenes Mensuales</span>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO POR MES - Total: {reportRecords.length.toLocaleString()}</h3>
+                      </div>
 
-                {/* Chart 2: Client distribution */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
-                  <div className="border-b border-slate-100 pb-3 mb-4">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Distribución de Volumen por Nombre de Cliente</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                      <Pie
-                        data={getClientPieData()}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {getClientPieData().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '11px' }} 
-                        itemStyle={{ color: '#fff' }}
-                      />
-                      <Legend 
-                        verticalAlign="bottom" 
-                        height={36} 
-                        iconType="circle"
-                        formatter={(value) => <span className="text-[9px] font-black text-slate-500 uppercase">{value}</span>}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
+                      {/* Dynamic Title Badges for Left Chart */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {(() => {
+                          const totals: { [st: string]: number } = {};
+                          let grandTotal = 0;
+                          reportRecords.forEach(r => {
+                            const st = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I';
+                            totals[st] = (totals[st] || 0) + 1;
+                            grandTotal++;
+                          });
+                          return Object.entries(totals).map(([status, count]) => {
+                            const pct = grandTotal > 0 ? ((count / grandTotal) * 100).toFixed(1) : '0.0';
+                            return (
+                              <div key={status} className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 rounded-lg text-[9px] font-black uppercase font-mono flex items-center gap-1.5 shadow-xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                <span className="text-slate-500">{status}:</span>
+                                <span className="text-indigo-600">{count.toLocaleString()} ({pct}%)</span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
 
-              </div>
+                      <ResponsiveContainer width="100%" height={260}>
+                        <BarChart data={ocBarData.data} margin={{ top: 15 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="month" stroke="#94a3b8" fontSize={9} tickLine={false} />
+                          <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '10px' }} 
+                            itemStyle={{ color: '#fff' }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36} 
+                            iconType="circle"
+                            formatter={(value) => <span className="text-[9px] font-black text-slate-500 uppercase">{value}</span>}
+                          />
+                          {ocBarData.statuses.map((status, index) => (
+                            <Bar key={status} dataKey={status} fill={CHART_COLORS[index % CHART_COLORS.length]} radius={[4, 4, 0, 0]}>
+                              <LabelList dataKey={status} position="top" fill="#475569" fontSize={8} fontWeight="bold" formatter={(val) => val > 0 ? val : ''} />
+                            </Bar>
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Chart 2: States per Client */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm overflow-hidden flex flex-col">
+                      <div className="border-b border-slate-100 pb-3 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-[9px] font-black tracking-widest text-violet-600 uppercase font-mono">Volúmenes de Clientes</span>
+                          <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO por Cliente - Total: {reportRecords.length.toLocaleString()}</h3>
+                        </div>
+                        
+                        {/* Interactive Dimension & limit Switchers */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 shadow-xs">
+                            <button
+                              type="button"
+                              onClick={() => setRightChartGroupBy('manifiesto')}
+                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
+                                rightChartGroupBy === 'manifiesto' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              Manifiesto
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRightChartGroupBy('oc')}
+                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
+                                rightChartGroupBy === 'oc' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              OC
+                            </button>
+                          </div>
+
+                          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 shadow-xs">
+                            <button
+                              type="button"
+                              onClick={() => setRightChartLimit('top10')}
+                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
+                                rightChartLimit === 'top10' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              Top 10
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRightChartLimit('all')}
+                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
+                                rightChartLimit === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              Todos
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dynamic Title Badges for Right Chart */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {(() => {
+                          const totals: { [st: string]: number } = {};
+                          let grandTotal = 0;
+                          reportRecords.forEach(r => {
+                            const st = rightChartGroupBy === 'oc'
+                              ? (r.oc_status ? String(r.oc_status).trim().toUpperCase() : 'S/I')
+                              : (r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I');
+                            totals[st] = (totals[st] || 0) + 1;
+                            grandTotal++;
+                          });
+                          return Object.entries(totals).map(([status, count]) => {
+                            const pct = grandTotal > 0 ? ((count / grandTotal) * 100).toFixed(1) : '0.0';
+                            return (
+                              <div key={status} className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 rounded-lg text-[9px] font-black uppercase font-mono flex items-center gap-1.5 shadow-xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+                                <span className="text-slate-500">{status}:</span>
+                                <span className="text-violet-600">{count.toLocaleString()} ({pct}%)</span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+
+                      <div className="flex-1 overflow-x-auto">
+                        <div className={`${rightChartLimit === 'all' ? 'min-w-[2000px]' : 'w-full'} h-[280px]`}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              data={clientBarData.data} 
+                              margin={{ bottom: 45 }}
+                              onClick={(state) => {
+                                if (state && state.activeLabel) {
+                                  setSelectedClientChartName(state.activeLabel);
+                                }
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis dataKey="client" stroke="#94a3b8" fontSize={8} tickLine={false} angle={-35} textAnchor="end" interval={0} style={{ cursor: 'pointer' }} />
+                              <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+                              <Tooltip 
+                                contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '10px' }} 
+                                itemStyle={{ color: '#fff' }}
+                              />
+                              <Legend 
+                                verticalAlign="top" 
+                                height={36} 
+                                iconType="circle"
+                                formatter={(value) => <span className="text-[9px] font-black text-slate-500 uppercase">{value}</span>}
+                              />
+                              {clientBarData.statuses.map((status, index) => (
+                                <Bar 
+                                  key={status} 
+                                  dataKey={status} 
+                                  fill={CHART_COLORS[index % CHART_COLORS.length]} 
+                                  stackId="a"
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <LabelList dataKey={status} position="inside" fill="#fff" fontSize={8} fontWeight="black" formatter={(val) => val > 0 ? val : ''} />
+                                </Bar>
+                              ))}
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Interactive Legend/Details Panel when a client is clicked */}
+                  {selectedClientChartName && (
+                    <div className="border border-violet-100 bg-violet-50/30 rounded-2xl p-6 shadow-sm animate-fadeIn">
+                      <div className="flex items-center justify-between border-b border-violet-100 pb-3 mb-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 bg-violet-600 text-white rounded-xl shadow-xs">
+                            <FileSpreadsheet size={18} />
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-bold tracking-widest text-violet-600 uppercase font-mono">Detalle de Cliente Seleccionado</span>
+                            <h4 className="text-sm font-black uppercase text-slate-800">{selectedClientChartName}</h4>
+                          </div>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setSelectedClientChartName(null)}
+                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all text-xs font-bold font-mono"
+                        >
+                          CERRAR ✕
+                        </button>
+                      </div>
+
+                      {/* Financial and Operating TDM Metrics (Sleek Grid) */}
+                      {(() => {
+                        const clientTdmData = getClientTdmTableData().find(
+                          x => x.clientName === selectedClientChartName
+                        );
+                        
+                        // Filter client's records for active statuses
+                        const clientRecords = reportRecords.filter(
+                          r => r.client_name?.trim().toUpperCase() === selectedClientChartName
+                        );
+                        
+                        const clientStatusTotals: { [st: string]: number } = {};
+                        clientRecords.forEach(r => {
+                          const st = rightChartGroupBy === 'oc'
+                            ? (r.oc_status ? String(r.oc_status).trim().toUpperCase() : 'S/I')
+                            : (r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I');
+                          clientStatusTotals[st] = (clientStatusTotals[st] || 0) + 1;
+                        });
+
+                        return (
+                          <div className="flex flex-col gap-5">
+                            {/* Metrics Row */}
+                            {clientTdmData ? (
+                              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Venta Total</span>
+                                  <span className="text-xs font-black text-slate-800 block mt-0.5">{formatMoney(clientTdmData.ventaTotal)}</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Ing. Terceros</span>
+                                  <span className="text-xs font-black text-rose-600 block mt-0.5">{formatMoney(clientTdmData.ingTerceros)}</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Ing. Propios</span>
+                                  <span className="text-xs font-black text-emerald-600 block mt-0.5">{formatMoney(clientTdmData.ingresosPropios)}</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">INT (%)</span>
+                                  <span className="text-xs font-black text-indigo-600 block mt-0.5">{clientTdmData.int.toFixed(1)}%</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Días Lab.</span>
+                                  <span className="text-xs font-black text-slate-700 block mt-0.5">{clientTdmData.workedDaysCount} días</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Veh. Utilizados</span>
+                                  <span className="text-xs font-black text-slate-700 block mt-0.5">{clientTdmData.totalVehicleUtilizations}</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs col-span-2 lg:col-span-1">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Promedio/Día</span>
+                                  <span className="text-xs font-black text-violet-600 block mt-0.5">{clientTdmData.averageVehiclesPerDay.toFixed(1)} veh/día</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-slate-400 text-[10px] italic">No hay datos financieros consolidados para este cliente (estatus anulado o sin transacciones válidas).</div>
+                            )}
+
+                            {/* Status Badges Row */}
+                            <div>
+                              <span className="text-[8px] font-bold text-slate-400 block uppercase mb-2">ESTADO DE MANIFIESTO ({rightChartGroupBy.toUpperCase()})</span>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(clientStatusTotals).map(([st, count]) => {
+                                  const pct = clientRecords.length > 0 ? ((count / clientRecords.length) * 100).toFixed(1) : '0.0';
+                                  return (
+                                    <div key={st} className="px-3.5 py-2 bg-white border border-slate-100 rounded-xl text-[10px] font-black uppercase font-mono flex items-center gap-2 shadow-2xs">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-pulse" />
+                                      <span className="text-slate-500">{st}:</span>
+                                      <span className="text-slate-800">{count} ({pct}%)</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
               {/* SUB-REPORT TAB SYSTEM SWITCHER */}
               <div className="flex border-b border-slate-200 bg-white p-1 rounded-xl gap-1 shadow-sm">
@@ -875,6 +1649,17 @@ export const InformesGerenciales: React.FC = () => {
                   }`}
                 >
                   Consolidado Clientes y Placas (Árbol 2 Niveles)
+                </button>
+
+                <button
+                  onClick={() => setSubReportTab('tdmVentas')}
+                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
+                    subReportTab === 'tdmVentas'
+                      ? 'bg-slate-950 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
+                  }`}
+                >
+                  Ventas con el 100% de TDM
                 </button>
               </div>
 
@@ -1023,7 +1808,7 @@ export const InformesGerenciales: React.FC = () => {
                     })}
                   </div>
                 </div>
-              ) : (
+              ) : subReportTab === 'clientes' ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between px-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     <span>Arborescencia: Nombre Cliente ➔ Placa Vehículo (Cantidad de Viajes / Remesas)</span>
@@ -1089,6 +1874,335 @@ export const InformesGerenciales: React.FC = () => {
                     })}
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-3 animate-in fade-in duration-300">
+                  {(() => {
+                    const rawData = getClientTdmTableData();
+                    const filteredData = tdmSearchQuery.trim() === ''
+                      ? rawData
+                      : rawData.filter(row => row.clientName.toLowerCase().includes(tdmSearchQuery.toLowerCase()));
+
+                    const totalVenta = filteredData.reduce((sum, item) => sum + item.ventaTotal, 0);
+                    const totalIngTerceros = filteredData.reduce((sum, item) => sum + item.ingTerceros, 0);
+                    const totalIngresosPropios = filteredData.reduce((sum, item) => sum + item.ingresosPropios, 0);
+                    const overallInt = totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0;
+                    const totalInvoicedSameMonthVal = filteredData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
+                    const overallInvoicedSameMonthPct = totalVenta > 0 ? (totalInvoicedSameMonthVal / totalVenta) * 100 : 0;
+                    
+                    const totalPaymentDaysVal = filteredData.reduce((sum, item) => sum + item.totalPaymentDays, 0);
+                    const totalPaymentDaysCount = filteredData.reduce((sum, item) => sum + item.paymentDaysCount, 0);
+                    const overallAveragePaymentDays = totalPaymentDaysCount > 0 ? totalPaymentDaysVal / totalPaymentDaysCount : 0;
+
+                    const allPlates = new Set<string>();
+                    const allDates = new Set<string>();
+                    const allVehicleDays = new Set<string>();
+                    filteredData.forEach(item => {
+                      item.uniquePlates.forEach(p => allPlates.add(p));
+                      item.workedDates.forEach(d => allDates.add(d));
+                      item.vehicleDays.forEach(vd => allVehicleDays.add(vd));
+                    });
+                    const totalVehicles = allPlates.size;
+                    const totalWorkedDaysCount = allDates.size;
+                    const totalVehicleUtilizationsCount = allVehicleDays.size;
+                    const overallAverageVehiclesPerDay = totalWorkedDaysCount > 0 ? totalVehicleUtilizationsCount / totalWorkedDaysCount : 0;
+
+                    return (
+                      <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Resumen: Ventas con el 100% de TDM</h3>
+                              <span className="bg-indigo-50 border border-indigo-100/50 text-indigo-700 px-2 py-0.5 rounded text-[9px] font-black uppercase font-mono">
+                                FECHA MANIFIESTO
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Filtrado por Rango de Fecha Manifiesto. Excluye manifiestos anulados.</p>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                placeholder="Buscar por cliente..."
+                                value={tdmSearchQuery}
+                                onChange={(e) => setTdmSearchQuery(e.target.value)}
+                                className="bg-white border border-slate-200 rounded-xl pl-8 pr-8 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-[180px] sm:w-[220px] transition-all"
+                              />
+                              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                              {tdmSearchQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTdmSearchQuery('')}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={exportTdmToExcel}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
+                              title="Descargar Excel con reporte resumen (Hoja 1) y detalle origen (Hoja 2)"
+                            >
+                              <Download size={14} />
+                              <span>Exportar Excel</span>
+                            </button>
+
+                            <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase font-mono border border-indigo-100/50">
+                              {filteredData.length} Clientes
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          {filteredData.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400 font-bold text-xs">
+                              No se encontraron clientes que coincidan con la búsqueda.
+                            </div>
+                          ) : (
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50/30 text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                  <th 
+                                    onClick={() => handleTdmSort('clientName')} 
+                                    className="p-3.5 cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center gap-1">
+                                      <span>Cliente</span>
+                                      {tdmSortField === 'clientName' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('ventaTotal')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>Venta</span>
+                                      {tdmSortField === 'ventaTotal' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('ingTerceros')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>Ing Terceros</span>
+                                      {tdmSortField === 'ingTerceros' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('ingresosPropios')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>Ingresos Propios</span>
+                                      {tdmSortField === 'ingresosPropios' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('int')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>INT</span>
+                                      {tdmSortField === 'int' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('participation')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>Part-vta</span>
+                                      {tdmSortField === 'participation' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('invoicedSameMonthVal')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>Vl fact mes</span>
+                                      {tdmSortField === 'invoicedSameMonthVal' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('invoicedSameMonthPct')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>% Fact. Mes</span>
+                                      {tdmSortField === 'invoicedSameMonthPct' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('averagePaymentDays')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>prom dia fact</span>
+                                      {tdmSortField === 'averagePaymentDays' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('workedDaysCount')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>Días Lab.</span>
+                                      {tdmSortField === 'workedDaysCount' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('totalVehicleUtilizations')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>Veh. prom mes</span>
+                                      {tdmSortField === 'totalVehicleUtilizations' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('averageVehiclesPerDay')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>veh Prom. Día</span>
+                                      {tdmSortField === 'averageVehiclesPerDay' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                                {filteredData.map((row, index) => (
+                                  <tr key={index} className="hover:bg-slate-50/40 transition-colors">
+                                    <td className="p-3.5 font-bold text-slate-800 uppercase tracking-tight">{row.clientName}</td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-900">
+                                      {row.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-600">
+                                      {row.ingTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-indigo-600 font-bold">
+                                      {row.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-black">
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${
+                                          row.int < 18 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'
+                                        }`}>
+                                          {row.int.toFixed(1)}%
+                                        </span>
+                                        <button 
+                                          onClick={() => setSelectedClientForVehiclesInt(row.clientName)}
+                                          title="Ver detalle de vehículos que afectaron el INT"
+                                          className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                        >
+                                          <Truck className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-700">
+                                      {Math.round(row.participation)}%
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-600 font-bold">
+                                      {row.invoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-black">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] ${
+                                        row.invoicedSameMonthPct < 60 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'
+                                      }`}>
+                                        {row.invoicedSameMonthPct.toFixed(1)}%
+                                      </span>
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-700">
+                                      {row.averagePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} d
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-600 font-bold">
+                                      {row.workedDaysCount}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-violet-600 font-bold">
+                                      {row.totalVehicleUtilizations}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-indigo-600 font-black">
+                                      {row.averageVehiclesPerDay.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                  </tr>
+                                ))}
+
+                                {/* Grand Total Row */}
+                                <tr className="bg-slate-100/50 border-t-2 border-slate-200 font-black text-slate-900">
+                                  <td className="p-3.5 text-[10px] uppercase tracking-wider">Total General</td>
+                                  <td className="p-3.5 text-right font-mono font-bold text-slate-950">
+                                    {totalVenta.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-slate-800">
+                                    {totalIngTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-indigo-700 font-bold">
+                                    {totalIngresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-indigo-700">
+                                    <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
+                                      {overallInt.toFixed(1)}%
+                                    </span>
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                    100%
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                    {totalInvoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-indigo-700 font-black">
+                                    {overallInvoicedSameMonthPct.toFixed(1)}%
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                    {overallAveragePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} d
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-slate-800">
+                                    {totalWorkedDaysCount}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-violet-700">
+                                    {totalVehicleUtilizationsCount}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-indigo-700">
+                                    {overallAverageVehiclesPerDay.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
 
             </div>
@@ -1105,7 +2219,7 @@ export const InformesGerenciales: React.FC = () => {
             {/* Left: Date Range selectors */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-col space-y-1">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono">Fecha Desde (OC)</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono">Fecha Desde (MANIFIESTO)</span>
                 <input 
                   type="date"
                   value={filters.fromDate}
@@ -1120,7 +2234,7 @@ export const InformesGerenciales: React.FC = () => {
               </div>
 
               <div className="flex flex-col space-y-1">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono">Fecha Hasta (OC)</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono">Fecha Hasta (MANIFIESTO)</span>
                 <input 
                   type="date"
                   value={filters.toDate}
@@ -1482,6 +2596,222 @@ export const InformesGerenciales: React.FC = () => {
           )}
         </div>
       )}
+      {/* Premium Vehicles INT Detail Modal */}
+      {selectedClientForVehiclesInt && (() => {
+        const vehiclesData = getVehiclesIntDetails();
+        const clientSales = vehiclesData.reduce((sum, item) => sum + item.ventaTotal, 0);
+        const clientIngresosPropios = vehiclesData.reduce((sum, item) => sum + item.ingresosPropios, 0);
+        const clientOverallInt = clientSales > 0 ? (clientIngresosPropios / clientSales) * 100 : 0;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-150 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <Truck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Vehículos que afectaron el INT</h3>
+                    <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wide mt-0.5">{selectedClientForVehiclesInt}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    setSelectedClientForVehiclesInt(null);
+                    setVehiclesSearchQuery('');
+                  }}
+                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Stats Summary Cards */}
+              <div className="px-6 pt-5 grid grid-cols-3 gap-4">
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                  <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Total Ventas</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-slate-900">
+                    {clientSales.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                  </span>
+                </div>
+                <div className="p-3 bg-indigo-50/40 border border-indigo-100/50 rounded-xl text-center">
+                  <span className="block text-[9px] font-black text-indigo-400 uppercase tracking-wider mb-1">Ingresos Propios</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-indigo-600">
+                    {clientIngresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                  </span>
+                </div>
+                <div className="p-3 bg-emerald-50/40 border border-emerald-100/50 rounded-xl text-center">
+                  <span className="block text-[9px] font-black text-emerald-400 uppercase tracking-wider mb-1">INT Consolidado</span>
+                  <span className="block">
+                    <span className={`px-2.5 py-0.5 rounded text-xs font-black font-mono ${
+                      clientOverallInt < 18 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                    }`}>
+                      {clientOverallInt.toFixed(1)}%
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Search and Export Row */}
+              <div className="mx-6 mt-5 p-3.5 bg-slate-50/60 border border-slate-150 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="relative flex-1 max-w-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={vehiclesSearchQuery}
+                    onChange={(e) => setVehiclesSearchQuery(e.target.value)}
+                    placeholder="Buscar por placa de vehículo..."
+                    className="w-full pl-9 pr-8 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 bg-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                  />
+                  {vehiclesSearchQuery && (
+                    <button
+                      onClick={() => setVehiclesSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={exportVehiclesToExcel}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-sm self-start sm:self-auto"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  Exportar a Excel
+                </button>
+              </div>
+
+              {/* Table Body Container */}
+              <div className="p-6 overflow-y-auto flex-1 min-h-0">
+                {vehiclesData.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 uppercase tracking-wider font-bold text-xs">
+                    No se encontraron registros de vehículos.
+                  </div>
+                ) : (
+                  <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                          <th 
+                            onClick={() => handleVehiclesSort('plate')}
+                            className="p-3 cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Vehículo (Placa)</span>
+                              {vehiclesSortField === 'plate' && (
+                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleVehiclesSort('manifestCount')}
+                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>Cantidad Manifiestos</span>
+                              {vehiclesSortField === 'manifestCount' && (
+                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleVehiclesSort('ventaTotal')}
+                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>Venta</span>
+                              {vehiclesSortField === 'ventaTotal' && (
+                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleVehiclesSort('ingTerceros')}
+                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>Ing Terceros</span>
+                              {vehiclesSortField === 'ingTerceros' && (
+                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleVehiclesSort('ingresosPropios')}
+                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>Ingresos Propios</span>
+                              {vehiclesSortField === 'ingresosPropios' && (
+                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleVehiclesSort('int')}
+                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                          >
+                            <div className="flex items-center justify-end gap-1">
+                              <span>INT (%)</span>
+                              {vehiclesSortField === 'int' && (
+                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
+                              )}
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-[11px] text-slate-600 font-medium">
+                        {vehiclesData.map((v, i) => (
+                          <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="p-3">
+                              <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-black text-slate-700">{v.plate}</span>
+                            </td>
+                            <td className="p-3 text-right font-mono font-bold">{v.manifestCount}</td>
+                            <td className="p-3 text-right font-mono font-bold text-slate-900">
+                              {v.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                            </td>
+                            <td className="p-3 text-right font-mono text-slate-500">
+                              {v.ingTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                            </td>
+                            <td className="p-3 text-right font-mono text-indigo-600 font-bold">
+                              {v.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                            </td>
+                            <td className="p-3 text-right font-mono">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                                v.int < 18 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                              }`}>
+                                {v.int.toFixed(1)}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex justify-end">
+                <button
+                  onClick={() => {
+                    setSelectedClientForVehiclesInt(null);
+                    setVehiclesSearchQuery('');
+                  }}
+                  className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-black uppercase tracking-wider hover:bg-slate-900 shadow-sm transition-all active:scale-[0.98]"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

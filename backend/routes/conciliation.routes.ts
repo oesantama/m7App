@@ -18,6 +18,7 @@ import {
     updateRemesaTDM,
     reverseConciliation,
     getPlateMovementHistory,
+    checkReferenceExists,
 } from '../controllers/conciliation.controller.js';
 
 const router = Router();
@@ -31,6 +32,7 @@ router.get('/pending',                    getPendingConciliations);
 router.get('/search-routes',              searchRoutesForPlanilla);
 router.get('/history',                    getConciliationHistory);
 router.get('/plate-history',              getPlateMovementHistory);
+router.get('/check-reference/:reference', checkReferenceExists);
 router.get('/planilla',                   downloadPlanilla);
 router.get('/:documentId/history',        getInvoiceStatusHistory);
 router.get('/:documentId',                getConciliationByDocument);
