@@ -76,6 +76,7 @@ const ValidacionConciliaciones = lazyWithRetry(() => import('./components/Operac
 const FletesConciliacion = lazyWithRetry(() => import('./components/OperacionExito/FletesConciliacion'));
 const InformeDashboardDrive = lazyWithRetry(() => import('./components/documents/InformeDashboardDrive'));
 const AuditoriaFactura = lazyWithRetry(() => import('./components/Logistics/AuditoriaFactura'));
+const InformesGerenciales = lazyWithRetry(() => import('./components/Logistics/InformesGerenciales'));
 
 
 // Import Admin Module
@@ -979,6 +980,12 @@ const App: React.FC = () => {
         return <InformeDashboardDrive user={user!} />;
       case 'auditoria-factura':
         return <AuditoriaFactura user={user!} />;
+      case 'informes-gerenciales':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Informes Gerenciales...</div>}>
+            <InformesGerenciales />
+          </React.Suspense>
+        );
       case 'validacion-conciliaciones':
         return <ValidacionConciliaciones user={user!} />;
       case 'fletes-conciliacion':

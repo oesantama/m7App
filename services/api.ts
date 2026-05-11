@@ -827,6 +827,34 @@ export const api = {
       body: JSON.stringify(data)
     }),
 
+  getManagementReports: (params: {
+    page?: number;
+    limit?: number;
+    ocNumber?: string;
+    manifestNumber?: string;
+    plate?: string;
+    clientName?: string;
+    fromDate?: string;
+    toDate?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.limit) qs.append('limit', String(params.limit));
+    if (params.ocNumber) qs.append('ocNumber', params.ocNumber);
+    if (params.manifestNumber) qs.append('manifestNumber', params.manifestNumber);
+    if (params.plate) qs.append('plate', params.plate);
+    if (params.clientName) qs.append('clientName', params.clientName);
+    if (params.fromDate) qs.append('fromDate', params.fromDate);
+    if (params.toDate) qs.append('toDate', params.toDate);
+    return fetchJson(`${API_URL}/management-reports?${qs.toString()}`);
+  },
+
+  uploadManagementReports: (records: any[]) =>
+    fetchJson(`${API_URL}/management-reports/upload`, {
+      method: 'POST',
+      body: JSON.stringify({ records })
+    }),
+
   getWhatsAppStatus: (userId: string) => fetchJson(`${API_URL}/whatsapp/status?userId=${userId}`),
   connectWhatsApp: (userId: string) => fetchJson(`${API_URL}/whatsapp/connect`, {
     method: 'POST',

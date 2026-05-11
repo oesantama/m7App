@@ -72,7 +72,7 @@ export function getStatusLabel(status: string): string {
 }
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'active';
-export type PageModule = 'home' | 'master' | 'inventory' | 'inventory-counts' | 'routes' | 'users' | 'drivers' | 'assignments' | 'reports' | 'notifications' | 'scanning' | 'whatsapp' | 'whatsapp-campaign' | 'whatsapp-status' | 'balance' | 'training' | 'inventory-news' | 'dispatch' | 'picking' | 'recibido-manual' | 'grupo-inter-ops' | 'conciliacion' | 'gestion-humana-miscelaneos' | 'cfg-ciudades' | 'validacion-conciliaciones' | 'fletes-conciliacion' | 'informe-dashboard-drive' | 'auditoria-factura';
+export type PageModule = 'home' | 'master' | 'inventory' | 'inventory-counts' | 'routes' | 'users' | 'drivers' | 'assignments' | 'reports' | 'notifications' | 'scanning' | 'whatsapp' | 'whatsapp-campaign' | 'whatsapp-status' | 'balance' | 'training' | 'inventory-news' | 'dispatch' | 'picking' | 'recibido-manual' | 'grupo-inter-ops' | 'conciliacion' | 'gestion-humana-miscelaneos' | 'cfg-ciudades' | 'validacion-conciliaciones' | 'fletes-conciliacion' | 'informe-dashboard-drive' | 'auditoria-factura' | 'informes-gerenciales';
 
 export interface UserPermission {
   module: string; 

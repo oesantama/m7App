@@ -76,6 +76,9 @@ services:
       - ./hooks:/app/hooks:z
       - ./types.ts:/app/types.ts:z
       - ./constants.tsx:/app/constants.tsx:z
+      - ./App.tsx:/app/App.tsx:z
+      - ./index.tsx:/app/index.tsx:z
+      - ./index.css:/app/index.css:z
       # Archivos de configuración raíz
       - ./vite.config.ts:/app/vite.config.ts:z
       - ./tailwind.config.ts:/app/tailwind.config.ts:z

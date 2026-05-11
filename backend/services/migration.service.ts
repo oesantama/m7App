@@ -196,12 +196,20 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'contacto_emergencia', 'acuerdo_requisitos', 'contiene_equipos', 'marca_dispositivo',
     'numero_serie', 'hora_salida', 'registrado_por_id', 'registrado_por_nombre',
     'fecha_registro', 'status_id'
+  ],
+  'management_orders': [
+    'oc_number', 'oc_status', 'oc_date', 'remesa_number', 'remission', 
+    'remission_status', 'remission_date', 'manifest_number', 'client_order', 
+    'manifest_observations', 'manifest_status', 'manifest_date', 'plate', 
+    'client_name', 'total_value_cxc_final', 'total_value_cxp_final', 
+    'invoice_cxc', 'receipt', 'invoice_date', 'total_cxc', 'egress', 
+    'cxp_date', 'total_cxp', 'created_by', 'created_at', 'updated_at'
   ]
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'invoice_conciliation_reversal_logs', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades', 'gh_visitas'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'invoice_conciliation_reversal_logs', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades', 'gh_visitas', 'management_orders'];
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
     try {
@@ -236,7 +244,7 @@ const healSchema = async (client: any) => {
             type = 'TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP';
           } else if (col === 'shift') {
             type = 'INTEGER DEFAULT 1';
-          } else if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repice' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repice_qty' || col === 'invoice_value' || col === 'collected_value' || col === 'total_volume_m3' || col === 'vehicle_capacity_m3' || col === 'utilization_pct' || col === 'id_departamento') {
+          } else if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col.includes('total_') || col.includes('value_') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repice' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repice_qty' || col === 'invoice_value' || col === 'collected_value' || col === 'total_volume_m3' || col === 'vehicle_capacity_m3' || col === 'utilization_pct' || col === 'id_departamento') {
             type = 'NUMERIC DEFAULT 0';
           } else if (col === 'client_ids') {
              type = 'TEXT[]';
@@ -512,6 +520,13 @@ const healSchema = async (client: any) => {
       CREATE INDEX IF NOT EXISTS idx_delivery_patterns_addr
         ON delivery_patterns (address_key);
     `);
+
+    // ── management_orders: índices y restricciones de unicidad ─────────────────
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS unq_management_orders_oc ON management_orders (oc_number);
+      CREATE INDEX IF NOT EXISTS idx_management_orders_plate ON management_orders (plate);
+      CREATE INDEX IF NOT EXISTS idx_management_orders_client ON management_orders (client_name);
+    `).catch(() => {});
 
     // ── FIX: delivery_patterns.id debe tener secuencia BIGSERIAL para INSERT sin id ──
     await client.query(`
@@ -810,7 +825,8 @@ export const restoreSystem = async () => {
       ('MOD-07', 'GESTIÓN GRUPO INTER', 'Truck', 'EST-01'),
       ('MOD-08', 'CENTRO DE FORMACIÓN', 'Award', 'EST-01'),
       ('MOD-09', 'GESTIÓN HUMANA', 'Users', 'EST-01'),
-      ('MOD-11', 'OPERACIÓN ÉXITO', 'Star', 'EST-01')
+      ('MOD-11', 'OPERACIÓN ÉXITO', 'Star', 'EST-01'),
+      ('MOD-12', 'GERENCIA', 'PieChart', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class, status_id = EXCLUDED.status_id;
     `);
 
@@ -885,7 +901,10 @@ export const restoreSystem = async () => {
 
       -- Operación Éxito (MOD-11)
       ('PAG-46', 'VALIDACIÓN CONCILIACIONES', 'validacion-conciliaciones', 'MOD-11', 'MOD-11', 'EST-01'),
-      ('PAG-47', 'FLETES DE CONCILIACIÓN',    'fletes-conciliacion',        'MOD-11', 'MOD-11', 'EST-01')
+      ('PAG-47', 'FLETES DE CONCILIACIÓN',    'fletes-conciliacion',        'MOD-11', 'MOD-11', 'EST-01'),
+
+      -- Gerencia (MOD-12)
+      ('PAG-50', 'INFORMES GERENCIALES',      'informes-gerenciales',       'MOD-12', 'MOD-12', 'EST-01')
 
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name, 
