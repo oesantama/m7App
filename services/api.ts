@@ -678,7 +678,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  repiceRouteInvoice: (data: { routeId: string; invoiceId: string; observations?: string; userId?: string }) =>
+  repiceRouteInvoice: (data: { routeId: string; invoiceId: string; observations?: string; userId?: string; newVehicleId?: string }) =>
     fetchJson(`${API_URL}/routes/repice-invoice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

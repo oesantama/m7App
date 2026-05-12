@@ -18,6 +18,10 @@ const COLS: Array<keyof ReportRow> = [
 
 const fmtColombianDate = (dateStr?: string): string => {
   if (!dateStr) return '—';
+  // If already formatted in Colombian/Spanish style (contains slashes and colons), return as is
+  if (dateStr.includes('/') && dateStr.includes(':')) {
+    return dateStr;
+  }
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
@@ -74,12 +78,19 @@ const MastersuiteReport: React.FC = () => {
   const exportExcel = () => {
     if (rows.length === 0) return;
 
+    // Map rows to exclude FECHA_HORA_ASIGNACION from Excel export
     const exportRows = rows.map(r => ({
-      ...r,
-      FECHA_HORA_ASIGNACION: fmtColombianDate(r.FECHA_HORA_ASIGNACION),
+      DOCUMENT_ID: r.DOCUMENT_ID,
+      TRUCK_ID_ORIGIN: r.TRUCK_ID_ORIGIN,
+      LOAD_ID: r.LOAD_ID,
+      TRUCK_ID_DESTIN: r.TRUCK_ID_DESTIN,
+      DRIVER_ID_DESTIN: r.DRIVER_ID_DESTIN,
     }));
-    const ws = XLSX.utils.json_to_sheet(exportRows, { header: COLS });
-    ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 24 }];
+
+    const ws = XLSX.utils.json_to_sheet(exportRows, { 
+      header: ['DOCUMENT_ID', 'TRUCK_ID_ORIGIN', 'LOAD_ID', 'TRUCK_ID_DESTIN', 'DRIVER_ID_DESTIN'] 
+    });
+    ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');

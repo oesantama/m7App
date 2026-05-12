@@ -691,7 +691,7 @@ export const unassignRouteInvoice = async (req: Request, res: Response) => {
 };
 
 export const repiceRouteInvoice = async (req: Request, res: Response) => {
-    const { routeId, invoiceId, observations, userId } = req.body;
+    const { routeId, invoiceId, observations, userId, newVehicleId } = req.body;
     if (!routeId || !invoiceId) {
         return res.status(400).json({ success: false, error: 'routeId e invoiceId son requeridos' });
     }
@@ -709,7 +709,7 @@ export const repiceRouteInvoice = async (req: Request, res: Response) => {
             throw new Error('La factura no pertenece a esta ruta');
         }
 
-        // 2. Actualizar item_status a EST-15 (REPICE) y fecha asignación al momento actual
+        // 2. Actualizar item_status a EST-15 (REPICE)
         await client.query(
             `UPDATE document_items SET item_status = 'EST-15'
              WHERE CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $1
@@ -717,13 +717,7 @@ export const repiceRouteInvoice = async (req: Request, res: Response) => {
             [invoiceId]
         );
 
-        await client.query(
-            `UPDATE route_invoices SET assigned_at = NOW()
-             WHERE route_id::text = $1::text AND invoice_id = $2`,
-            [routeId, invoiceId]
-        );
-
-        // 3. Registrar en log con acción REPICE_INVOICE
+        // 3. Obtener datos de la ruta/placa/conductor actuales
         const plateRes = await client.query(
             `SELECT v.plate, r.driver_id, d.name AS driver_name
              FROM routes r
@@ -734,12 +728,42 @@ export const repiceRouteInvoice = async (req: Request, res: Response) => {
         );
         const prevPlate  = plateRes.rows[0]?.plate      || null;
         const driverName = plateRes.rows[0]?.driver_name || null;
-        const obs        = `repice: ${observations || ''}`;
+
+        let action = 'REPICE_INVOICE';
+        let newPlate: string | null = null;
+
+        if (newVehicleId) {
+            // OTRO CONDUCTOR: sacar de la ruta actual, queda libre en EST-15
+            await client.query(
+                `DELETE FROM route_invoices WHERE route_id::text = $1::text AND invoice_id = $2`,
+                [routeId, invoiceId]
+            );
+            const newVehRes = await client.query(
+                `SELECT v.plate, d.name AS driver_name
+                 FROM vehicles v
+                 LEFT JOIN assignments a ON a.vehicle_id::text = v.id::text AND a.is_active = true
+                 LEFT JOIN drivers d ON d.id::text = a.driver_id::text
+                 WHERE v.id::text = $1 LIMIT 1`,
+                [newVehicleId]
+            );
+            newPlate = newVehRes.rows[0]?.plate || null;
+            action   = 'REPICE_REASSIGN';
+        } else {
+            // MISMO CONDUCTOR: mantener en ruta, actualizar timestamp
+            await client.query(
+                `UPDATE route_invoices SET assigned_at = NOW()
+                 WHERE route_id::text = $1::text AND invoice_id = $2`,
+                [routeId, invoiceId]
+            );
+        }
+
+        // 4. Registrar histórico
+        const obs = `repice: ${observations || ''}`;
         await client.query(
-            `INSERT INTO route_modifications_log (route_id, invoice_id, action, user_id, previous_plate, details)
-             VALUES ($1, $2, 'REPICE_INVOICE', $3, $4, $5)`,
-            [routeId, invoiceId, userId || null, prevPlate,
-             JSON.stringify({ observations: obs, driver_name: driverName, timestamp: new Date().toISOString() })]
+            `INSERT INTO route_modifications_log (route_id, invoice_id, action, user_id, previous_plate, new_plate, details)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [routeId, invoiceId, action, userId || null, prevPlate, newPlate,
+             JSON.stringify({ observations: obs, driver_name: driverName, new_vehicle_id: newVehicleId || null, timestamp: new Date().toISOString() })]
         );
 
         await client.query('COMMIT');

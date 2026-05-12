@@ -78,7 +78,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [filteredClients, setFilteredClients] = useState<any[]>([]);
     const [clientsReady, setClientsReady] = useState(false);
 
-    const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().slice(0, 10));
+    const [filterDate, setFilterDate] = useState<string>(() => {
+        return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+    });
 
     const [vehicleLocations, setVehicleLocations] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -117,12 +119,20 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [reassignData, setReassignData] = useState({ newVehicleId: '', observations: '' });
     const [vehicleSearch, setVehicleSearch] = useState('');
     const [vehicleDropOpen, setVehicleDropOpen] = useState(false);
-    const [reassignTab, setReassignTab] = useState<'placa' | 'factura'>('placa');
+    const [reassignTab, setReassignTab] = useState<'placa' | 'factura' | 'repice'>('placa');
     const [modalRouteInvoices, setModalRouteInvoices] = useState<any[]>([]);
     const [loadingModalInvoices, setLoadingModalInvoices] = useState(false);
     const [selectedInvoicesToRemove, setSelectedInvoicesToRemove] = useState<Set<string>>(new Set());
     const [unassignObs, setUnassignObs] = useState('');
     const [isUnassigning, setIsUnassigning] = useState(false);
+    // Repice tab
+    const [repiceSelected, setRepiceSelected] = useState<Set<string>>(new Set());
+    const [repiceObs, setRepiceObs] = useState('');
+    const [repiceDestino, setRepiceDestino] = useState<'MISMO' | 'OTRO'>('MISMO');
+    const [repiceVehicleId, setRepiceVehicleId] = useState('');
+    const [repiceVehicleSearch, setRepiceVehicleSearch] = useState('');
+    const [repiceVehicleDropOpen, setRepiceVehicleDropOpen] = useState(false);
+    const [isRepicing, setIsRepicing] = useState(false);
     const mapRef = useRef<L.Map | null>(null);
     const markersRef = useRef<{ [key: string]: L.Marker }>({});
     const routeLinesRef = useRef<{ [key: string]: L.Polyline }>({});
@@ -733,6 +743,38 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         if (fail > 0) toast.error(`${fail} no se pudieron liberar`);
     };
 
+    const handleRepiceInvoices = async () => {
+        if (!showReassignModal.route || repiceSelected.size === 0) return;
+        if (!repiceObs.trim()) { toast.error('Debe ingresar una observación'); return; }
+        if (repiceDestino === 'OTRO' && !repiceVehicleId) { toast.error('Debe seleccionar el conductor destino'); return; }
+        setIsRepicing(true);
+        let ok = 0; let fail = 0;
+        for (const invoiceId of repiceSelected) {
+            try {
+                await api.repiceRouteInvoice({
+                    routeId: showReassignModal.route.id,
+                    invoiceId,
+                    observations: repiceObs,
+                    userId: user.id,
+                    ...(repiceDestino === 'OTRO' ? { newVehicleId: repiceVehicleId } : {}),
+                });
+                ok++;
+            } catch { fail++; }
+        }
+        setIsRepicing(false);
+        if (ok > 0) {
+            toast.success(`${ok} factura${ok > 1 ? 's' : ''} marcada${ok > 1 ? 's' : ''} como REPICE`);
+            setRepiceObs('');
+            setRepiceSelected(new Set());
+            setRepiceDestino('MISMO');
+            setRepiceVehicleId('');
+            setRepiceVehicleSearch('');
+            loadModalInvoices(showReassignModal.route.id);
+            onRefresh();
+        }
+        if (fail > 0) toast.error(`${fail} no se pudieron procesar`);
+    };
+
     const handleReassignPlate = async () => {
         if (!showReassignModal.route || !reassignData.newVehicleId) {
             toast.error("Debe seleccionar un vehículo");
@@ -1314,7 +1356,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 const raw = (route as any).created_at || (route as any).createdAt;
                 if (!raw) return true;
                 const d = new Date(raw);
-                return isNaN(d.getTime()) ? true : d.toISOString().slice(0, 10) === filterDate;
+                return isNaN(d.getTime()) ? true : d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }) === filterDate;
             });
         }
 
@@ -1789,12 +1831,20 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         )}
 
                         {/* Date filter */}
-                        <div className="mb-3">
+                        <div className="relative mb-3">
+                            <div className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white flex justify-between items-center pointer-events-none select-none transition-all">
+                                <span>{(() => {
+                                    if (!filterDate) return 'Seleccionar fecha';
+                                    const [year, month, day] = filterDate.split('-');
+                                    return `${day} / ${month} / ${year}`;
+                                })()}</span>
+                                <Icons.Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            </div>
                             <input
                                 type="date"
                                 value={filterDate}
                                 onChange={e => setFilterDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-emerald-500 transition-all"
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                             />
                         </div>
 
@@ -2497,7 +2547,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Gestión de Ruta</h3>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">🚛 {showReassignModal.route?.plate}</p>
                                 </div>
-                                <button onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setVehicleSearch(''); setVehicleDropOpen(false); setReassignTab('placa'); }}
+                                <button onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setVehicleSearch(''); setVehicleDropOpen(false); setReassignTab('placa'); setRepiceObs(''); setRepiceSelected(new Set()); setRepiceDestino('MISMO'); setRepiceVehicleId(''); setRepiceVehicleSearch(''); }}
                                     className="w-9 h-9 bg-slate-100 hover:bg-rose-50 hover:text-rose-500 rounded-full flex items-center justify-center text-slate-400 transition-all text-lg font-black">×</button>
                             </div>
                             {/* Tabs */}
@@ -2511,6 +2561,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all
                                         ${reassignTab === 'factura' ? 'bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200' : 'bg-white border-slate-200 text-slate-500 hover:border-rose-300'}`}>
                                     📦 Liberar Factura
+                                </button>
+                                <button onClick={() => { setReassignTab('repice'); loadModalInvoices(showReassignModal.route.id); }}
+                                    className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all
+                                        ${reassignTab === 'repice' ? 'bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300'}`}>
+                                    🔁 Repice
                                 </button>
                             </div>
                         </div>
@@ -2582,6 +2637,150 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         )}
 
                         {/* ── TAB: LIBERAR FACTURA ── */}
+                        {/* ── TAB: REPICE ── */}
+                        {reassignTab === 'repice' && (
+                            <>
+                                <div className="flex-1 overflow-y-auto">
+                                    {/* Selector de destino */}
+                                    <div className="px-7 pt-5 pb-3">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Destino del Repice</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button onClick={() => { setRepiceDestino('MISMO'); setRepiceVehicleId(''); setRepiceVehicleSearch(''); }}
+                                                className={`py-3 px-4 rounded-2xl border-2 text-center transition-all ${repiceDestino === 'MISMO' ? 'bg-amber-50 border-amber-400' : 'bg-slate-50 border-slate-200 hover:border-amber-300'}`}>
+                                                <p className="text-xl mb-1">🚛</p>
+                                                <p className="text-[10px] font-black text-slate-800 uppercase">Mismo Conductor</p>
+                                                <p className="text-[8px] text-slate-500 mt-0.5">Sigue en ruta</p>
+                                            </button>
+                                            <button onClick={() => setRepiceDestino('OTRO')}
+                                                className={`py-3 px-4 rounded-2xl border-2 text-center transition-all ${repiceDestino === 'OTRO' ? 'bg-amber-50 border-amber-400' : 'bg-slate-50 border-slate-200 hover:border-amber-300'}`}>
+                                                <p className="text-xl mb-1">🔀</p>
+                                                <p className="text-[10px] font-black text-slate-800 uppercase">Otro Conductor</p>
+                                                <p className="text-[8px] text-slate-500 mt-0.5">Libera de esta ruta</p>
+                                            </button>
+                                        </div>
+                                        {/* Buscador de vehículo destino */}
+                                        {repiceDestino === 'OTRO' && (
+                                            <div className="mt-3 relative">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Conductor / Placa Destino <span className="text-amber-500">*</span></label>
+                                                <div className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus-within:ring-2 focus-within:ring-amber-400/30 cursor-text flex items-center gap-2"
+                                                    onClick={() => setRepiceVehicleDropOpen(true)}>
+                                                    <input className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-900 placeholder:text-slate-400"
+                                                        placeholder={repiceVehicleId
+                                                            ? (availableVehicles.find((v: any) => v.id === repiceVehicleId)?.plate + ' — ' + availableVehicles.find((v: any) => v.id === repiceVehicleId)?.driverName)
+                                                            : 'Buscar placa o conductor...'}
+                                                        value={repiceVehicleSearch}
+                                                        onChange={e => { setRepiceVehicleSearch(e.target.value); setRepiceVehicleDropOpen(true); }}
+                                                        onFocus={() => setRepiceVehicleDropOpen(true)} />
+                                                    {repiceVehicleId && (
+                                                        <button onClick={e => { e.stopPropagation(); setRepiceVehicleId(''); setRepiceVehicleSearch(''); }}
+                                                            className="text-slate-400 hover:text-rose-500 text-lg leading-none">×</button>
+                                                    )}
+                                                </div>
+                                                {repiceVehicleDropOpen && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-10" onClick={() => setRepiceVehicleDropOpen(false)} />
+                                                        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-48 overflow-y-auto">
+                                                            {availableVehicles
+                                                                .filter((v: any) => {
+                                                                    const q = repiceVehicleSearch.toLowerCase();
+                                                                    return !q || v.plate?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q);
+                                                                })
+                                                                .map((v: any) => (
+                                                                    <button key={v.id}
+                                                                        className={`w-full text-left px-4 py-3 text-sm font-bold hover:bg-amber-50 hover:text-amber-700 transition-colors ${repiceVehicleId === v.id ? 'bg-amber-50 text-amber-700' : 'text-slate-700'}`}
+                                                                        onClick={() => { setRepiceVehicleId(v.id); setRepiceVehicleSearch(''); setRepiceVehicleDropOpen(false); }}>
+                                                                        <span className="font-black">{v.plate}</span>
+                                                                        {v.driverName && <span className="text-slate-400 font-normal"> — {v.driverName}</span>}
+                                                                    </button>
+                                                                ))}
+                                                            {availableVehicles.filter((v: any) => { const q = repiceVehicleSearch.toLowerCase(); return !q || v.plate?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q); }).length === 0 && (
+                                                                <p className="px-4 py-3 text-xs text-slate-400 font-bold">Sin resultados</p>
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Lista de facturas */}
+                                    {loadingModalInvoices ? (
+                                        <div className="flex items-center justify-center py-10">
+                                            <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                                        </div>
+                                    ) : modalRouteInvoices.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-400">
+                                            <p className="text-3xl mb-2">🔁</p>
+                                            <p className="text-sm font-bold">No hay facturas en esta ruta</p>
+                                        </div>
+                                    ) : (
+                                        <div className="px-7 pb-2 space-y-2">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                    {repiceSelected.size} de {modalRouteInvoices.length} seleccionadas
+                                                </p>
+                                                <div className="flex gap-3">
+                                                    <button onClick={() => setRepiceSelected(new Set(modalRouteInvoices.map((i: any) => i.invoice_id)))}
+                                                        className="text-[8px] font-black text-amber-500 hover:text-amber-700 uppercase tracking-widest">Todas</button>
+                                                    <span className="text-slate-300 text-[8px]">|</span>
+                                                    <button onClick={() => setRepiceSelected(new Set())}
+                                                        className="text-[8px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest">Ninguna</button>
+                                                </div>
+                                            </div>
+                                            {modalRouteInvoices.map((inv: any) => {
+                                                const checked = repiceSelected.has(inv.invoice_id);
+                                                return (
+                                                    <label key={inv.invoice_id}
+                                                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border cursor-pointer transition-all
+                                                            ${checked ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-100 hover:border-slate-300'}`}>
+                                                        <input type="checkbox" checked={checked} className="w-4 h-4 accent-amber-500 shrink-0"
+                                                            onChange={() => {
+                                                                setRepiceSelected(prev => {
+                                                                    const next = new Set(prev);
+                                                                    next.has(inv.invoice_id) ? next.delete(inv.invoice_id) : next.add(inv.invoice_id);
+                                                                    return next;
+                                                                });
+                                                            }} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[11px] font-black text-slate-900">{inv.invoice_number || inv.invoice_id}</p>
+                                                            {inv.customer_name && <p className="text-[9px] text-slate-500 truncate">{inv.customer_name}</p>}
+                                                        </div>
+                                                        {inv.invoice_value && (
+                                                            <span className="text-[9px] font-black text-slate-600 shrink-0">
+                                                                ${Number(inv.invoice_value).toLocaleString('es-CO')}
+                                                            </span>
+                                                        )}
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Observación */}
+                                    <div className="px-7 pt-3 pb-5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                                            Motivo / Notas <span className="text-amber-500">*</span>
+                                        </label>
+                                        <textarea className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400/30 h-24 resize-none"
+                                            placeholder="Ej: Cliente ausente, reagendar para mañana..."
+                                            value={repiceObs}
+                                            onChange={e => setRepiceObs(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="px-7 py-5 bg-slate-50 border-t border-slate-100 flex gap-3">
+                                    <button className="px-5 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setReassignTab('placa'); setRepiceObs(''); setRepiceSelected(new Set()); setRepiceDestino('MISMO'); setRepiceVehicleId(''); setRepiceVehicleSearch(''); }}>
+                                        Cancelar
+                                    </button>
+                                    <button className="flex-1 py-3 bg-amber-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg shadow-amber-200 disabled:opacity-50"
+                                        onClick={handleRepiceInvoices}
+                                        disabled={isRepicing || repiceSelected.size === 0 || !repiceObs.trim() || (repiceDestino === 'OTRO' && !repiceVehicleId)}>
+                                        {isRepicing ? 'Procesando...' : `Registrar Repice (${repiceSelected.size})`}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
                         {reassignTab === 'factura' && (
                             <>
                                 <div className="flex-1 overflow-y-auto">
