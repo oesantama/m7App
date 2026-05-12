@@ -3,6 +3,8 @@ process.env.TZ = 'America/Bogota';
 import dotenv from 'dotenv';
 dotenv.config();
 
+import cluster from 'cluster';
+import os from 'os';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -15,7 +17,20 @@ import ghVisitasRoutes from './routes/gh-visitas.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import { initDeliveryTables } from './controllers/dispatch.controller.js';
 import { initScheduler } from './services/scheduler.service.js';
+import { authenticateToken } from './middleware/auth.middleware.js';
 import fs from 'fs';
+
+// ── CLUSTER: if primary in production, fork 2 workers and stop here ──────────
+if (cluster.isPrimary && process.env.NODE_ENV === 'production') {
+  const numCPUs = Math.min(os.cpus().length, 2);
+  console.log(`[ORBIT-CLUSTER] Primary ${process.pid} — forking ${numCPUs} workers`);
+  for (let i = 0; i < numCPUs; i++) cluster.fork();
+  cluster.on('exit', (worker, code) => {
+    console.warn(`[ORBIT-CLUSTER] Worker ${worker.process.pid} died (code ${code}) — restarting`);
+    cluster.fork();
+  });
+  // Primary process stops here — workers run the Express app below
+} else {
 
 // Leer versión desde package.json
 const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8'));
@@ -90,8 +105,6 @@ app.use((req, res, next) => {
   });
   next();
 });
-
-import { authenticateToken } from './middleware/auth.middleware.js';
 
 // Montaje de API Modular
 app.use('/api/auth/login', loginLimiter); 
@@ -213,3 +226,6 @@ process.on('uncaughtException', (err: any) => {
   console.error('[ORBIT-UNCAUGHT-EXCEPTION] Proceso en estado inestable, reiniciando:', err.message);
   process.exit(1); // Docker/PM2 reiniciará el contenedor limpiamente
 });
+
+// Cierre del bloque else del cluster (ver inicio de archivo)
+}

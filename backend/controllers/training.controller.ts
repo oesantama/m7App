@@ -110,7 +110,8 @@ export const getSessions = async (req: Request, res: Response) => {
     const result = await pool.query('SELECT * FROM training_sessions ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: "Error al obtener sesiones" });
+    console.error('[TRAINING-CTRL] ERROR getSessions:', err.message);
+    res.status(500).json({ error: "Error al obtener sesiones", detail: err.message });
   }
 };
 

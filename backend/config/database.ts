@@ -14,17 +14,21 @@ const dbName = process.env.DB_NAME || process.env.POSTGRES_DB || 'm7_logistica';
 
 const connectionString = process.env.DATABASE_URL || `postgres://${dbUser}:${dbPass}@${dbHost}:${dbPort}/${dbName}`;
 
-const isProduction = process.env.NODE_ENV === 'production';
+// Con cluster de 2 workers cada uno abre su propio pool.
+// 2 workers × 10 conexiones = 20 activas → deja 80 libres en postgres (max_connections=100).
+const POOL_SIZE = process.env.NODE_ENV === 'production' ? 10 : 20;
 
 const pool = new Pool({
   connectionString,
-  // Tamaño del pool: 20 conexiones máx para aguantar carga sin agotar postgres (max_connections=50)
-  max: 20,
+  max: POOL_SIZE,
   min: 2,
-  idleTimeoutMillis: 30_000,        // Cierra conexiones ociosas a los 30s
-  connectionTimeoutMillis: 5_000,   // Falla rápido si no hay conexión disponible
-  // SSL desactivado: PostgreSQL corre en red Docker interna — no requiere SSL
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  // SSL off: PostgreSQL corre en red Docker interna
   ssl: false,
+  // Keepalive evita que el firewall de DO corte conexiones inactivas
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10_000,
 });
 
 pool.on('connect', (client) => {

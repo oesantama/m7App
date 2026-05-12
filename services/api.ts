@@ -852,6 +852,8 @@ export const api = {
     clientName?: string;
     fromDate?: string;
     toDate?: string;
+    sortBy?: string;
+    sortDirection?: string;
   }) => {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
@@ -862,6 +864,8 @@ export const api = {
     if (params.clientName) qs.append('clientName', params.clientName);
     if (params.fromDate) qs.append('fromDate', params.fromDate);
     if (params.toDate) qs.append('toDate', params.toDate);
+    if (params.sortBy) qs.append('sortBy', params.sortBy);
+    if (params.sortDirection) qs.append('sortDirection', params.sortDirection);
     return fetchJson(`${API_URL}/management-reports?${qs.toString()}`);
   },
 

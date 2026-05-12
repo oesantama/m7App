@@ -156,15 +156,28 @@ export const getReports = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
 
-    const { ocNumber, manifestNumber, plate, clientName, fromDate, toDate } = req.query;
+    const { ocNumber, manifestNumber, plate, clientName, fromDate, toDate, sortBy, sortDirection } = req.query;
 
     const conditions: string[] = [];
     const values: any[] = [];
     let counter = 1;
 
     if (ocNumber) {
-      conditions.push(`oc_number ILIKE $${counter++}`);
+      conditions.push(`(
+        oc_number ILIKE $${counter} OR 
+        oc_status ILIKE $${counter} OR 
+        remesa_number ILIKE $${counter} OR 
+        remission ILIKE $${counter} OR 
+        manifest_number ILIKE $${counter} OR 
+        plate ILIKE $${counter} OR 
+        client_name ILIKE $${counter} OR 
+        invoice_cxc ILIKE $${counter} OR 
+        receipt ILIKE $${counter} OR 
+        egress ILIKE $${counter} OR 
+        client_order ILIKE $${counter}
+      )`);
       values.push(`%${ocNumber}%`);
+      counter++;
     }
     if (manifestNumber) {
       conditions.push(`manifest_number ILIKE $${counter++}`);
@@ -189,6 +202,71 @@ export const getReports = async (req: Request, res: Response) => {
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
+    // Validate and build ORDER BY sorting direction and column safely
+    const allowedSortFields = [
+      'oc_number', 'oc_status', 'oc_date', 'remesa_number', 'remission', 
+      'remission_status', 'remission_date', 'manifest_number', 'client_order', 
+      'manifest_status', 'manifest_date', 'plate', 'client_name', 
+      'total_value_cxc_final', 'total_value_cxp_final', 'invoice_cxc', 
+      'receipt', 'invoice_date', 'total_cxc', 'egress', 'cxp_date', 
+      'total_cxp', 'fecha_recibo', 'fecha_egreso', 'created_at', 'updated_at'
+    ];
+
+    let orderByColumn = 'manifest_date';
+    if (sortBy && typeof sortBy === 'string') {
+      const cleanSort = sortBy.trim();
+      const mapping: { [key: string]: string } = {
+        ocNumber: 'oc_number',
+        oc_number: 'oc_number',
+        ocStatus: 'oc_status',
+        oc_status: 'oc_status',
+        ocDate: 'oc_date',
+        oc_date: 'oc_date',
+        remesaNumber: 'remesa_number',
+        remesa_number: 'remesa_number',
+        remission: 'remission',
+        manifestNumber: 'manifest_number',
+        manifest_number: 'manifest_number',
+        clientOrder: 'client_order',
+        client_order: 'client_order',
+        manifestStatus: 'manifest_status',
+        manifest_status: 'manifest_status',
+        manifestDate: 'manifest_date',
+        manifest_date: 'manifest_date',
+        plate: 'plate',
+        clientName: 'client_name',
+        client_name: 'client_name',
+        totalValueCxcFinal: 'total_value_cxc_final',
+        total_value_cxc_final: 'total_value_cxc_final',
+        totalValueCxpFinal: 'total_value_cxp_final',
+        total_value_cxp_final: 'total_value_cxp_final',
+        invoiceCxc: 'invoice_cxc',
+        invoice_cxc: 'invoice_cxc',
+        receipt: 'receipt',
+        invoiceDate: 'invoice_date',
+        invoice_date: 'invoice_date',
+        totalCxc: 'total_cxc',
+        total_cxc: 'total_cxc',
+        egress: 'egress',
+        cxpDate: 'cxp_date',
+        cxp_date: 'cxp_date',
+        totalCxp: 'total_cxp',
+        total_cxp: 'total_cxp',
+        fechaRecibo: 'fecha_recibo',
+        fecha_recibo: 'fecha_recibo',
+        fechaEgreso: 'fecha_egreso',
+        fecha_egreso: 'fecha_egreso'
+      };
+
+      if (mapping[cleanSort]) {
+        orderByColumn = mapping[cleanSort];
+      } else if (allowedSortFields.includes(cleanSort)) {
+        orderByColumn = cleanSort;
+      }
+    }
+
+    const direction = sortDirection === 'asc' ? 'ASC' : 'DESC';
+
     // Count query
     const countQuery = `SELECT COUNT(*) as total FROM management_orders ${whereClause}`;
     const countResult = await pool.query(countQuery, values);
@@ -199,7 +277,7 @@ export const getReports = async (req: Request, res: Response) => {
     const dataQuery = `
       SELECT * FROM management_orders 
       ${whereClause} 
-      ORDER BY manifest_date DESC, created_at DESC 
+      ORDER BY ${orderByColumn} ${direction}, created_at DESC 
       LIMIT $${counter++} OFFSET $${counter++}
     `;
     const dataResult = await pool.query(dataQuery, dataValues);

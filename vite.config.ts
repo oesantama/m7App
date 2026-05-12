@@ -57,19 +57,30 @@ export default defineConfig(({ mode }) => {
         }
       },
       build: {
-    outDir: 'dist',
-    minify: 'esbuild',
-    sourcemap: false,
-    chunkSizeWarningLimit: 3000,
-    rollupOptions: {
-      // maxParallelFileOps=2: procesa archivos de 2 en 2, reduce el pico de RAM vs modo paralelo total
-      maxParallelFileOps: 2,
-      output: {
-        // Sin manualChunks: Rollup usa su algoritmo nativo que es más frugal en memoria.
-        // manualChunks fuerza a Rollup a mantener TODOS los chunks en RAM simultáneamente.
-      }
-    }
-  },
+        outDir: 'dist',
+        minify: 'esbuild',
+        sourcemap: false,
+        chunkSizeWarningLimit: 3000,
+        rollupOptions: {
+          maxParallelFileOps: 2,
+          output: {
+            // Separa las librerias pesadas en chunks propios para que el navegador
+            // las cachee independientemente del codigo de la app.
+            // xlsx (420 KB) y jspdf (411 KB) solo se descargan cuando el usuario
+            // abre un modulo de exportacion por primera vez.
+            manualChunks(id) {
+              if (id.includes('node_modules/xlsx'))         return 'vendor-xlsx';
+              if (id.includes('node_modules/jspdf'))        return 'vendor-jspdf';
+              if (id.includes('node_modules/html2canvas'))  return 'vendor-html2canvas';
+              if (id.includes('node_modules/leaflet'))      return 'vendor-leaflet';
+              if (id.includes('node_modules/recharts') ||
+                  id.includes('node_modules/d3-'))          return 'vendor-charts';
+              if (id.includes('node_modules/react') ||
+                  id.includes('node_modules/react-dom'))    return 'vendor-react';
+            },
+          },
+        },
+      },
       optimizeDeps: {
         include: ['zustand', 'react', 'react-dom']
       }

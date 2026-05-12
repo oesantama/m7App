@@ -110,6 +110,20 @@ export const InformesGerenciales: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState(filters);
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
 
+  // Sorting state for Consultas de Información tab
+  const [consultasSortField, setConsultasSortField] = useState<string>('manifest_date');
+  const [consultasSortDirection, setConsultasSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleConsultasSort = (field: string) => {
+    if (consultasSortField === field) {
+      setConsultasSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setConsultasSortField(field);
+      setConsultasSortDirection('desc');
+    }
+    setPage(1);
+  };
+
   // Excel parsing & upload states
   const [excelData, setExcelData] = useState<any[]>([]);
   const [uploadType, setUploadType] = useState<'general' | 'recibo' | 'egreso'>('general');
@@ -139,6 +153,47 @@ export const InformesGerenciales: React.FC = () => {
   // Check if dates are fully selected (Both needed to query)
   const isReportDateRangeComplete = reportFromDate !== '' && reportToDate !== '';
 
+  // 25 columns configuration mapping for general import, receipts and egresses
+  const columnsConfig = [
+    { key: 'oc_number', label: 'Número OC', render: (row: ManagementOrder) => <span className="font-black text-slate-800">{row.oc_number}</span> },
+    { key: 'oc_status', label: 'Estado OC', render: (row: ManagementOrder) => (
+      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase leading-none ${
+        row.oc_status === 'COMPLETADA' || row.oc_status === 'COMPLETADO' || row.oc_status === 'CUMPLIDO' || row.oc_status === 'ENTREGADO'
+          ? 'bg-emerald-50 text-emerald-700'
+          : 'bg-amber-50 text-amber-700'
+      }`}>
+        {row.oc_status || 'S/I'}
+      </span>
+    ) },
+    { key: 'oc_date', label: 'Fecha OC', render: (row: ManagementOrder) => <span className="text-slate-500 whitespace-nowrap">{formatDate(row.oc_date)}</span> },
+    { key: 'remesa_number', label: 'Número Remesa', render: (row: ManagementOrder) => <span className="font-bold text-slate-600">{row.remesa_number || 'S/I'}</span> },
+    { key: 'remission', label: 'Remisión', render: (row: ManagementOrder) => <span className="font-bold text-slate-800">{row.remission || 'S/I'}</span> },
+    { key: 'remission_status', label: 'Estado Remisión', render: (row: ManagementOrder) => <span className="text-slate-500">{row.remission_status || 'S/I'}</span> },
+    { key: 'remission_date', label: 'Fecha Remisión', render: (row: ManagementOrder) => <span className="text-slate-500 whitespace-nowrap">{formatDate(row.remission_date)}</span> },
+    { key: 'manifest_number', label: 'Número Manifiesto', render: (row: ManagementOrder) => <span className="font-bold text-slate-600">{row.manifest_number || 'S/I'}</span> },
+    { key: 'manifest_status', label: 'Estado Manifiesto', render: (row: ManagementOrder) => <span className="text-slate-500">{row.manifest_status || 'S/I'}</span> },
+    { key: 'manifest_date', label: 'Fecha Manifiesto', render: (row: ManagementOrder) => <span className="text-slate-500 whitespace-nowrap">{formatDate(row.manifest_date)}</span> },
+    { key: 'manifest_observations', label: 'Observaciones Manifiesto', render: (row: ManagementOrder) => <span className="text-slate-400 truncate max-w-[150px] inline-block" title={row.manifest_observations}>{row.manifest_observations || 'S/I'}</span> },
+    { key: 'client_order', label: 'Orden Cliente', render: (row: ManagementOrder) => <span className="text-slate-500">{row.client_order || 'S/I'}</span> },
+    { key: 'plate', label: 'Placa', render: (row: ManagementOrder) => (
+      <span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-600 font-mono">
+        {row.plate || 'S/I'}
+      </span>
+    ) },
+    { key: 'client_name', label: 'Nombre Cliente', render: (row: ManagementOrder) => <span className="font-bold truncate max-w-[150px] inline-block" title={row.client_name}>{row.client_name || 'S/I'}</span> },
+    { key: 'total_value_cxc_final', label: 'Valor Total CXC final', align: 'right', render: (row: ManagementOrder) => <span className="font-black text-indigo-600">{formatMoney(row.total_value_cxc_final)}</span> },
+    { key: 'total_value_cxp_final', label: 'Valor Tot CXP final', align: 'right', render: (row: ManagementOrder) => <span className="font-black text-slate-800">{formatMoney(row.total_value_cxp_final)}</span> },
+    { key: 'invoice_cxc', label: 'Factura CXC', render: (row: ManagementOrder) => <span className="font-bold text-slate-700">{row.invoice_cxc || 'S/I'}</span> },
+    { key: 'receipt', label: 'Recibo', render: (row: ManagementOrder) => <span className="font-bold text-slate-700">{row.receipt || 'S/I'}</span> },
+    { key: 'invoice_date', label: 'Fecha Factura', render: (row: ManagementOrder) => <span className="text-slate-500 whitespace-nowrap">{formatDate(row.invoice_date)}</span> },
+    { key: 'total_cxc', label: 'Total CXC', align: 'right', render: (row: ManagementOrder) => <span className="font-bold text-slate-600">{formatMoney(row.total_cxc)}</span> },
+    { key: 'egress', label: 'Egreso', render: (row: ManagementOrder) => <span className="font-bold text-slate-700">{row.egress || 'S/I'}</span> },
+    { key: 'cxp_date', label: 'Fecha CXP', render: (row: ManagementOrder) => <span className="text-slate-500 whitespace-nowrap">{formatDate(row.cxp_date)}</span> },
+    { key: 'total_cxp', label: 'Total CXP', align: 'right', render: (row: ManagementOrder) => <span className="font-bold text-slate-600">{formatMoney(row.total_cxp)}</span> },
+    { key: 'fecha_recibo', label: 'Fecha Recibo', render: (row: ManagementOrder) => <span className="font-bold whitespace-nowrap text-slate-500">{row.fecha_recibo ? formatDate(row.fecha_recibo) : '-'}</span> },
+    { key: 'fecha_egreso', label: 'Fecha Egreso', render: (row: ManagementOrder) => <span className="font-bold whitespace-nowrap text-slate-500">{row.fecha_egreso ? formatDate(row.fecha_egreso) : '-'}</span> }
+  ];
+
   // Load records from DB for the "Consultas" tab
   const loadRecords = async (currentPage = page, filterParams = appliedFilters, currentLimit = limit) => {
     // If one of the dates is selected but not both, do NOT execute query to avoid inconsistency
@@ -153,6 +208,8 @@ export const InformesGerenciales: React.FC = () => {
       const res = await (api as any).getManagementReports({
         page: currentPage,
         limit: currentLimit,
+        sortBy: consultasSortField,
+        sortDirection: consultasSortDirection,
         ...filterParams
       });
       if (res) {
@@ -169,7 +226,7 @@ export const InformesGerenciales: React.FC = () => {
 
   useEffect(() => {
     loadRecords(page, appliedFilters, limit);
-  }, [page, appliedFilters, limit]);
+  }, [page, appliedFilters, limit, consultasSortField, consultasSortDirection]);
 
   // Hierarchical Report Generator (Both States and Clients trees in one pass)
   const generateReport = async () => {
@@ -2515,23 +2572,28 @@ export const InformesGerenciales: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/60 border-b border-slate-200/80">
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Número OC</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Estado OC</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Fecha OC</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Remisión / Remesa</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Manifiesto</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Placa / Conductor</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Nombre Cliente</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Fecha Recibo</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Fecha Egreso</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Valor CXC</th>
-                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Valor CXP</th>
+                    {columnsConfig.map((col) => (
+                      <th 
+                        key={col.key}
+                        onClick={() => handleConsultasSort(col.key)}
+                        className={`p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100 select-none transition-colors whitespace-nowrap ${
+                          col.align === 'right' ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : 'justify-start'}`}>
+                          <span>{col.label}</span>
+                          {consultasSortField === col.key && (
+                            <span className="text-indigo-600 font-bold text-[8px]">{consultasSortDirection === 'asc' ? '▲' : '▼'}</span>
+                          )}
+                        </div>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={11} className="p-12 text-center">
+                      <td colSpan={columnsConfig.length} className="p-12 text-center">
                         <div className="flex flex-col items-center justify-center space-y-3">
                           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent animate-spin rounded-full"></div>
                           <span className="text-xs font-black uppercase tracking-widest text-slate-400">Cargando registros...</span>
@@ -2540,7 +2602,7 @@ export const InformesGerenciales: React.FC = () => {
                     </tr>
                   ) : records.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="p-12 text-center">
+                      <td colSpan={columnsConfig.length} className="p-12 text-center">
                         <div className="flex flex-col items-center justify-center space-y-2 text-slate-400">
                           <FileSpreadsheet size={32} className="stroke-1 animate-pulse" />
                           <span className="text-xs font-black uppercase tracking-wider">No se encontraron registros</span>
@@ -2551,42 +2613,16 @@ export const InformesGerenciales: React.FC = () => {
                   ) : (
                     records.map((row) => (
                       <tr key={row.oc_number} className="hover:bg-slate-50/50 transition-all text-xs font-medium text-slate-700">
-                        <td className="p-4 font-black text-slate-800">{row.oc_number}</td>
-                        <td className="p-4">
-                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase leading-none ${
-                            row.oc_status === 'COMPLETADA' || row.oc_status === 'COMPLETADO' || row.oc_status === 'CUMPLIDO' || row.oc_status === 'ENTREGADO'
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-amber-50 text-amber-700'
-                          }`}>
-                            {row.oc_status || 'S/I'}
-                          </span>
-                        </td>
-                        <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(row.oc_date)}</td>
-                        <td className="p-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-800">{row.remission || 'S/I'}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase">Remesa: {row.remesa_number || 'S/I'}</span>
-                          </div>
-                        </td>
-                        <td className="p-4 font-bold text-slate-600">{row.manifest_number || 'S/I'}</td>
-                        <td className="p-4">
-                          <span className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-600 font-mono">
-                            {row.plate || 'S/I'}
-                          </span>
-                        </td>
-                        <td className="p-4 font-bold truncate max-w-[150px]">{row.client_name || 'S/I'}</td>
-                        <td className="p-4 font-bold whitespace-nowrap text-slate-500">
-                          {row.fecha_recibo ? formatDate(row.fecha_recibo) : '-'}
-                        </td>
-                        <td className="p-4 font-bold whitespace-nowrap text-slate-500">
-                          {row.fecha_egreso ? formatDate(row.fecha_egreso) : '-'}
-                        </td>
-                        <td className="p-4 font-black text-right text-indigo-600">
-                          {formatMoney(row.total_value_cxc_final || row.total_cxc)}
-                        </td>
-                        <td className="p-4 font-black text-right text-slate-800">
-                          {formatMoney(row.total_value_cxp_final || row.total_cxp)}
-                        </td>
+                        {columnsConfig.map((col) => (
+                          <td 
+                            key={col.key} 
+                            className={`p-4 whitespace-nowrap ${
+                              col.align === 'right' ? 'text-right' : 'text-left'
+                            }`}
+                          >
+                            {col.render(row)}
+                          </td>
+                        ))}
                       </tr>
                     ))
                   )}

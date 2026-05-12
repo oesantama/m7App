@@ -267,13 +267,19 @@ const healSchema = async (client: any) => {
     }
   }
 
-  try {
-    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS geocoding_cache_address_key_idx ON geocoding_cache (address_key)`);
-  } catch (e) {}
-
-  try {
-    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_conciliations_doc_inv ON invoice_conciliations (document_id, invoice_number)`);
-  } catch (e) {}
+  for (const [sp, sql] of [
+    ['sp_idx_geo', `CREATE UNIQUE INDEX IF NOT EXISTS geocoding_cache_address_key_idx ON geocoding_cache (address_key)`],
+    ['sp_idx_conc', `CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_conciliations_doc_inv ON invoice_conciliations (document_id, invoice_number)`],
+  ] as [string, string][]) {
+    try {
+      await client.query(`SAVEPOINT ${sp}`);
+      await client.query(sql);
+      await client.query(`RELEASE SAVEPOINT ${sp}`);
+    } catch (e) {
+      await client.query(`ROLLBACK TO SAVEPOINT ${sp}`).catch(() => {});
+      await client.query(`RELEASE SAVEPOINT ${sp}`).catch(() => {});
+    }
+  }
 
   // ─── Índices de rendimiento crítico (agregados en auditoría Sprint 1) ──────────
   const performanceIndexes = [
@@ -334,9 +340,47 @@ const healSchema = async (client: any) => {
     `CREATE INDEX IF NOT EXISTS idx_conciliation_transactions_inv   ON conciliation_transactions (invoice)`,
     // unique: un inventario por vehículo/artículo/lote
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_vehicle_inventory ON vehicle_inventory (vehicle_plate, article_id, batch)`,
+
+    // --- INDICES ADICIONALES DE RENDIMIENTO ---
+    // documents_l: filtro combinado cliente+estado (pantalla principal de despacho)
+    `CREATE INDEX IF NOT EXISTS idx_documents_l_client_status ON documents_l (client_id, status)`,
+    // documents_l: búsqueda por external_doc_id (upload de Plan R y planificador)
+    `CREATE INDEX IF NOT EXISTS idx_documents_l_ext_doc_id ON documents_l (external_doc_id)`,
+    // document_items: filtro por item_status + document_id (query masivo del planificador)
+    `CREATE INDEX IF NOT EXISTS idx_document_items_status_doc ON document_items (item_status, document_id)`,
+    // document_items: búsqueda por ciudad + item_status (agrupación geográfica)
+    `CREATE INDEX IF NOT EXISTS idx_document_items_city_status ON document_items (city, item_status)`,
+    // notificaciones: lookup por tipo + estado (syncInventory, blindCount)
+    `CREATE INDEX IF NOT EXISTS idx_notificaciones_tipo_status ON notificaciones (tipo_notificacion_id, status_id)`,
+    // master_records: lookup frecuente categoría + estado
+    `CREATE INDEX IF NOT EXISTS idx_master_records_cat_status ON master_records (category, status_id)`,
+    // routing_patterns: lookup por vehículo + ciudad (aprendizaje de territorio)
+    `CREATE INDEX IF NOT EXISTS idx_routing_patterns_vehicle_city ON routing_patterns (vehicle_id, city)`,
+    // delivery_patterns: lookup por dirección + cliente
+    `CREATE INDEX IF NOT EXISTS idx_delivery_patterns_client ON delivery_patterns (client_id, address_key)`,
+    // delivery_confirmations: historial de entregas por conductor
+    `CREATE INDEX IF NOT EXISTS idx_delivery_conf_driver ON delivery_confirmations (driver_id, delivered_at DESC)`,
+    // route_invoices: join ruta ↔ factura (muy frecuente en conciliación)
+    `CREATE INDEX IF NOT EXISTS idx_route_invoices_route ON route_invoices (route_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_route_invoices_invoice ON route_invoices (invoice_id)`,
+    // users: búsqueda por email (login, cada request autenticado)
+    `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`,
+    // assignments: filtro is_active (usado en CADA asignación activa)
+    `CREATE INDEX IF NOT EXISTS idx_assignments_active ON assignments (client_id, is_active)`,
   ];
-  for (const idxSql of performanceIndexes) {
-    try { await client.query(idxSql); } catch (e) {}
+  // Cada índice usa SAVEPOINT para que un fallo no aborte la transacción completa.
+  // Sin SAVEPOINT, un error dentro de BEGIN..COMMIT deja la transacción en estado
+  // ABORTED y todos los queries siguientes fallan (incluyendo creación de tablas).
+  for (let i = 0; i < performanceIndexes.length; i++) {
+    const sp = `sp_idx_${i}`;
+    try {
+      await client.query(`SAVEPOINT ${sp}`);
+      await client.query(performanceIndexes[i]);
+      await client.query(`RELEASE SAVEPOINT ${sp}`);
+    } catch (e: any) {
+      await client.query(`ROLLBACK TO SAVEPOINT ${sp}`).catch(() => {});
+      await client.query(`RELEASE SAVEPOINT ${sp}`).catch(() => {});
+    }
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
