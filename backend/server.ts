@@ -177,20 +177,32 @@ app.use((err: any, req: any, res: any, _next: any) => {
 });
 
 const PORT = process.env.PORT || 8080;
+
+// En modo cluster solo el Worker 1 corre migraciones para evitar que dos workers
+// intenten CREATE INDEX al mismo tiempo (genera duplicate key en pg_class).
+const isLeaderWorker = !cluster.worker || cluster.worker.id === 1;
+
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
   console.log(`[ORBIT-SYSTEM] Servidor Operacional en Puerto ${PORT}`);
   console.log(`[ORBIT-SYSTEM] Versión: ${APP_VERSION}`);
+  console.log(`[ORBIT-SYSTEM] Worker: ${cluster.worker?.id ?? 'standalone'}`);
   console.log(`[ORBIT-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
   initScheduler();
 
-  // Inicialización de WhatsApp 
   console.log('[ORBIT-SYSTEM] Evolution API Integration Active');
 
-  // FLUJO DE ARRANQUE CRÍTICO M7 (SECUENCIAL PARA EVITAR DEADLOCKS)
+  if (!isLeaderWorker) {
+    // Workers secundarios no corren migraciones — el Worker 1 ya las maneja.
+    systemReady = true;
+    console.log('[ORBIT-BOOT] Worker secundario listo (migraciones delegadas al Worker 1).');
+    return;
+  }
+
+  // FLUJO DE ARRANQUE CRÍTICO M7 — solo Worker 1 (o modo standalone en dev)
   console.log('[ORBIT-BOOT] Iniciando secuencia de servicios...');
-  
+
   initDeliveryTables()
     .then(() => {
       console.log('[ORBIT-BOOT] Tablas de Despacho verificadas.');
@@ -201,7 +213,7 @@ app.listen(PORT, () => {
       console.log('[ORBIT-BOOT] Ejecutando Restauración Nuclear...');
       const result = await m.restoreSystem();
       console.log(`[ORBIT-BOOT] Sistema configurado en ${Date.now() - dbStart}ms:`, result.message);
-      
+
       // Lanzar optimizaciones pesadas en segundo plano para no bloquear el 200 OK del healthcheck
       m.runBackgroundOptimizations().catch(() => {});
 
