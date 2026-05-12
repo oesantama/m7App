@@ -86,7 +86,9 @@ export const InformesGerenciales: React.FC = () => {
   const [rightChartLimit, setRightChartLimit] = useState<'top10' | 'all'>('top10');
   const [rightChartGroupBy, setRightChartGroupBy] = useState<'oc' | 'manifiesto'>('manifiesto');
   const [tdmSearchQuery, setTdmSearchQuery] = useState('');
-  const [tdmSortField, setTdmSortField] = useState<'clientName' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int' | 'participation' | 'invoicedSameMonthVal' | 'invoicedSameMonthPct' | 'averagePaymentDays'>('ventaTotal');
+  const [tdmSortField, setTdmSortField] = useState<
+    'clientName' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int' | 'participation' | 'invoicedSameMonthVal' | 'invoicedSameMonthPct' | 'averagePaymentDays' | 'workedDaysCount' | 'totalVehicleUtilizations' | 'averageVehiclesPerDay' | 'averageRecDays' | 'averageEgrDays' | 'averageManRecDays' | 'receivedValue' | 'receivedPct'
+  >('ventaTotal');
   const [tdmSortDirection, setTdmSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // DB Records state
@@ -764,6 +766,13 @@ export const InformesGerenciales: React.FC = () => {
         invoicedSameMonth: number;
         totalPaymentDays: number;
         paymentDaysCount: number;
+        totalRecDays: number;
+        recDaysCount: number;
+        totalEgrDays: number;
+        egrDaysCount: number;
+        totalManRecDays: number;
+        manRecDaysCount: number;
+        receivedValue: number;
       } 
     } = {};
 
@@ -793,7 +802,14 @@ export const InformesGerenciales: React.FC = () => {
           vehicleDays: new Set<string>(),
           invoicedSameMonth: 0,
           totalPaymentDays: 0,
-          paymentDaysCount: 0
+          paymentDaysCount: 0,
+          totalRecDays: 0,
+          recDaysCount: 0,
+          totalEgrDays: 0,
+          egrDaysCount: 0,
+          totalManRecDays: 0,
+          manRecDaysCount: 0,
+          receivedValue: 0
         };
       }
 
@@ -804,10 +820,12 @@ export const InformesGerenciales: React.FC = () => {
       let invoicedInSameMonth = 0;
       const dMan = parseCustomDate(r.manifest_date);
       const dInv = parseCustomDate(r.invoice_date);
+      const dRec = parseCustomDate(r.fecha_recibo);
+      const dEgr = parseCustomDate(r.fecha_egreso);
 
       if (dMan && dInv) {
         const diffMs = dInv.getTime() - dMan.getTime();
-        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
         clientsMap[client].totalPaymentDays += diffDays;
         clientsMap[client].paymentDaysCount += 1;
 
@@ -819,6 +837,34 @@ export const InformesGerenciales: React.FC = () => {
         }
       }
       clientsMap[client].invoicedSameMonth += invoicedInSameMonth;
+
+      // 1. prom dias rec (invoice to receipt)
+      if (dInv && dRec) {
+        const diffMs = dRec.getTime() - dInv.getTime();
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        clientsMap[client].totalRecDays += diffDays;
+        clientsMap[client].recDaysCount += 1;
+      }
+
+      // 2. prom dias egreso (receipt to egress)
+      if (dRec && dEgr) {
+        const diffMs = dEgr.getTime() - dRec.getTime();
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        clientsMap[client].totalEgrDays += diffDays;
+        clientsMap[client].egrDaysCount += 1;
+      }
+
+      // 3. prom dia man recibido (manifest to receipt) and received value
+      if (dMan && dRec) {
+        const diffMs = dRec.getTime() - dMan.getTime();
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        clientsMap[client].totalManRecDays += diffDays;
+        clientsMap[client].manRecDaysCount += 1;
+      }
+
+      if (dRec) {
+        clientsMap[client].receivedValue += ventaRecord;
+      }
 
       if (plate) {
         clientsMap[client].vehicles.add(plate);
@@ -854,6 +900,12 @@ export const InformesGerenciales: React.FC = () => {
 
       const averagePaymentDays = node.paymentDaysCount > 0 ? node.totalPaymentDays / node.paymentDaysCount : 0;
 
+      const averageRecDays = node.recDaysCount > 0 ? node.totalRecDays / node.recDaysCount : 0;
+      const averageEgrDays = node.egrDaysCount > 0 ? node.totalEgrDays / node.egrDaysCount : 0;
+      const averageManRecDays = node.manRecDaysCount > 0 ? node.totalManRecDays / node.manRecDaysCount : 0;
+      const receivedValue = node.receivedValue;
+      const receivedPct = ventaTotal > 0 ? (receivedValue / ventaTotal) * 100 : 0;
+
       return {
         clientName,
         ventaTotal,
@@ -872,7 +924,12 @@ export const InformesGerenciales: React.FC = () => {
         invoicedSameMonthPct,
         averagePaymentDays,
         totalPaymentDays: node.totalPaymentDays,
-        paymentDaysCount: node.paymentDaysCount
+        paymentDaysCount: node.paymentDaysCount,
+        averageRecDays,
+        averageEgrDays,
+        averageManRecDays,
+        receivedValue,
+        receivedPct
       };
     }).sort((a, b) => {
       const valA = a[tdmSortField];
@@ -981,7 +1038,12 @@ export const InformesGerenciales: React.FC = () => {
         "PARTICIPACIÓN (%)": Math.round(row.participation),
         "FACT. MISMO MES": row.invoicedSameMonthVal,
         "% FACT. MISMO MES": Math.round(row.invoicedSameMonthPct * 10) / 10,
-        "PROM DÍA PAGO (DÍAS)": Math.round(row.averagePaymentDays * 10) / 10,
+        "PROM DÍA PAGO": Math.round(row.averagePaymentDays * 10) / 10,
+        "PROM DIAS REC": Math.round((row.averageRecDays || 0) * 10) / 10,
+        "PROM DIAS EGRESO": Math.round((row.averageEgrDays || 0) * 10) / 10,
+        "PROM DIA MAN RECIBIDO": Math.round((row.averageManRecDays || 0) * 10) / 10,
+        "VL RECIBIDO": row.receivedValue,
+        "% RECIBIDO": Math.round((row.receivedPct || 0) * 10) / 10,
         "DÍAS LABORADOS": row.workedDaysCount,
         "VEHÍCULOS UTILIZADOS": row.totalVehicleUtilizations,
         "PROMEDIO DÍA": Math.round(row.averageVehiclesPerDay * 10) / 10
@@ -999,6 +1061,12 @@ export const InformesGerenciales: React.FC = () => {
       const totalPaymentDaysVal = tdmTableData.reduce((sum, item) => sum + item.totalPaymentDays, 0);
       const totalPaymentDaysCount = tdmTableData.reduce((sum, item) => sum + item.paymentDaysCount, 0);
       const overallAveragePaymentDays = totalPaymentDaysCount > 0 ? totalPaymentDaysVal / totalPaymentDaysCount : 0;
+
+      const overallAverageRecDays = tdmTableData.reduce((sum, i) => sum + (i.totalRecDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.recDaysCount || 0), 0) || 0;
+      const overallAverageEgrDays = tdmTableData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
+      const overallAverageManRecDays = tdmTableData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
+      const totalReceivedValueVal = tdmTableData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+      const overallReceivedPct = totalVenta > 0 ? (totalReceivedValueVal / totalVenta) * 100 : 0;
 
       const allPlates = new Set<string>();
       const allDates = new Set<string>();
@@ -1023,7 +1091,12 @@ export const InformesGerenciales: React.FC = () => {
         "PARTICIPACIÓN (%)": 100,
         "FACT. MISMO MES": totalInvoicedSameMonth,
         "% FACT. MISMO MES": Math.round(overallInvoicedSameMonthPct * 10) / 10,
-        "PROM DÍA PAGO (DÍAS)": Math.round(overallAveragePaymentDays * 10) / 10,
+        "PROM DÍA PAGO": Math.round(overallAveragePaymentDays * 10) / 10,
+        "PROM DIAS REC": Math.round(overallAverageRecDays * 10) / 10,
+        "PROM DIAS EGRESO": Math.round(overallAverageEgrDays * 10) / 10,
+        "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays * 10) / 10,
+        "VL RECIBIDO": totalReceivedValueVal,
+        "% RECIBIDO": Math.round(overallReceivedPct * 10) / 10,
         "DÍAS LABORADOS": totalWorkedDays,
         "VEHÍCULOS UTILIZADOS": totalVehicleDaysCount,
         "PROMEDIO DÍA": Math.round(totalAvgVehiclesPerDay * 10) / 10
@@ -1921,6 +1994,12 @@ export const InformesGerenciales: React.FC = () => {
                     const totalPaymentDaysCount = filteredData.reduce((sum, item) => sum + item.paymentDaysCount, 0);
                     const overallAveragePaymentDays = totalPaymentDaysCount > 0 ? totalPaymentDaysVal / totalPaymentDaysCount : 0;
 
+                    const overallAverageRecDays = filteredData.reduce((sum, i) => sum + (i.totalRecDays || 0), 0) / filteredData.reduce((sum, i) => sum + (i.recDaysCount || 0), 0) || 0;
+                    const overallAverageEgrDays = filteredData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / filteredData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
+                    const overallAverageManRecDays = filteredData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / filteredData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
+                    const totalReceivedValueVal = filteredData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+                    const overallReceivedPct = totalVenta > 0 ? (totalReceivedValueVal / totalVenta) * 100 : 0;
+
                     const allPlates = new Set<string>();
                     const allDates = new Set<string>();
                     const allVehicleDays = new Set<string>();
@@ -2093,6 +2172,61 @@ export const InformesGerenciales: React.FC = () => {
                                     </div>
                                   </th>
                                   <th 
+                                    onClick={() => handleTdmSort('averageRecDays')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>prom dias rec</span>
+                                      {tdmSortField === 'averageRecDays' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('averageEgrDays')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>prom dias egreso</span>
+                                      {tdmSortField === 'averageEgrDays' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('averageManRecDays')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>prom dia man recibido</span>
+                                      {tdmSortField === 'averageManRecDays' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('receivedValue')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>Vl Recibido</span>
+                                      {tdmSortField === 'receivedValue' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
+                                    onClick={() => handleTdmSort('receivedPct')} 
+                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
+                                  >
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span>% Recibido</span>
+                                      {tdmSortField === 'receivedPct' && (
+                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
+                                      )}
+                                    </div>
+                                  </th>
+                                  <th 
                                     onClick={() => handleTdmSort('workedDaysCount')} 
                                     className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
                                   >
@@ -2170,7 +2304,26 @@ export const InformesGerenciales: React.FC = () => {
                                       </span>
                                     </td>
                                     <td className="p-3.5 text-right font-mono font-bold text-slate-700">
-                                      {row.averagePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} d
+                                      {row.averagePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-indigo-600/85">
+                                      {row.averageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-violet-600/85">
+                                      {row.averageEgrDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-700">
+                                      {row.averageManRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-900">
+                                      {row.receivedValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-black">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] ${
+                                        row.receivedPct < 60 ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-emerald-50 text-emerald-600'
+                                      }`}>
+                                        {row.receivedPct.toFixed(1)}%
+                                      </span>
                                     </td>
                                     <td className="p-3.5 text-right font-mono text-slate-600 font-bold">
                                       {row.workedDaysCount}
@@ -2211,7 +2364,24 @@ export const InformesGerenciales: React.FC = () => {
                                     {overallInvoicedSameMonthPct.toFixed(1)}%
                                   </td>
                                   <td className="p-3.5 text-right font-mono text-slate-950 font-black">
-                                    {overallAveragePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} d
+                                    {overallAveragePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-indigo-700/90 font-black">
+                                    {overallAverageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-violet-700/90 font-black">
+                                    {overallAverageEgrDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                    {overallAverageManRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono font-bold text-slate-950 font-black">
+                                    {totalReceivedValueVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                  </td>
+                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                    <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
+                                      {overallReceivedPct.toFixed(1)}%
+                                    </span>
                                   </td>
                                   <td className="p-3.5 text-right font-mono text-slate-800">
                                     {totalWorkedDaysCount}
