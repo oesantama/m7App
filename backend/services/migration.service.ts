@@ -267,18 +267,11 @@ const healSchema = async (client: any) => {
     }
   }
 
-  for (const [sp, sql] of [
-    ['sp_idx_geo', `CREATE UNIQUE INDEX IF NOT EXISTS geocoding_cache_address_key_idx ON geocoding_cache (address_key)`],
-    ['sp_idx_conc', `CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_conciliations_doc_inv ON invoice_conciliations (document_id, invoice_number)`],
-  ] as [string, string][]) {
-    try {
-      await client.query(`SAVEPOINT ${sp}`);
-      await client.query(sql);
-      await client.query(`RELEASE SAVEPOINT ${sp}`);
-    } catch (e) {
-      await client.query(`ROLLBACK TO SAVEPOINT ${sp}`).catch(() => {});
-      await client.query(`RELEASE SAVEPOINT ${sp}`).catch(() => {});
-    }
+  for (const sql of [
+    `CREATE UNIQUE INDEX IF NOT EXISTS geocoding_cache_address_key_idx ON geocoding_cache (address_key)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_conciliations_doc_inv ON invoice_conciliations (document_id, invoice_number)`,
+  ]) {
+    try { await client.query(sql); } catch (e) {}
   }
 
   // ─── Índices de rendimiento crítico (agregados en auditoría Sprint 1) ──────────
@@ -368,19 +361,11 @@ const healSchema = async (client: any) => {
     // assignments: filtro is_active (usado en CADA asignación activa)
     `CREATE INDEX IF NOT EXISTS idx_assignments_active ON assignments (client_id, is_active)`,
   ];
-  // Cada índice usa SAVEPOINT para que un fallo no aborte la transacción completa.
-  // Sin SAVEPOINT, un error dentro de BEGIN..COMMIT deja la transacción en estado
-  // ABORTED y todos los queries siguientes fallan (incluyendo creación de tablas).
-  for (let i = 0; i < performanceIndexes.length; i++) {
-    const sp = `sp_idx_${i}`;
-    try {
-      await client.query(`SAVEPOINT ${sp}`);
-      await client.query(performanceIndexes[i]);
-      await client.query(`RELEASE SAVEPOINT ${sp}`);
-    } catch (e: any) {
-      await client.query(`ROLLBACK TO SAVEPOINT ${sp}`).catch(() => {});
-      await client.query(`RELEASE SAVEPOINT ${sp}`).catch(() => {});
-    }
+  // healSchema corre en autocommit (antes del BEGIN en restoreSystem).
+  // En autocommit cada statement es su propio txn: un IF NOT EXISTS fallido no
+  // envenena la conexión, así que plain try/catch es suficiente.
+  for (const idxSql of performanceIndexes) {
+    try { await client.query(idxSql); } catch (e) {}
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
