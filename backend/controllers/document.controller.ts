@@ -2175,10 +2175,40 @@ export const uploadCumplido = async (req: Request, res: Response) => {
         });
     };
 
+    // Helper: genera el link con hasta 3 reintentos si rclone devuelve vacío
+    const getRcloneLink = (remotePath: string): Promise<string> =>
+        new Promise((resolve) => {
+            let attempts = 0;
+            const tryLink = () => {
+                exec(`rclone link "${remotePath}"`, (err, stdout) => {
+                    const link = stdout ? stdout.trim() : '';
+                    if (link) return resolve(link);
+                    attempts++;
+                    if (attempts < 3) {
+                        setTimeout(tryLink, 1500);
+                    } else {
+                        console.error(`[CUMPLIDOS] rclone link sin resultado tras 3 intentos: ${remotePath}`);
+                        resolve('');
+                    }
+                });
+            };
+            tryLink();
+        });
+
     try {
         const clientRes = await pool.query('SELECT name, client_type FROM clients WHERE id = $1', [clientId]);
         const isNational = clientRes.rows[0]?.client_type === 'NACIONAL';
         const fullClientName = clientRes.rows[0]?.name || clientName;
+
+        // Crear la carpeta destino UNA SOLA VEZ antes de los uploads paralelos.
+        // Sin esto, las 5 subidas concurrentes crean cada una su propia carpeta "DIA XX"
+        // en Google Drive (que permite nombres duplicados), resultando en carpetas repetidas.
+        await new Promise<void>((resolve) => {
+            exec(`rclone mkdir "gdrive_cumplidos:${drivePath}"`, (err) => {
+                if (err) console.error('[CUMPLIDOS] Error creando carpeta destino:', err);
+                resolve();
+            });
+        });
 
         const limit = pLimit(5); // Procesar hasta 5 archivos en paralelo para no ahogar el CPU ni la red
         const uploadTasks = files.map(file => limit(async () => {
@@ -2226,11 +2256,8 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                 });
             });
 
-            // Generar enlace público/compartido de Google Drive
-            const driveLink = await new Promise<string>((resolve) => {
-                const linkCmd = `rclone link "gdrive_cumplidos:${drivePath}/${fileName}"`;
-                exec(linkCmd, (err, stdout) => resolve(stdout ? stdout.trim() : ''));
-            });
+            // Generar enlace — con reintentos para evitar links vacíos
+            const driveLink = await getRcloneLink(`gdrive_cumplidos:${drivePath}/${fileName}`);
 
             // Registrar en base de datos
             await pool.query(

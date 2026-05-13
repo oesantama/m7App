@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Informe de Migración y Optimización — OrbitM7</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 50%, #0a1628 100%);
+      border-bottom: 1px solid #1e4a7a;
+      padding: 48px 40px 40px;
+    }
+    .header-inner { max-width: 960px; margin: 0 auto; }
+    .badge {
+      display: inline-block;
+      background: #1a56a0;
+      color: #93c5fd;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+      border: 1px solid #2563eb44;
+    }
+    .header h1 {
+      font-size: 32px;
+      font-weight: 800;
+      color: #f0f9ff;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      color: #94a3b8;
+      font-size: 15px;
+    }
+    .header-meta {
+      display: flex;
+      gap: 24px;
+      margin-top: 20px;
+    }
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #64748b;
+    }
+    .meta-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-red { background: #ef4444; }
+    .dot-green { background: #22c55e; }
+    .dot-blue { background: #3b82f6; }
+
+    /* ── LAYOUT ── */
+    .container { max-width: 960px; margin: 0 auto; padding: 40px; }
+
+    /* ── CARDS ── */
+    .card {
+      background: #161b27;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    .card-danger { border-left: 4px solid #ef4444; }
+    .card-warning { border-left: 4px solid #f59e0b; }
+    .card-success { border-left: 4px solid #22c55e; }
+    .card-info { border-left: 4px solid #3b82f6; }
+
+    .card h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .card p { color: #94a3b8; font-size: 14px; margin-top: 6px; }
+
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #475569;
+      margin: 40px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #1e293b;
+    }
+
+    /* ── METRICS ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .metric {
+      background: #0d1520;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .metric-value {
+      font-size: 30px;
+      font-weight: 800;
+      color: #f0f9ff;
+      letter-spacing: -1px;
+    }
+    .metric-value.bad { color: #ef4444; }
+    .metric-value.good { color: #22c55e; }
+    .metric-value.warn { color: #f59e0b; }
+    .metric-label {
+      font-size: 11px;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+    .metric-sub {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    /* ── COMPARISON TABLE ── */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .compare-table th {
+      background: #0d1520;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #1e293b;
+    }
+    .compare-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #1a2235;
+      vertical-align: middle;
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table tr:hover td { background: #0d1520; }
+    .tag-bad {
+      display: inline-block;
+      background: #3b0a0a;
+      color: #fca5a5;
+      border: 1px solid #7f1d1d;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .tag-good {
+      display: inline-block;
+      background: #052e16;
+      color: #86efac;
+      border: 1px solid #14532d;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .tag-neutral {
+      display: inline-block;
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* ── STEPS ── */
+    .steps { list-style: none; }
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .step:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 18px;
+      top: 40px;
+      bottom: -4px;
+      width: 2px;
+      background: #1e293b;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #1a3050;
+      border: 2px solid #2563eb;
+      color: #60a5fa;
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step-num.done {
+      background: #052e16;
+      border-color: #16a34a;
+      color: #4ade80;
+    }
+    .step-num.warning {
+      background: #2d1f00;
+      border-color: #d97706;
+      color: #fbbf24;
+    }
+    .step-content { flex: 1; padding-top: 6px; }
+    .step-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 4px;
+    }
+    .step-desc { font-size: 13px; color: #64748b; }
+    .step-desc strong { color: #94a3b8; }
+
+    /* ── CODE BLOCKS ── */
+    .code-block {
+      background: #080d14;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      color: #7dd3fc;
+      margin-top: 10px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .code-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+    .cmd { color: #a78bfa; }
+    .cmt { color: #374151; }
+    .str { color: #86efac; }
+    .kw  { color: #f9a8d4; }
+
+    /* ── ALERT BOX ── */
+    .alert {
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 12px;
+      font-size: 13px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .alert-danger { background: #2d0707; border: 1px solid #7f1d1d; color: #fca5a5; }
+    .alert-warning { background: #2d1a00; border: 1px solid #78350f; color: #fcd34d; }
+    .alert-success { background: #021a0c; border: 1px solid #14532d; color: #86efac; }
+    .alert-info { background: #0c1f3a; border: 1px solid #1e3a5f; color: #93c5fd; }
+
+    /* ── PRIORITY TABLE ── */
+    .priority-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .priority-item {
+      background: #0d1520;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .priority-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .priority-title { font-size: 14px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
+    .priority-meta { font-size: 12px; color: #64748b; }
+    .impact-high { border-top: 3px solid #22c55e; }
+    .impact-med  { border-top: 3px solid #f59e0b; }
+    .impact-low  { border-top: 3px solid #64748b; }
+
+    /* ── COOLIFY SECTION ── */
+    .coolify-steps { counter-reset: coolify; }
+    .coolify-step {
+      background: #0d1520;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .coolify-step::before {
+      counter-increment: coolify;
+      content: counter(coolify);
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      background: #1a2535;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: #60a5fa;
+    }
+    .coolify-text { font-size: 14px; color: #94a3b8; line-height: 1.5; }
+    .coolify-text strong { color: #e2e8f0; }
+    .coolify-text code {
+      background: #0a1220;
+      border: 1px solid #1e293b;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #7dd3fc;
+    }
+
+    /* ── TIMELINE ── */
+    .timeline { position: relative; padding-left: 28px; }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 9px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, #1e3a5f, #1e293b);
+    }
+    .tl-item {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .tl-dot {
+      position: absolute;
+      left: -24px;
+      top: 4px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid;
+    }
+    .tl-dot-blue  { background: #1e3a5f; border-color: #3b82f6; }
+    .tl-dot-green { background: #052e16; border-color: #22c55e; }
+    .tl-dot-warn  { background: #2d1a00; border-color: #f59e0b; }
+    .tl-time { font-size: 11px; color: #475569; font-weight: 700; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tl-text { font-size: 14px; color: #94a3b8; }
+    .tl-text strong { color: #e2e8f0; }
+
+    /* ── FOOTER ── */
+    .footer {
+      background: #0a0d14;
+      border-top: 1px solid #1e293b;
+      padding: 24px 40px;
+      margin-top: 20px;
+    }
+    .footer-inner { max-width: 960px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .footer p { font-size: 12px; color: #334155; }
+
+    @media (max-width: 640px) {
+      .container { padding: 20px; }
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+      .priority-grid { grid-template-columns: 1fr; }
+      .header { padding: 28px 20px; }
+      .footer-inner { flex-direction: column; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div class="badge">Informe Técnico · Optimización de Infraestructura</div>
+    <h1>Migración SFO2 → NYC1 &amp; Optimización Coolify</h1>
+    <p>Plan completo para reducir latencia, acelerar deploys y estabilizar la plataforma OrbitM7</p>
+    <div class="header-meta">
+      <div class="meta-item">
+        <div class="meta-dot dot-red"></div>
+        Estado actual: SFO2 San Francisco
+      </div>
+      <div class="meta-item">
+        <div class="meta-dot dot-green"></div>
+        Destino: NYC1 Nueva York
+      </div>
+      <div class="meta-item">
+        <div class="meta-dot dot-blue"></div>
+        Fecha sugerida: Domingo
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ── DIAGNÓSTICO ── -->
+  <div class="section-title">Diagnóstico actual</div>
+
+  <div class="metrics-grid">
+    <div class="metric">
+      <div class="metric-value bad">~160ms</div>
+      <div class="metric-label">Latencia Colombia → SFO2</div>
+      <div class="metric-sub">San Francisco, CA</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value warn">~8 min</div>
+      <div class="metric-label">Tiempo de deploy</div>
+      <div class="metric-sub">Sin caché de capas Docker</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value bad">1 vCPU</div>
+      <div class="metric-label">CPU durante build</div>
+      <div class="metric-sub">Compartida con producción</div>
+    </div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric">
+      <div class="metric-value good">~70ms</div>
+      <div class="metric-label">Latencia Colombia → NYC1</div>
+      <div class="metric-sub">Nueva York — objetivo</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value good">~2 min</div>
+      <div class="metric-label">Deploy con caché GHA</div>
+      <div class="metric-sub">Ya implementado ✓</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value good">2 vCPU</div>
+      <div class="metric-label">CPU actual</div>
+      <div class="metric-sub">Resize ya aplicado ✓</div>
+    </div>
+  </div>
+
+  <!-- ── COMPARACIÓN REGIONES ── -->
+  <div class="section-title">Comparación de regiones DigitalOcean</div>
+
+  <div class="card">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Región</th>
+          <th>Latencia desde Colombia</th>
+          <th>Costo</th>
+          <th>Recomendación</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color:#ef4444">SFO2 — San Francisco</strong> <span style="color:#475569;font-size:12px">(actual)</span></td>
+          <td><span class="tag-bad">~160 ms</span></td>
+          <td>$24/mo</td>
+          <td><span class="tag-bad">Alejado de CO</span></td>
+        </tr>
+        <tr>
+          <td><strong style="color:#22c55e">NYC1 — Nueva York</strong></td>
+          <td><span class="tag-good">~65 ms</span></td>
+          <td>$24/mo</td>
+          <td><span class="tag-good">Óptimo para Colombia</span></td>
+        </tr>
+        <tr>
+          <td><strong style="color:#22c55e">NYC3 — Nueva York</strong></td>
+          <td><span class="tag-good">~65 ms</span></td>
+          <td>$24/mo</td>
+          <td><span class="tag-good">Idéntico a NYC1</span></td>
+        </tr>
+        <tr>
+          <td><strong>MIA — Miami</strong> <span style="color:#475569;font-size:12px">(si está disponible)</span></td>
+          <td><span class="tag-good">~45 ms</span></td>
+          <td>$24/mo</td>
+          <td><span class="tag-good">Más cercano, verificar disponibilidad</span></td>
+        </tr>
+        <tr>
+          <td><strong>AMS3 — Ámsterdam</strong></td>
+          <td><span class="tag-bad">~210 ms</span></td>
+          <td>$24/mo</td>
+          <td><span class="tag-bad">Peor que SFO2</span></td>
+        </tr>
+        <tr>
+          <td><strong>SGP1 — Singapur</strong></td>
+          <td><span class="tag-bad">~300 ms</span></td>
+          <td>$24/mo</td>
+          <td><span class="tag-bad">Inaceptable</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── PROCESO MIGRACIÓN ── -->
+  <div class="section-title">Proceso de migración paso a paso</div>
+
+  <div class="card card-warning">
+    <h2>⚠️ Antes de empezar</h2>
+    <p>Hacer la migración un <strong>domingo en la noche</strong> cuando el tráfico es mínimo. El proceso completo toma ~30-45 minutos y la app estará intermitente durante ~5 minutos del paso de DNS.</p>
+  </div>
+
+  <div class="card">
+    <h2>Fase 1 — Crear el Snapshot</h2>
+    <h3>~10 minutos · Sin downtime</h3>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Abrir el droplet en DigitalOcean</div>
+          <div class="step-desc">Dashboard → Droplets → <strong>ubuntu-s-2vcpu-4gb-sfo2-01</strong></div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Ir a la pestaña "Snapshots"</div>
+          <div class="step-desc">Menú izquierdo del droplet → Snapshots</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Crear snapshot</div>
+          <div class="step-desc">Clic en <strong>"Take Snapshot"</strong> → nombre: <code style="background:#0a1220;padding:2px 6px;border-radius:4px;font-family:monospace;color:#7dd3fc;font-size:12px">m7app-sfo2-2025-DD</code></div>
+          <div class="alert alert-info" style="margin-top:10px">
+            <span class="alert-icon">ℹ️</span>
+            <span>La app sigue corriendo mientras se crea el snapshot. No habrá caída en este paso.</span>
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Esperar a que termine</div>
+          <div class="step-desc">Tarda entre 5 y 15 minutos dependiendo del tamaño del disco</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Fase 2 — Crear el Nuevo Droplet en NYC1</h2>
+    <h3>~5 minutos · Sin downtime</h3>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Ir a Images → Snapshots</div>
+          <div class="step-desc">DigitalOcean → <strong>Manage → Images → Snapshots</strong></div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Crear droplet desde el snapshot</div>
+          <div class="step-desc">Buscar el snapshot <strong>m7app-sfo2</strong> → clic en los <strong>"..."</strong> → <strong>"Create Droplet"</strong></div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Configurar el nuevo droplet</div>
+          <div class="step-desc">
+            <strong>Región:</strong> Nueva York 1 (NYC1)<br/>
+            <strong>Plan:</strong> 2 vCPU / 4 GB RAM / $24/mo<br/>
+            <strong>Auth:</strong> SSH Key (la misma existente)<br/>
+            <strong>Hostname:</strong> ubuntu-s-2vcpu-4gb-nyc1-01
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Anotar la nueva IP</div>
+          <div class="step-desc">DigitalOcean asigna una IP nueva. Guardarla — la necesitas en los siguientes pasos.</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Fase 3 — Actualizar Coolify</h2>
+    <h3>~5 minutos</h3>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Abrir Coolify → Settings → Servers</div>
+          <div class="step-desc">En el panel lateral de Coolify</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Seleccionar el servidor actual</div>
+          <div class="step-desc">El que apunta a la IP <strong>138.68.245.236</strong> (SFO2)</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Cambiar la IP</div>
+          <div class="step-desc">Campo <strong>"IP Address"</strong> → reemplazar <code style="background:#0a1220;padding:2px 6px;border-radius:4px;font-family:monospace;color:#ef4444;font-size:12px">138.68.245.236</code> por la nueva IP de NYC1</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Verificar conexión SSH</div>
+          <div class="step-desc">Coolify → el servidor → botón <strong>"Test Connection"</strong> o <strong>"Validate"</strong>. Debe aparecer en verde.</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <div class="step-title">Hacer un deploy de prueba</div>
+          <div class="step-desc">En cualquiera de las apps (frontend o backend) → botón <strong>"Deploy"</strong> → verificar que completa sin errores</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Fase 4 — Actualizar DNS</h2>
+    <h3>~2 minutos de trabajo · 5-30 min de propagación</h3>
+
+    <div class="alert alert-warning">
+      <span class="alert-icon">⚠️</span>
+      <span>Este es el único paso con impacto en usuarios. Habrá ~5 minutos donde algunas peticiones van al servidor viejo y otras al nuevo. Hacerlo de noche minimiza el impacto.</span>
+    </div>
+
+    <ul class="steps" style="margin-top:16px">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Entrar al proveedor de dominio (Cloudflare / GoDaddy / otro)</div>
+          <div class="step-desc">Donde esté registrado el dominio de OrbitM7</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Buscar el registro tipo "A" del dominio</div>
+          <div class="step-desc">DNS → Records → buscar el registro <strong>A</strong> que apunta a <code style="background:#0a1220;padding:2px 6px;border-radius:4px;font-family:monospace;color:#ef4444;font-size:12px">138.68.245.236</code></div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Cambiar la IP destino</div>
+          <div class="step-desc">Reemplazar la IP vieja por la nueva IP del droplet NYC1</div>
+          <div class="alert alert-info" style="margin-top:10px">
+            <span class="alert-icon">💡</span>
+            <span><strong>Si usas Cloudflare:</strong> bajar el TTL a <strong>1 minuto</strong> antes de cambiar la IP, esperar 5 min, cambiar la IP, esperar 5 min más, luego volver el TTL a "Auto". Esto hace la transición casi instantánea.</span>
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Verificar propagación</div>
+          <div class="step-desc">Abrir la app en el navegador. Si abre y funciona normalmente, el DNS propagó correctamente.</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card card-danger">
+    <h2>Fase 5 — Destruir el Droplet Viejo</h2>
+    <h3>Solo cuando todo funcione · Acción irreversible</h3>
+    <div class="alert alert-danger">
+      <span class="alert-icon">🚨</span>
+      <span><strong>No destruir el droplet viejo hasta confirmar que la app funciona correctamente en el nuevo</strong> — incluyendo login, carga de datos, uploads a Drive, y un deploy completo desde Coolify.</span>
+    </div>
+    <ul class="steps" style="margin-top:16px">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Confirmar que todo funciona en NYC1</div>
+          <div class="step-desc">Probar login, rutas, documentos, PDFs, Cumplidos Drive, y que Coolify puede hacer deploy al nuevo servidor</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Esperar 24 horas (opcional, por seguridad)</div>
+          <div class="step-desc">Si el lunes todo corre normal, el martes se puede destruir el droplet SFO2</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num warning">!</div>
+        <div class="step-content">
+          <div class="step-title">Destruir el droplet SFO2</div>
+          <div class="step-desc">DigitalOcean → Droplets → <strong>ubuntu-s-2vcpu-4gb-sfo2-01</strong> → Destroy → confirmar</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ── OPTIMIZACIONES COOLIFY ── -->
+  <div class="section-title">Optimizaciones en Coolify (hacer antes/durante)</div>
+
+  <div class="card">
+    <h2>Configurar Zero Downtime Deployment</h2>
+    <p>Mantiene el contenedor viejo activo mientras el nuevo levanta. Los usuarios no notan el deploy.</p>
+
+    <div class="coolify-steps" style="margin-top:16px">
+      <div class="coolify-step">
+        <div class="coolify-text">Coolify → seleccionar la app (backend o frontend) → pestaña <strong>General</strong></div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">Buscar la opción <strong>"Zero Downtime Deployment"</strong> y activar el toggle</div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">En la sección <strong>Health Check</strong>, configurar:<br/>
+          Path: <code>/api/health</code> · Interval: <code>10s</code> · Timeout: <code>30s</code> · Retries: <code>3</code>
+        </div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">Guardar y hacer un deploy de prueba para verificar que el nuevo contenedor pasa el health check</div>
+      </div>
+    </div>
+
+    <div class="code-label" style="margin-top:16px">Endpoint a agregar en backend/index.ts (si no existe)</div>
+    <div class="code-block"><span class="cmt">// Antes de todas las rutas</span>
+<span class="kw">app</span>.get(<span class="str">'/api/health'</span>, (<span class="kw">_req</span>, <span class="kw">res</span>) <span class="cmd">=></span> <span class="kw">res</span>.json({ ok: <span class="cmd">true</span> }));</div>
+  </div>
+
+  <div class="card">
+    <h2>Configurar Backend para usar imagen GHCR</h2>
+    <p>En lugar de que Coolify construya el backend en el servidor, lo jala desde GitHub Actions. El deploy pasa de ~8 min a ~30 segundos.</p>
+
+    <div class="coolify-steps" style="margin-top:16px">
+      <div class="coolify-step">
+        <div class="coolify-text">Coolify → la aplicación del <strong>backend</strong> → pestaña <strong>Source</strong> o <strong>General</strong></div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">Cambiar tipo de fuente de <strong>"Build from Source"</strong> a <strong>"Docker Image"</strong></div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">En el campo imagen poner:<br/><code>ghcr.io/oesantama/m7-backend:latest</code></div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">El workflow <strong>build-backend.yml</strong> ya está creado — el primer push a <code>backend/</code> construirá la imagen en GitHub Actions y la subirá a GHCR</div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">Guardar. A partir de ahora el servidor solo hace <code>docker pull</code> — sin build local</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Configurar Variables de Entorno en Coolify</h2>
+    <p>Verificar que todas las ENV del backend están en Coolify y no hardcodeadas en el Dockerfile.</p>
+
+    <div class="coolify-steps" style="margin-top:16px">
+      <div class="coolify-step">
+        <div class="coolify-text">Coolify → backend app → pestaña <strong>Environment Variables</strong></div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">Confirmar que existen: <code>DATABASE_URL</code>, <code>JWT_SECRET</code>, <code>NODE_ENV=production</code>, <code>TZ=America/Bogota</code>, y cualquier clave de servicios externos</div>
+      </div>
+      <div class="coolify-step">
+        <div class="coolify-text">Si falta alguna, agregarla aquí — nunca en el Dockerfile ni en el repositorio</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── QUÉ YA ESTÁ HECHO ── -->
+  <div class="section-title">Lo que ya está implementado</div>
+
+  <div class="card card-success">
+    <h2>✅ Cambios ya aplicados en el repositorio</h2>
+    <div style="margin-top: 14px;">
+      <ul class="steps">
+        <li class="step">
+          <div class="step-num done">✓</div>
+          <div class="step-content">
+            <div class="step-title">Resize 1 vCPU → 2 vCPU</div>
+            <div class="step-desc">DigitalOcean ya muestra 2 vCPU / 4 GB — confirmado por el usuario</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num done">✓</div>
+          <div class="step-content">
+            <div class="step-title">Caché de Docker en GitHub Actions (frontend)</div>
+            <div class="step-desc"><strong>build-frontend.yml</strong> — agregados <code style="background:#0a1220;padding:2px 6px;border-radius:4px;font-family:monospace;color:#7dd3fc;font-size:12px">cache-from: type=gha</code> y <code style="background:#0a1220;padding:2px 6px;border-radius:4px;font-family:monospace;color:#7dd3fc;font-size:12px">cache-to: type=gha,mode=max</code></div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num done">✓</div>
+          <div class="step-content">
+            <div class="step-title">Workflow de build del backend en GitHub Actions</div>
+            <div class="step-desc"><strong>.github/workflows/build-backend.yml</strong> — construye y sube imagen a GHCR con caché activado</div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num done">✓</div>
+          <div class="step-content">
+            <div class="step-title">Caché npm en Dockerfiles</div>
+            <div class="step-desc"><strong>Dockerfile.backend</strong> y <strong>Dockerfile.frontend</strong> — <code style="background:#0a1220;padding:2px 6px;border-radius:4px;font-family:monospace;color:#7dd3fc;font-size:12px">--mount=type=cache,target=/root/.npm</code> para reutilizar paquetes descargados</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── IMPACTO ESPERADO ── -->
+  <div class="section-title">Impacto esperado después de la migración</div>
+
+  <div class="priority-grid">
+    <div class="priority-item impact-high">
+      <div class="priority-num">Latencia API</div>
+      <div class="priority-title">160 ms → 65 ms</div>
+      <div class="priority-meta">-59% · Solo por cambio de región</div>
+    </div>
+    <div class="priority-item impact-high">
+      <div class="priority-num">Tiempo de deploy</div>
+      <div class="priority-title">8 min → ~30 seg</div>
+      <div class="priority-meta">Con caché GHA + imagen preconstruida</div>
+    </div>
+    <div class="priority-item impact-med">
+      <div class="priority-num">CPU durante deploy</div>
+      <div class="priority-title">0% impacto en prod</div>
+      <div class="priority-meta">Build ocurre en GitHub Actions, no en el servidor</div>
+    </div>
+    <div class="priority-item impact-med">
+      <div class="priority-num">Carga inicial de app</div>
+      <div class="priority-title">Significativamente más rápida</div>
+      <div class="priority-meta">Menor RTT + gzip + cache de assets activo</div>
+    </div>
+  </div>
+
+  <!-- ── TIMELINE DOMINGO ── -->
+  <div class="section-title">Timeline sugerido para el domingo</div>
+
+  <div class="card">
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot tl-dot-blue"></div>
+        <div class="tl-time">8:00 PM</div>
+        <div class="tl-text"><strong>Crear snapshot</strong> del droplet SFO2. La app sigue activa. Esperar ~10-15 min.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot tl-dot-blue"></div>
+        <div class="tl-time">8:20 PM</div>
+        <div class="tl-text"><strong>Crear nuevo droplet NYC1</strong> desde el snapshot. Anotar la nueva IP.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot tl-dot-blue"></div>
+        <div class="tl-time">8:25 PM</div>
+        <div class="tl-text"><strong>Actualizar Coolify</strong> con la nueva IP. Configurar Zero Downtime. Validar conexión SSH.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot tl-dot-blue"></div>
+        <div class="tl-time">8:35 PM</div>
+        <div class="tl-text"><strong>Hacer deploy de prueba</strong> desde Coolify al servidor NYC1. Verificar que la app responde por la IP nueva.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot tl-dot-warn"></div>
+        <div class="tl-time">8:45 PM</div>
+        <div class="tl-text"><strong>Cambiar el DNS</strong> a la IP de NYC1. ~5 min de transición para usuarios.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot tl-dot-green"></div>
+        <div class="tl-time">9:00 PM</div>
+        <div class="tl-text"><strong>Verificar funcionamiento completo</strong>: login, documentos, Drive, PDFs. Todo debe operar normal.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot tl-dot-green"></div>
+        <div class="tl-time">Lunes o Martes</div>
+        <div class="tl-text"><strong>Destruir el droplet SFO2</strong> una vez confirmado que todo funciona sin problemas.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ROLLBACK ── -->
+  <div class="card card-danger">
+    <h2>🔄 Plan de Rollback (si algo falla)</h2>
+    <p>El droplet SFO2 no se destruye hasta el día siguiente. Si algo sale mal durante la migración:</p>
+    <ul class="steps" style="margin-top:14px">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Revertir el DNS</div>
+          <div class="step-desc">Cambiar el registro A de vuelta a <strong>138.68.245.236</strong> (IP vieja SFO2) — tarda ~5 min en propagar</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Revertir Coolify</div>
+          <div class="step-desc">Settings → Servers → volver la IP al valor original <strong>138.68.245.236</strong></div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">La app vuelve a funcionar desde SFO2</div>
+          <div class="step-desc">Como si nada hubiera pasado. El droplet NYC1 queda activo unos días mientras se investiga el problema</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-inner">
+    <p>OrbitM7 · Informe de Infraestructura · Mayo 2026</p>
+    <p>DigitalOcean SFO2 → NYC1 · Coolify · Docker BuildKit · GitHub Actions Cache</p>
+  </div>
+</div>
+
+</body>
+</html>
