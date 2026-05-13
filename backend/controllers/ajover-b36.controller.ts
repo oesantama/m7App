@@ -348,8 +348,8 @@ export const exportAllAuditoriaExcel = async (req: Request, res: Response) => {
               u1.name AS inhouse_name,
               u2.name AS creator_name
        FROM ajover_b36_encabezado e
-       LEFT JOIN users u1 ON e.inhouse_id = u1.id::text OR e.inhouse_id = u1.username
-       LEFT JOIN users u2 ON e.uploaded_by = u2.id::text OR e.uploaded_by = u2.username
+       LEFT JOIN users u1 ON e.inhouse_id = u1.id::text OR e.inhouse_id = u1.email
+       LEFT JOIN users u2 ON e.uploaded_by = u2.id::text OR e.uploaded_by = u2.email
        ${where}
        ORDER BY e.uploaded_at DESC, e.id DESC
        LIMIT 2000`,
