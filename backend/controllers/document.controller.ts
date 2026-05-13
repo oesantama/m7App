@@ -2471,6 +2471,73 @@ export const renameCumplido = async (req: Request, res: Response) => {
     }
 };
 
+export const appendCumplido = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const user = (req as any).user;
+        const file = req.file as Express.Multer.File;
+
+        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const hasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
+        if (!isSuper && !hasPerm) return res.status(403).json({ error: 'No tienes permisos para editar archivos.' });
+        if (!file) return res.status(400).json({ error: 'Se requiere un archivo PDF.' });
+
+        const { rows } = await pool.query('SELECT * FROM document_drive_logs WHERE id = $1', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Archivo no encontrado.' });
+
+        const doc = rows[0];
+        if (doc.is_deleted) return res.status(400).json({ error: 'El archivo está eliminado.' });
+        if (!doc.file_name.toLowerCase().endsWith('.pdf')) return res.status(400).json({ error: 'Solo se puede anexar a archivos PDF.' });
+
+        const remotePath = `gdrive_cumplidos:${doc.drive_path}/${doc.file_name}`;
+        const ts = Date.now();
+        const existingPdf = `/tmp/cumplido_existing_${ts}.pdf`;
+        const appendPdf   = `/tmp/cumplido_append_${ts}.pdf`;
+        const mergedPdf   = `/tmp/cumplido_merged_${ts}.pdf`;
+
+        fs.writeFileSync(appendPdf, file.buffer);
+
+        // Descargar el PDF actual desde Drive
+        await new Promise<void>((resolve, reject) => {
+            exec(`rclone copyto "${remotePath}" "${existingPdf}"`, (err, _o, stderr) => {
+                if (err) { console.error('[APPEND] Descarga:', stderr); reject(new Error('Error al descargar el PDF de Drive')); }
+                else resolve();
+            });
+        });
+
+        // Fusionar con Ghostscript: existente primero, nuevo al final
+        await new Promise<void>((resolve, reject) => {
+            const cmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${mergedPdf}" "${existingPdf}" "${appendPdf}"`;
+            exec(cmd, (err, _o, stderr) => {
+                if (err) { console.error('[APPEND] Fusión:', stderr); reject(new Error('Error al fusionar los PDFs')); }
+                else resolve();
+            });
+        });
+
+        // Re-subir el PDF fusionado sobreescribiendo el original
+        await new Promise<void>((resolve, reject) => {
+            exec(`rclone copyto "${mergedPdf}" "${remotePath}"`, (err, _o, stderr) => {
+                if (err) { console.error('[APPEND] Re-subida:', stderr); reject(new Error('Error al re-subir el PDF fusionado')); }
+                else resolve();
+            });
+        });
+
+        // Renovar el link compartido
+        const driveLink = await new Promise<string>((resolve) => {
+            exec(`rclone link "${remotePath}"`, (err, stdout) => resolve(stdout ? stdout.trim() : doc.drive_link));
+        });
+
+        await pool.query('UPDATE document_drive_logs SET drive_link = $1 WHERE id = $2', [driveLink, id]);
+
+        [existingPdf, appendPdf, mergedPdf].forEach(f => { try { fs.unlinkSync(f); } catch {} });
+
+        res.json({ success: true, message: 'Documento anexado exitosamente.', driveLink });
+    } catch (err: any) {
+        console.error('[M7-APPEND-ERR]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 export const deleteCumplido = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;

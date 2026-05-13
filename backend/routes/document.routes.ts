@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2, updateItemInvoice, getInvoiceTraceability, getConciliationHistory, uploadCumplido, getDocumentStats, correctDocumentItems, renameCumplido, deleteCumplido, driveExplorer, generateDriveLink } from '../controllers/document.controller.js';
+import { getDocuments, syncInventory, bulkCreateDocuments, createManualDocument, updateStatus, getInvoices, deleteDocument, resendInventoryNotification, processDocumentLPayment, getInventoryLog, getMastersuiteReport, parsePdfRemisiones, updateConsolidatedCount2, updateItemInvoice, getInvoiceTraceability, getConciliationHistory, uploadCumplido, getDocumentStats, correctDocumentItems, renameCumplido, deleteCumplido, appendCumplido, driveExplorer, generateDriveLink } from '../controllers/document.controller.js';
 import multer from 'multer';
 
 import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
@@ -91,6 +91,7 @@ router.get('/stats', authenticateToken, getDocumentStats);
 router.get('/drive-explorer', authenticateToken, driveExplorer);
 router.post('/drive-link', authenticateToken, generateDriveLink);
 router.put('/cumplido/:id/rename', authenticateToken, renameCumplido);
+router.post('/cumplido/:id/append', authenticateToken, upload.single('file'), appendCumplido);
 router.delete('/cumplido/:id/delete', authenticateToken, deleteCumplido);
 
 // Corrección masiva de ítems desde archivo (solo edición, no inserción)

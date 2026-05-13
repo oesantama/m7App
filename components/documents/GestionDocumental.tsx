@@ -60,8 +60,8 @@ const GestionDocumental: React.FC = () => {
     const [explorePath, setExplorePath] = useState('');
 
     // Modals state
-    const [renameModal, setRenameModal] = useState<{isOpen: boolean, doc: DocumentLog | null, newName: string, isSubmitting: boolean}>({
-        isOpen: false, doc: null, newName: '', isSubmitting: false
+    const [renameModal, setRenameModal] = useState<{isOpen: boolean, doc: DocumentLog | null, newName: string, isSubmitting: boolean, tab: 'rename' | 'append', appendFile: File | null, isAppending: boolean}>({
+        isOpen: false, doc: null, newName: '', isSubmitting: false, tab: 'rename', appendFile: null, isAppending: false
     });
     const [deleteModal, setDeleteModal] = useState<{isOpen: boolean, doc: DocumentLog | null, reason: string, isSubmitting: boolean}>({
         isOpen: false, doc: null, reason: '', isSubmitting: false
@@ -232,7 +232,7 @@ const GestionDocumental: React.FC = () => {
     };
 
     const handleRename = (doc: DocumentLog) => {
-        setRenameModal({ isOpen: true, doc, newName: doc.fileName, isSubmitting: false });
+        setRenameModal({ isOpen: true, doc, newName: doc.fileName, isSubmitting: false, tab: 'rename', appendFile: null, isAppending: false });
     };
 
     const submitRename = async () => {
@@ -249,11 +249,31 @@ const GestionDocumental: React.FC = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             toast.success("Archivo renombrado exitosamente");
-            setRenameModal({ isOpen: false, doc: null, newName: '', isSubmitting: false });
+            setRenameModal({ isOpen: false, doc: null, newName: '', isSubmitting: false, tab: 'rename', appendFile: null, isAppending: false });
             fetchHistory();
         } catch (error: any) {
             toast.error(error.response?.data?.error || "Error al renombrar el archivo");
             setRenameModal(prev => ({ ...prev, isSubmitting: false }));
+        }
+    };
+
+    const submitAppend = async () => {
+        const { doc, appendFile } = renameModal;
+        if (!doc || !appendFile) { toast.error("Seleccione un archivo PDF para anexar."); return; }
+        setRenameModal(prev => ({ ...prev, isAppending: true }));
+        try {
+            const token = user?.token || '';
+            const fd = new FormData();
+            fd.append('file', appendFile);
+            await axios.post(`/api/documents/cumplido/${doc.id}/append`, fd, {
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+            });
+            toast.success("Documento anexado exitosamente al PDF en Drive.");
+            setRenameModal({ isOpen: false, doc: null, newName: '', isSubmitting: false, tab: 'rename', appendFile: null, isAppending: false });
+            fetchHistory();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || "Error al anexar el documento");
+            setRenameModal(prev => ({ ...prev, isAppending: false }));
         }
     };
 
@@ -1080,47 +1100,113 @@ const GestionDocumental: React.FC = () => {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
                         <div className="p-8 space-y-6">
-                            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-[1.5rem] flex items-center justify-center mx-auto shadow-inner">
-                                <Edit2 size={32} />
-                            </div>
-                            <div className="text-center space-y-2">
-                                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Renombrar Archivo</h2>
-                                <p className="text-slate-500 text-sm font-medium">Actualizando el archivo directamente en Google Drive.</p>
-                            </div>
-                            
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-2">Nuevo Nombre (PDF)</label>
-                                <div className="relative">
-                                    <FileText size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" />
-                                    <input 
-                                        type="text"
-                                        className="w-full pl-12 pr-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
-                                        value={renameModal.newName}
-                                        onChange={e => setRenameModal(prev => ({ ...prev, newName: e.target.value }))}
-                                        placeholder="Ej: NUEVO_NOMBRE_CUMPLIDO"
-                                        disabled={renameModal.isSubmitting}
-                                        autoFocus
-                                    />
+                            {/* Icon + title */}
+                            <div className="flex flex-col items-center gap-3">
+                                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-[1.5rem] flex items-center justify-center shadow-inner">
+                                    <Edit2 size={32} />
                                 </div>
-                                <p className="text-[10px] text-slate-400 px-2 font-bold uppercase">* La extensión .pdf se añadirá automáticamente si no se incluye.</p>
+                                <div className="text-center">
+                                    <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Gestionar Archivo</h2>
+                                    <p className="text-slate-400 text-xs font-medium mt-1 truncate max-w-xs">{renameModal.doc?.fileName}</p>
+                                </div>
                             </div>
+
+                            {/* Tabs */}
+                            <div className="flex bg-slate-100 rounded-2xl p-1 gap-1">
+                                <button
+                                    onClick={() => setRenameModal(prev => ({ ...prev, tab: 'rename' }))}
+                                    className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${renameModal.tab === 'rename' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Renombrar
+                                </button>
+                                <button
+                                    onClick={() => setRenameModal(prev => ({ ...prev, tab: 'append' }))}
+                                    disabled={!renameModal.doc?.fileName.toLowerCase().endsWith('.pdf')}
+                                    className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed ${renameModal.tab === 'append' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Anexar Documento
+                                </button>
+                            </div>
+
+                            {/* Tab: Renombrar */}
+                            {renameModal.tab === 'rename' && (
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-2">Nuevo Nombre (PDF)</label>
+                                    <div className="relative">
+                                        <FileText size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" />
+                                        <input
+                                            type="text"
+                                            className="w-full pl-12 pr-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                                            value={renameModal.newName}
+                                            onChange={e => setRenameModal(prev => ({ ...prev, newName: e.target.value }))}
+                                            placeholder="Ej: NUEVO_NOMBRE_CUMPLIDO"
+                                            disabled={renameModal.isSubmitting}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 px-2 font-bold uppercase">* La extensión .pdf se añadirá automáticamente si no se incluye.</p>
+                                </div>
+                            )}
+
+                            {/* Tab: Anexar Documento */}
+                            {renameModal.tab === 'append' && (
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-2">Archivo PDF a Anexar</label>
+                                    <label className={`flex flex-col items-center justify-center gap-3 w-full py-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${renameModal.appendFile ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-indigo-50/50'}`}>
+                                        <input
+                                            type="file"
+                                            accept=".pdf,application/pdf"
+                                            className="hidden"
+                                            disabled={renameModal.isAppending}
+                                            onChange={e => setRenameModal(prev => ({ ...prev, appendFile: e.target.files?.[0] || null }))}
+                                        />
+                                        {renameModal.appendFile ? (
+                                            <>
+                                                <CheckCircle2 size={28} className="text-indigo-500" />
+                                                <span className="text-xs font-bold text-indigo-700 text-center px-4 truncate max-w-full">{renameModal.appendFile.name}</span>
+                                                <span className="text-[10px] text-indigo-400 font-bold uppercase">Clic para cambiar</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload size={28} className="text-slate-400" />
+                                                <span className="text-xs font-bold text-slate-500">Seleccionar PDF</span>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase">Solo archivos .pdf</span>
+                                            </>
+                                        )}
+                                    </label>
+                                    <p className="text-[10px] text-slate-400 px-2 font-bold uppercase">* El PDF seleccionado se agregará al final del documento existente en Drive.</p>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Footer */}
                         <div className="p-6 bg-slate-50/50 flex gap-3 border-t border-slate-100">
-                            <button 
-                                onClick={() => setRenameModal({ isOpen: false, doc: null, newName: '', isSubmitting: false })}
-                                disabled={renameModal.isSubmitting}
+                            <button
+                                onClick={() => setRenameModal({ isOpen: false, doc: null, newName: '', isSubmitting: false, tab: 'rename', appendFile: null, isAppending: false })}
+                                disabled={renameModal.isSubmitting || renameModal.isAppending}
                                 className="flex-1 py-4 bg-white text-slate-500 font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-slate-100 border-2 border-slate-200 transition-all disabled:opacity-50"
                             >
                                 Cancelar
                             </button>
-                            <button 
-                                onClick={submitRename}
-                                disabled={renameModal.isSubmitting || !renameModal.newName || renameModal.newName === renameModal.doc?.fileName}
-                                className="flex-1 py-4 bg-indigo-600 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/30 flex justify-center items-center gap-2 disabled:opacity-50 disabled:shadow-none"
-                            >
-                                {renameModal.isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                Guardar Cambios
-                            </button>
+                            {renameModal.tab === 'rename' ? (
+                                <button
+                                    onClick={submitRename}
+                                    disabled={renameModal.isSubmitting || !renameModal.newName || renameModal.newName === renameModal.doc?.fileName}
+                                    className="flex-1 py-4 bg-indigo-600 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/30 flex justify-center items-center gap-2 disabled:opacity-50 disabled:shadow-none"
+                                >
+                                    {renameModal.isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                    Guardar Cambios
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={submitAppend}
+                                    disabled={renameModal.isAppending || !renameModal.appendFile}
+                                    className="flex-1 py-4 bg-indigo-600 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/30 flex justify-center items-center gap-2 disabled:opacity-50 disabled:shadow-none"
+                                >
+                                    {renameModal.isAppending ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                                    {renameModal.isAppending ? 'Procesando...' : 'Anexar al PDF'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
