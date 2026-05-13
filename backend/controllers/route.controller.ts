@@ -44,11 +44,11 @@ export const getRoutes = async (req: Request, res: Response) => {
         COALESCE(s.total_invoices, 0)             AS total_invoices,
         COALESCE(del.delivered_invoices, 0)       AS delivered_invoices
       FROM routes r
-      LEFT JOIN vehicles    v   ON v.id        = r.vehicle_id
-      LEFT JOIN drivers     d   ON d.id        = r.driver_id
-      LEFT JOIN ri_stats    s   ON s.route_id  = r.id
-      LEFT JOIN ri_delivered del ON del.route_id = r.id
-      INNER JOIN active_routes ar ON ar.route_id = r.id
+      LEFT JOIN vehicles    v   ON v.id::text        = r.vehicle_id::text
+      LEFT JOIN drivers     d   ON d.id::text        = r.driver_id::text
+      LEFT JOIN ri_stats    s   ON s.route_id::text  = r.id::text
+      LEFT JOIN ri_delivered del ON del.route_id::text = r.id::text
+      INNER JOIN active_routes ar ON ar.route_id::text = r.id::text
       WHERE r.created_at >= CURRENT_DATE - INTERVAL '7 days'
         AND r.status_id NOT IN ('EST-16', 'COMPLETADO', 'FINALIZADO')
 
@@ -70,9 +70,9 @@ export const getRoutes = async (req: Request, res: Response) => {
         CASE WHEN da.status IN ('COMPLETED','PENDING_SIGNATURES','EN_RUTA','EST-11','EST-12','ENTREGADO')
              THEN 1 ELSE 0 END              AS delivered_invoices
       FROM dispatch_assignments da
-      LEFT JOIN assignments a ON a.driver_id = da.driver_id AND a.is_active = true
-      LEFT JOIN vehicles    v ON v.id        = a.vehicle_id
-      LEFT JOIN drivers     d ON d.id        = da.driver_id
+      LEFT JOIN assignments a ON a.driver_id::text = da.driver_id::text AND a.is_active = true
+      LEFT JOIN vehicles    v ON v.id::text        = a.vehicle_id::text
+      LEFT JOIN drivers     d ON d.id::text        = da.driver_id::text
       WHERE da.status IN ('PENDING_SIGNATURES','EN_RUTA','En repart','PENDING')
         AND da.created_at >= CURRENT_DATE - INTERVAL '7 days'
 

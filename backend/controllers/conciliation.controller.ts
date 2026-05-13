@@ -18,6 +18,8 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
 
         if (!docId) {
             conditions.push(`dl.plan_type ILIKE '%plan r%'`);
+            // Filtrar solo documentos con facturas pendientes (HAVING sin GROUP BY no es válido en PG)
+            conditions.push(`(COALESCE(inv.total_invoices, 0) - COALESCE(ic_agg.conciliadas, 0) > 0 OR COALESCE(rs_agg.pending_surcharges, 0) > 0)`);
         } else {
             conditions.push(`dl.external_doc_id = $${p++}`);
             params.push(docId);
@@ -29,11 +31,6 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
         if (to)       { conditions.push(`dl.created_at <= $${p++}`); params.push(to); }
 
         const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-
-        // Para búsqueda por docId no filtramos por pendientes (se quiere ver todo el doc)
-        const havingClause = docId ? '' : `
-            HAVING (inv.total_invoices - COALESCE(ic_agg.conciliadas, 0)) > 0
-                OR COALESCE(rs_agg.pending_surcharges, 0) > 0`;
 
         const result = await pool.query(`
             WITH inv_agg AS (
@@ -102,7 +99,6 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
             LEFT JOIN rgp_agg          ON rgp_agg.document_id = dl.id
             LEFT JOIN cond_agg cond    ON cond.doc_id         = dl.id
             ${where}
-            ${havingClause}
             ORDER BY dl.created_at DESC
         `, params);
 
@@ -129,6 +125,7 @@ export const getPendingPlanNormal = async (req: Request, res: Response) => {
         if (clientId) { conditions.push(`dl.client_id = $${p++}`); params.push(clientId); }
         if (from)     { conditions.push(`dl.created_at >= $${p++}`); params.push(from); }
         if (to)       { conditions.push(`dl.created_at <= $${p++}`); params.push(to); }
+        conditions.push(`(COALESCE(inv.total_invoices, 0) > 0 AND COALESCE(inv.total_invoices, 0) - COALESCE(ic.conciliadas, 0) > 0)`);
 
         const where = `WHERE ${conditions.join(' AND ')}`;
 
@@ -163,8 +160,6 @@ export const getPendingPlanNormal = async (req: Request, res: Response) => {
             LEFT JOIN ic_agg   ic   ON ic.document_id   = dl.id
             LEFT JOIN cond_agg cond ON cond.doc_id      = dl.id
             ${where}
-            HAVING COALESCE(inv.total_invoices, 0) > 0
-               AND COALESCE(inv.total_invoices, 0) - COALESCE(ic.conciliadas, 0) > 0
             ORDER BY dl.created_at DESC
         `, params);
 
