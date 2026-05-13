@@ -746,7 +746,11 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 };
 
 export const getOrders = async (req: Request, res: Response): Promise<void> => {
+    const dbClient = await pool.connect();
     try {
+        // [M7-PERF] Timeout de seguridad: si la query tarda más de 20s, devolvemos error controlado
+        await dbClient.query(`SET LOCAL statement_timeout = '20000'`);
+
         const { search, status, client, fechaCorteDesde, fechaCorteHasta, invoice, plate, planilla, dateType } = req.query;
         const values: any[] = [];
         let paramIdx = 1;
@@ -815,19 +819,21 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             values.push(fechaCorteHasta);
             paramIdx++;
         } else if (!search && !invoice && !plate && !planilla) {
-            // Rango por defecto si no se ingresan fechas ni búsquedas de texto: últimos 30 días para no saturar la vista
-            whereClauses.push(`(${dateCol} >= CURRENT_DATE - INTERVAL '30 days' OR ${dateCol} IS NULL)`);
+            // Rango por defecto: usar fecha_carge (siempre tiene valor) para evitar full scan
+            whereClauses.push(`(p.fecha_carge >= CURRENT_DATE - INTERVAL '30 days')`);
         }
 
         const whereStr = whereClauses.join(' AND ');
 
-        // [M7-OPTIMIZE] Eliminamos ::TEXT en los JOINs y WHERE del IN para usar índices INT nativos
+        // Ordenar por la columna filtrada para maximizar el uso del índice
+        const orderCol = dateType === 'cargue' ? 'p.fecha_carge' : 'p.fecha_carge';
+
         const query = `
             WITH pedidos_filtrados AS (
                 SELECT p.*
                 FROM grupo_inter_pedidos p
                 WHERE ${whereStr}
-                ORDER BY p.f_ultimo_corte DESC, p.create_at DESC
+                ORDER BY ${orderCol} DESC NULLS LAST, p.create_at DESC
                 LIMIT 500
             ),
             items_agg AS (
@@ -850,16 +856,23 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             FROM pedidos_filtrados pf
             LEFT JOIN items_agg      ia ON ia.pid = pf.id
             LEFT JOIN historico_agg  ha ON ha.pid = pf.id
-            ORDER BY pf.f_ultimo_corte DESC, pf.create_at DESC
+            ORDER BY pf.fecha_carge DESC NULLS LAST, pf.create_at DESC
         `;
 
-        const result = await pool.query(query, values);
+        const result = await dbClient.query(query, values);
         res.json(result.rows);
     } catch (error: any) {
         console.error('[M7-ERR] getOrders:', error?.message || error);
-        res.status(500).json({ message: 'Error al obtener pedidos' });
+        if (error?.message?.includes('canceling statement due to statement timeout')) {
+            res.status(504).json({ message: 'La consulta tardó demasiado. Por favor reduce el rango de fechas e intenta de nuevo.' });
+        } else {
+            res.status(500).json({ message: 'Error al obtener pedidos', detail: error?.message });
+        }
+    } finally {
+        dbClient.release();
     }
 };
+
 
 // --- EXPORTACIÓN PÚBLICA ---
 export const getOrdersPublicListSecure = async (req: Request, res: Response): Promise<void> => {
