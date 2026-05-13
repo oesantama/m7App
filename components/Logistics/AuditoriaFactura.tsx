@@ -973,7 +973,7 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
       
       doc.rect(55, startY, 55, rh);
       doc.setFont('helvetica', 'normal');
-      doc.text(new Date(row.fecha_carge).toLocaleDateString('es-CO'), 57, startY + 4.2);
+      doc.text(row.fecha_programado ? new Date(row.fecha_programado).toLocaleDateString('es-CO') : new Date(row.fecha_carge).toLocaleDateString('es-CO'), 57, startY + 4.2);
       
       doc.rect(110, startY, 90, rh);
       

@@ -86,7 +86,7 @@ router.get('/invoice-traceability', (req, res, next) => {
 }, getInvoiceTraceability);
 
 // Gestión Documental de Cumplidos (Drive) — PAG-45 / MOD-10
-router.post('/upload-cumplido', authenticateToken, upload.array('files', 10), uploadCumplido);
+router.post('/upload-cumplido', authenticateToken, upload.array('files', 50), uploadCumplido);
 router.get('/stats', authenticateToken, getDocumentStats);
 router.get('/drive-explorer', authenticateToken, driveExplorer);
 router.post('/drive-link', authenticateToken, generateDriveLink);

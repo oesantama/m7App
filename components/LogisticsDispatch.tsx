@@ -72,6 +72,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
     const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Control colapsable
     const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
+    const [dispatchTab, setDispatchTab] = useState<'individual' | 'grupal'>('individual');
+    const [groupScannedItems, setGroupScannedItems] = useState<Record<string, number>>({});
+    const [groupItemPickingModes, setGroupItemPickingModes] = useState<Record<string, 'UND' | 'CAJA' | 'STD'>>({});
+    const [isGroupDispatching, setIsGroupDispatching] = useState(false);
 
     // ── Client selector ──────────────────────────────────────────────────────
     const [internalClientId, setInternalClientId] = useState<string>('');
@@ -114,6 +118,36 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             };
         }).filter(item => item !== null) as (any)[];
     }, [assignments, vehicles, drivers, user.clientId]);
+
+    // Artículos agrupados de TODAS las facturas de la ruta activa (para despacho grupal)
+    const groupedItems = useMemo(() => {
+        const map = new Map<string, any>();
+        for (const inv of routeInvoices) {
+            for (const item of (inv.items || [])) {
+                const sku = String(item.sku || item.articleId || '').trim().toUpperCase();
+                if (!sku) continue;
+                const master = articlesMaster.find(a =>
+                    String(a.sku || '').trim().toUpperCase() === sku ||
+                    String(a.id  || '').trim().toUpperCase() === sku
+                );
+                if (map.has(sku)) {
+                    map.get(sku)!.qty += Number(item.qty || item.expectedQty || 0);
+                } else {
+                    map.set(sku, {
+                        ...item,
+                        sku,
+                        qty: Number(item.qty || item.expectedQty || 0),
+                        factorInter:  master?.factor_inter  || master?.factorInter  || 0,
+                        factorStd:    master?.factor_std    || master?.factorStd    || 0,
+                        uomInterName: master?.uom_inter_name || master?.uomInterName || 'CAJA',
+                        uomStdName:   master?.uom_std_name   || master?.uomStdName   || 'STD',
+                        unit: master?.unit || item.unit || 'UND',
+                    });
+                }
+            }
+        }
+        return Array.from(map.values());
+    }, [routeInvoices, articlesMaster]);
 
     const [showReassignModal, setShowReassignModal] = useState<{ isOpen: boolean; route: any }>({ isOpen: false, route: null });
     const [reassignData, setReassignData] = useState({ newVehicleId: '', observations: '' });
@@ -1426,6 +1460,99 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         return vehicleLocations.filter(loc => visibleVehicleIds.has(loc.vehicle_id));
     }, [filteredRoutes, vehicleLocations]);
 
+    // ── HANDLERS DESPACHO GRUPAL ──────────────────────────────────────────────
+    const handleGroupManualAdd = (sku: string, qty: number) => {
+        const item = groupedItems.find(it =>
+            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() ||
+            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase()
+        );
+        if (!item) { toast.error(`Artículo no encontrado: ${sku}`); return; }
+        const itemSku = item.sku;
+        const current = groupScannedItems[itemSku] || 0;
+        const expected = Number(item.qty || 0);
+        if (current >= expected) { toast.error(`LÍMITE ALCANZADO: ${item.articleName || itemSku}`); return; }
+        const added = Math.min(expected - current, qty);
+        setGroupScannedItems(prev => ({ ...prev, [itemSku]: current + added }));
+        toast.success(`${item.articleName || itemSku}`, { description: `${current + added}/${expected}`, icon: '📦', duration: 2000 });
+    };
+
+    const handleGroupBarcodeScan = (rawBarcode: string) => {
+        const sku = cleanSkuM7(rawBarcode);
+        const item = groupedItems.find(it =>
+            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() ||
+            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase()
+        );
+        if (!item) { toast.error(`Artículo no encontrado: ${sku}`); return; }
+        const itemSku = item.sku;
+        const preferredMode = groupItemPickingModes[itemSku] || 'UND';
+        let multiplier = 1;
+        if (preferredMode === 'CAJA') multiplier = Number(item.factorInter) || 1;
+        else if (preferredMode === 'STD') multiplier = Number(item.factorStd) || 1;
+        else if (rawBarcode.includes('Ñ')) {
+            const parts = rawBarcode.split('Ñ').map((p: string) => p.trim());
+            const possibleQty = parts.slice(1).find((p: string) => !isNaN(Number(p)) && p.length <= 4);
+            if (possibleQty) multiplier = Number(possibleQty);
+        }
+        handleGroupManualAdd(sku, multiplier);
+    };
+
+    const handleConfirmGroupDispatch = async () => {
+        if (!selectedActiveRoute) return;
+        const totalScanned = Object.values(groupScannedItems).reduce((a, b) => a + b, 0);
+        const totalExpected = groupedItems.reduce((a, b) => a + Number(b.qty || 0), 0);
+
+        const doDispatch = async () => {
+            setIsGroupDispatching(true);
+            try {
+                const pending = routeInvoices.filter(inv => {
+                    const st = String(inv.itemStatus || inv.item_status || inv.status || '');
+                    return !['EST-11','EST-12','EST-13','EST-14'].includes(st);
+                });
+                if (pending.length === 0) { toast.info('No hay facturas pendientes'); return; }
+                let ok = 0;
+                for (const inv of pending) {
+                    const route = activeRoutes.find(r => r.id === (inv.route_id || inv.routeId));
+                    const actualDriver = drivers.find(d => d.id === (route?.driver_id || route?.driverId));
+                    try {
+                        const res = await api.initDispatch({
+                            invoiceId: inv.invoiceNumber || inv.id,
+                            driverId: actualDriver?.id || user.id,
+                            helperIds: isAccompanied ? selectedHelpers.slice(0, helperCount).filter(Boolean) : [],
+                            scannedItems: {},
+                            isAccompanied,
+                            helperCount: isAccompanied ? helperCount : 0,
+                            createdBy: user.id,
+                            signatures: []
+                        });
+                        if (res.success) {
+                            ok++;
+                            setDispatchedIds(prev => new Set([...prev, cleanId(inv.invoiceNumber || inv.id)]));
+                        }
+                    } catch { /* continuar con las demás */ }
+                }
+                toast.success(`Despacho grupal: ${ok}/${pending.length} facturas confirmadas`);
+                setGroupScannedItems({});
+                setGroupItemPickingModes({});
+                routeInvoicesCache.current.delete(selectedActiveRoute.id);
+                loadRouteInvoicesData(selectedActiveRoute, setRouteInvoices, false);
+                onRefresh();
+            } finally {
+                setIsGroupDispatching(false);
+            }
+        };
+
+        if (totalExpected > 0 && totalScanned > 0 && totalScanned < totalExpected) {
+            setConfirmModal({
+                isOpen: true,
+                title: 'Artículos incompletos',
+                message: `Escaneados ${totalScanned} de ${totalExpected}. ¿Confirmar despacho grupal de todas las facturas?`,
+                onConfirm: doDispatch
+            });
+            return;
+        }
+        await doDispatch();
+    };
+
     // LOGICA DE NEGOCIO PARA DESPACHO (MOVIDA ANTES DEL RETURN)
     const handleManualAdd = (sku: string, qty: number) => {
         if (!assigningInvoice) return;
@@ -2233,11 +2360,31 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                        <p className="text-[10px] font-bold text-slate-500 uppercase">{selectedActiveRoute.driver_name || 'Sin Conductor'}</p>
                                    </div>
                                 </div>
-                                <button onClick={() => setSelectedActiveRoute(null)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 transition-all">
+                                <button onClick={() => { setSelectedActiveRoute(null); setDispatchTab('individual'); setGroupScannedItems({}); setGroupItemPickingModes({}); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 transition-all">
                                     <Icons.X className="w-5 h-5 text-slate-400" />
                                 </button>
                             </div>
-                            
+
+                            {/* TABS */}
+                            <div className="flex gap-2 mb-2">
+                                <button
+                                    onClick={() => setDispatchTab('individual')}
+                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${dispatchTab === 'individual' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    <Icons.Truck className="w-3.5 h-3.5 inline mr-1" />
+                                    Despacho Individual
+                                </button>
+                                <button
+                                    onClick={() => setDispatchTab('grupal')}
+                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${dispatchTab === 'grupal' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    <Icons.Package className="w-3.5 h-3.5 inline mr-1" />
+                                    Despacho Grupal
+                                </button>
+                            </div>
+
+                            {/* Stats + search (solo en tab individual) */}
+                            {dispatchTab === 'individual' && (
                             <div className="flex flex-wrap gap-2 items-center">
                                 <div className="flex-1 min-w-[200px] relative">
                                     <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -2262,8 +2409,121 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     </div>
                                 </div>
                             </div>
+                            )}
                         </div>
 
+                        {/* ── TAB: DESPACHO GRUPAL ─────────────────────────────── */}
+                        {dispatchTab === 'grupal' && (
+                        <div className="flex-1 flex flex-col overflow-hidden">
+                            {/* Scanner */}
+                            <div className="bg-amber-50 px-4 py-3 border-b border-amber-100 flex items-center gap-3">
+                                <input
+                                    id="m7-group-dispatch-barcode"
+                                    type="text"
+                                    autoFocus
+                                    autoComplete="off"
+                                    placeholder="ESCANEANDO... ESPERANDO BARCODE"
+                                    className="flex-1 bg-white border-2 border-amber-200 rounded-2xl px-5 py-2.5 text-center text-sm font-mono font-black text-slate-900 outline-none focus:border-amber-400 transition-all"
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val.includes('Ñ') || val.includes(':')) {
+                                            setTimeout(() => {
+                                                const el = document.getElementById('m7-group-dispatch-barcode') as HTMLInputElement;
+                                                if (el && (el.value.includes('Ñ') || el.value.includes(':'))) {
+                                                    handleGroupBarcodeScan(el.value.trim());
+                                                    el.value = '';
+                                                }
+                                            }, 100);
+                                        }
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            const val = e.currentTarget.value.trim();
+                                            if (val) { handleGroupBarcodeScan(val); e.currentTarget.value = ''; }
+                                        }
+                                    }}
+                                />
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Lectora Activa</span>
+                                </div>
+                            </div>
+
+                            {/* Lista de artículos agrupados */}
+                            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 custom-scrollbar bg-slate-50/50">
+                                <div className="flex justify-between items-center mb-2 px-1">
+                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                        {groupedItems.length} artículos — {routeInvoices.length} facturas
+                                    </p>
+                                    <p className="text-[9px] font-black text-emerald-600 uppercase">
+                                        Escaneado: {Object.values(groupScannedItems).reduce((a,b)=>a+b,0)} / {groupedItems.reduce((a,b)=>a+Number(b.qty||0),0)}
+                                    </p>
+                                </div>
+                                {groupedItems.map((item, i) => {
+                                    const scanned = groupScannedItems[item.sku] || 0;
+                                    const expected = Number(item.qty || 0);
+                                    const isDone = scanned >= expected;
+                                    return (
+                                        <div key={i} className={`p-4 rounded-2xl border flex flex-col gap-2 transition-all ${isDone ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 shadow-sm'}`}>
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <p className="text-[12px] font-black text-slate-900 leading-tight">{item.articleName || 'Artículo'}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku}</p>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <p className={`text-xl font-black ${isDone ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                                        {scanned} <span className="text-[11px] text-slate-300">/</span> {expected}
+                                                    </p>
+                                                    <p className="text-[8px] font-black text-slate-500 uppercase">{item.unit || 'UND'}</p>
+                                                </div>
+                                            </div>
+                                            {!isDone && (
+                                                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                                                    <button onClick={() => setGroupItemPickingModes(p => ({...p, [item.sku]: 'UND'}))}
+                                                        className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase flex flex-col items-center gap-0.5 transition-all ${(!groupItemPickingModes[item.sku] || groupItemPickingModes[item.sku] === 'UND') ? 'bg-slate-900 text-white ring-2 ring-slate-900 ring-offset-1' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>
+                                                        <span>x1</span><span className="text-[7px] opacity-70">{item.unit||'UND'}</span>
+                                                    </button>
+                                                    {Number(item.factorInter||0) > 1 && (
+                                                        <button onClick={() => setGroupItemPickingModes(p => ({...p, [item.sku]: 'CAJA'}))}
+                                                            className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase flex flex-col items-center gap-0.5 transition-all ${groupItemPickingModes[item.sku]==='CAJA' ? 'bg-indigo-600 text-white ring-2 ring-indigo-600 ring-offset-1' : 'bg-indigo-50 text-indigo-400 border border-indigo-100'}`}>
+                                                            <span>x{item.factorInter}</span><span className="text-[7px] opacity-70">{item.uomInterName||'CAJA'}</span>
+                                                        </button>
+                                                    )}
+                                                    {Number(item.factorStd||0) > 1 && Number(item.factorStd) !== Number(item.factorInter) && (
+                                                        <button onClick={() => setGroupItemPickingModes(p => ({...p, [item.sku]: 'STD'}))}
+                                                            className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase flex flex-col items-center gap-0.5 transition-all ${groupItemPickingModes[item.sku]==='STD' ? 'bg-amber-500 text-white ring-2 ring-amber-500 ring-offset-1' : 'bg-amber-50 text-amber-400 border border-amber-100'}`}>
+                                                            <span>x{item.factorStd}</span><span className="text-[7px] opacity-70">{item.uomStdName||'STD'}</span>
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => handleGroupManualAdd(item.sku, groupItemPickingModes[item.sku]==='CAJA' ? Number(item.factorInter)||1 : groupItemPickingModes[item.sku]==='STD' ? Number(item.factorStd)||1 : 1)}
+                                                        className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[9px] font-black uppercase flex items-center gap-1">
+                                                        <Icons.Plus className="w-3 h-3" /> Añadir
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Footer grupal */}
+                            <div className="p-4 bg-white border-t border-slate-100 flex gap-3 shrink-0">
+                                <button
+                                    onClick={handleConfirmGroupDispatch}
+                                    disabled={isGroupDispatching}
+                                    className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isGroupDispatching ? <><Icons.RotateCcw className="w-4 h-4 animate-spin" /> PROCESANDO...</> : <><Icons.Check className="w-4 h-4" /> CONFIRMAR DESPACHO GRUPAL ({routeInvoices.filter(i => !['EST-11','EST-12','EST-13','EST-14'].includes(String(i.itemStatus||i.item_status||''))).length} FACTURAS)</>}
+                                </button>
+                                <button onClick={() => { setGroupScannedItems({}); setGroupItemPickingModes({}); }} className="px-5 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">
+                                    Limpiar
+                                </button>
+                            </div>
+                        </div>
+                        )}
+
+                        {/* ── TAB: DESPACHO INDIVIDUAL ─────────────────────────── */}
+                        {dispatchTab === 'individual' && (<>
                         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 custom-scrollbar bg-slate-50/50">
                             {routeInvoices
                                 .filter(inv => {
@@ -2400,6 +2660,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 })}
                         </div>
 
+                        {/* Footer individual: planilla + cerrar */}
                         <div className="p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row gap-4 shrink-0 rounded-b-[2rem]">
                             <button
                                 className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
@@ -2411,11 +2672,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             </button>
                             <button
                                 className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
-                                onClick={() => setSelectedActiveRoute(null)}
+                                onClick={() => { setSelectedActiveRoute(null); setDispatchTab('individual'); setGroupScannedItems({}); setGroupItemPickingModes({}); }}
                             >
                                 CERRAR DETALLE
                             </button>
                         </div>
+                        </>)}
                     </div>
                 </div>
             )}
