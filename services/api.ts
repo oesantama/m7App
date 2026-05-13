@@ -172,6 +172,10 @@ export const api = {
     const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
     return fetchJson(`${API_URL}/conciliation/pending${qs}`);
   },
+  getConciliationPendingNormal: (params?: { clientId?: string; from?: string; to?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
+    return fetchJson(`${API_URL}/conciliation/pending-normal${qs}`);
+  },
   getConciliationHistory: (params: { from?: string; to?: string; doc_id?: string; invoice?: string; plate?: string }) => {
     const qs = '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v) as [string, string][])).toString();
     return fetchJson(`${API_URL}/conciliation/history${qs}`);
@@ -238,6 +242,28 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+  getRouteActivePlates: (clientId?: string) =>
+    fetchJson(`${API_URL}/dispatch/route-active-plates${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
+  getRoutePlateInvoices: (plate: string, clientId?: string) =>
+    fetchJson(`${API_URL}/dispatch/route-plate-invoices/${encodeURIComponent(plate)}${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
+  registerRouteReturn: (data: { invoiceId: string; vehiclePlate: string; returnType: 'COMPLETA' | 'PARCIAL'; returnReason?: string; notes?: string; items?: any[]; createdBy?: string }) =>
+    fetchJson(`${API_URL}/dispatch/register-route-return`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  getApprovalPendingReturns: (clientId?: string) =>
+    fetchJson(`${API_URL}/dispatch/approval-pending${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
+  createApprovalBatch: (data: { clientId: string; returnIds: number[]; notes?: string; createdBy?: string }) =>
+    fetchJson(`${API_URL}/dispatch/approval-batches`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  getApprovalBatches: (clientId?: string) =>
+    fetchJson(`${API_URL}/dispatch/approval-batches${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
+  getApprovalBatchByCode: (batchCode: string) =>
+    fetchJson(`${API_URL}/dispatch/approval-batch/${encodeURIComponent(batchCode)}`),
 
   // ── Consulta de Inventario / Kardex ───────────────────────────────────────
   getInventoryStock: (params?: { clientId?: string; articleId?: string; location?: string; dateFrom?: string; dateTo?: string }) => {

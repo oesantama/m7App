@@ -1,6 +1,16 @@
 import React from 'react';
 import { Icons } from '../../constants';
 
+export const RETURN_REASONS = [
+    'Cliente no atiende',
+    'Ya no desea el producto',
+    'Domicilio equivocado',
+    'Artículo en mal estado',
+    'Excedente de pedido',
+    'Error en pedido',
+    'Otro',
+];
+
 interface ReturnItem {
     sku?: string;
     article_id?: string;
@@ -8,6 +18,8 @@ interface ReturnItem {
     batch?: string;
     qty?: number;
     quantity_returned?: number;
+    quantity_delivered?: number;
+    expected_qty?: number;
     unit?: string;
 }
 
@@ -20,24 +32,36 @@ interface ReturnCardProps {
     externalDocId?: string;
     items: ReturnItem[];
     isProcessing: boolean;
-    onConfirm: (obs: string) => void;
+    onConfirm: (obs: string, reason: string) => void;
     onCancel?: () => void;
     type: 'ruta' | 'legalizacion';
+    returnReason?: string;
 }
 
 const fmtDate = (d: string) =>
     d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
+const isPartial = (items: ReturnItem[]) => {
+    return items.some(i => {
+        const returned  = i.quantity_returned ?? i.qty ?? 0;
+        const expected  = i.expected_qty ?? (i.quantity_returned ?? i.qty ?? 0);
+        const delivered = i.quantity_delivered ?? 0;
+        return delivered > 0 || returned < expected;
+    });
+};
+
 export const ReturnCard: React.FC<ReturnCardProps> = ({
     invoiceId, driverName, vehiclePlate, conductorName, createdAt,
-    externalDocId, items, isProcessing, onConfirm, onCancel, type,
+    externalDocId, items, isProcessing, onConfirm, onCancel, type, returnReason: initialReason,
 }) => {
-    const [obs, setObs] = React.useState('');
+    const [obs, setObs]         = React.useState('');
+    const [reason, setReason]   = React.useState(initialReason || '');
     const [expanded, setExpanded] = React.useState(false);
 
-    const displayName = driverName || conductorName || '—';
-    const plate = vehiclePlate || '—';
-    const validItems = items.filter(i => (i.sku || i.article_id));
+    const displayName  = driverName || conductorName || '—';
+    const plate        = vehiclePlate || '—';
+    const validItems   = items.filter(i => (i.sku || i.article_id));
+    const partial      = isPartial(validItems);
 
     return (
         <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden hover:border-slate-200 transition-all">
@@ -52,6 +76,10 @@ export const ReturnCard: React.FC<ReturnCardProps> = ({
                         <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase
                             ${type === 'ruta' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
                             {type === 'ruta' ? '🚛 De Ruta' : '📋 Post-Legalización'}
+                        </span>
+                        <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase
+                            ${partial ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {partial ? '⚠️ Parcial' : '✅ Completa'}
                         </span>
                     </div>
                     <p className="text-[9px] text-slate-500 font-bold mt-0.5">
@@ -78,7 +106,8 @@ export const ReturnCard: React.FC<ReturnCardProps> = ({
                             <tr className="text-slate-400 font-black uppercase">
                                 <th className="text-left pb-1.5">Artículo</th>
                                 <th className="text-left pb-1.5">Lote</th>
-                                <th className="text-right pb-1.5">Cant.</th>
+                                <th className="text-right pb-1.5">Devuelto</th>
+                                <th className="text-right pb-1.5">Entregado</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -89,8 +118,11 @@ export const ReturnCard: React.FC<ReturnCardProps> = ({
                                         {item.article_name && <span className="block text-[7px] text-slate-400 font-normal">{item.article_name}</span>}
                                     </td>
                                     <td className="py-1 text-slate-500">{item.batch || 'S/L'}</td>
-                                    <td className="py-1 text-right font-black text-slate-900">
-                                        {item.qty ?? item.quantity_returned ?? '—'} {item.unit || 'und'}
+                                    <td className="py-1 text-right font-black text-rose-600">
+                                        {item.quantity_returned ?? item.qty ?? '—'} {item.unit || 'und'}
+                                    </td>
+                                    <td className="py-1 text-right font-black text-emerald-600">
+                                        {item.quantity_delivered ?? '—'}
                                     </td>
                                 </tr>
                             ))}
@@ -100,24 +132,33 @@ export const ReturnCard: React.FC<ReturnCardProps> = ({
             )}
 
             {/* Acciones */}
-            <div className="border-t border-slate-100 px-4 py-3 flex items-center gap-2">
-                <input
-                    value={obs}
-                    onChange={e => setObs(e.target.value)}
-                    placeholder="Observación (opcional)…"
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-emerald-500"
-                />
-                {onCancel && (
-                    <button onClick={onCancel} disabled={isProcessing}
-                        className="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-[9px] font-black uppercase hover:bg-slate-50 disabled:opacity-40 transition-all">
-                        Cancelar
+            <div className="border-t border-slate-100 px-4 py-3 space-y-2">
+                <select
+                    value={reason}
+                    onChange={e => setReason(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-rose-400 text-slate-700 font-bold">
+                    <option value="">— Motivo de devolución —</option>
+                    {RETURN_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <div className="flex items-center gap-2">
+                    <input
+                        value={obs}
+                        onChange={e => setObs(e.target.value)}
+                        placeholder="Observación (opcional)…"
+                        className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] outline-none focus:border-emerald-500"
+                    />
+                    {onCancel && (
+                        <button onClick={onCancel} disabled={isProcessing}
+                            className="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-[9px] font-black uppercase hover:bg-slate-50 disabled:opacity-40 transition-all">
+                            Cancelar
+                        </button>
+                    )}
+                    <button onClick={() => onConfirm(obs, reason)} disabled={isProcessing || !reason}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5">
+                        {isProcessing ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.Check className="w-3 h-3" />}
+                        Recibir
                     </button>
-                )}
-                <button onClick={() => onConfirm(obs)} disabled={isProcessing}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5">
-                    {isProcessing ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.Check className="w-3 h-3" />}
-                    Recibir
-                </button>
+                </div>
             </div>
         </div>
     );

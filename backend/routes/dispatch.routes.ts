@@ -15,6 +15,13 @@ import {
     updateReturnStatus,
     confirmBodegaReturn,
     getPendingBodegaReturns,
+    getRouteActivePlates,
+    getRoutePlateInvoices,
+    registerRouteReturn,
+    getApprovalPendingReturns,
+    createApprovalBatch,
+    getApprovalBatches,
+    getApprovalBatchByCode,
 } from '../controllers/dispatch.controller.js';
 
 const router = Router();
@@ -42,5 +49,16 @@ router.put('/returns/:id/status', updateReturnStatus);
 // Devoluciones post-legalización (bodega confirma mercancía de conciliación DEVOLUCION)
 router.get('/pending-bodega-returns', getPendingBodegaReturns);
 router.post('/bodega-receipt', confirmBodegaReturn);
+
+// Devoluciones desde ruta — flujo iniciado en bodega
+router.get('/route-active-plates',       getRouteActivePlates);
+router.get('/route-plate-invoices/:plate', getRoutePlateInvoices);
+router.post('/register-route-return',    registerRouteReturn);
+
+// Lotes de aprobación de devoluciones
+router.get('/approval-pending',          getApprovalPendingReturns);
+router.post('/approval-batches',         createApprovalBatch);
+router.get('/approval-batches',          getApprovalBatches);
+router.get('/approval-batch/:batchCode', getApprovalBatchByCode);
 
 export default router;

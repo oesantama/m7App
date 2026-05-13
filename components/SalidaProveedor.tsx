@@ -267,6 +267,7 @@ const SalidaProveedor: React.FC<{ user: any }> = ({ user }) => {
                     articleSearch={articleSearch}
                     setArticleSearch={setArticleSearch}
                     formItems={formItems}
+                    setFormItems={setFormItems}
                     reference={reference}
                     setReference={setReference}
                     returnReason={returnReason}
@@ -278,6 +279,7 @@ const SalidaProveedor: React.FC<{ user: any }> = ({ user }) => {
                     onUpdateItem={updateItem}
                     onRemoveItem={removeItem}
                     onSubmit={handleSubmit}
+                    showToast={showToast}
                 />
             ) : (
                 <ReturnList
@@ -299,6 +301,7 @@ const NewReturnForm: React.FC<{
     articleSearch: string;
     setArticleSearch: (v: string) => void;
     formItems: ReturnItem[];
+    setFormItems: React.Dispatch<React.SetStateAction<ReturnItem[]>>;
     reference: string;
     setReference: (v: string) => void;
     returnReason: string;
@@ -310,9 +313,13 @@ const NewReturnForm: React.FC<{
     onUpdateItem: (idx: number, field: 'quantity' | 'notes', val: string) => void;
     onRemoveItem: (idx: number) => void;
     onSubmit: () => void;
-}> = ({ stockLoading, filteredStock, articleSearch, setArticleSearch, formItems, reference,
-    setReference, returnReason, setReturnReason, formNotes, setFormNotes,
-    submitting, onAddItem, onUpdateItem, onRemoveItem, onSubmit }) => {
+    showToast: (msg: string, ok?: boolean) => void;
+}> = ({ stockLoading, filteredStock, articleSearch, setArticleSearch, formItems, setFormItems,
+    reference, setReference, returnReason, setReturnReason, formNotes, setFormNotes,
+    submitting, onAddItem, onUpdateItem, onRemoveItem, onSubmit, showToast }) => {
+
+    const [batchCodeSearch, setBatchCodeSearch] = React.useState('');
+    const [batchLoading, setBatchLoading]       = React.useState(false);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -366,6 +373,58 @@ const NewReturnForm: React.FC<{
                 {/* Header fields */}
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-3">
                     <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">2. Datos del despacho</h2>
+
+                    {/* Importar desde lote de aprobación */}
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+                        <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-1.5">
+                            📋 Importar desde Lote de Aprobación
+                        </label>
+                        <div className="flex gap-2">
+                            <input type="text" value={batchCodeSearch}
+                                onChange={e => setBatchCodeSearch(e.target.value.toUpperCase())}
+                                placeholder="Ej: DEV-2026-05-12-001"
+                                className="flex-1 px-3 py-2 border border-indigo-200 rounded-xl text-[11px] text-slate-700 outline-none focus:border-indigo-500 bg-white font-mono transition-all" />
+                            <button
+                                disabled={!batchCodeSearch.trim() || batchLoading}
+                                onClick={async () => {
+                                    if (!batchCodeSearch.trim()) return;
+                                    setBatchLoading(true);
+                                    try {
+                                        const res = await api.getApprovalBatchByCode(batchCodeSearch.trim());
+                                        if (!res?.success) throw new Error(res?.error || 'Lote no encontrado');
+                                        // Pre-llenar reference y notas
+                                        setReference(res.batch.batch_code);
+                                        setFormNotes(`Lote aprobación: ${res.batch.batch_code}${res.batch.notes ? ' — ' + res.batch.notes : ''}`);
+                                        // Importar artículos de las facturas aprobadas
+                                        const importedItems: any[] = [];
+                                        for (const bItem of (res.items || [])) {
+                                            for (const it of (bItem.items || [])) {
+                                                if (it.sku) {
+                                                    importedItems.push({
+                                                        articleId: it.sku,
+                                                        articleName: it.article_name || it.sku,
+                                                        batch: 'S/L',
+                                                        quantity: it.quantity_returned || 0,
+                                                        unit: it.unit || 'und',
+                                                        availableQty: it.quantity_returned || 0,
+                                                        notes: `Factura ${bItem.invoice_id}`,
+                                                    });
+                                                }
+                                            }
+                                        }
+                                        if (importedItems.length > 0) setFormItems(prev => [...prev, ...importedItems]);
+                                        showToast(`Lote ${res.batch.batch_code} importado — ${importedItems.length} artículos`);
+                                        setBatchCodeSearch('');
+                                    } catch (e: any) { showToast(e.message || 'Error al importar lote', false); }
+                                    finally { setBatchLoading(false); }
+                                }}
+                                className="px-3 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-1.5">
+                                {batchLoading ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> : null}
+                                Cargar
+                            </button>
+                        </div>
+                    </div>
+
                     <div>
                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Referencia / Remisión</label>
                         <input type="text" value={reference} onChange={e => setReference(e.target.value)}

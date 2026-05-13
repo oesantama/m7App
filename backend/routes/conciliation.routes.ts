@@ -3,6 +3,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import {
     getPendingConciliations,
+    getPendingPlanNormal,
     getConciliationByDocument,
     getConciliationHistory,
     downloadPlanilla,
@@ -29,6 +30,7 @@ const upload = multer({
 });
 
 router.get('/pending',                    getPendingConciliations);
+router.get('/pending-normal',             getPendingPlanNormal);
 router.get('/search-routes',              searchRoutesForPlanilla);
 router.get('/history',                    getConciliationHistory);
 router.get('/plate-history',              getPlateMovementHistory);

@@ -181,6 +181,72 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET /conciliation/pending-normal ────────────────────────────────────────
+// Documentos Plan Normal (no Plan R) con al menos 1 factura sin conciliar.
+// Solo se necesita indicar estado de entrega (entregado/parcial/devolucion).
+export const getPendingPlanNormal = async (req: Request, res: Response) => {
+    try {
+        const { clientId, from, to } = req.query;
+
+        const conditions: string[] = [
+            `(dl.plan_type IS NULL OR dl.plan_type NOT ILIKE '%plan r%')`,
+        ];
+        const params: any[] = [];
+        let p = 1;
+
+        if (clientId) { conditions.push(`dl.client_id = $${p++}`); params.push(clientId); }
+        if (from)     { conditions.push(`dl.created_at >= $${p++}`); params.push(from); }
+        if (to)       { conditions.push(`dl.created_at <= $${p++}`); params.push(to); }
+
+        const where = `WHERE ${conditions.join(' AND ')}`;
+
+        const result = await pool.query(`
+            SELECT
+                dl.id,
+                dl.external_doc_id,
+                dl.vehicle_plate,
+                dl.plan_type,
+                dl.status,
+                dl.created_at,
+                dl.delivery_date,
+                dl.client_id,
+                (SELECT COUNT(DISTINCT di.invoice)
+                 FROM document_items di
+                 WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
+                ) AS total_invoices,
+                (SELECT COUNT(DISTINCT ic.invoice_number)
+                 FROM invoice_conciliations ic
+                 WHERE ic.document_id = dl.id
+                ) AS conciliadas,
+                (
+                  (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
+                  -
+                  (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
+                ) AS pendientes,
+                (SELECT da.driver_id FROM dispatch_assignments da WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1) AS conductor_id,
+                (SELECT u.name FROM dispatch_assignments da LEFT JOIN users u ON u.id = da.driver_id WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1) AS conductor_name
+            FROM documents_l dl
+            ${where}
+            GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.plan_type, dl.status, dl.created_at, dl.delivery_date, dl.client_id
+            HAVING (
+                (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '') > 0
+                AND
+                (
+                  (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
+                  -
+                  (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
+                ) > 0
+            )
+            ORDER BY dl.created_at DESC
+        `, params);
+
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[CONCILIATION] getPendingPlanNormal error:', err.message);
+        res.status(500).json({ success: false, error: 'Error interno del servidor', details: err.message });
+    }
+};
+
 // ─── GET /conciliation/search-routes ─────────────────────────────────────────
 // Consulta directa a tabla routes por cliente y fecha.
 // Retorna placa (vehicles), conductor (drivers), estado (estados), total facturas.
@@ -620,10 +686,13 @@ export const saveConciliation = async (req: Request, res: Response) => {
                     items_returned  = EXCLUDED.items_returned,
                     updated_at      = NOW()
                 RETURNING *
+            // Para Plan Normal (sin formaPago) usar estadoEntrega como forma_pago
+            const efectivaFormaPago = formaPago || (estadoEntrega ? estadoEntrega.toUpperCase() : null);
+
             `, [
                 documentId, invoiceNumber,
                 banco || null, valor || null, comprobante || null, fechaPago || null,
-                formaPago || null, numeroCheque || null, esDevolucion ?? false, conciliadoPor || null,
+                efectivaFormaPago, numeroCheque || null, esDevolucion ?? false, conciliadoPor || null,
                 finalPlate || null, finalConductorId || null, finalConductorName || null,
                 Number(sobrecosto) || 0,
                 itemsReturned ? JSON.stringify(itemsReturned) : '[]',

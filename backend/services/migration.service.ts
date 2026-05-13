@@ -126,6 +126,26 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'notes'              // observación por ítem
   ],
 
+  // ─── LOTES DE APROBACIÓN DE DEVOLUCIONES ─────────────────────────────────
+  'return_approval_batches': [
+    'batch_code',        // código legible: DEV-YYYY-MM-DD-NNN
+    'client_id',         // cliente al que pertenece
+    'notes',             // observaciones del lote
+    'status',            // borrador | enviado | aprobado | procesado
+    'created_by',        // usuario que creó el lote
+    'created_at',        // fecha creación
+    'sent_at'            // fecha de envío/correo
+  ],
+  'return_approval_batch_items': [
+    'batch_id',          // FK return_approval_batches
+    'return_id',         // FK delivery_returns (la devolución agrupada)
+    'invoice_id',        // factura (desnormalizado para búsqueda rápida)
+    'return_type',       // COMPLETA | PARCIAL
+    'return_reason',     // motivo de devolución
+    'approved',          // true = aprobada por proveedor
+    'approval_notes'     // notas de aprobación
+  ],
+
   // ─── CABECERA DE CONCILIACIÓN ─────────────────────────────────────────────
   // Una conciliación por conductor/vehículo/fecha. Agrupa todas las facturas del día.
   // Valida: lo entregado vs lo recaudado vs lo devuelto vs lo en repice.
@@ -209,7 +229,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'invoice_conciliation_reversal_logs', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades', 'gh_visitas', 'management_orders'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'invoice_conciliation_reversal_logs', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades', 'gh_visitas', 'management_orders', 'return_approval_batches', 'return_approval_batch_items'];
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
     try {

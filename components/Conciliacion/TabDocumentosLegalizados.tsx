@@ -86,6 +86,8 @@ const FORMA_COLOR: Record<string, { bg: string; text: string; label: string }> =
     CONSIGNACION:  { bg: 'bg-violet-100',  text: 'text-violet-700',  label: '🏦 Consignación'  },
     CHEQUE:        { bg: 'bg-amber-100',   text: 'text-amber-700',   label: '📄 Cheque'        },
     DEVOLUCION:    { bg: 'bg-rose-100',    text: 'text-rose-700',    label: '🔄 Devolución'    },
+    ENTREGADO:     { bg: 'bg-emerald-100', text: 'text-emerald-700', label: '✅ Entregado'      },
+    PARCIAL:       { bg: 'bg-amber-100',   text: 'text-amber-700',   label: '⚠️ Parcial'       },
 };
 
 const ENTREGADO_STATUS = ['EST-12', 'ENTREGADO', 'COMPLETED', 'FINALIZADO'];

@@ -4,12 +4,13 @@ import { toast } from 'sonner';
 import TabPendientes, { DocSummary } from './Conciliacion/TabPendientes';
 import TabDocumentosLegalizados from './Conciliacion/TabDocumentosLegalizados';
 import TabPlanilla from './Conciliacion/TabPlanilla';
+import TabPlanNormal from './Conciliacion/TabPlanNormal';
 
 interface Props { user: any; }
 
 interface Client { id: string; name: string; }
 
-type Tab = 'pendientes' | 'documentos_legalizados' | 'planilla';
+type Tab = 'pendientes' | 'plan_normal' | 'documentos_legalizados' | 'planilla';
 
 const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
     const [activeTab, setActiveTab] = useState<Tab>('pendientes');
@@ -101,9 +102,10 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
 
                 <div className="flex gap-1">
                     {([
-                        { id: 'pendientes' as Tab, label: 'Pendientes',       icon: '⏳', badge: pendingBadge },
-                        { id: 'documentos_legalizados' as Tab, label: 'Documentos Legalizados', icon: '✅', badge: 0 },
-                        { id: 'planilla'   as Tab, label: 'Descarga Planilla', icon: '📥', badge: 0           },
+                        { id: 'pendientes'            as Tab, label: 'PDT PLAN R',          icon: '⏳', badge: pendingBadge },
+                        { id: 'plan_normal'           as Tab, label: 'PDT PLAN NORMAL',     icon: '📋', badge: 0           },
+                        { id: 'documentos_legalizados' as Tab, label: 'Documentos Legalizados', icon: '✅', badge: 0       },
+                        { id: 'planilla'              as Tab, label: 'Descarga Planilla',   icon: '📥', badge: 0           },
                     ]).map(tab => (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wide border-b-2 transition-all
@@ -137,6 +139,8 @@ const ConciliacionFacturas: React.FC<Props> = ({ user }) => {
                     onRefresh={() => loadDocs(selectedClientId)}
                     user={user}
                 />
+            ) : activeTab === 'plan_normal' ? (
+                <TabPlanNormal clientId={selectedClientId} user={user} />
             ) : activeTab === 'documentos_legalizados' ? (
                 <TabDocumentosLegalizados user={user} />
             ) : (

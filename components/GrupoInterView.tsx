@@ -56,6 +56,20 @@ const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string
   </div>
 );
 
+const formatColDate = (dateStr: string | null) => {
+  if (!dateStr) return '-';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '-';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch (e) {
+    return '-';
+  }
+};
+
 const GrupoInterView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'carga' | 'gestion'>('gestion');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -99,9 +113,9 @@ const GrupoInterView: React.FC = () => {
   const [isFinished, setIsFinished] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
-
+ 
   const { user } = useAppStore();
-
+ 
   const [filters, setFilters] = useState<{
     status: string;
     client: string;
@@ -110,6 +124,7 @@ const GrupoInterView: React.FC = () => {
     placa?: string;
     planilla?: string;
     factura?: string;
+    dateType: 'entrega' | 'cargue';
   }>({
     status: '',
     client: '',
@@ -117,7 +132,8 @@ const GrupoInterView: React.FC = () => {
     fechaCorteHasta: new Date().toISOString().split('T')[0],
     placa: '',
     planilla: '',
-    factura: ''
+    factura: '',
+    dateType: 'entrega'
   });
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
@@ -161,6 +177,7 @@ const GrupoInterView: React.FC = () => {
       if (filters.factura) params.invoice = filters.factura;
       if (filters.placa) params.plate = filters.placa;
       if (filters.planilla) params.planilla = filters.planilla;
+      if (filters.dateType) params.dateType = filters.dateType;
       
       const data = await api.getGrupoInterOrders(params);
       
@@ -326,6 +343,33 @@ const GrupoInterView: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      status: '',
+      client: '',
+      fechaCorteDesde: '',
+      fechaCorteHasta: '',
+      placa: '',
+      planilla: '',
+      factura: '',
+      dateType: 'entrega'
+    });
+    setSearchTerm('');
+    setCurrentPage(1);
+    toast.success('Filtros restablecidos con éxito');
+    
+    // Obtener órdenes de forma fresca e inmediata con filtros limpios
+    setTimeout(() => {
+      api.getGrupoInterOrders({ dateType: 'entrega' }).then(data => {
+        if (data) {
+          setOrders(data);
+        }
+      }).catch(err => {
+        console.error('Error al restablecer pedidos:', err);
+      });
+    }, 50);
   };
 
   const handleExportExcel = () => {
@@ -640,93 +684,207 @@ const GrupoInterView: React.FC = () => {
         ) : (
           <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
             <div className="p-8 lg:p-10 space-y-8">
-              {/* Primary Filter Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Clock size={12} className="text-blue-500" /> Rango de Consulta
-                  </label>
-                  <div className="flex items-center bg-slate-50 p-1.5 rounded-2xl border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
-                    <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none text-slate-700" value={filters.fechaCorteDesde} onChange={(e) => setFilters({...filters, fechaCorteDesde: e.target.value})} />
-                    <div className="w-px h-4 bg-slate-300 mx-1"></div>
-                    <input type="date" className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none text-slate-700" value={filters.fechaCorteHasta} onChange={(e) => setFilters({...filters, fechaCorteHasta: e.target.value})} />
+              {/* Premium Dashboard Filter Panel */}
+              <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-6">
+                <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-200">
+                      <Filter size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm text-slate-800 uppercase tracking-tight">Panel de Filtros Avanzados</h3>
+                      <p className="text-[10px] text-slate-400 font-bold">Personaliza la consulta de despachos y logística</p>
+                    </div>
+                  </div>
+
+                  {/* Date Type Selector (Toggle Switch) */}
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => setFilters({ ...filters, dateType: 'entrega' })}
+                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all ${
+                        filters.dateType === 'entrega'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Fecha de Entrega
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilters({ ...filters, dateType: 'cargue' })}
+                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all ${
+                        filters.dateType === 'cargue'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Fecha de Cargue
+                    </button>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Search size={12} className="text-blue-500" /> Búsqueda Global
-                  </label>
-                  <div className="relative group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
-                    <input 
-                      type="text" 
-                      placeholder="Factura, placa, planilla..." 
-                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500/20 focus:bg-white outline-none transition-all" 
-                      value={searchTerm} 
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        setCurrentPage(1);
-                      }} 
-                      onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)} 
-                    />
+                {/* Main Filter Inputs Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Date Range Selector */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Clock size={12} className="text-blue-500" /> Rango de Consulta
+                    </label>
+                    <div className="flex items-center bg-white p-1.5 rounded-2xl border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all shadow-sm">
+                      <input
+                        type="date"
+                        className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none text-slate-700"
+                        value={filters.fechaCorteDesde}
+                        onChange={(e) => setFilters({ ...filters, fechaCorteDesde: e.target.value })}
+                      />
+                      <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                      <input
+                        type="date"
+                        className="flex-1 bg-transparent border-none text-xs font-bold p-2 outline-none text-slate-700"
+                        value={filters.fechaCorteHasta}
+                        onChange={(e) => setFilters({ ...filters, fechaCorteHasta: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Factura / Documento Input */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <FileText size={12} className="text-blue-500" /> Documento / Factura
+                    </label>
+                    <div className="relative group">
+                      <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={14} />
+                      <input
+                        type="text"
+                        placeholder="Ej. TI1000..."
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm focus:bg-white animate-fade-in"
+                        value={filters.factura || ''}
+                        onChange={(e) => {
+                          setFilters({ ...filters, factura: e.target.value });
+                          setCurrentPage(1);
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Planilla Input */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <FileSpreadsheet size={12} className="text-blue-500" /> Planilla
+                    </label>
+                    <div className="relative group">
+                      <FileSpreadsheet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={14} />
+                      <input
+                        type="text"
+                        placeholder="Ej. 100043"
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm focus:bg-white"
+                        value={filters.planilla || ''}
+                        onChange={(e) => {
+                          setFilters({ ...filters, planilla: e.target.value });
+                          setCurrentPage(1);
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Placa Input */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Truck size={12} className="text-blue-500" /> Placa de Vehículo
+                    </label>
+                    <div className="relative group">
+                      <Truck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={14} />
+                      <input
+                        type="text"
+                        placeholder="Ej. LZN785"
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm uppercase focus:bg-white"
+                        value={filters.placa || ''}
+                        onChange={(e) => {
+                          setFilters({ ...filters, placa: e.target.value });
+                          setCurrentPage(1);
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      const today = new Date();
-                      const eightDaysAgo = new Date();
-                      eightDaysAgo.setDate(today.getDate() - 8);
-                      setFilters({...filters, fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0], fechaCorteHasta: today.toISOString().split('T')[0]});
-                      setTimeout(() => fetchOrders(searchTerm), 0);
-                    }}
-                    className="flex-1 py-3.5 bg-white text-slate-600 border border-slate-200 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-slate-50 transition-all uppercase tracking-widest"
-                  >
-                    8 Días
-                  </button>
-                  <button onClick={() => fetchOrders(searchTerm)} className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95">
-                    Consultar
-                  </button>
-                </div>
+                {/* Sub-toolbar: Global Search, Buttons, Clean & Export */}
+                <div className="flex flex-col lg:flex-row gap-4 items-center justify-between pt-4 border-t border-slate-100">
+                  {/* Global Search integrated above the table */}
+                  <div className="w-full lg:max-w-md space-y-1.5">
+                    <div className="relative group">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
+                      <input
+                        type="text"
+                        placeholder="Buscar globalmente (factura, placa, planilla, cliente...)"
+                        className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-sm"
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)}
+                      />
+                    </div>
+                  </div>
 
-                <div className="flex items-center justify-between px-6 py-3.5 bg-blue-50/50 border border-blue-100 rounded-2xl">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Resultados</span>
-                    <span className="text-lg font-black text-blue-600 leading-tight">{visibleOrders.length}</span>
-                  </div>
-                  <button 
-                    onClick={() => handleExportExcel()}
-                    className="p-2.5 bg-white text-emerald-600 rounded-xl font-black hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                    title="Exportar a Excel"
-                  >
-                    <FileSpreadsheet size={18} />
-                  </button>
-                </div>
-              </div>
+                  {/* Actions buttons row */}
+                  <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+                    {/* Clear Button */}
+                    <button
+                      onClick={handleClearFilters}
+                      className="px-4 py-3.5 border border-rose-200 text-rose-600 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-rose-50 transition-all uppercase tracking-widest"
+                      title="Limpiar todos los filtros"
+                    >
+                      <X size={14} />
+                      Limpiar
+                    </button>
 
-              {/* Secondary Specific Filters */}
-              <div className="pt-6 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Filtro Factura</label>
-                  <div className="relative">
-                    <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
-                    <input type="text" placeholder="Ej. TI1000..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all" value={filters.factura || ''} onChange={e => {setFilters({...filters, factura: e.target.value}); setCurrentPage(1);}} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Filtro Planilla</label>
-                  <div className="relative">
-                    <FileSpreadsheet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
-                    <input type="text" placeholder="Ej. 100043" className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all" value={filters.planilla || ''} onChange={e => {setFilters({...filters, planilla: e.target.value}); setCurrentPage(1);}} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Filtro Placa</label>
-                  <div className="relative">
-                    <Truck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
-                    <input type="text" placeholder="Ej. LZN785" className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all uppercase" value={filters.placa || ''} onChange={e => {setFilters({...filters, placa: e.target.value}); setCurrentPage(1);}} />
+                    {/* Quick 8 Days */}
+                    <button
+                      onClick={() => {
+                        const today = new Date();
+                        const eightDaysAgo = new Date();
+                        eightDaysAgo.setDate(today.getDate() - 8);
+                        setFilters({
+                          ...filters,
+                          fechaCorteDesde: eightDaysAgo.toISOString().split('T')[0],
+                          fechaCorteHasta: today.toISOString().split('T')[0],
+                        });
+                        setTimeout(() => fetchOrders(searchTerm), 0);
+                      }}
+                      className="px-4 py-3.5 bg-white text-slate-600 border border-slate-200 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-slate-50 transition-all uppercase tracking-widest"
+                    >
+                      8 Días
+                    </button>
+
+                    {/* Submit Inquiry */}
+                    <button
+                      onClick={() => fetchOrders(searchTerm)}
+                      className="px-6 py-3.5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95"
+                    >
+                      Consultar
+                    </button>
+
+                    {/* Excel Exporter */}
+                    <button
+                      onClick={() => handleExportExcel()}
+                      className="px-4 py-3.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all uppercase tracking-widest"
+                      title="Exportar a Excel"
+                    >
+                      <FileSpreadsheet size={16} />
+                      Exportar
+                    </button>
+
+                    {/* Results Count Badge */}
+                    <div className="flex items-center gap-2 px-5 py-3 bg-blue-50 border border-blue-100 rounded-2xl shadow-sm">
+                      <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Resultados:</span>
+                      <span className="text-sm font-black text-blue-600">{visibleOrders.length}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -740,7 +898,8 @@ const GrupoInterView: React.FC = () => {
                       { key: 'numero_documento', label: 'Documento' },
                       { key: 'numero_planilla', label: 'Planilla' },
                       { key: 'placa', label: 'Placa' },
-                      { key: 'f_ultimo_corte', label: 'Fct. Último C.' },
+                      { key: 'fecha_carge', label: 'F. Cargue' },
+                      { key: 'fecha_entregado', label: 'F. Entrega' },
                       { key: 'clienteDestino', label: 'Cliente / Destino' },
                       { key: 'cantidad_total', label: 'Total Und' },
                       { key: 'peso_total_prod', label: 'Total Kg' },
@@ -779,7 +938,16 @@ const GrupoInterView: React.FC = () => {
                            </span>
                         </td>
                         <td className="px-8 py-5 font-black text-slate-700 uppercase">{order.placa || '-'}</td>
-                        <td className="px-8 py-5 font-bold text-slate-400">{order.f_ultimo_corte ? new Date(order.f_ultimo_corte).toLocaleDateString() : '-'}</td>
+                        <td className="px-8 py-5 font-bold text-slate-500">{formatColDate(order.fecha_carge)}</td>
+                        <td className="px-8 py-5 font-bold text-slate-500">
+                          {order.fecha_entregado ? (
+                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black border border-emerald-100">
+                              {formatColDate(order.fecha_entregado)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">-</span>
+                          )}
+                        </td>
                         <td className="px-8 py-5">
                            <div className="flex flex-col max-w-[200px]">
                              <span className="font-extrabold text-slate-800 truncate">{order.cliente}</span>
@@ -821,7 +989,7 @@ const GrupoInterView: React.FC = () => {
                            </div>
                         </td>
                         <td className="px-8 py-5 text-right">
-                          <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex gap-2 justify-end transition-opacity">
                             <button onClick={() => openDetail(order)} className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-black transition-all shadow-lg shadow-blue-200" title="Ver Detalle"><Eye size={18} /></button>
                             <button 
                                 onClick={() => {

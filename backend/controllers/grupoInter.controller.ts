@@ -42,6 +42,17 @@ const ensureSchema = async () => {
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS peso_total_prod NUMERIC DEFAULT 0;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS acta_entrega_b64 TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS fecha_entregado TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS fecha_carge TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+        `);
+
+        // Crear índices para optimizar búsquedas por rango de fecha, placa, planilla y documento
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_fecha_entregado ON grupo_inter_pedidos(fecha_entregado);
+            CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_fecha_carge ON grupo_inter_pedidos(fecha_carge);
+            CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_numero_documento ON grupo_inter_pedidos(numero_documento);
+            CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_f_ultimo_corte ON grupo_inter_pedidos(f_ultimo_corte);
+            CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_placa ON grupo_inter_pedidos(placa);
+            CREATE INDEX IF NOT EXISTS idx_grupo_inter_pedidos_numero_planilla ON grupo_inter_pedidos(numero_planilla);
         `);
 
         // Parche para create_at nulo — seguro porque no borra datos
@@ -349,12 +360,14 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                 const existingRes = await pool.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [doc]);
                 let pedidoId: number;
 
+                const excelCorteDate = idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null;
+
                 if (existingRes.rows.length > 0) {
                     pedidoId = existingRes.rows[0].id;
                     await pool.query(`
                         UPDATE grupo_inter_pedidos SET
                             nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5, 
-                            municipio_destino = $6, empresa = $7, f_ultimo_corte = $8, 
+                            municipio_destino = $6, empresa = $7, f_ultimo_corte = COALESCE($8, f_ultimo_corte, CURRENT_TIMESTAMP), 
                             clasificacion = $9, placa = $10, valor_flete = $11, numero_planilla = $12,
                             cantidad_total = $13, precio_total = $14, peso_total_prod = $15,
                             update_by = $16, update_at = CURRENT_TIMESTAMP
@@ -367,7 +380,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
                         idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
                         idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
-                        idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
+                        excelCorteDate,
                         idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
                         placa,
                         fleteProporcional,
@@ -385,7 +398,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                             clasificacion, placa, valor_flete, numero_planilla, 
                             cantidad_total, precio_total, peso_total_prod,
                             estado, create_by, create_at, fecha_carge
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, CURRENT_TIMESTAMP), $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         RETURNING id;
                     `, [
                         doc,
@@ -395,7 +408,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         idxNota >= 0 ? String(rowArr[idxNota] || '').trim() : '',
                         idxDest >= 0 ? String(rowArr[idxDest] || '').trim() : '',
                         idxEmpresa >= 0 ? String(rowArr[idxEmpresa] || '').trim() : '',
-                        idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null,
+                        excelCorteDate,
                         idxClasif >= 0 ? String(rowArr[idxClasif] || '').trim() : '',
                         placa,
                         fleteProporcional,
@@ -734,7 +747,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 
 export const getOrders = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { search, status, client, fechaCorteDesde, fechaCorteHasta, invoice, plate, planilla } = req.query;
+        const { search, status, client, fechaCorteDesde, fechaCorteHasta, invoice, plate, planilla, dateType } = req.query;
         const values: any[] = [];
         let paramIdx = 1;
 
@@ -756,9 +769,9 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             paramIdx++;
         }
 
-        // Nuevos filtros específicos con soporte ILIKE (coincidencia parcial)
+        // El input factura debe buscar por numero_documento (Documento en la tabla) o por no_factura_m7
         if (invoice) {
-            whereClauses.push(`p.no_factura_m7 ILIKE $${paramIdx}`);
+            whereClauses.push(`(p.numero_documento ILIKE $${paramIdx} OR p.no_factura_m7 ILIKE $${paramIdx})`);
             values.push(`%${invoice}%`);
             paramIdx++;
         }
@@ -784,25 +797,26 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             paramIdx++;
         }
 
-        // M7-EXT: Filtro de fecha (Solo si no hay búsqueda global activa)
-        if (!search && !invoice && !plate && !planilla) {
-            if (fechaCorteDesde && fechaCorteHasta) {
-                // [M7-OPTIMIZE] Usamos >= y < (raw timestamp) en lugar de ::DATE para permitir uso de índices
-                whereClauses.push(`p.f_ultimo_corte >= $${paramIdx}`);
-                whereClauses.push(`p.f_ultimo_corte < ($${paramIdx + 1}::date + 1)`);
-                values.push(fechaCorteDesde, fechaCorteHasta);
-                paramIdx += 2;
-            } else if (fechaCorteDesde) {
-                whereClauses.push(`p.f_ultimo_corte >= $${paramIdx}`);
-                values.push(fechaCorteDesde);
-                paramIdx++;
-            } else if (fechaCorteHasta) {
-                whereClauses.push(`p.f_ultimo_corte < ($${paramIdx}::date + 1)`);
-                values.push(fechaCorteHasta);
-                paramIdx++;
-            } else {
-                whereClauses.push(`(p.f_ultimo_corte >= CURRENT_DATE - INTERVAL '8 days' OR p.f_ultimo_corte IS NULL)`);
-            }
+        // Selección dinámica de la columna de fecha para búsquedas ultra optimizadas por índice
+        const dateCol = dateType === 'cargue' ? 'p.fecha_carge' : 'p.fecha_entregado';
+
+        // Filtro de fecha combinado con otros inputs (AND)
+        if (fechaCorteDesde && fechaCorteHasta) {
+            whereClauses.push(`${dateCol} >= $${paramIdx}::date`);
+            whereClauses.push(`${dateCol} < ($${paramIdx + 1}::date + INTERVAL '1 day')`);
+            values.push(fechaCorteDesde, fechaCorteHasta);
+            paramIdx += 2;
+        } else if (fechaCorteDesde) {
+            whereClauses.push(`${dateCol} >= $${paramIdx}::date`);
+            values.push(fechaCorteDesde);
+            paramIdx++;
+        } else if (fechaCorteHasta) {
+            whereClauses.push(`${dateCol} < ($${paramIdx}::date + INTERVAL '1 day')`);
+            values.push(fechaCorteHasta);
+            paramIdx++;
+        } else if (!search && !invoice && !plate && !planilla) {
+            // Rango por defecto si no se ingresan fechas ni búsquedas de texto: últimos 30 días para no saturar la vista
+            whereClauses.push(`(${dateCol} >= CURRENT_DATE - INTERVAL '30 days' OR ${dateCol} IS NULL)`);
         }
 
         const whereStr = whereClauses.join(' AND ');

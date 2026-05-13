@@ -1101,3 +1101,318 @@ export const getPendingBodegaReturns = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET /api/dispatch/route-active-plates ────────────────────────────────────
+// Placas con vehículos actualmente en ruta y con facturas sin entregar (EST-11)
+export const getRouteActivePlates = async (req: Request, res: Response) => {
+    try {
+        const { clientId } = req.query as Record<string, string>;
+        const params: any[] = ['EST-11'];
+        let clientFilter = '';
+        if (clientId) { params.push(clientId); clientFilter = `AND dl.client_id = $${params.length}`; }
+
+        const result = await pool.query(`
+            SELECT DISTINCT
+                v.plate,
+                v.id AS vehicle_id,
+                d.name AS driver_name,
+                d.id AS driver_id,
+                COUNT(DISTINCT di.invoice) AS invoice_count
+            FROM document_items di
+            JOIN documents_l dl ON dl.id = di.document_id
+            JOIN route_assignment_items rai ON rai.invoice = di.invoice AND rai.item_status = $1
+            JOIN vehicles v ON v.plate = rai.vehicle_plate
+            LEFT JOIN assignments a ON a.vehicle_id::text = v.id::text AND a.is_active = true
+            LEFT JOIN drivers d ON d.id::text = a.driver_id::text
+            WHERE di.item_status = $1 ${clientFilter}
+            GROUP BY v.plate, v.id, d.name, d.id
+            ORDER BY v.plate
+        `, params);
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[M7-RETURNS] getRouteActivePlates:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── GET /api/dispatch/route-plate-invoices/:plate ────────────────────────────
+// Facturas de una placa que están en ruta sin entregar
+export const getRoutePlateInvoices = async (req: Request, res: Response) => {
+    try {
+        const { plate } = req.params;
+        const { clientId } = req.query as Record<string, string>;
+        const params: any[] = [plate, 'EST-11'];
+        let clientFilter = '';
+        if (clientId) { params.push(clientId); clientFilter = `AND dl.client_id = $${params.length}`; }
+
+        const result = await pool.query(`
+            SELECT DISTINCT
+                di.invoice AS invoice_id,
+                di.customer_name,
+                di.address,
+                di.city,
+                dl.client_id,
+                COUNT(di.id) AS item_count,
+                SUM(di.expected_qty) AS total_qty,
+                json_agg(json_build_object(
+                    'article_id', di.article_id,
+                    'article_name', COALESCE(a.name, di.article_id),
+                    'batch', di.batch,
+                    'expected_qty', di.expected_qty,
+                    'unit', di.unit
+                )) AS items
+            FROM document_items di
+            JOIN documents_l dl ON dl.id = di.document_id
+            JOIN route_assignment_items rai ON rai.invoice = di.invoice AND rai.vehicle_plate = $1 AND rai.item_status = $2
+            LEFT JOIN articles a ON a.id = di.article_id
+            WHERE di.item_status = $2 ${clientFilter}
+            GROUP BY di.invoice, di.customer_name, di.address, di.city, dl.client_id
+            ORDER BY di.invoice
+        `, params);
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[M7-RETURNS] getRoutePlateInvoices:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/register-route-return ─────────────────────────────────
+// Registra devolución iniciada desde bodega para una factura en ruta
+export const registerRouteReturn = async (req: Request, res: Response) => {
+    const { invoiceId, vehiclePlate, returnType, returnReason, notes, items, createdBy } = req.body;
+    if (!invoiceId || !vehiclePlate || !returnType) {
+        return res.status(400).json({ success: false, error: 'invoiceId, vehiclePlate y returnType son requeridos' });
+    }
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Obtener vehicle_id y driver_id de la placa
+        const vRes = await client.query(
+            `SELECT v.id AS vehicle_id, a.driver_id
+             FROM vehicles v
+             LEFT JOIN assignments a ON a.vehicle_id::text = v.id::text AND a.is_active = true
+             WHERE v.plate = $1 LIMIT 1`,
+            [vehiclePlate]
+        );
+        const vehicleId = vRes.rows[0]?.vehicle_id || null;
+        const driverId  = vRes.rows[0]?.driver_id  || null;
+
+        // Crear cabecera delivery_return
+        const retRes = await client.query(
+            `INSERT INTO delivery_returns (invoice_id, vehicle_id, driver_id, return_reason, notes, status, created_at)
+             VALUES ($1, $2, $3, $4, $5, 'PENDING', CURRENT_TIMESTAMP)
+             RETURNING id`,
+            [invoiceId, vehicleId, driverId, returnReason || null, notes || null]
+        );
+        const returnId = retRes.rows[0].id;
+
+        // Insertar ítems
+        const itemsArr = Array.isArray(items) ? items : [];
+        for (const item of itemsArr) {
+            await client.query(
+                `INSERT INTO delivery_return_items (return_id, sku, article_name, quantity_returned, quantity_delivered, unit, notes)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [returnId, item.article_id || item.sku, item.article_name || null,
+                 item.return_qty || item.quantity_returned || 0,
+                 item.delivered_qty || 0,
+                 item.unit || 'und', item.notes || null]
+            );
+        }
+
+        // Marcar item_status en document_items según returnType
+        const newStatus = returnType === 'COMPLETA' ? 'EST-16' : 'EST-17'; // EST-16=devuelto, EST-17=parcial
+        await client.query(
+            `UPDATE document_items SET item_status = $1
+             WHERE TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $2
+                OR CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $2`,
+            [newStatus, invoiceId]
+        );
+
+        // Log en route_modifications_log
+        await client.query(
+            `INSERT INTO route_modifications_log (invoice_id, action, user_id, previous_plate, details)
+             VALUES ($1, 'BODEGA_RETURN', $2, $3, $4)`,
+            [invoiceId, createdBy || null, vehiclePlate,
+             JSON.stringify({ returnType, returnReason, notes, timestamp: new Date().toISOString() })]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true, returnId });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[M7-RETURNS] registerRouteReturn:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
+
+// ─── GET /api/dispatch/approval-pending ──────────────────────────────────────
+// Devoluciones procesadas por bodega que aún no pertenecen a ningún lote de aprobación
+export const getApprovalPendingReturns = async (req: Request, res: Response) => {
+    try {
+        const { clientId } = req.query as Record<string, string>;
+        const params: any[] = ['PENDING', 'PROCESSED'];
+        let clientFilter = '';
+        if (clientId) { params.push(clientId); clientFilter = `AND dl.client_id = $${params.length}`; }
+
+        const result = await pool.query(`
+            SELECT
+                dr.id, dr.invoice_id, dr.return_reason, dr.notes, dr.status, dr.created_at,
+                v.plate AS vehicle_plate,
+                d.name  AS driver_name,
+                dl.client_id,
+                dl.external_doc_id,
+                COALESCE(json_agg(json_build_object(
+                    'sku',               dri.sku,
+                    'article_name',      dri.article_name,
+                    'quantity_returned', dri.quantity_returned,
+                    'quantity_delivered',dri.quantity_delivered,
+                    'unit',              dri.unit
+                )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
+            FROM delivery_returns dr
+            LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
+            LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
+            LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN document_items di ON di.invoice = dr.invoice_id
+            LEFT JOIN documents_l dl ON dl.id = di.document_id
+            WHERE dr.status IN ($1, $2)
+              AND dr.id NOT IN (SELECT return_id FROM return_approval_batch_items WHERE return_id IS NOT NULL)
+              ${clientFilter}
+            GROUP BY dr.id, v.plate, d.name, dl.client_id, dl.external_doc_id
+            ORDER BY dr.created_at DESC
+        `, params);
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[M7-RETURNS] getApprovalPendingReturns:', err.message);
+        if (err.message?.includes('does not exist')) return res.json({ success: true, data: [] });
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/approval-batches ─────────────────────────────────────
+// Crea un lote de aprobación agrupando devoluciones seleccionadas
+export const createApprovalBatch = async (req: Request, res: Response) => {
+    const { clientId, returnIds, notes, createdBy } = req.body;
+    if (!clientId || !Array.isArray(returnIds) || returnIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'clientId y returnIds son requeridos' });
+    }
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Generar código único: DEV-YYYY-MM-DD-NNN
+        const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const countRes = await client.query(
+            `SELECT COUNT(*) FROM return_approval_batches WHERE batch_code LIKE $1`,
+            [`DEV-${dateStr}-%`]
+        );
+        const seq = String(parseInt(countRes.rows[0].count) + 1).padStart(3, '0');
+        const batchCode = `DEV-${dateStr}-${seq}`;
+
+        const batchRes = await client.query(
+            `INSERT INTO return_approval_batches (batch_code, client_id, notes, status, created_by, created_at, sent_at)
+             VALUES ($1, $2, $3, 'borrador', $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             RETURNING id, batch_code`,
+            [batchCode, clientId, notes || null, createdBy || null]
+        );
+        const batchId   = batchRes.rows[0].id;
+        const batchCodeOut = batchRes.rows[0].batch_code;
+
+        for (const returnId of returnIds) {
+            // Obtener datos del return para desnormalizar
+            const retInfo = await client.query(
+                `SELECT dr.invoice_id, dr.return_reason
+                 FROM delivery_returns dr WHERE dr.id = $1`, [returnId]
+            );
+            const invoiceId   = retInfo.rows[0]?.invoice_id  || null;
+            const returnReason= retInfo.rows[0]?.return_reason|| null;
+
+            await client.query(
+                `INSERT INTO return_approval_batch_items (batch_id, return_id, invoice_id, return_reason, approved)
+                 VALUES ($1, $2, $3, $4, false)`,
+                [batchId, returnId, invoiceId, returnReason]
+            );
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, batchId, batchCode: batchCodeOut });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[M7-BATCH] createApprovalBatch:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
+
+// ─── GET /api/dispatch/approval-batches ──────────────────────────────────────
+// Lista lotes de aprobación de un cliente
+export const getApprovalBatches = async (req: Request, res: Response) => {
+    try {
+        const { clientId } = req.query as Record<string, string>;
+        const params: any[] = [];
+        let whereClause = '';
+        if (clientId) { params.push(clientId); whereClause = `WHERE rab.client_id = $1`; }
+
+        const result = await pool.query(`
+            SELECT
+                rab.id, rab.batch_code, rab.client_id, rab.notes, rab.status,
+                rab.created_by, rab.created_at, rab.sent_at,
+                COUNT(rabi.id)::int AS total_items,
+                COUNT(rabi.id) FILTER (WHERE rabi.approved = true)::int AS approved_items
+            FROM return_approval_batches rab
+            LEFT JOIN return_approval_batch_items rabi ON rabi.batch_id::text = rab.id::text
+            ${whereClause}
+            GROUP BY rab.id
+            ORDER BY rab.created_at DESC
+        `, params);
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[M7-BATCH] getApprovalBatches:', err.message);
+        if (err.message?.includes('does not exist')) return res.json({ success: true, data: [] });
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── GET /api/dispatch/approval-batch/:batchCode ─────────────────────────────
+// Detalle completo de un lote (para salida a proveedor)
+export const getApprovalBatchByCode = async (req: Request, res: Response) => {
+    try {
+        const { batchCode } = req.params;
+        const batchRes = await pool.query(
+            `SELECT * FROM return_approval_batches WHERE batch_code = $1 LIMIT 1`,
+            [batchCode]
+        );
+        if (!batchRes.rowCount) return res.status(404).json({ success: false, error: 'Lote no encontrado' });
+        const batch = batchRes.rows[0];
+
+        const itemsRes = await pool.query(`
+            SELECT
+                rabi.id, rabi.invoice_id, rabi.return_reason, rabi.approved, rabi.approval_notes,
+                dr.notes, dr.status AS return_status, dr.created_at AS return_date,
+                v.plate AS vehicle_plate,
+                d.name  AS driver_name,
+                COALESCE(json_agg(json_build_object(
+                    'sku',               dri.sku,
+                    'article_name',      dri.article_name,
+                    'quantity_returned', dri.quantity_returned,
+                    'unit',              dri.unit
+                )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
+            FROM return_approval_batch_items rabi
+            LEFT JOIN delivery_returns dr ON dr.id::text = rabi.return_id::text
+            LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
+            LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
+            LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            WHERE rabi.batch_id::text = $1
+            GROUP BY rabi.id, dr.notes, dr.status, dr.created_at, v.plate, d.name
+            ORDER BY rabi.invoice_id
+        `, [String(batch.id)]);
+
+        res.json({ success: true, batch, items: itemsRes.rows });
+    } catch (err: any) {
+        console.error('[M7-BATCH] getApprovalBatchByCode:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
