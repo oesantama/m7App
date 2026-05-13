@@ -65,13 +65,35 @@ const ensureTables = async () => {
       fecha        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )
   `);
+
+  // ── Tabla de conciliaciones por factura ──────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ajover_b36_conciliacion (
+      id            SERIAL PRIMARY KEY,
+      id_detalle    INTEGER REFERENCES ajover_b36_detalle(id) ON DELETE CASCADE,
+      id_enca       INTEGER REFERENCES ajover_b36_encabezado(id) ON DELETE CASCADE,
+      factura       TEXT,
+      placa         TEXT,
+      estado        TEXT DEFAULT 'PENDIENTE',
+      observacion   TEXT,
+      conciliado_por TEXT,
+      conciliado_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      client_id     TEXT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_b36_conc_detalle ON ajover_b36_conciliacion (id_detalle);
+  `);
+
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_b36_enc_client  ON ajover_b36_encabezado (client_id);
     CREATE INDEX IF NOT EXISTS idx_b36_enc_fecha   ON ajover_b36_encabezado (fecha_carge DESC);
     CREATE INDEX IF NOT EXISTS idx_b36_det_id_enca ON ajover_b36_detalle (id_enca);
     CREATE INDEX IF NOT EXISTS idx_b36_log_id_enca ON ajover_b36_log (id_enca);
+    CREATE INDEX IF NOT EXISTS idx_b36_conc_placa  ON ajover_b36_conciliacion (placa);
+    CREATE INDEX IF NOT EXISTS idx_b36_conc_enca   ON ajover_b36_conciliacion (id_enca);
   `);
 };
+
+
 
 // ─── Parsear fecha tolerante ──────────────────────────────────────────────────
 const parseDate = (v: any): string | null => {
@@ -653,4 +675,163 @@ export const getLogs = async (req: Request, res: Response) => {
   }
 };
 
+// ─── GET /ajover-b36/conciliacion ─────────────────────────────────────────────
+// Retorna planillas agrupadas por placa con sus facturas y estado de conciliación.
+export const getPlacasConciliacion = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { clientId, from, to, placa, factura } = req.query as any;
 
+    const conds: string[] = ['1=1'];
+    const params: any[] = [];
+    let p = 1;
+
+    if (clientId) { conds.push(`e.client_id = $${p++}`); params.push(clientId); }
+    if (from)     { conds.push(`e.fecha_carge >= $${p++}`); params.push(from); }
+    if (to)       { conds.push(`e.fecha_carge <= $${p++}`); params.push(to); }
+    if (placa)    { conds.push(`UPPER(e.placa) LIKE $${p++}`); params.push(`%${String(placa).toUpperCase()}%`); }
+
+    const where = conds.join(' AND ');
+
+    // Facturas con estado de conciliación joinado
+    const result = await pool.query(`
+      SELECT
+        e.id           AS enca_id,
+        e.os,
+        e.placa,
+        e.conductor,
+        e.fecha_carge,
+        e.nombre_ruta,
+        e.valor_flete,
+        d.id           AS detalle_id,
+        d.factura,
+        d.notas,
+        d.volumen,
+        d.peso,
+        COALESCE(c.estado, 'PENDIENTE') AS estado_conc,
+        c.observacion  AS conc_observacion,
+        c.conciliado_por,
+        c.conciliado_at,
+        c.id           AS conc_id
+      FROM ajover_b36_encabezado e
+      JOIN ajover_b36_detalle d ON d.id_enca = e.id
+      LEFT JOIN ajover_b36_conciliacion c ON c.id_detalle = d.id
+      WHERE ${where}
+        ${factura ? `AND d.factura ILIKE $${p++}` : ''}
+      ORDER BY e.fecha_carge DESC, e.id DESC, d.id ASC
+    `, factura ? [...params, `%${factura}%`] : params);
+
+    // Agrupar por placa + enca
+    const grouped: Record<string, any> = {};
+    for (const row of result.rows) {
+      const key = `${row.placa || 'SIN_PLACA'}__${row.enca_id}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          enca_id:     row.enca_id,
+          os:          row.os,
+          placa:       row.placa || null,
+          conductor:   row.conductor,
+          fecha_carge: row.fecha_carge,
+          nombre_ruta: row.nombre_ruta,
+          valor_flete: row.valor_flete,
+          facturas:    [],
+        };
+      }
+      grouped[key].facturas.push({
+        detalle_id:      row.detalle_id,
+        factura:         row.factura,
+        notas:           row.notas,
+        volumen:         row.volumen,
+        peso:            row.peso,
+        estado_conc:     row.estado_conc,
+        conc_observacion: row.conc_observacion,
+        conciliado_por:  row.conciliado_por,
+        conciliado_at:   row.conciliado_at,
+        conc_id:         row.conc_id,
+      });
+    }
+
+    const list = Object.values(grouped).map((g: any) => ({
+      ...g,
+      total_facturas:     g.facturas.length,
+      conciliadas:        g.facturas.filter((f: any) => f.estado_conc === 'CONCILIADO').length,
+      pendientes:         g.facturas.filter((f: any) => f.estado_conc === 'PENDIENTE').length,
+    }));
+
+    res.json(list);
+  } catch (err: any) {
+    console.error('[B36-CONCILIACION-GET]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── POST /ajover-b36/conciliacion ────────────────────────────────────────────
+// UPSERT estado de conciliación de una factura (id_detalle).
+export const saveConciliacionB36 = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { id_detalle, id_enca, factura, placa, estado, observacion, client_id } = req.body;
+    const usuario = (req as any).user?.name || (req as any).user?.email || 'sistema';
+
+    if (!id_detalle || !estado) {
+      return res.status(400).json({ error: 'id_detalle y estado son requeridos.' });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO ajover_b36_conciliacion
+        (id_detalle, id_enca, factura, placa, estado, observacion, conciliado_por, conciliado_at, client_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
+      ON CONFLICT (id_detalle) DO UPDATE SET
+        estado         = EXCLUDED.estado,
+        observacion    = EXCLUDED.observacion,
+        conciliado_por = EXCLUDED.conciliado_por,
+        conciliado_at  = NOW()
+      RETURNING *
+    `, [id_detalle, id_enca, factura, placa, estado, observacion || null, usuario, client_id || null]);
+
+    // Log de auditoría
+    await pool.query(`
+      INSERT INTO ajover_b36_log (id_enca, factura, accion, observacion, usuario)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [id_enca, factura, `CONCILIACION_${estado}`, observacion || `Estado actualizado a ${estado}`, usuario]);
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err: any) {
+    console.error('[B36-CONCILIACION-SAVE]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── PUT /ajover-b36/asignar-placa/:encId ─────────────────────────────────────
+// Asigna placa y conductor a una planilla que no tenía (o actualiza).
+export const asignarPlacaB36 = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { encId } = req.params;
+    const { placa, conductor } = req.body;
+    const usuario = (req as any).user?.name || (req as any).user?.email || 'sistema';
+
+    if (!placa) return res.status(400).json({ error: 'placa es requerida.' });
+
+    await pool.query(
+      `UPDATE ajover_b36_encabezado SET placa = $1, conductor = COALESCE($2, conductor) WHERE id = $3`,
+      [String(placa).trim().toUpperCase(), conductor ? String(conductor).trim() : null, encId]
+    );
+
+    await pool.query(`
+      INSERT INTO ajover_b36_log (id_enca, factura, accion, observacion, usuario)
+      VALUES ($1, NULL, 'ASIGNACION_PLACA', $2, $3)
+    `, [encId, `Placa asignada: ${placa}${conductor ? ' / Conductor: ' + conductor : ''}`, usuario]);
+
+    // Actualizar placa en conciliaciones existentes de esta planilla
+    await pool.query(
+      `UPDATE ajover_b36_conciliacion SET placa = $1 WHERE id_enca = $2`,
+      [String(placa).trim().toUpperCase(), encId]
+    );
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[B36-ASIGNAR-PLACA]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};

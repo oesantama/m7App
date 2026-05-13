@@ -380,6 +380,24 @@ const healSchema = async (client: any) => {
     `CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`,
     // assignments: filtro is_active (usado en CADA asignación activa)
     `CREATE INDEX IF NOT EXISTS idx_assignments_active ON assignments (client_id, is_active)`,
+
+    // ── Índices para CTEs de conciliación (eliminan subqueries correlacionadas) ──
+    // invoice_conciliations: GROUP BY document_id en CTE ic_agg
+    `CREATE INDEX IF NOT EXISTS idx_invoice_concil_doc_id ON invoice_conciliations (document_id)`,
+    // document_l_payments: GROUP BY document_id en CTE pay_agg
+    `CREATE INDEX IF NOT EXISTS idx_doc_l_payments_doc_id ON document_l_payments (document_id)`,
+    // route_surcharges: GROUP BY document_id + filtro status en CTE rs_agg
+    `CREATE INDEX IF NOT EXISTS idx_route_surcharges_doc_status ON route_surcharges (document_id, status_id)`,
+    // route_group_payments: GROUP BY document_id en CTE rgp_agg
+    `CREATE INDEX IF NOT EXISTS idx_route_group_payments_doc ON route_group_payments (document_id)`,
+    // dispatch_assignments: DISTINCT ON invoice_id para conductor en CTE cond_agg
+    `CREATE INDEX IF NOT EXISTS idx_dispatch_asgn_invoice_id ON dispatch_assignments (invoice_id, id DESC)`,
+    // documents_l: filtro plan_type (ILIKE '%plan r%' se beneficia con índice parcial)
+    `CREATE INDEX IF NOT EXISTS idx_documents_l_plan_type ON documents_l (plan_type)`,
+    // routes: filtro created_at + status_id en getRoutes
+    `CREATE INDEX IF NOT EXISTS idx_routes_created_at_status ON routes (created_at DESC, status_id)`,
+    // route_invoices: compound para CTE stats de getRoutes
+    `CREATE INDEX IF NOT EXISTS idx_route_invoices_route_inv ON route_invoices (route_id, invoice_id)`,
   ];
   // healSchema corre en autocommit (antes del BEGIN en restoreSystem).
   // En autocommit cada statement es su propio txn: un IF NOT EXISTS fallido no
@@ -387,6 +405,25 @@ const healSchema = async (client: any) => {
   for (const idxSql of performanceIndexes) {
     try { await client.query(idxSql); } catch (e) {}
   }
+  // ─── Tablas auxiliares de conciliación (antes vivían en el request handler) ──
+  for (const ddl of [
+    `CREATE TABLE IF NOT EXISTS route_surcharges (
+        id SERIAL PRIMARY KEY, document_id TEXT NOT NULL, plate TEXT NOT NULL,
+        valor NUMERIC(15,2) NOT NULL, referencia TEXT, fecha DATE,
+        status_id TEXT DEFAULT 'PENDIENTE', user_id TEXT, observaciones TEXT,
+        facturas TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS route_group_payments (
+        id SERIAL PRIMARY KEY, document_id TEXT NOT NULL, plate TEXT NOT NULL,
+        valor NUMERIC(15,2) NOT NULL, referencia TEXT, fecha DATE,
+        metodo_pago TEXT, observacion TEXT, user_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS document_payment_history (
+        id SERIAL PRIMARY KEY, document_id TEXT, invoice TEXT,
+        old_method TEXT, new_method TEXT, user_id TEXT, user_name TEXT,
+        observations TEXT,
+        changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`,
+  ]) { try { await client.query(ddl); } catch (e) {} }
+
   // ─────────────────────────────────────────────────────────────────────────────
 
   try {

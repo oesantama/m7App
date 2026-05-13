@@ -10,74 +10,70 @@ interface LearningPatternData {
 export const getRoutes = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
+      WITH ri_stats AS (
+        SELECT
+          ri.route_id,
+          json_agg(ri.invoice_id)        AS invoice_ids,
+          COUNT(DISTINCT ri.invoice_id)  AS total_invoices
+        FROM route_invoices ri
+        GROUP BY ri.route_id
+      ),
+      ri_delivered AS (
+        SELECT ri.route_id, COUNT(DISTINCT ri.invoice_id) AS delivered_invoices
+        FROM route_invoices ri
+        JOIN document_items di
+          ON di.invoice = ri.invoice_id
+          OR di.invoice = SPLIT_PART(ri.invoice_id, '_', 2)
+        WHERE di.item_status IN ('EST-11','EST-12','EST-13','EST-14','COMPLETED','ENTREGADO','FINALIZADO')
+        GROUP BY ri.route_id
+      ),
+      active_routes AS (
+        SELECT DISTINCT route_id
+        FROM route_invoices ri
+        LEFT JOIN document_items di
+          ON di.invoice = ri.invoice_id
+          OR di.invoice = SPLIT_PART(ri.invoice_id, '_', 2)
+        WHERE di.item_status NOT IN ('EST-12','EST-13','EST-14','COMPLETADO','FINALIZADO','ENTREGADO')
+           OR di.item_status IS NULL
+      )
       SELECT
-        r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text, r.created_by::text, r.status_id::text, r.created_at,
-        v.plate, d.name as driver_name, d.document_number as driver_document,
-        COALESCE(
-          (
-            SELECT json_agg(invoice_id)
-            FROM route_invoices
-            WHERE route_id::text = r.id::text
-          ),
-          '[]'::json
-        ) as invoice_ids,
-        -- Contadores robustos via subquery
-        (
-          SELECT COUNT(DISTINCT ri.invoice_id)
-          FROM route_invoices ri
-          WHERE ri.route_id::text = r.id::text
-        ) as total_invoices,
-        (
-          SELECT COUNT(DISTINCT ri.invoice_id)
-          FROM route_invoices ri
-          JOIN document_items di ON (
-            CONCAT(di.document_id, '_', COALESCE(NULLIF(di.invoice, ''), di.order_number)) = ri.invoice_id 
-            OR TRIM(COALESCE(NULLIF(di.invoice, ''), di.order_number)) = ri.invoice_id
-          )
-          WHERE ri.route_id::text = r.id::text
-            AND di.item_status IN ('EST-11', 'EST-12', 'EST-13', 'EST-14', 'COMPLETED', 'ENTREGADO', 'FINALIZADO')
-        ) as delivered_invoices
+        r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text,
+        r.created_by::text, r.status_id::text, r.created_at,
+        v.plate, d.name AS driver_name, d.document_number AS driver_document,
+        COALESCE(s.invoice_ids, '[]'::json)       AS invoice_ids,
+        COALESCE(s.total_invoices, 0)             AS total_invoices,
+        COALESCE(del.delivered_invoices, 0)       AS delivered_invoices
       FROM routes r
-      LEFT JOIN vehicles v ON r.vehicle_id::text = v.id::text
-      LEFT JOIN drivers d ON r.driver_id::text = d.id::text
+      LEFT JOIN vehicles    v   ON v.id        = r.vehicle_id
+      LEFT JOIN drivers     d   ON d.id        = r.driver_id
+      LEFT JOIN ri_stats    s   ON s.route_id  = r.id
+      LEFT JOIN ri_delivered del ON del.route_id = r.id
+      INNER JOIN active_routes ar ON ar.route_id = r.id
       WHERE r.created_at >= CURRENT_DATE - INTERVAL '7 days'
-        -- Solo excluir rutas canceladas/reasignadas
         AND r.status_id NOT IN ('EST-16', 'COMPLETADO', 'FINALIZADO')
-        -- Mostrar la ruta si tiene al menos una factura vinculada que no esté en estado final
-        AND EXISTS (
-          SELECT 1 FROM route_invoices ri
-          LEFT JOIN document_items di ON (
-            TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
-            OR CONCAT(di.document_id::text, '_', COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
-          )
-          WHERE ri.route_id::text = r.id::text
-            AND (
-              di.item_status NOT IN ('EST-12','EST-13','EST-14','COMPLETADO','FINALIZADO','ENTREGADO')
-              OR di.item_status IS NULL
-            )
-        )
 
       UNION ALL
 
       SELECT
         da.id::text,
-        COALESCE(a.vehicle_id::text, 'S/V') as vehicle_id,
+        COALESCE(a.vehicle_id::text, 'S/V') AS vehicle_id,
         da.driver_id::text,
-        'CLI-01' as client_id,
+        'CLI-01'                             AS client_id,
         da.created_by::text,
         da.status::text,
         da.created_at,
         v.plate,
-        d.name as driver_name,
-        d.document_number as driver_document,
-        json_build_array(da.invoice_id) as invoice_ids,
-        1 as total_invoices,
-        CASE WHEN da.status IN ('COMPLETED', 'PENDING_SIGNATURES', 'EN_RUTA', 'EST-11', 'EST-12', 'ENTREGADO') THEN 1 ELSE 0 END as delivered_invoices
+        d.name                               AS driver_name,
+        d.document_number                    AS driver_document,
+        json_build_array(da.invoice_id)      AS invoice_ids,
+        1                                    AS total_invoices,
+        CASE WHEN da.status IN ('COMPLETED','PENDING_SIGNATURES','EN_RUTA','EST-11','EST-12','ENTREGADO')
+             THEN 1 ELSE 0 END              AS delivered_invoices
       FROM dispatch_assignments da
-      LEFT JOIN assignments a ON da.driver_id::text = a.driver_id::text AND a.is_active::boolean = true
-      LEFT JOIN vehicles v ON a.vehicle_id::text = v.id::text
-      LEFT JOIN drivers d ON da.driver_id::text = d.id::text
-      WHERE da.status IN ('PENDING_SIGNATURES', 'EN_RUTA', 'En repart', 'PENDING')
+      LEFT JOIN assignments a ON a.driver_id = da.driver_id AND a.is_active = true
+      LEFT JOIN vehicles    v ON v.id        = a.vehicle_id
+      LEFT JOIN drivers     d ON d.id        = da.driver_id
+      WHERE da.status IN ('PENDING_SIGNATURES','EN_RUTA','En repart','PENDING')
         AND da.created_at >= CURRENT_DATE - INTERVAL '7 days'
 
       ORDER BY created_at DESC
@@ -127,11 +123,6 @@ export const saveRoute = async (req: Request, res: Response) => {
   const client = await pool.connect();
 
   try {
-    // Asegurar columnas de eficiencia FUERA de la transacción (DDL no puede estar en BEGIN/COMMIT)
-    await client.query('ALTER TABLE routes ADD COLUMN IF NOT EXISTS total_volume_m3 NUMERIC(10,4) DEFAULT 0');
-    await client.query('ALTER TABLE routes ADD COLUMN IF NOT EXISTS vehicle_capacity_m3 NUMERIC(10,2) DEFAULT 0');
-    await client.query('ALTER TABLE routes ADD COLUMN IF NOT EXISTS utilization_pct INTEGER DEFAULT 0');
-
     await client.query('BEGIN');
 
     // AUTO-ASSIGN DRIVER IF MISSING (Requerimiento Crítico)

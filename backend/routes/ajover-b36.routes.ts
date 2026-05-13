@@ -13,6 +13,9 @@ import {
   addDetalle,
   deleteDetalle,
   getLogs,
+  getPlacasConciliacion,
+  saveConciliacionB36,
+  asignarPlacaB36,
 } from '../controllers/ajover-b36.controller.js';
 
 const router = Router();
@@ -31,5 +34,9 @@ router.delete('/encabezado/:id',    deleteEncabezado);
 router.post('/detalle',             addDetalle);
 router.delete('/detalle/:id',       deleteDetalle);
 router.get('/logs/:encId',          getLogs);
+router.get('/conciliacion',         getPlacasConciliacion);
+router.post('/conciliacion',        saveConciliacionB36);
+router.put('/asignar-placa/:encId', asignarPlacaB36);
 
 export default router;
+

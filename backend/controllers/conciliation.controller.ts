@@ -16,7 +16,6 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
         const params: any[] = [];
         let p = 1;
 
-        // Si no hay docId, forzamos Plan R (comportamiento original para la lista de pendientes)
         if (!docId) {
             conditions.push(`dl.plan_type ILIKE '%plan r%'`);
         } else {
@@ -31,140 +30,78 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
 
         const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-        // [M7-SELF-HEALING] Asegurar que la tabla de sobrecostos existe antes de consultar
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS route_surcharges (
-                id SERIAL PRIMARY KEY,
-                document_id TEXT NOT NULL,
-                plate TEXT NOT NULL,
-                valor NUMERIC(15,2) NOT NULL,
-                referencia TEXT,
-                fecha DATE,
-                status_id TEXT DEFAULT 'PENDIENTE',
-                user_id TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // [M7-SELF-HEALING] Tabla para Consignaciones Grupales (por Ruta/Placa, sin factura)
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS route_group_payments (
-                id SERIAL PRIMARY KEY,
-                document_id TEXT NOT NULL,
-                plate TEXT NOT NULL,
-                valor NUMERIC(15,2) NOT NULL,
-                referencia TEXT,
-                fecha DATE,
-                metodo_pago TEXT,
-                observacion TEXT,
-                user_id TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // [M7-SELF-HEALING] Tabla para Historial de Cambios en Método de Pago
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS document_payment_history (
-                id SERIAL PRIMARY KEY,
-                document_id TEXT,
-                invoice TEXT,
-                old_method TEXT,
-                new_method TEXT,
-                user_id TEXT,
-                user_name TEXT,
-                observations TEXT,
-                changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // Garantizar columnas opcionales en route_surcharges
-        await pool.query(`
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='route_surcharges' AND column_name='user_id') THEN
-                    ALTER TABLE route_surcharges ADD COLUMN user_id TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='route_surcharges' AND column_name='observaciones') THEN
-                    ALTER TABLE route_surcharges ADD COLUMN observaciones TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='route_surcharges' AND column_name='facturas') THEN
-                    ALTER TABLE route_surcharges ADD COLUMN facturas TEXT;
-                END IF;
-            END $$;
-        `);
-
-        // El HAVING solo se aplica si NO estamos buscando un documento específico (docId)
+        // Para búsqueda por docId no filtramos por pendientes (se quiere ver todo el doc)
         const havingClause = docId ? '' : `
-            HAVING (
-                (
-                  (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
-                  - 
-                  (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
-                ) > 0
-                OR
-                (SELECT COUNT(*) FROM route_surcharges rs WHERE rs.document_id = dl.id AND (rs.status_id IN ('PENDIENTE', 'EST-01') OR rs.status_id IS NULL)) > 0
-            )
-              AND (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '') > 0
-        `;
+            HAVING (inv.total_invoices - COALESCE(ic_agg.conciliadas, 0)) > 0
+                OR COALESCE(rs_agg.pending_surcharges, 0) > 0`;
 
         const result = await pool.query(`
+            WITH inv_agg AS (
+                SELECT document_id,
+                    COUNT(DISTINCT invoice) AS total_invoices
+                FROM document_items
+                WHERE invoice IS NOT NULL AND invoice <> ''
+                GROUP BY document_id
+            ),
+            ic_agg AS (
+                SELECT document_id,
+                    COUNT(DISTINCT invoice_number) AS conciliadas,
+                    COALESCE(SUM(valor::numeric), 0) AS total_legalizado_individual
+                FROM invoice_conciliations
+                GROUP BY document_id
+            ),
+            pay_agg AS (
+                SELECT document_id,
+                    COALESCE(SUM(CASE WHEN UPPER(TRIM(metodo_pago)) IN ('EF','EFECTIVO','CASH') OR UPPER(TRIM(metodo_pago)) LIKE '%EFE%'
+                        THEN COALESCE(NULLIF(TRIM(vmetodo),'')::numeric, 0) ELSE 0 END), 0) AS total_efectivo,
+                    COALESCE(SUM(CASE WHEN metodo_pago IS NOT NULL
+                        AND UPPER(TRIM(metodo_pago)) NOT IN ('EF','EFECTIVO','CASH')
+                        AND UPPER(TRIM(metodo_pago)) NOT LIKE '%EFE%'
+                        THEN COALESCE(NULLIF(TRIM(vmetodo),'')::numeric, 0) ELSE 0 END), 0) AS total_credito
+                FROM document_l_payments
+                GROUP BY document_id
+            ),
+            rs_agg AS (
+                SELECT document_id,
+                    COALESCE(SUM(CASE WHEN status_id IN ('APROBADO','EST-02') THEN valor::numeric ELSE 0 END), 0) AS total_sobrecosto_ruta,
+                    COUNT(CASE WHEN status_id IN ('PENDIENTE','EST-01') OR status_id IS NULL THEN 1 END)          AS pending_surcharges
+                FROM route_surcharges
+                GROUP BY document_id
+            ),
+            rgp_agg AS (
+                SELECT document_id, COALESCE(SUM(valor::numeric), 0) AS total_pago_grupal
+                FROM route_group_payments
+                GROUP BY document_id
+            ),
+            cond_agg AS (
+                SELECT DISTINCT ON (da.invoice_id) da.invoice_id AS doc_id, da.driver_id, u.name AS conductor_name
+                FROM dispatch_assignments da
+                LEFT JOIN users u ON u.id = da.driver_id
+                ORDER BY da.invoice_id, da.id DESC
+            )
             SELECT
-                dl.id,
-                dl.external_doc_id,
-                dl.vehicle_plate,
-                dl.remesatdm AS "remesaTDM",
-                dl.plan_type,
-                dl.status,
-                dl.created_at,
-                dl.delivery_date,
-                dl.client_id,
-
-                (SELECT COUNT(DISTINCT di.invoice) 
-                 FROM document_items di 
-                 WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
-                ) AS total_invoices,
-
-                (SELECT COUNT(DISTINCT ic.invoice_number)
-                 FROM invoice_conciliations ic
-                 WHERE ic.document_id = dl.id
-                ) AS conciliadas,
-
-                (
-                  (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
-                  - 
-                  (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
-                ) AS pendientes,
-
-                (SELECT COALESCE(SUM(CASE 
-                    WHEN UPPER(TRIM(p.metodo_pago)) IN ('EF', 'EFECTIVO', 'CASH') OR UPPER(TRIM(p.metodo_pago)) LIKE '%EFE%'
-                    THEN COALESCE(NULLIF(TRIM(p.vmetodo), '')::numeric, 0) ELSE 0 END), 0)
-                 FROM document_l_payments p
-                 WHERE p.document_id = dl.id
-                ) AS total_efectivo,
-
-                (SELECT COALESCE(SUM(CASE 
-                    WHEN p.metodo_pago IS NOT NULL
-                         AND UPPER(TRIM(p.metodo_pago)) NOT IN ('EF', 'EFECTIVO', 'CASH')
-                         AND UPPER(TRIM(p.metodo_pago)) NOT LIKE '%EFE%'
-                    THEN COALESCE(NULLIF(TRIM(p.vmetodo), '')::numeric, 0) ELSE 0 END), 0)
-                 FROM document_l_payments p
-                 WHERE p.document_id = dl.id
-                ) AS total_credito,
-
-                (SELECT da.driver_id FROM dispatch_assignments da
-                 WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_id,
-                (SELECT u.name FROM dispatch_assignments da
-                 LEFT JOIN users u ON u.id = da.driver_id
-                 WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1)   AS conductor_name,
-
-                (SELECT COALESCE(SUM(valor::numeric), 0) FROM route_surcharges rs WHERE rs.document_id = dl.id AND rs.status_id IN ('APROBADO', 'EST-02')) AS total_sobrecosto_ruta,
-                (SELECT COUNT(*) FROM route_surcharges rs WHERE rs.document_id = dl.id AND (rs.status_id IN ('PENDIENTE', 'EST-01') OR rs.status_id IS NULL)) AS pending_surcharges,
-                (SELECT COALESCE(SUM(valor::numeric), 0) FROM route_group_payments rgp WHERE rgp.document_id = dl.id) AS total_pago_grupal,
-                (SELECT COALESCE(SUM(valor::numeric), 0) FROM invoice_conciliations ic WHERE ic.document_id = dl.id) AS total_legalizado_individual
-
+                dl.id, dl.external_doc_id, dl.vehicle_plate,
+                dl.remesatdm AS "remesaTDM", dl.plan_type, dl.status,
+                dl.created_at, dl.delivery_date, dl.client_id,
+                COALESCE(inv.total_invoices, 0)                                         AS total_invoices,
+                COALESCE(ic_agg.conciliadas, 0)                                         AS conciliadas,
+                COALESCE(inv.total_invoices, 0) - COALESCE(ic_agg.conciliadas, 0)       AS pendientes,
+                COALESCE(pay.total_efectivo, 0)                                         AS total_efectivo,
+                COALESCE(pay.total_credito, 0)                                          AS total_credito,
+                cond.driver_id                                                          AS conductor_id,
+                cond.conductor_name,
+                COALESCE(rs_agg.total_sobrecosto_ruta, 0)                               AS total_sobrecosto_ruta,
+                COALESCE(rs_agg.pending_surcharges, 0)                                  AS pending_surcharges,
+                COALESCE(rgp_agg.total_pago_grupal, 0)                                  AS total_pago_grupal,
+                COALESCE(ic_agg.total_legalizado_individual, 0)                         AS total_legalizado_individual
             FROM documents_l dl
+            LEFT JOIN inv_agg  inv     ON inv.document_id     = dl.id
+            LEFT JOIN ic_agg           ON ic_agg.document_id  = dl.id
+            LEFT JOIN pay_agg  pay     ON pay.document_id     = dl.id
+            LEFT JOIN rs_agg           ON rs_agg.document_id  = dl.id
+            LEFT JOIN rgp_agg          ON rgp_agg.document_id = dl.id
+            LEFT JOIN cond_agg cond    ON cond.doc_id         = dl.id
             ${where}
-            GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.remesatdm, dl.plan_type, dl.status, dl.created_at, dl.delivery_date, dl.client_id
             ${havingClause}
             ORDER BY dl.created_at DESC
         `, params);
@@ -172,12 +109,7 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
         res.json({ success: true, data: result.rows });
     } catch (err: any) {
         console.error('[CONCILIATION] getPendingConciliations error:', err.message);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Error interno del servidor', 
-            details: err.message,
-            hint: 'Verifique si la tabla route_surcharges existe'
-        });
+        res.status(500).json({ success: false, error: 'Error interno del servidor', details: err.message });
     }
 };
 
@@ -201,42 +133,38 @@ export const getPendingPlanNormal = async (req: Request, res: Response) => {
         const where = `WHERE ${conditions.join(' AND ')}`;
 
         const result = await pool.query(`
-            SELECT
-                dl.id,
-                dl.external_doc_id,
-                dl.vehicle_plate,
-                dl.plan_type,
-                dl.status,
-                dl.created_at,
-                dl.delivery_date,
-                dl.client_id,
-                (SELECT COUNT(DISTINCT di.invoice)
-                 FROM document_items di
-                 WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> ''
-                ) AS total_invoices,
-                (SELECT COUNT(DISTINCT ic.invoice_number)
-                 FROM invoice_conciliations ic
-                 WHERE ic.document_id = dl.id
-                ) AS conciliadas,
-                (
-                  (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
-                  -
-                  (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
-                ) AS pendientes,
-                (SELECT da.driver_id FROM dispatch_assignments da WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1) AS conductor_id,
-                (SELECT u.name FROM dispatch_assignments da LEFT JOIN users u ON u.id = da.driver_id WHERE da.invoice_id = dl.id ORDER BY da.id DESC LIMIT 1) AS conductor_name
-            FROM documents_l dl
-            ${where}
-            GROUP BY dl.id, dl.external_doc_id, dl.vehicle_plate, dl.plan_type, dl.status, dl.created_at, dl.delivery_date, dl.client_id
-            HAVING (
-                (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '') > 0
-                AND
-                (
-                  (SELECT COUNT(DISTINCT di.invoice) FROM document_items di WHERE di.document_id = dl.id AND di.invoice IS NOT NULL AND di.invoice <> '')
-                  -
-                  (SELECT COUNT(DISTINCT ic.invoice_number) FROM invoice_conciliations ic WHERE ic.document_id = dl.id)
-                ) > 0
+            WITH inv_agg AS (
+                SELECT document_id, COUNT(DISTINCT invoice) AS total_invoices
+                FROM document_items
+                WHERE invoice IS NOT NULL AND invoice <> ''
+                GROUP BY document_id
+            ),
+            ic_agg AS (
+                SELECT document_id, COUNT(DISTINCT invoice_number) AS conciliadas
+                FROM invoice_conciliations
+                GROUP BY document_id
+            ),
+            cond_agg AS (
+                SELECT DISTINCT ON (da.invoice_id) da.invoice_id AS doc_id, da.driver_id, u.name AS conductor_name
+                FROM dispatch_assignments da
+                LEFT JOIN users u ON u.id = da.driver_id
+                ORDER BY da.invoice_id, da.id DESC
             )
+            SELECT
+                dl.id, dl.external_doc_id, dl.vehicle_plate, dl.plan_type,
+                dl.status, dl.created_at, dl.delivery_date, dl.client_id,
+                COALESCE(inv.total_invoices, 0)                                   AS total_invoices,
+                COALESCE(ic.conciliadas, 0)                                       AS conciliadas,
+                COALESCE(inv.total_invoices, 0) - COALESCE(ic.conciliadas, 0)    AS pendientes,
+                cond.driver_id                                                    AS conductor_id,
+                cond.conductor_name
+            FROM documents_l dl
+            LEFT JOIN inv_agg  inv  ON inv.document_id  = dl.id
+            LEFT JOIN ic_agg   ic   ON ic.document_id   = dl.id
+            LEFT JOIN cond_agg cond ON cond.doc_id      = dl.id
+            ${where}
+            HAVING COALESCE(inv.total_invoices, 0) > 0
+               AND COALESCE(inv.total_invoices, 0) - COALESCE(ic.conciliadas, 0) > 0
             ORDER BY dl.created_at DESC
         `, params);
 

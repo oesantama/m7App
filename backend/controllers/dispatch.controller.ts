@@ -79,33 +79,34 @@ export const initDispatch = async (req: Request, res: Response) => {
 
         // 3b. Poblar vehicle_inventory y route_assignment_items
         if (updatedItems.rows.length > 0) {
-          const vehicleRes = await client.query(
-            `SELECT v.plate, d.name as driver_name FROM assignments a
-             JOIN vehicles v ON a.vehicle_id::text = v.id::text
-             JOIN drivers d ON a.driver_id::text = d.id::text
-             WHERE a.driver_id = $1 AND a.is_active = true LIMIT 1`,
-            [driverId]
-          );
-          const vehiclePlate = vehicleRes.rows[0]?.plate || 'S/P';
+          // Queries de contexto — una sola vez cada una, sin ::text en JOINs
+          const [vehicleRes, routeRes, clientRes] = await Promise.all([
+            client.query(
+              `SELECT v.plate, d.name AS driver_name FROM assignments a
+               JOIN vehicles v ON v.id = a.vehicle_id
+               JOIN drivers  d ON d.id = a.driver_id
+               WHERE a.driver_id = $1 AND a.is_active = true LIMIT 1`,
+              [driverId]
+            ),
+            client.query(
+              `SELECT ri.route_id FROM route_invoices ri
+               WHERE ri.invoice_id = $1
+                  OR ri.invoice_id = CONCAT($2::text, '_', $1::text)
+               ORDER BY ri.created_at DESC LIMIT 1`,
+              [invoiceId, updatedItems.rows[0]?.document_id || '']
+            ),
+            client.query(
+              `SELECT client_id FROM documents_l WHERE id = $1 LIMIT 1`,
+              [updatedItems.rows[0]?.document_id || '']
+            ),
+          ]);
+
+          const vehiclePlate = vehicleRes.rows[0]?.plate       || 'S/P';
           const driverName   = vehicleRes.rows[0]?.driver_name || createdBy || 'S/C';
+          const routeId      = routeRes.rows[0]?.route_id      || null;
+          const clientId     = clientRes.rows[0]?.client_id    || 'CLI-01';
 
-          // Buscar ruta activa — route_invoices guarda compound key (docId_invoice) o plain
-          const docIdFromUpdate = updatedItems.rows[0]?.document_id || '';
-          const routeRes = await client.query(
-            `SELECT ri.route_id FROM route_invoices ri
-             WHERE ri.invoice_id = $1
-                OR ri.invoice_id = CONCAT($2::text, '_', $1::text)
-             ORDER BY ri.created_at DESC LIMIT 1`,
-            [invoiceId, docIdFromUpdate]
-          );
-          const routeId = routeRes.rows[0]?.route_id || null;
-
-          const clientRes = await client.query(
-            `SELECT client_id FROM documents_l WHERE id = $1 LIMIT 1`,
-            [docIdFromUpdate]
-          );
-          const clientId = clientRes.rows[0]?.client_id || 'CLI-01';
-
+          // Agrupar items por artículo
           const artMap: Record<string, { qty: number; batch: string; unit: string; customerName: string; city: string; address: string; docId: string }> = {};
           for (const it of updatedItems.rows) {
             const key = it.article_id;
@@ -113,32 +114,59 @@ export const initDispatch = async (req: Request, res: Response) => {
             artMap[key].qty += Number(it.expected_qty || 0);
           }
 
+          const articleIds = Object.keys(artMap);
+
+          // Un solo SELECT para todos los artículos en lugar de N queries
+          const artRows = await client.query(
+            'SELECT id, name FROM articles WHERE id = ANY($1)',
+            [articleIds]
+          );
+          const nameMap = new Map<string, string>(artRows.rows.map((r: any) => [String(r.id), String(r.name)]));
+
+          // Batch INSERT para vehicle_inventory — un solo statement con múltiples VALUES
+          const viParams: any[] = [];
+          const viValues = articleIds.map((articleId, i) => {
+            const d = artMap[articleId];
+            const n = i * 10;
+            viParams.push(vehiclePlate, driverId, driverName, articleId, nameMap.get(articleId) || articleId, d.batch, clientId, d.qty, routeId, createdBy);
+            return `($${n+1},$${n+2},$${n+3},$${n+4},$${n+5},$${n+6},$${n+7},$${n+8},$${n+9},CURRENT_TIMESTAMP,$${n+10})`;
+          }).join(',');
+
+          await client.query(`
+            INSERT INTO vehicle_inventory
+              (vehicle_plate,driver_id,driver_name,article_id,article_name,batch,client_id,quantity,route_id,last_updated,last_user)
+            VALUES ${viValues}
+            ON CONFLICT (vehicle_plate, article_id, batch) DO UPDATE SET
+              quantity     = vehicle_inventory.quantity + EXCLUDED.quantity,
+              route_id     = EXCLUDED.route_id,
+              driver_id    = EXCLUDED.driver_id,
+              driver_name  = EXCLUDED.driver_name,
+              last_updated = CURRENT_TIMESTAMP,
+              last_user    = EXCLUDED.last_user
+          `, viParams);
+
+          // Batch INSERT para route_assignment_items
+          const raiParams: any[] = [];
+          const raiValues = articleIds.map((articleId, i) => {
+            const d = artMap[articleId];
+            const articleName = nameMap.get(articleId) || articleId;
+            const n = i * 16;
+            raiParams.push(routeId, d.docId, invoiceId, articleId, articleName, d.batch, clientId, vehiclePlate, driverId, driverName, d.qty, d.unit, d.customerName, d.city, d.address, createdBy);
+            return `($${n+1},$${n+2},$${n+3},$${n+4},$${n+5},$${n+6},$${n+7},$${n+8},$${n+9},$${n+10},$${n+11},$${n+12},$${n+13},$${n+14},$${n+15},$${n+16},CURRENT_TIMESTAMP)`;
+          }).join(',');
+
+          await client.query(`
+            INSERT INTO route_assignment_items
+              (route_id,document_id,invoice,article_id,article_name,batch,client_id,vehicle_plate,driver_id,driver_name,assigned_qty,unit,customer_name,city,address,assigned_by,assigned_at)
+            VALUES ${raiValues}
+          `, raiParams);
+
+          // logMovement es fire-and-forget; se ejecuta fuera de la transacción
           for (const [articleId, d] of Object.entries(artMap)) {
-            const artRes = await client.query('SELECT name FROM articles WHERE id = $1 LIMIT 1', [articleId]);
-            const articleName = artRes.rows[0]?.name || articleId;
-
-            await client.query(`
-              INSERT INTO vehicle_inventory (vehicle_plate, driver_id, driver_name, article_id, article_name, batch, client_id, quantity, route_id, last_updated, last_user)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10)
-              ON CONFLICT (vehicle_plate, article_id, batch) DO UPDATE SET
-                quantity    = vehicle_inventory.quantity + EXCLUDED.quantity,
-                route_id    = EXCLUDED.route_id,
-                driver_id   = EXCLUDED.driver_id,
-                driver_name = EXCLUDED.driver_name,
-                last_updated = CURRENT_TIMESTAMP,
-                last_user   = EXCLUDED.last_user
-            `, [vehiclePlate, driverId, driverName, articleId, articleName, d.batch, clientId, d.qty, routeId, createdBy]);
-
-            await client.query(`
-              INSERT INTO route_assignment_items
-                (route_id, document_id, invoice, article_id, article_name, batch, client_id, vehicle_plate, driver_id, driver_name, assigned_qty, unit, customer_name, city, address, assigned_by, assigned_at)
-              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,CURRENT_TIMESTAMP)
-            `, [routeId, d.docId, invoiceId, articleId, articleName, d.batch, clientId, vehiclePlate, driverId, driverName, d.qty, d.unit, d.customerName, d.city, d.address, createdBy]);
-
             logMovement({
               clientId,
               articleId,
-              articleName,
+              articleName:   nameMap.get(articleId) || articleId,
               batch:         d.batch,
               movementType:  'DESPACHO',
               quantity:      d.qty,
@@ -399,7 +427,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
 
         const confirmationId: number = confirmRes.rows[0].id;
 
-        // 4. Si hay devolución (PARTIAL, RETURN o REPICE), crear encabezado + detalle
+        // 4. Devolución: encabezado + batch INSERT de items
         let returnId: number | null = null;
         const itemsToReturn = deliveryType === 'REPICE'
             ? deliveredItems.map((i: any) => ({ ...i, quantityReturned: i.quantityDelivered }))
@@ -415,18 +443,21 @@ export const confirmDelivery = async (req: Request, res: Response) => {
 
             returnId = returnRes.rows[0].id;
 
-            // Detalle de devolución
-            for (const item of itemsToReturn) {
-                await pool.query(`
-                    INSERT INTO delivery_return_items
-                        (return_id, sku, article_name, quantity_returned, quantity_delivered, unit, notes)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                `, [
-                    returnId, item.sku || null, item.articleName || null,
+            // Batch INSERT: todos los items en un solo statement
+            const riParams: any[] = [];
+            const riValues = itemsToReturn.map((item: any, i: number) => {
+                const n = i * 7;
+                riParams.push(returnId, item.sku || null, item.articleName || null,
                     Number(item.quantityReturned), Number(item.quantityDelivered ?? 0),
-                    item.unit || null, item.notes || null
-                ]);
-            }
+                    item.unit || null, item.notes || null);
+                return `($${n+1},$${n+2},$${n+3},$${n+4},$${n+5},$${n+6},$${n+7})`;
+            }).join(',');
+
+            await pool.query(`
+                INSERT INTO delivery_return_items
+                    (return_id, sku, article_name, quantity_returned, quantity_delivered, unit, notes)
+                VALUES ${riValues}
+            `, riParams);
         }
 
         // 5. Actualizar estado de los items en document_items
@@ -437,91 +468,103 @@ export const confirmDelivery = async (req: Request, res: Response) => {
                OR CONCAT(TRIM(document_id), '_', TRIM(COALESCE(NULLIF(invoice, ''), order_number))) = TRIM($2)
         `, [newStatus, invoiceId]);
 
-        // 6. Ajustar vehicle_inventory según el tipo de entrega
-        // Obtener placa del vehículo para identificar el inventario del camión
+        // 6. Ajustar vehicle_inventory — un SELECT para placa, luego batch UPDATE
         const vehiclePlate = vehicleId
           ? (await pool.query('SELECT plate FROM vehicles WHERE id = $1 LIMIT 1', [vehicleId])).rows[0]?.plate || vehicleId
           : vehicleId;
 
         if (vehiclePlate && deliveredItems.length > 0) {
-          for (const item of deliveredItems) {
-            const sku = item.sku || item.article_id;
-            if (!sku) continue;
-            const deliveredQty = Number(item.quantityDelivered ?? 0);
-            const returnedQty  = Number(item.quantityReturned  ?? 0);
-            const batch = item.batch || 'S/L';
-
-            if (deliveryType === 'FULL') {
-              await pool.query(`
-                UPDATE vehicle_inventory SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
-                WHERE vehicle_plate = $3 AND article_id = $4 AND batch = $5
-              `, [deliveredQty, driverId, vehiclePlate, sku, batch]);
-              logMovement({ articleId: sku, batch, movementType: 'ENTREGA', quantity: deliveredQty,
-                locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'CLIENTE',
-                referenceType: 'ENTREGA', referenceId: String(confirmationId),
-                invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
-
-            } else if (deliveryType === 'PARTIAL') {
-              // Descontar lo entregado; lo devuelto queda en vehículo hasta que bodega procese
-              await pool.query(`
-                UPDATE vehicle_inventory SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
-                WHERE vehicle_plate = $3 AND article_id = $4 AND batch = $5
-              `, [deliveredQty, driverId, vehiclePlate, sku, batch]);
-              if (deliveredQty > 0) logMovement({ articleId: sku, batch, movementType: 'ENTREGA_PARCIAL', quantity: deliveredQty,
-                locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'CLIENTE',
-                referenceType: 'ENTREGA', referenceId: String(confirmationId),
-                invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
-
-            } else if (deliveryType === 'RETURN') {
-              await pool.query(`
-                UPDATE vehicle_inventory SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
-                WHERE vehicle_plate = $3 AND article_id = $4 AND batch = $5
-              `, [returnedQty, driverId, vehiclePlate, sku, batch]);
-
-              const clientRes2 = await pool.query(
-                `SELECT d.client_id FROM documents_l d JOIN document_items i ON i.document_id = d.id WHERE (TRIM(COALESCE(NULLIF(i.invoice,''),i.order_number)) = $1) LIMIT 1`,
-                [invoiceId]
-              );
-              const clientId2 = clientRes2.rows[0]?.client_id;
-              if (clientId2) {
-                await pool.query(`
-                  INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-                  VALUES ($1,$2,$3,$4::numeric,$5,CURRENT_TIMESTAMP)
-                  ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-                    quantity = GREATEST(0, inventario_clientes.quantity::numeric + $4::numeric), last_user = $5, last_updated = CURRENT_TIMESTAMP
-                `, [clientId2, sku, batch, returnedQty, driverId]);
-              }
-              logMovement({ clientId: clientId2 || undefined, articleId: sku, batch, movementType: 'DEVOLUCION_BODEGA', quantity: returnedQty,
-                locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'BODEGA',
-                referenceType: 'DEVOLUCION', referenceId: String(returnId || confirmationId),
-                invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
-
-            } else if (deliveryType === 'REPICE' && repiceDestination !== 'SAME_PLATE') {
-              const totalQty = deliveredQty + returnedQty || Number(item.quantityDelivered ?? item.qty ?? 0);
-              await pool.query(`
-                UPDATE vehicle_inventory SET quantity = GREATEST(0, quantity - $1), last_updated = CURRENT_TIMESTAMP, last_user = $2
-                WHERE vehicle_plate = $3 AND article_id = $4 AND batch = $5
-              `, [totalQty, driverId, vehiclePlate, sku, batch]);
-
-              const clientRes3 = await pool.query(
-                `SELECT d.client_id FROM documents_l d JOIN document_items i ON i.document_id = d.id WHERE (TRIM(COALESCE(NULLIF(i.invoice,''),i.order_number)) = $1) LIMIT 1`,
-                [invoiceId]
-              );
-              const clientId3 = clientRes3.rows[0]?.client_id;
-              if (clientId3) {
-                await pool.query(`
-                  INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
-                  VALUES ($1,$2,$3,$4::numeric,$5,CURRENT_TIMESTAMP)
-                  ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
-                    quantity = GREATEST(0, inventario_clientes.quantity::numeric + $4::numeric), last_user = $5, last_updated = CURRENT_TIMESTAMP
-                `, [clientId3, sku, batch, totalQty, driverId]);
-              }
-              logMovement({ clientId: clientId3 || undefined, articleId: sku, batch, movementType: 'REPICE', quantity: totalQty,
-                locationFrom: `PLACA-${vehiclePlate}`, locationTo: 'BODEGA',
-                referenceType: 'DEVOLUCION', referenceId: String(confirmationId),
-                invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
+            // Resolver client_id una sola vez (es el mismo para todos los items de la misma factura)
+            let invoiceClientId: string | undefined;
+            if (deliveryType === 'RETURN' || (deliveryType === 'REPICE' && repiceDestination !== 'SAME_PLATE')) {
+                const clientRes = await pool.query(
+                    `SELECT d.client_id FROM documents_l d
+                     JOIN document_items i ON i.document_id = d.id
+                     WHERE TRIM(COALESCE(NULLIF(i.invoice,''), i.order_number)) = $1 LIMIT 1`,
+                    [invoiceId]
+                );
+                invoiceClientId = clientRes.rows[0]?.client_id;
             }
-          }
+
+            // Construir lista de (sku, batch, qtyToSubtract) según tipo de entrega
+            type InvRow = { sku: string; batch: string; qty: number; movType: string };
+            const invRows: InvRow[] = [];
+            const icRows: { sku: string; batch: string; qty: number }[] = [];
+
+            for (const item of deliveredItems) {
+                const sku = item.sku || item.article_id;
+                if (!sku) continue;
+                const deliveredQty = Number(item.quantityDelivered ?? 0);
+                const returnedQty  = Number(item.quantityReturned  ?? 0);
+                const batch        = item.batch || 'S/L';
+
+                if (deliveryType === 'FULL') {
+                    invRows.push({ sku, batch, qty: deliveredQty, movType: 'ENTREGA' });
+                } else if (deliveryType === 'PARTIAL') {
+                    if (deliveredQty > 0) invRows.push({ sku, batch, qty: deliveredQty, movType: 'ENTREGA_PARCIAL' });
+                } else if (deliveryType === 'RETURN') {
+                    invRows.push({ sku, batch, qty: returnedQty, movType: 'DEVOLUCION_BODEGA' });
+                    if (invoiceClientId) icRows.push({ sku, batch, qty: returnedQty });
+                } else if (deliveryType === 'REPICE' && repiceDestination !== 'SAME_PLATE') {
+                    const totalQty = deliveredQty + returnedQty || Number(item.quantityDelivered ?? item.qty ?? 0);
+                    invRows.push({ sku, batch, qty: totalQty, movType: 'REPICE' });
+                    if (invoiceClientId) icRows.push({ sku, batch, qty: totalQty });
+                }
+            }
+
+            // Batch UPDATE vehicle_inventory con VALUES join (1 query para todos los items)
+            if (invRows.length > 0) {
+                const viParams: any[] = [driverId, vehiclePlate];
+                const viValues = invRows.map((r, i) => {
+                    const n = i * 3 + 3;
+                    viParams.push(r.sku, r.batch, r.qty);
+                    return `($${n}::text, $${n+1}::text, $${n+2}::numeric)`;
+                }).join(',');
+
+                await pool.query(`
+                    UPDATE vehicle_inventory vi
+                    SET quantity = GREATEST(0, vi.quantity - v.qty),
+                        last_updated = CURRENT_TIMESTAMP, last_user = $1
+                    FROM (VALUES ${viValues}) AS v(article_id, batch, qty)
+                    WHERE vi.vehicle_plate = $2
+                      AND vi.article_id   = v.article_id
+                      AND vi.batch        = v.batch
+                `, viParams);
+            }
+
+            // Batch UPSERT inventario_clientes (RETURN / REPICE)
+            if (icRows.length > 0 && invoiceClientId) {
+                const icParams: any[] = [driverId, invoiceClientId];
+                const icValues = icRows.map((r, i) => {
+                    const n = i * 3 + 3;
+                    icParams.push(r.sku, r.batch, r.qty);
+                    return `($${n}::text, $${n+1}::text, $${n+2}::numeric)`;
+                }).join(',');
+
+                await pool.query(`
+                    INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
+                    SELECT $2, v.sku, v.batch, v.qty, $1, CURRENT_TIMESTAMP
+                    FROM (VALUES ${icValues}) AS v(sku, batch, qty)
+                    ON CONFLICT (client_id, article_id, batch) DO UPDATE SET
+                        quantity = GREATEST(0, inventario_clientes.quantity::numeric + EXCLUDED.quantity::numeric),
+                        last_user = $1, last_updated = CURRENT_TIMESTAMP
+                `, icParams);
+            }
+
+            // logMovement es fire-and-forget — fuera de la transacción
+            const movType = deliveryType === 'FULL' ? 'ENTREGA'
+                : deliveryType === 'PARTIAL' ? 'ENTREGA_PARCIAL'
+                : deliveryType === 'REPICE'  ? 'REPICE'
+                : 'DEVOLUCION_BODEGA';
+            const locationTo = (deliveryType === 'FULL' || deliveryType === 'PARTIAL') ? 'CLIENTE' : 'BODEGA';
+            for (const r of invRows) {
+                logMovement({ clientId: invoiceClientId, articleId: r.sku, batch: r.batch,
+                    movementType: movType, quantity: r.qty,
+                    locationFrom: `PLACA-${vehiclePlate}`, locationTo,
+                    referenceType: deliveryType === 'FULL' || deliveryType === 'PARTIAL' ? 'ENTREGA' : 'DEVOLUCION',
+                    referenceId: String(returnId || confirmationId),
+                    invoice: invoiceId, vehiclePlate, driverId, userId: driverId });
+            }
         }
 
         // ── Actualizar status_id de la ruta si todas sus facturas ya finalizaron ──

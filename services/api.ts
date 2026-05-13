@@ -805,6 +805,32 @@ export const api = {
   getAuditoriaB36Logs: (encId: number) =>
     fetchJson(`${API_URL}/ajover-b36/logs/${encId}`),
 
+  getAuditoriaB36Conciliacion: (params?: { clientId?: string; from?: string; to?: string; placa?: string; factura?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.clientId) qs.set('clientId', params.clientId);
+    if (params?.from)     qs.set('from', params.from);
+    if (params?.to)       qs.set('to', params.to);
+    if (params?.placa)    qs.set('placa', params.placa);
+    if (params?.factura)  qs.set('factura', params.factura);
+    return fetchJson(`${API_URL}/ajover-b36/conciliacion?${qs.toString()}`);
+  },
+
+  saveAuditoriaB36Conciliacion: (data: { id_detalle: number; id_enca: number; factura: string; placa?: string; estado: string; observacion?: string; client_id?: string }) =>
+    fetchJson(`${API_URL}/ajover-b36/conciliacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  asignarPlacaB36: (encId: number, data: { placa: string; conductor?: string }) =>
+    fetchJson(`${API_URL}/ajover-b36/asignar-placa/${encId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+
+
   // GPS Tracking (Nueva API dedicada)
   updateVehicleLocation: (data: any) => fetchJson(`${API_URL}/locations/update`, {
     method: 'POST',
