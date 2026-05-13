@@ -2137,13 +2137,17 @@ export const uploadCumplido = async (req: Request, res: Response) => {
     }
 
     // Validar que TODOS los archivos sean estrictamente PDF o imágenes
-    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
-    const allowedMimeTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.xlsx', '.xls', '.csv'];
+    const allowedMimeTypes = [
+        'application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel', 'text/csv', 'application/csv',
+    ];
 
     for (const file of files) {
         const ext = path.extname(file.originalname).toLowerCase();
         if (!allowedExtensions.includes(ext) && !allowedMimeTypes.includes(file.mimetype)) {
-            return res.status(400).json({ error: `Solo se permiten archivos en formato PDF o imágenes (PNG, JPG, JPEG, WEBP). El archivo "${file.originalname}" no es válido.` });
+            return res.status(400).json({ error: `Solo se permiten PDF, imágenes (PNG, JPG, WEBP) o planillas (XLSX, XLS, CSV). El archivo "${file.originalname}" no es válido.` });
         }
     }
 
@@ -2222,25 +2226,26 @@ export const uploadCumplido = async (req: Request, res: Response) => {
 
             fs.writeFileSync(tmpPath, file.buffer);
 
-            // Compresión inteligente según tipo de archivo
-            if (ext === '.pdf') {
-                // Intentar compresión del PDF con Ghostscript
-                await new Promise<void>((resolve) => {
-                    const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
-                    exec(compressCmd, (err) => {
-                        if (err) console.error(`[CUMPLIDOS] Error comprimiendo PDF ${file.originalname}:`, err);
-                        resolve();
+            // Compresión inteligente según tipo de archivo (Excel/CSV se suben sin procesar)
+            const isSpreadsheet = ['.xlsx', '.xls', '.csv'].includes(ext);
+            if (!isSpreadsheet) {
+                if (ext === '.pdf') {
+                    await new Promise<void>((resolve) => {
+                        const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
+                        exec(compressCmd, (err) => {
+                            if (err) console.error(`[CUMPLIDOS] Error comprimiendo PDF ${file.originalname}:`, err);
+                            resolve();
+                        });
                     });
-                });
-            } else {
-                // Intentar compresión de Imagen con ImageMagick (convert)
-                await new Promise<void>((resolve) => {
-                    const compressCmd = `convert "${tmpPath}" -resize "2048x2048>" -quality 82 -strip "${compressedPath}"`;
-                    exec(compressCmd, (err) => {
-                        if (err) console.error(`[CUMPLIDOS] Error comprimiendo imagen ${file.originalname}:`, err);
-                        resolve();
+                } else {
+                    await new Promise<void>((resolve) => {
+                        const compressCmd = `convert "${tmpPath}" -resize "2048x2048>" -quality 82 -strip "${compressedPath}"`;
+                        exec(compressCmd, (err) => {
+                            if (err) console.error(`[CUMPLIDOS] Error comprimiendo imagen ${file.originalname}:`, err);
+                            resolve();
+                        });
                     });
-                });
+                }
             }
 
             const finalFile = fs.existsSync(compressedPath) ? compressedPath : tmpPath;
