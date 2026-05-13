@@ -715,9 +715,9 @@ const healSchema = async (client: any) => {
       SELECT 'MOD-10', 'GESTIÓN DOCUMENTOS DRIVE', 'FileText', 'EST-01'
       WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-10');
 
-      INSERT INTO pages (id, name, route, module_id, status_id)
-      SELECT 'PAG-45', 'CUMPLIDOS DRIVE', 'cumplidos', 'MOD-10', 'EST-01'
-      WHERE NOT EXISTS (SELECT 1 FROM pages WHERE id = 'PAG-45');
+      INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
+      VALUES ('PAG-45', 'CUMPLIDOS DRIVE', 'cumplidos', 'MOD-10', 'MOD-10', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = 'CUMPLIDOS DRIVE', route = 'cumplidos', module_id = 'MOD-10', parent_id = 'MOD-10';
 
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
       SELECT 'PAG-48', 'INFORME DASHBOARD DRIVE', 'informe-dashboard-drive', 'MOD-10', 'MOD-10', 'EST-01'
@@ -1000,7 +1000,7 @@ export const restoreSystem = async () => {
 
       -- Configuración Maestros extra (MOD-01)
       ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01'),
-      ('PAG-45', 'PROV CLIENTE', 'prov-clientes', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-51', 'PROV CLIENTE', 'prov-clientes', 'MOD-01', 'MOD-01', 'EST-01'),
 
       -- Gestión Ajover (MOD-03)
       ('PAG-49', 'AUDITORÍA FACTURA',          'auditoria-factura',          'MOD-03', 'MOD-03', 'EST-01'),
