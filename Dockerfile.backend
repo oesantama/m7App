@@ -6,10 +6,10 @@ WORKDIR /app
 COPY package*.json ./
 
 # PODA + INSTALL + BUILD + PRUNE en una sola capa para ahorrar el 50% de disco durante el build
-RUN rm -f package-lock.json && \
+RUN --mount=type=cache,target=/root/.npm \
+    rm -f package-lock.json && \
     node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['leaflet','lucide-react','recharts','pdfjs-dist','qrcode.react','@tailwindcss/vite','autoprefixer','postcss','tailwindcss','vite','vite-plugin-pwa','react','react-dom','zustand','sonner']; toDelete.forEach(d => { if(pkg.dependencies[d]) delete pkg.dependencies[d]; if(pkg.devDependencies[d]) delete pkg.devDependencies[d]; }); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))" && \
-    npm install --no-package-lock --legacy-peer-deps --no-audit --ignore-scripts --prefer-offline && \
-    npm cache clean --force
+    npm install --no-package-lock --legacy-peer-deps --no-audit --ignore-scripts --prefer-offline
 
 COPY . .
 # Compilamos el servidor con límite de RAM ajustado

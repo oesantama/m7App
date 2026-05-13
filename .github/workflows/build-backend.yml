@@ -1,30 +1,21 @@
-name: Build & Push Frontend Image
+name: Build & Push Backend Image
 
-# Se ejecuta en cada push a main — construye la imagen del frontend
-# en GitHub Actions (7GB RAM disponibles) y la sube a GHCR.
-# El servidor solo hace "docker pull", eliminando el OOM durante el deploy.
+# Se ejecuta en cada push a main que toque archivos del backend.
+# Construye la imagen en GitHub Actions (7GB RAM) y la sube a GHCR.
+# El servidor solo hace "docker pull", eliminando el build en producción.
 on:
   push:
     branches: [main]
     paths:
-      - 'components/**'
-      - 'pages/**'
-      - 'services/**'
-      - 'utils/**'
-      - 'types/**'
-      - 'constants.tsx'
-      - 'App.tsx'
-      - 'index.html'
+      - 'backend/**'
       - 'package.json'
-      - 'vite.config.ts'
-      - 'tailwind.config.*'
-      - 'Dockerfile.frontend'
-      - 'nginx.conf'
-      - '.github/workflows/build-frontend.yml'
+      - 'tsconfig*.json'
+      - 'Dockerfile.backend'
+      - '.github/workflows/build-backend.yml'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/m7-frontend
+  IMAGE_NAME: ${{ github.repository_owner }}/m7-backend
 
 jobs:
   build-and-push:
@@ -56,22 +47,20 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
 
-      - name: Build y Push imagen frontend
+      - name: Build y Push imagen backend
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.frontend
+          file: Dockerfile.backend
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Hace el paquete público automáticamente para que Coolify pueda
-      # hacer docker pull sin necesidad de credenciales.
       - name: Hacer paquete público en GHCR
         run: |
-          PACKAGE_NAME="m7-frontend"
+          PACKAGE_NAME="m7-backend"
           curl -s -X PATCH \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
