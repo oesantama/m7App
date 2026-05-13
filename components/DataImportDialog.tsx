@@ -27,6 +27,7 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
   const [headers, setHeaders] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [importSummary, setImportSummary] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const FIELD_DESCRIPTIONS: Record<string, string> = {
@@ -269,7 +270,9 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
         // Mensaje informativo (no bloquea)
         if (updateCount > 0) {
             const newCount = data.length - updateCount;
-            errors.push(`ℹ️ ${newCount} registros nuevos a CREAR, ${updateCount} registros existentes a ACTUALIZAR.`);
+            setImportSummary(`${newCount} registros nuevos a CREAR, ${updateCount} registros existentes a ACTUALIZAR.`);
+        } else {
+            setImportSummary(`${data.length} registros nuevos a CREAR.`);
         }
 
     } catch (e: any) {
@@ -279,10 +282,8 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
         setIsProcessing(false);
     }
     
-    // Solo bloquear si hay errores reales (no los mensajes informativos ℹ️)
-    const realErrors = errors.filter(e => !e.startsWith('ℹ️'));
     setValidationErrors(errors);
-    return realErrors.length === 0;
+    return errors.length === 0;
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -471,6 +472,14 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
 
                {step === 3 && (
                   <div className="w-full space-y-4">
+                     {importSummary && (
+                        <div className="p-4 bg-blue-50/80 border border-blue-200/80 rounded-2xl flex items-center gap-3 text-blue-800 font-bold text-xs shadow-xs">
+                           <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                              ℹ️
+                           </div>
+                           <span>{importSummary}</span>
+                        </div>
+                     )}
                      {validationErrors.length > 0 && (
                         <div className="p-4 bg-red-50 border-2 border-red-100 rounded-2xl space-y-2">
                            <div className="flex items-center gap-2 text-red-600 font-black text-[10px] uppercase">
