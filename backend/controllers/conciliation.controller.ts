@@ -664,6 +664,9 @@ export const saveConciliation = async (req: Request, res: Response) => {
             const prevItemStatus = prevRes.rows[0]?.item_status || null;
 
             // 3. UPSERT en invoice_conciliations
+            // Para Plan Normal (sin formaPago) usar estadoEntrega como forma_pago
+            const efectivaFormaPago = formaPago || (estadoEntrega ? estadoEntrega.toUpperCase() : null);
+
             const result = await client.query(`
                 INSERT INTO invoice_conciliations
                     (document_id, invoice_number, banco, valor, comprobante, fecha_pago,
@@ -686,9 +689,6 @@ export const saveConciliation = async (req: Request, res: Response) => {
                     items_returned  = EXCLUDED.items_returned,
                     updated_at      = NOW()
                 RETURNING *
-            // Para Plan Normal (sin formaPago) usar estadoEntrega como forma_pago
-            const efectivaFormaPago = formaPago || (estadoEntrega ? estadoEntrega.toUpperCase() : null);
-
             `, [
                 documentId, invoiceNumber,
                 banco || null, valor || null, comprobante || null, fechaPago || null,
@@ -697,6 +697,8 @@ export const saveConciliation = async (req: Request, res: Response) => {
                 Number(sobrecosto) || 0,
                 itemsReturned ? JSON.stringify(itemsReturned) : '[]',
             ]);
+
+
 
             // 4. Determinar nuevo item_status según estado de entrega
             let nuevoItemStatus: string | null = null;
