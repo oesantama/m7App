@@ -1,10 +1,11 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from '../constants';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { MasterCategory } from '../types';
 import { api } from '../services/api';
+import { useAppStore } from '../stores/useAppStore';
 
 interface DataImportDialogProps {
   isOpen: boolean;
@@ -17,6 +18,9 @@ interface DataImportDialogProps {
 export const DataImportDialog: React.FC<DataImportDialogProps> = ({ 
   isOpen, onClose, activeMaster, existingData = [], onImport 
 }) => {
+  const { user, allMasterData } = useAppStore();
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [localClients, setLocalClients] = useState<any[]>([]);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<any[]>([]);
@@ -47,10 +51,51 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
     parentId: "ID del módulo o página padre."
   };
 
+  useEffect(() => {
+    const fetchLocalClients = async () => {
+      try {
+        const data = await api.getClients();
+        if (Array.isArray(data)) {
+          setLocalClients(data);
+        }
+      } catch (err) {
+        console.error("Error loading clients in DataImportDialog:", err);
+      }
+    };
+    if (isOpen) {
+      fetchLocalClients();
+    }
+  }, [isOpen]);
+
+  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const masterList = localClients.length > 0 ? localClients : (allMasterData?.masterClientes || []);
+
+  const allClients = masterList.map((c: any) => ({
+      id: String(c.id || c.clientId || ''),
+      name: String(c.name || c.nombre || c.businessName || c.business_name || ''),
+  })).filter((c: any) => c.id && c.name);
+
+  const userClientIds = (user?.clientIds || (user?.clientId ? [user.clientId] : []))
+      .map((id: any) => String(id));
+
+  const authorizedClients = isSuper
+      ? allClients
+      : allClients.filter(c => userClientIds.includes(String(c.id)));
+
+  useEffect(() => {
+    if (activeMaster === 'masterVehiculos') {
+      if (authorizedClients.length === 1) {
+        setSelectedClientId(authorizedClients[0].id);
+      } else if (user?.clientId) {
+        setSelectedClientId(user.clientId);
+      }
+    }
+  }, [authorizedClients.length, activeMaster]);
+
   if (!isOpen) return null;
 
   // Mapa de campos esperados y ejemplos por Maestro
-  const getTemplateStructure = (master: MasterCategory): { fields: string[], examples: any[] } => {
+  const getTemplateStructure = (master: any): { fields: string[], examples: any[] } => {
     switch (master) {
       case 'masterUsuarios': 
         return { 
@@ -296,7 +341,15 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
     
     setIsProcessing(true);
     try {
-        await onImport(previewData);
+        let dataToSend = previewData;
+        if (activeMaster === 'masterVehiculos' && selectedClientId) {
+          dataToSend = previewData.map(row => ({
+            ...row,
+            clientId: selectedClientId,
+            selectedClientId: selectedClientId
+          }));
+        }
+        await onImport(dataToSend);
         toast.success("Importación Exitosa", { description: `${previewData.length} registros procesados.` });
         handleClose();
     } catch (err) {
@@ -311,6 +364,7 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
     setFile(null);
     setPreviewData([]);
     setValidationErrors([]);
+    setSelectedClientId('');
     onClose();
   };
 
@@ -367,22 +421,53 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
                )}
 
                {step === 2 && (
-                 <div className="flex flex-col items-center gap-4">
-                    <input 
-                       type="file" 
-                       accept=".xlsx, .xls" 
-                       ref={fileInputRef}
-                       className="hidden" 
-                       onChange={handleFileUpload}
-                    />
-                    <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-4 group">
-                        <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                           <Icons.Upload className="w-10 h-10" />
+                  <div className="flex flex-col items-center gap-6 w-full max-w-sm mx-auto">
+                     {activeMaster === 'masterVehiculos' && (
+                        <div className="w-full space-y-2 text-left bg-slate-100/80 p-4 rounded-2xl border border-slate-200">
+                           <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                              <Icons.User className="w-3.5 h-3.5 text-blue-500" />
+                              <span>Cliente Destinatario</span>
+                           </label>
+                           <select 
+                              value={selectedClientId} 
+                              onChange={(e) => setSelectedClientId(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                           >
+                              <option value="">-- SELECCIONE UN CLIENTE --</option>
+                              {authorizedClients.map(c => (
+                                 <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                           </select>
+                           <p className="text-[9px] text-slate-400 font-bold">
+                              * Todos los vehículos de este cargue masivo se asociarán a este cliente.
+                           </p>
                         </div>
-                        <span className="font-bold text-slate-600 group-hover:text-blue-600 uppercase text-xs tracking-widest">Seleccionar Archivo</span>
-                    </button>
-                 </div>
-              )}
+                     )}
+
+                     <input 
+                        type="file" 
+                        accept=".xlsx, .xls" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        onChange={handleFileUpload}
+                     />
+                     <button 
+                        onClick={() => {
+                           if (activeMaster === 'masterVehiculos' && !selectedClientId) {
+                              toast.error('Por favor, seleccione un cliente antes de cargar el archivo.');
+                              return;
+                           }
+                           fileInputRef.current?.click();
+                        }} 
+                        className={`flex flex-col items-center gap-4 group ${activeMaster === 'masterVehiculos' && !selectedClientId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                     >
+                         <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Icons.Upload className="w-10 h-10" />
+                         </div>
+                         <span className="font-bold text-slate-600 group-hover:text-blue-600 uppercase text-xs tracking-widest">Seleccionar Archivo</span>
+                     </button>
+                  </div>
+               )}
 
                {step === 3 && (
                   <div className="w-full space-y-4">

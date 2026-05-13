@@ -38,6 +38,8 @@ interface ManagementOrder {
   fecha_egreso?: string;
   created_by: string;
   created_at: string;
+  client_document?: string;
+  driver_name?: string;
 }
 
 interface HierarchicalReportNode {
@@ -82,7 +84,41 @@ export const InformesGerenciales: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'informes' | 'consultas' | 'cargar'>('informes');
 
   // Sub-reports tab: 'estados' | 'clientes'
-  const [subReportTab, setSubReportTab] = useState<'estados' | 'clientes' | 'tdmVentas'>('estados');
+  const [subReportTab, setSubReportTab] = useState<'estados' | 'clientes' | 'tdmVentas'>('tdmVentas');
+  const [provClientes, setProvClientes] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchOnMount = async () => {
+      try {
+        const data = await api.getProvClientes();
+        if (Array.isArray(data)) {
+          setProvClientes(data);
+        }
+      } catch (err) {
+        console.error("Error loading prov clientes:", err);
+      }
+      try {
+        const vehiclesData = await api.getVehicles();
+        if (Array.isArray(vehiclesData)) {
+          setVehicles(vehiclesData);
+        }
+      } catch (err) {
+        console.error("Error loading vehicles:", err);
+      }
+      try {
+        const clientsData = await api.getClients();
+        if (Array.isArray(clientsData)) {
+          setClients(clientsData);
+        }
+      } catch (err) {
+        console.error("Error loading clients:", err);
+      }
+    };
+    fetchOnMount();
+  }, []);
+
   const [rightChartLimit, setRightChartLimit] = useState<'top10' | 'all'>('top10');
   const [rightChartGroupBy, setRightChartGroupBy] = useState<'oc' | 'manifiesto'>('manifiesto');
   const [tdmSearchQuery, setTdmSearchQuery] = useState('');
@@ -181,6 +217,7 @@ export const InformesGerenciales: React.FC = () => {
       </span>
     ) },
     { key: 'client_name', label: 'Nombre Cliente', render: (row: ManagementOrder) => <span className="font-bold truncate max-w-[150px] inline-block" title={row.client_name}>{row.client_name || 'S/I'}</span> },
+    { key: 'client_document', label: 'Documento Cliente', render: (row: ManagementOrder) => <span className="font-mono text-[10px] text-slate-500">{row.client_document || '—'}</span> },
     { key: 'total_value_cxc_final', label: 'Valor Total CXC final', align: 'right', render: (row: ManagementOrder) => <span className="font-black text-indigo-600">{formatMoney(row.total_value_cxc_final)}</span> },
     { key: 'total_value_cxp_final', label: 'Valor Tot CXP final', align: 'right', render: (row: ManagementOrder) => <span className="font-black text-slate-800">{formatMoney(row.total_value_cxp_final)}</span> },
     { key: 'invoice_cxc', label: 'Factura CXC', render: (row: ManagementOrder) => <span className="font-bold text-slate-700">{row.invoice_cxc || 'S/I'}</span> },
@@ -482,6 +519,7 @@ export const InformesGerenciales: React.FC = () => {
             row['Nombre Cliente'] = clientName;
             row.clientName = clientName;
           }
+
           return row;
         });
 
@@ -812,6 +850,83 @@ export const InformesGerenciales: React.FC = () => {
     return isNaN(parsed) ? 0 : parsed;
   };
 
+  const SalesPieChart: React.FC<{ data: { client: string; ventaTotal: number }[] }> = ({ data }) => {
+    const chartData = data
+      .filter(item => item.ventaTotal > 0)
+      .map(item => ({
+        name: item.client,
+        value: item.ventaTotal
+      }));
+
+    if (chartData.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs font-bold py-12">
+          No hay ventas registradas para graficar.
+        </div>
+      );
+    }
+
+    const CHART_COLORS = [
+      '#6366f1', // Indigo
+      '#10b981', // Emerald
+      '#3b82f6', // Blue
+      '#f59e0b', // Amber
+      '#ec4899', // Pink
+      '#8b5cf6', // Violet
+      '#06b6d4', // Cyan
+      '#f43f5e', // Rose
+      '#14b8a6', // Teal
+      '#a855f7'  // Purple
+    ];
+
+    return (
+      <div className="w-full flex flex-col items-center">
+        <div className="h-[280px] w-full max-w-lg">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={90}
+                paddingAngle={3}
+                dataKey="value"
+                label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                formatter={(value: any) => [`$${Number(value).toLocaleString('es-CO')}`, 'Venta']}
+                contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        
+        {/* Custom Legend for premium look with sales details */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-4 w-full max-h-[160px] overflow-y-auto custom-scrollbar bg-white/80 p-3 rounded-2xl border border-slate-100 shadow-xs">
+          {chartData.map((item, index) => {
+            const color = CHART_COLORS[index % CHART_COLORS.length];
+            return (
+              <div key={item.name} className="flex items-start gap-2 p-2 rounded-xl hover:bg-white transition-all shadow-xs border border-slate-50">
+                <span className="w-3 h-3 rounded-full mt-0.5 shrink-0 shadow-xs" style={{ backgroundColor: color }} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-black text-slate-800 truncate uppercase tracking-tight leading-tight">{item.name}</p>
+                  <p className="text-[10px] font-mono font-bold text-indigo-600 leading-none mt-1">
+                    ${item.value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const getClientTdmTableData = () => {
     const clientsMap: { 
       [clientName: string]: { 
@@ -839,7 +954,17 @@ export const InformesGerenciales: React.FC = () => {
         return;
       }
 
-      const client = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
+      let client = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
+      if (client === 'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S' || client === 'LOGISTICA, TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S') {
+        const p = r.plate ? String(r.plate).trim().toUpperCase() : '';
+        const veh = vehicles.find(v => String(v.plate).trim().toUpperCase() === p);
+        if (veh && veh.client_id) {
+          const cli = clients.find(c => String(c.id).trim().toUpperCase() === String(veh.client_id).trim().toUpperCase());
+          if (cli && cli.name) {
+            client = String(cli.name).trim().toUpperCase();
+          }
+        }
+      }
 
       const cxc = parseValNum(r.total_cxc);
       const cxcFinal = parseValNum(r.total_value_cxc_final);
@@ -982,6 +1107,213 @@ export const InformesGerenciales: React.FC = () => {
         averagePaymentDays,
         totalPaymentDays: node.totalPaymentDays,
         paymentDaysCount: node.paymentDaysCount,
+        totalRecDays: node.totalRecDays,
+        recDaysCount: node.recDaysCount,
+        totalEgrDays: node.totalEgrDays,
+        egrDaysCount: node.egrDaysCount,
+        totalManRecDays: node.totalManRecDays,
+        manRecDaysCount: node.manRecDaysCount,
+        averageRecDays,
+        averageEgrDays,
+        averageManRecDays,
+        receivedValue,
+        receivedPct
+      };
+    }).sort((a, b) => {
+      const valA = a[tdmSortField];
+      const valB = b[tdmSortField];
+      
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return tdmSortDirection === 'asc' 
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      } else {
+        return tdmSortDirection === 'asc'
+          ? (valA as number) - (valB as number)
+          : (valB as number) - (valA as number);
+      }
+    });
+  };
+
+  const getGeneralTdmTableData = () => {
+    const clientsMap: { 
+      [clientName: string]: { 
+        ventaTotal: number; 
+        ingTerceros: number; 
+        vehicles: Set<string>; 
+        workedDates: Set<string>;
+        vehicleDays: Set<string>;
+        invoicedSameMonth: number;
+        totalPaymentDays: number;
+        paymentDaysCount: number;
+        totalRecDays: number;
+        recDaysCount: number;
+        totalEgrDays: number;
+        egrDaysCount: number;
+        totalManRecDays: number;
+        manRecDaysCount: number;
+        receivedValue: number;
+      } 
+    } = {};
+
+    reportRecords.forEach(r => {
+      const manifestStatus = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : '';
+      if (manifestStatus === 'ANULADO' || manifestStatus === 'ANULADA') {
+        return;
+      }
+
+      // Join logic using provClientes state
+      const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
+      const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
+      const client = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+
+      const cxc = parseValNum(r.total_cxc);
+      const cxcFinal = parseValNum(r.total_value_cxc_final);
+      const ventaRecord = cxc === 0 ? cxcFinal : cxc;
+
+      const ingTercerosRecord = parseValNum(r.total_value_cxp_final);
+
+      const plate = r.plate ? String(r.plate).trim().toUpperCase() : '';
+      const date = r.manifest_date ? String(r.manifest_date).trim() : '';
+
+      if (!clientsMap[client]) {
+        clientsMap[client] = {
+          ventaTotal: 0,
+          ingTerceros: 0,
+          vehicles: new Set<string>(),
+          workedDates: new Set<string>(),
+          vehicleDays: new Set<string>(),
+          invoicedSameMonth: 0,
+          totalPaymentDays: 0,
+          paymentDaysCount: 0,
+          totalRecDays: 0,
+          recDaysCount: 0,
+          totalEgrDays: 0,
+          egrDaysCount: 0,
+          totalManRecDays: 0,
+          manRecDaysCount: 0,
+          receivedValue: 0
+        };
+      }
+
+      clientsMap[client].ventaTotal += ventaRecord;
+      clientsMap[client].ingTerceros += ingTercerosRecord;
+
+      // Calculate same month invoicing & payment speed days
+      let invoicedInSameMonth = 0;
+      const dMan = parseCustomDate(r.manifest_date);
+      const dInv = parseCustomDate(r.invoice_date);
+      const dRec = parseCustomDate(r.fecha_recibo);
+      const dEgr = parseCustomDate(r.fecha_egreso);
+
+      if (dMan && dInv) {
+        const diffMs = dInv.getTime() - dMan.getTime();
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        clientsMap[client].totalPaymentDays += diffDays;
+        clientsMap[client].paymentDaysCount += 1;
+
+        const hasInvoice = r.invoice_cxc && String(r.invoice_cxc).trim() !== '' && String(r.invoice_cxc).trim() !== '0';
+        if (hasInvoice) {
+          if (dMan.getFullYear() === dInv.getFullYear() && dMan.getMonth() === dInv.getMonth()) {
+            invoicedInSameMonth = ventaRecord;
+          }
+        }
+      }
+      clientsMap[client].invoicedSameMonth += invoicedInSameMonth;
+
+      // 1. prom dias rec (invoice to receipt)
+      if (dInv && dRec) {
+        const diffMs = dRec.getTime() - dInv.getTime();
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        clientsMap[client].totalRecDays += diffDays;
+        clientsMap[client].recDaysCount += 1;
+      }
+
+      // 2. prom dias egreso (receipt to egress)
+      if (dRec && dEgr) {
+        const diffMs = dEgr.getTime() - dRec.getTime();
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        clientsMap[client].totalEgrDays += diffDays;
+        clientsMap[client].egrDaysCount += 1;
+      }
+
+      // 3. prom dia man recibido (manifest to receipt) and received value
+      if (dMan && dRec) {
+        const diffMs = dRec.getTime() - dMan.getTime();
+        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+        clientsMap[client].totalManRecDays += diffDays;
+        clientsMap[client].manRecDaysCount += 1;
+      }
+
+      if (dRec) {
+        clientsMap[client].receivedValue += ventaRecord;
+      }
+
+      if (plate) {
+        clientsMap[client].vehicles.add(plate);
+      }
+      if (date) {
+        clientsMap[client].workedDates.add(date);
+        if (plate) {
+          clientsMap[client].vehicleDays.add(`${plate}_${date}`);
+        }
+      }
+    });
+
+    // Calculate total sales of all clients combined
+    let grandTotalSales = 0;
+    Object.values(clientsMap).forEach(node => {
+      grandTotalSales += node.ventaTotal;
+    });
+
+    return Object.keys(clientsMap).map(clientName => {
+      const node = clientsMap[clientName];
+      const ventaTotal = node.ventaTotal;
+      const ingTerceros = node.ingTerceros;
+      const ingresosPropios = ventaTotal - ingTerceros;
+      const int = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
+      const vehiculosCount = node.vehicles.size;
+      const workedDaysCount = node.workedDates.size;
+      const totalVehicleUtilizations = node.vehicleDays.size;
+      const averageVehiclesPerDay = workedDaysCount > 0 ? totalVehicleUtilizations / workedDaysCount : 0;
+      const participation = grandTotalSales > 0 ? (ventaTotal / grandTotalSales) * 100 : 0;
+      
+      const invoicedSameMonthVal = node.invoicedSameMonth;
+      const invoicedSameMonthPct = ventaTotal > 0 ? (invoicedSameMonthVal / ventaTotal) * 100 : 0;
+
+      const averagePaymentDays = node.paymentDaysCount > 0 ? node.totalPaymentDays / node.paymentDaysCount : 0;
+
+      const averageRecDays = node.recDaysCount > 0 ? node.totalRecDays / node.recDaysCount : 0;
+      const averageEgrDays = node.egrDaysCount > 0 ? node.totalEgrDays / node.egrDaysCount : 0;
+      const averageManRecDays = node.manRecDaysCount > 0 ? node.totalManRecDays / node.manRecDaysCount : 0;
+      const receivedValue = node.receivedValue;
+      const receivedPct = ventaTotal > 0 ? (receivedValue / ventaTotal) * 100 : 0;
+
+      return {
+        clientName,
+        ventaTotal,
+        ingTerceros,
+        ingresosPropios,
+        int,
+        vehiculosCount,
+        uniquePlates: node.vehicles,
+        workedDaysCount,
+        totalVehicleUtilizations,
+        averageVehiclesPerDay,
+        workedDates: node.workedDates,
+        vehicleDays: node.vehicleDays,
+        participation,
+        invoicedSameMonthVal,
+        invoicedSameMonthPct,
+        averagePaymentDays,
+        totalPaymentDays: node.totalPaymentDays,
+        paymentDaysCount: node.paymentDaysCount,
+        totalRecDays: node.totalRecDays,
+        recDaysCount: node.recDaysCount,
+        totalEgrDays: node.totalEgrDays,
+        egrDaysCount: node.egrDaysCount,
+        totalManRecDays: node.totalManRecDays,
+        manRecDaysCount: node.manRecDaysCount,
         averageRecDays,
         averageEgrDays,
         averageManRecDays,
@@ -1079,6 +1411,120 @@ export const InformesGerenciales: React.FC = () => {
           : (valB as number) - (valA as number);
       }
     });
+  };
+
+  const exportGeneralTdmToExcel = () => {
+    try {
+      const tdmTableData = getGeneralTdmTableData();
+      
+      // Sheet 1: Resumen Ventas TDM (with real numbers)
+      const summaryRows = tdmTableData.map(row => ({
+        "CLIENTE": row.clientName,
+        "VENTA": row.ventaTotal,
+        "ING TERCEROS": row.ingTerceros,
+        "INGRESOS PROPIOS": row.ingresosPropios,
+        "INT (%)": Math.round(row.int * 10) / 10,
+        "PARTICIPACIÓN (%)": Math.round(row.participation),
+        "FACT. MISMO MES": row.invoicedSameMonthVal,
+        "% FACT. MISMO MES": Math.round(row.invoicedSameMonthPct * 10) / 10,
+        "PROM DÍA PAGO": Math.round(row.averagePaymentDays * 10) / 10,
+        "PROM DIAS REC": Math.round((row.averageRecDays || 0) * 10) / 10,
+        "PROM DIAS EGRESO": Math.round((row.averageEgrDays || 0) * 10) / 10,
+        "PROM DIA MAN RECIBIDO": Math.round((row.averageManRecDays || 0) * 10) / 10,
+        "VL RECIBIDO": row.receivedValue,
+        "% RECIBIDO": Math.round((row.receivedPct || 0) * 10) / 10,
+        "DÍAS LABORADOS": row.workedDaysCount,
+        "VEHÍCULOS UTILIZADOS": row.totalVehicleUtilizations,
+        "PROMEDIO DÍA": Math.round(row.averageVehiclesPerDay * 10) / 10
+      }));
+
+      // Calculate totals for summary
+      const totalVenta = tdmTableData.reduce((sum, item) => sum + item.ventaTotal, 0);
+      const totalIngTerceros = tdmTableData.reduce((sum, item) => sum + item.ingTerceros, 0);
+      const totalIngresosPropios = tdmTableData.reduce((sum, item) => sum + item.ingresosPropios, 0);
+      const overallInt = totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0;
+      
+      const totalInvoicedSameMonth = tdmTableData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
+      const overallInvoicedSameMonthPct = totalVenta > 0 ? (totalInvoicedSameMonth / totalVenta) * 100 : 0;
+
+      const totalPaymentDaysVal = tdmTableData.reduce((sum, item) => sum + item.totalPaymentDays, 0);
+      const totalPaymentDaysCount = tdmTableData.reduce((sum, item) => sum + item.paymentDaysCount, 0);
+      const overallAveragePaymentDays = totalPaymentDaysCount > 0 ? totalPaymentDaysVal / totalPaymentDaysCount : 0;
+
+      const overallAverageRecDays = tdmTableData.reduce((sum, i) => sum + (i.totalRecDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.recDaysCount || 0), 0) || 0;
+      const overallAverageEgrDays = tdmTableData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
+      const overallAverageManRecDays = tdmTableData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
+      const totalReceivedValueVal = tdmTableData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+      const overallReceivedPct = totalVenta > 0 ? (totalReceivedValueVal / totalVenta) * 100 : 0;
+
+      const allPlates = new Set<string>();
+      const allDates = new Set<string>();
+      const allVehicleDays = new Set<string>();
+
+      tdmTableData.forEach(item => {
+        item.uniquePlates.forEach(p => allPlates.add(p));
+        item.workedDates.forEach(d => allDates.add(d));
+        item.vehicleDays.forEach(vd => allVehicleDays.add(vd));
+      });
+
+      const totalWorkedDays = allDates.size;
+      const totalVehicleDaysCount = allVehicleDays.size;
+      const totalAvgVehiclesPerDay = totalWorkedDays > 0 ? totalVehicleDaysCount / totalWorkedDays : 0;
+
+      summaryRows.push({
+        "CLIENTE": "TOTAL GENERAL",
+        "VENTA": totalVenta,
+        "ING TERCEROS": totalIngTerceros,
+        "INGRESOS PROPIOS": totalIngresosPropios,
+        "INT (%)": Math.round(overallInt * 10) / 10,
+        "PARTICIPACIÓN (%)": 100,
+        "FACT. MISMO MES": totalInvoicedSameMonth,
+        "% FACT. MISMO MES": Math.round(overallInvoicedSameMonthPct * 10) / 10,
+        "PROM DÍA PAGO": Math.round(overallAveragePaymentDays * 10) / 10,
+        "PROM DIAS REC": Math.round(overallAverageRecDays * 10) / 10,
+        "PROM DIAS EGRESO": Math.round(overallAverageEgrDays * 10) / 10,
+        "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays * 10) / 10,
+        "VL RECIBIDO": totalReceivedValueVal,
+        "% RECIBIDO": Math.round(overallReceivedPct * 10) / 10,
+        "DÍAS LABORADOS": totalWorkedDays,
+        "VEHÍCULOS UTILIZADOS": totalVehicleDaysCount,
+        "PROMEDIO DÍA": Math.round(totalAvgVehiclesPerDay * 10) / 10
+      });
+
+      const worksheetSummary = XLSX.utils.json_to_sheet(summaryRows);
+
+      // Sheet 2: Detalle Transacciones (exclude ANULADO)
+      const detailRecords = reportRecords.filter(r => {
+        const st = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : '';
+        return st !== 'ANULADO' && st !== 'ANULADA';
+      });
+
+      const detailRows = detailRecords.map(r => ({
+        "ORDEN DE COMPRA": r.oc_number || '',
+        "MANIFIESTO": r.manifest_number || '',
+        "FECHA MANIFIESTO": formatColombianDateStr(r.manifest_date),
+        "ESTADO MANIFIESTO": r.manifest_status || '',
+        "CLIENTE": r.client_name || '',
+        "TOTAL CXC": parseValNum(r.total_cxc),
+        "VALOR TOTAL CXC FINAL": parseValNum(r.total_value_cxc_final),
+        "VALOR TOT CXP FINAL": parseValNum(r.total_value_cxp_final),
+        "PLACA": r.plate || '',
+        "CONDUCTOR": r.driver_name || ''
+      }));
+
+      const worksheetDetail = XLSX.utils.json_to_sheet(detailRows);
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheetSummary, "Clientes General TDM");
+      XLSX.utils.book_append_sheet(workbook, worksheetDetail, "Detalle Transacciones");
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `Clientes_General_100_TDM_${dateStr}.xlsx`);
+      toast.success('Reporte Excel de Clientes General descargado con éxito.');
+    } catch (err) {
+      console.error('[EXPORT-GENERAL-XLSX-ERR]', err);
+      toast.error('Hubo un error al exportar el reporte a Excel.');
+    }
   };
 
   const exportTdmToExcel = () => {
@@ -1551,7 +1997,7 @@ export const InformesGerenciales: React.FC = () => {
                           />
                           {ocBarData.statuses.map((status, index) => (
                             <Bar key={status} dataKey={status} fill={CHART_COLORS[index % CHART_COLORS.length]} radius={[4, 4, 0, 0]}>
-                              <LabelList dataKey={status} position="top" fill="#475569" fontSize={8} fontWeight="bold" formatter={(val) => val > 0 ? val : ''} />
+                              <LabelList dataKey={status} position="top" fill="#475569" fontSize={8} fontWeight="bold" formatter={(val) => Number(val) > 0 ? val : ''} />
                             </Bar>
                           ))}
                         </BarChart>
@@ -1645,7 +2091,7 @@ export const InformesGerenciales: React.FC = () => {
                               margin={{ bottom: 45 }}
                               onClick={(state) => {
                                 if (state && state.activeLabel) {
-                                  setSelectedClientChartName(state.activeLabel);
+                                  setSelectedClientChartName(String(state.activeLabel));
                                 }
                               }}
                             >
@@ -1670,7 +2116,7 @@ export const InformesGerenciales: React.FC = () => {
                                   stackId="a"
                                   style={{ cursor: 'pointer' }}
                                 >
-                                  <LabelList dataKey={status} position="inside" fill="#fff" fontSize={8} fontWeight="black" formatter={(val) => val > 0 ? val : ''} />
+                                  <LabelList dataKey={status} position="inside" fill="#fff" fontSize={8} fontWeight="black" formatter={(val) => Number(val) > 0 ? val : ''} />
                                 </Bar>
                               ))}
                             </BarChart>
@@ -1788,6 +2234,17 @@ export const InformesGerenciales: React.FC = () => {
               {/* SUB-REPORT TAB SYSTEM SWITCHER */}
               <div className="flex border-b border-slate-200 bg-white p-1 rounded-xl gap-1 shadow-sm">
                 <button
+                  onClick={() => setSubReportTab('tdmVentas')}
+                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
+                    subReportTab === 'tdmVentas'
+                      ? 'bg-slate-950 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
+                  }`}
+                >
+                  Ventas con el 100% de TDM
+                </button>
+
+                <button
                   onClick={() => setSubReportTab('estados')}
                   className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
                     subReportTab === 'estados'
@@ -1807,17 +2264,6 @@ export const InformesGerenciales: React.FC = () => {
                   }`}
                 >
                   Consolidado Clientes y Placas (Árbol 2 Niveles)
-                </button>
-
-                <button
-                  onClick={() => setSubReportTab('tdmVentas')}
-                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
-                    subReportTab === 'tdmVentas'
-                      ? 'bg-slate-950 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
-                  }`}
-                >
-                  Ventas con el 100% de TDM
                 </button>
               </div>
 
@@ -2033,425 +2479,640 @@ export const InformesGerenciales: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3 animate-in fade-in duration-300">
+                <div className="space-y-8 animate-in fade-in duration-300">
                   {(() => {
-                    const rawData = getClientTdmTableData();
-                    const filteredData = tdmSearchQuery.trim() === ''
-                      ? rawData
-                      : rawData.filter(row => row.clientName.toLowerCase().includes(tdmSearchQuery.toLowerCase()));
+                    const rawGeneralData = getGeneralTdmTableData();
+                    const filteredGeneralData = tdmSearchQuery.trim() === ''
+                      ? rawGeneralData
+                      : rawGeneralData.filter(row => row.clientName.toLowerCase().includes(tdmSearchQuery.toLowerCase()));
 
-                    const totalVenta = filteredData.reduce((sum, item) => sum + item.ventaTotal, 0);
-                    const totalIngTerceros = filteredData.reduce((sum, item) => sum + item.ingTerceros, 0);
-                    const totalIngresosPropios = filteredData.reduce((sum, item) => sum + item.ingresosPropios, 0);
-                    const overallInt = totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0;
-                    const totalInvoicedSameMonthVal = filteredData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
-                    const overallInvoicedSameMonthPct = totalVenta > 0 ? (totalInvoicedSameMonthVal / totalVenta) * 100 : 0;
+                    // General Totals
+                    const totalGeneralVenta = filteredGeneralData.reduce((sum, item) => sum + item.ventaTotal, 0);
+                    const totalGeneralIngTerceros = filteredGeneralData.reduce((sum, item) => sum + item.ingTerceros, 0);
+                    const totalGeneralIngresosPropios = filteredGeneralData.reduce((sum, item) => sum + item.ingresosPropios, 0);
+                    const overallGeneralInt = totalGeneralVenta > 0 ? (totalGeneralIngresosPropios / totalGeneralVenta) * 100 : 0;
+                    const totalGeneralInvoicedSameMonthVal = filteredGeneralData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
+                    const overallGeneralInvoicedSameMonthPct = totalGeneralVenta > 0 ? (totalGeneralInvoicedSameMonthVal / totalGeneralVenta) * 100 : 0;
                     
-                    const totalPaymentDaysVal = filteredData.reduce((sum, item) => sum + item.totalPaymentDays, 0);
-                    const totalPaymentDaysCount = filteredData.reduce((sum, item) => sum + item.paymentDaysCount, 0);
-                    const overallAveragePaymentDays = totalPaymentDaysCount > 0 ? totalPaymentDaysVal / totalPaymentDaysCount : 0;
+                    const totalGeneralPaymentDaysVal = filteredGeneralData.reduce((sum, item) => sum + item.totalPaymentDays, 0);
+                    const totalGeneralPaymentDaysCount = filteredGeneralData.reduce((sum, item) => sum + item.paymentDaysCount, 0);
+                    const overallGeneralAveragePaymentDays = totalGeneralPaymentDaysCount > 0 ? totalGeneralPaymentDaysVal / totalGeneralPaymentDaysCount : 0;
 
-                    const overallAverageRecDays = filteredData.reduce((sum, i) => sum + (i.totalRecDays || 0), 0) / filteredData.reduce((sum, i) => sum + (i.recDaysCount || 0), 0) || 0;
-                    const overallAverageEgrDays = filteredData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / filteredData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
-                    const overallAverageManRecDays = filteredData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / filteredData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
-                    const totalReceivedValueVal = filteredData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
-                    const overallReceivedPct = totalVenta > 0 ? (totalReceivedValueVal / totalVenta) * 100 : 0;
+                    const overallGeneralAverageRecDays = filteredGeneralData.reduce((sum, i) => sum + (i.totalRecDays || 0), 0) / filteredGeneralData.reduce((sum, i) => sum + (i.recDaysCount || 0), 0) || 0;
+                    const overallGeneralAverageEgrDays = filteredGeneralData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / filteredGeneralData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
+                    const overallGeneralAverageManRecDays = filteredGeneralData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / filteredGeneralData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
+                    const totalGeneralReceivedValueVal = filteredGeneralData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+                    const overallGeneralReceivedPct = totalGeneralVenta > 0 ? (totalGeneralReceivedValueVal / totalGeneralVenta) * 100 : 0;
 
-                    const allPlates = new Set<string>();
-                    const allDates = new Set<string>();
-                    const allVehicleDays = new Set<string>();
-                    filteredData.forEach(item => {
-                      item.uniquePlates.forEach(p => allPlates.add(p));
-                      item.workedDates.forEach(d => allDates.add(d));
-                      item.vehicleDays.forEach(vd => allVehicleDays.add(vd));
+                    const allGeneralPlates = new Set<string>();
+                    const allGeneralDates = new Set<string>();
+                    const allGeneralVehicleDays = new Set<string>();
+                    filteredGeneralData.forEach(item => {
+                      item.uniquePlates.forEach(p => allGeneralPlates.add(p));
+                      item.workedDates.forEach(d => allGeneralDates.add(d));
+                      item.vehicleDays.forEach(vd => allGeneralVehicleDays.add(vd));
                     });
-                    const totalVehicles = allPlates.size;
-                    const totalWorkedDaysCount = allDates.size;
-                    const totalVehicleUtilizationsCount = allVehicleDays.size;
-                    const overallAverageVehiclesPerDay = totalWorkedDaysCount > 0 ? totalVehicleUtilizationsCount / totalWorkedDaysCount : 0;
+                    const totalGeneralVehicles = allGeneralPlates.size;
+                    const totalGeneralWorkedDaysCount = allGeneralDates.size;
+                    const totalGeneralVehicleUtilizationsCount = allGeneralVehicleDays.size;
+                    const overallGeneralAverageVehiclesPerDay = totalGeneralWorkedDaysCount > 0 ? totalGeneralVehicleUtilizationsCount / totalGeneralWorkedDaysCount : 0;
+
+
+                    const rawSummaryData = getClientTdmTableData();
+                    const filteredSummaryData = tdmSearchQuery.trim() === ''
+                      ? rawSummaryData
+                      : rawSummaryData.filter(row => row.clientName.toLowerCase().includes(tdmSearchQuery.toLowerCase()));
+
+                    // Summary Totals
+                    const totalSummaryVenta = filteredSummaryData.reduce((sum, item) => sum + item.ventaTotal, 0);
+                    const totalSummaryIngTerceros = filteredSummaryData.reduce((sum, item) => sum + item.ingTerceros, 0);
+                    const totalSummaryIngresosPropios = filteredSummaryData.reduce((sum, item) => sum + item.ingresosPropios, 0);
+                    const overallSummaryInt = totalSummaryVenta > 0 ? (totalSummaryIngresosPropios / totalSummaryVenta) * 100 : 0;
+                    const totalSummaryInvoicedSameMonthVal = filteredSummaryData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
+                    const overallSummaryInvoicedSameMonthPct = totalSummaryVenta > 0 ? (totalSummaryInvoicedSameMonthVal / totalSummaryVenta) * 100 : 0;
+                    
+                    const totalSummaryPaymentDaysVal = filteredSummaryData.reduce((sum, item) => sum + item.totalPaymentDays, 0);
+                    const totalSummaryPaymentDaysCount = filteredSummaryData.reduce((sum, item) => sum + item.paymentDaysCount, 0);
+                    const overallSummaryAveragePaymentDays = totalSummaryPaymentDaysCount > 0 ? totalSummaryPaymentDaysVal / totalSummaryPaymentDaysCount : 0;
+
+                    const overallSummaryAverageRecDays = filteredSummaryData.reduce((sum, i) => sum + (i.totalRecDays || 0), 0) / filteredSummaryData.reduce((sum, i) => sum + (i.recDaysCount || 0), 0) || 0;
+                    const overallSummaryAverageEgrDays = filteredSummaryData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / filteredSummaryData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
+                    const overallSummaryAverageManRecDays = filteredSummaryData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / filteredSummaryData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
+                    const totalSummaryReceivedValueVal = filteredSummaryData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+                    const overallSummaryReceivedPct = totalSummaryVenta > 0 ? (totalSummaryReceivedValueVal / totalSummaryVenta) * 100 : 0;
+
+                    const allSummaryPlates = new Set<string>();
+                    const allSummaryDates = new Set<string>();
+                    const allSummaryVehicleDays = new Set<string>();
+                    filteredSummaryData.forEach(item => {
+                      item.uniquePlates.forEach(p => allSummaryPlates.add(p));
+                      item.workedDates.forEach(d => allSummaryDates.add(d));
+                      item.vehicleDays.forEach(vd => allSummaryVehicleDays.add(vd));
+                    });
+                    const totalSummaryVehicles = allSummaryPlates.size;
+                    const totalSummaryWorkedDaysCount = allSummaryDates.size;
+                    const totalSummaryVehicleUtilizationsCount = allSummaryVehicleDays.size;
+                    const overallSummaryAverageVehiclesPerDay = totalSummaryWorkedDaysCount > 0 ? totalSummaryVehicleUtilizationsCount / totalSummaryWorkedDaysCount : 0;
 
                     return (
-                      <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
-                        <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Resumen: Ventas con el 100% de TDM</h3>
-                              <span className="bg-indigo-50 border border-indigo-100/50 text-indigo-700 px-2 py-0.5 rounded text-[9px] font-black uppercase font-mono">
-                                FECHA MANIFIESTO
+                      <div className="space-y-8">
+                        {/* TABLE 1: CLIENTES GENERAL */}
+                        <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
+                          <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Ventas
+Clientes General</h3>
+                                </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Agrupado por el nombre del cliente de prov_cliente según su documento. Excluye anulados.</p>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Buscar por cliente..."
+                                  value={tdmSearchQuery}
+                                  onChange={(e) => setTdmSearchQuery(e.target.value)}
+                                  className="bg-white border border-slate-200 rounded-xl pl-8 pr-8 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-[180px] sm:w-[220px] transition-all"
+                                />
+                                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                {tdmSearchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setTdmSearchQuery('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={exportGeneralTdmToExcel}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
+                                title="Descargar Excel con Clientes General (Hoja 1) y detalle origen (Hoja 2)"
+                              >
+                                <Download size={14} />
+                                <span>Exportar Excel</span>
+                              </button>
+
+                              <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase font-mono border border-indigo-100/50">
+                                {filteredGeneralData.length} Clientes
                               </span>
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-0.5">Filtrado por Rango de Fecha Manifiesto. Excluye manifiestos anulados.</p>
                           </div>
-                          
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <div className="relative">
-                              <input
-                                type="text"
-                                placeholder="Buscar por cliente..."
-                                value={tdmSearchQuery}
-                                onChange={(e) => setTdmSearchQuery(e.target.value)}
-                                className="bg-white border border-slate-200 rounded-xl pl-8 pr-8 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-[180px] sm:w-[220px] transition-all"
-                              />
-                              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                              {tdmSearchQuery && (
-                                <button
-                                  type="button"
-                                  onClick={() => setTdmSearchQuery('')}
-                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs"
-                                >
-                                  ×
-                                </button>
-                              )}
+
+                          {filteredGeneralData.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400 font-bold text-xs">
+                              No se encontraron clientes en el listado general.
                             </div>
+                          ) : (
+                            <div className="flex flex-col gap-8 p-6">
+                              <div className="overflow-x-auto custom-scrollbar">
+                                <table className="w-full text-left border-collapse">
+                                <thead>
+                                  <tr className="border-b border-blue-100/80 bg-blue-50/70 text-[9px] font-black uppercase tracking-wider text-blue-800">
+                                    <th onClick={() => handleTdmSort('clientName')} className="p-3.5 cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center gap-1">
+                                        <span>Cliente</span>
+                                        {tdmSortField === 'clientName' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('ventaTotal')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Venta</span>
+                                        {tdmSortField === 'ventaTotal' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('ingTerceros')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Ing Terceros</span>
+                                        {tdmSortField === 'ingTerceros' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('ingresosPropios')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Ingresos Propios</span>
+                                        {tdmSortField === 'ingresosPropios' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('int')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>INT</span>
+                                        {tdmSortField === 'int' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('participation')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Part-vta</span>
+                                        {tdmSortField === 'participation' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('invoicedSameMonthVal')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Vl fact mes</span>
+                                        {tdmSortField === 'invoicedSameMonthVal' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('invoicedSameMonthPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>% Fact. Mes</span>
+                                        {tdmSortField === 'invoicedSameMonthPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>prom dia fact</span>
+                                        {tdmSortField === 'averagePaymentDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>prom dias rec</span>
+                                        {tdmSortField === 'averageRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>prom dias egreso</span>
+                                        {tdmSortField === 'averageEgrDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>prom dia man recibido</span>
+                                        {tdmSortField === 'averageManRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('receivedValue')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Vl Recibido</span>
+                                        {tdmSortField === 'receivedValue' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('receivedPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>% Recibido</span>
+                                        {tdmSortField === 'receivedPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('workedDaysCount')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Días Lab.</span>
+                                        {tdmSortField === 'workedDaysCount' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('totalVehicleUtilizations')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Veh. prom mes</span>
+                                        {tdmSortField === 'totalVehicleUtilizations' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averageVehiclesPerDay')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>veh Prom. Día</span>
+                                        {tdmSortField === 'averageVehiclesPerDay' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                                  {filteredGeneralData.map((row, index) => (
+                                    <tr key={index} className="hover:bg-slate-50/40 transition-colors">
+                                      <td className="p-3.5 font-bold text-slate-800 uppercase tracking-tight">{row.clientName}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-900">
+                                        {row.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono text-slate-600">
+                                        {row.ingTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono text-indigo-600 font-bold">
+                                        {row.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-black">
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          <span className={`px-2 py-0.5 rounded text-[10px] ${row.int < 18 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
+                                            {row.int.toFixed(1)}%
+                                          </span>
+                                          <button 
+                                            onClick={() => setSelectedClientForVehiclesInt(row.clientName)}
+                                            title="Ver detalle de vehículos que afectaron el INT"
+                                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                          >
+                                            <Truck className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-700">{Math.round(row.participation)}%</td>
+                                      <td className="p-3.5 text-right font-mono text-slate-600 font-bold">
+                                        {row.invoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-black">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${row.invoicedSameMonthPct < 60 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
+                                          {row.invoicedSameMonthPct.toFixed(1)}%
+                                        </span>
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-700">{row.averagePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-indigo-600/85">{row.averageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-violet-600/85">{row.averageEgrDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-700">{row.averageManRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-900">
+                                        {row.receivedValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-black">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${row.receivedPct < 60 ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
+                                          {row.receivedPct.toFixed(1)}%
+                                        </span>
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono text-slate-600 font-bold">{row.workedDaysCount}</td>
+                                      <td className="p-3.5 text-right font-mono text-violet-600 font-bold">{row.totalVehicleUtilizations}</td>
+                                      <td className="p-3.5 text-right font-mono text-indigo-600 font-black">{row.averageVehiclesPerDay.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                    </tr>
+                                  ))}
 
-                            <button
-                              type="button"
-                              onClick={exportTdmToExcel}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
-                              title="Descargar Excel con reporte resumen (Hoja 1) y detalle origen (Hoja 2)"
-                            >
-                              <Download size={14} />
-                              <span>Exportar Excel</span>
-                            </button>
+                                  {/* Grand Total Row */}
+                                  <tr className="bg-slate-100/50 border-t-2 border-slate-200 font-black text-slate-900">
+                                    <td className="p-3.5 text-[10px] uppercase tracking-wider">Total General</td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-950">
+                                      {totalGeneralVenta.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-800">
+                                      {totalGeneralIngTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-indigo-700 font-bold">
+                                      {totalGeneralIngresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-indigo-700">
+                                      <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
+                                        {overallGeneralInt.toFixed(1)}%
+                                      </span>
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">100%</td>
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                      {totalGeneralInvoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-indigo-700 font-black">
+                                      {overallGeneralInvoicedSameMonthPct.toFixed(1)}%
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                      {overallGeneralAveragePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-indigo-700/90 font-black">
+                                      {overallGeneralAverageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-violet-700/90 font-black">
+                                      {overallGeneralAverageEgrDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                      {overallGeneralAverageManRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-950 font-black">
+                                      {totalGeneralReceivedValueVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                      <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
+                                        {overallGeneralReceivedPct.toFixed(1)}%
+                                      </span>
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-800">{totalGeneralWorkedDaysCount}</td>
+                                    <td className="p-3.5 text-right font-mono text-violet-700">{totalGeneralVehicleUtilizationsCount}</td>
+                                    <td className="p-3.5 text-right font-mono text-indigo-700">
+                                      {overallGeneralAverageVehiclesPerDay.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                                </table>
+                              </div>
 
-                            <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase font-mono border border-indigo-100/50">
-                              {filteredData.length} Clientes
-                            </span>
-                          </div>
+                              {/* Bottom Section: Pie Chart */}
+                              <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col items-center justify-center w-full shadow-xs mt-4">
+                                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-wider mb-2 text-center">Distribución y Participación de Venta</h4>
+                                <SalesPieChart data={filteredGeneralData.map(item => ({ client: item.clientName, ventaTotal: item.ventaTotal }))} />
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="overflow-x-auto">
-                          {filteredData.length === 0 ? (
+                        {/* TABLE 2: RESUMEN VENTAS CON EL 100% DE TDM */}
+                        <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
+                          <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 font-bold">Resumen: Ventas con el 100% de TDM</h3>
+                                <span className="bg-indigo-50 border border-indigo-100/50 text-indigo-700 px-2 py-0.5 rounded text-[9px] font-black uppercase font-mono">
+                                  FECHA MANIFIESTO
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Filtrado por Rango de Fecha Manifiesto. Excluye manifiestos anulados.</p>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Buscar por cliente..."
+                                  value={tdmSearchQuery}
+                                  onChange={(e) => setTdmSearchQuery(e.target.value)}
+                                  className="bg-white border border-slate-200 rounded-xl pl-8 pr-8 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-[180px] sm:w-[220px] transition-all"
+                                />
+                                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                {tdmSearchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setTdmSearchQuery('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={exportTdmToExcel}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
+                                title="Descargar Excel con reporte resumen (Hoja 1) y detalle origen (Hoja 2)"
+                              >
+                                <Download size={14} />
+                                <span>Exportar Excel</span>
+                              </button>
+
+                              <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase font-mono border border-indigo-100/50">
+                                {filteredSummaryData.length} Clientes
+                              </span>
+                            </div>
+                          </div>
+
+                          {filteredSummaryData.length === 0 ? (
                             <div className="p-8 text-center text-slate-400 font-bold text-xs">
                               No se encontraron clientes que coincidan con la búsqueda.
                             </div>
                           ) : (
-                            <table className="w-full text-left border-collapse">
-                              <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/30 text-[9px] font-black uppercase tracking-wider text-slate-500">
-                                  <th 
-                                    onClick={() => handleTdmSort('clientName')} 
-                                    className="p-3.5 cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center gap-1">
-                                      <span>Cliente</span>
-                                      {tdmSortField === 'clientName' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('ventaTotal')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>Venta</span>
-                                      {tdmSortField === 'ventaTotal' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('ingTerceros')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>Ing Terceros</span>
-                                      {tdmSortField === 'ingTerceros' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('ingresosPropios')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>Ingresos Propios</span>
-                                      {tdmSortField === 'ingresosPropios' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('int')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>INT</span>
-                                      {tdmSortField === 'int' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('participation')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>Part-vta</span>
-                                      {tdmSortField === 'participation' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('invoicedSameMonthVal')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>Vl fact mes</span>
-                                      {tdmSortField === 'invoicedSameMonthVal' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('invoicedSameMonthPct')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>% Fact. Mes</span>
-                                      {tdmSortField === 'invoicedSameMonthPct' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('averagePaymentDays')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>prom dia fact</span>
-                                      {tdmSortField === 'averagePaymentDays' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('averageRecDays')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>prom dias rec</span>
-                                      {tdmSortField === 'averageRecDays' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('averageEgrDays')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>prom dias egreso</span>
-                                      {tdmSortField === 'averageEgrDays' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('averageManRecDays')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>prom dia man recibido</span>
-                                      {tdmSortField === 'averageManRecDays' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('receivedValue')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>Vl Recibido</span>
-                                      {tdmSortField === 'receivedValue' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('receivedPct')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>% Recibido</span>
-                                      {tdmSortField === 'receivedPct' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('workedDaysCount')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>Días Lab.</span>
-                                      {tdmSortField === 'workedDaysCount' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('totalVehicleUtilizations')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>Veh. prom mes</span>
-                                      {tdmSortField === 'totalVehicleUtilizations' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                  <th 
-                                    onClick={() => handleTdmSort('averageVehiclesPerDay')} 
-                                    className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                                  >
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span>veh Prom. Día</span>
-                                      {tdmSortField === 'averageVehiclesPerDay' && (
-                                        <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>
-                                      )}
-                                    </div>
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                                {filteredData.map((row, index) => (
-                                  <tr key={index} className="hover:bg-slate-50/40 transition-colors">
-                                    <td className="p-3.5 font-bold text-slate-800 uppercase tracking-tight">{row.clientName}</td>
-                                    <td className="p-3.5 text-right font-mono font-bold text-slate-900">
-                                      {row.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                                    </td>
-                                    <td className="p-3.5 text-right font-mono text-slate-600">
-                                      {row.ingTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                                    </td>
-                                    <td className="p-3.5 text-right font-mono text-indigo-600 font-bold">
-                                      {row.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                                    </td>
-                                    <td className="p-3.5 text-right font-mono font-black">
-                                      <div className="flex items-center justify-end gap-1.5">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] ${
-                                          row.int < 18 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'
-                                        }`}>
-                                          {row.int.toFixed(1)}%
-                                        </span>
-                                        <button 
-                                          onClick={() => setSelectedClientForVehiclesInt(row.clientName)}
-                                          title="Ver detalle de vehículos que afectaron el INT"
-                                          className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                                        >
-                                          <Truck className="w-3.5 h-3.5" />
-                                        </button>
+                            <div className="flex flex-col gap-8 p-6">
+                              <div className="overflow-x-auto custom-scrollbar">
+                                <table className="w-full text-left border-collapse">
+                                <thead>
+                                  <tr className="border-b border-blue-100/80 bg-blue-50/70 text-[9px] font-black uppercase tracking-wider text-blue-800">
+                                    <th onClick={() => handleTdmSort('clientName')} className="p-3.5 cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center gap-1">
+                                        <span>Cliente</span>
+                                        {tdmSortField === 'clientName' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('ventaTotal')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Venta</span>
+                                        {tdmSortField === 'ventaTotal' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('ingTerceros')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Ing Terceros</span>
+                                        {tdmSortField === 'ingTerceros' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('ingresosPropios')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Ingresos Propios</span>
+                                        {tdmSortField === 'ingresosPropios' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('int')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>INT</span>
+                                        {tdmSortField === 'int' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('participation')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Part-vta</span>
+                                        {tdmSortField === 'participation' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('invoicedSameMonthVal')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Vl fact mes</span>
+                                        {tdmSortField === 'invoicedSameMonthVal' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('invoicedSameMonthPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>% Fact. Mes</span>
+                                        {tdmSortField === 'invoicedSameMonthPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>prom dia fact</span>
+                                        {tdmSortField === 'averagePaymentDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>prom dias rec</span>
+                                        {tdmSortField === 'averageRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>prom dias egreso</span>
+                                        {tdmSortField === 'averageEgrDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>prom dia man recibido</span>
+                                        {tdmSortField === 'averageManRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('receivedValue')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Vl Recibido</span>
+                                        {tdmSortField === 'receivedValue' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('receivedPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>% Recibido</span>
+                                        {tdmSortField === 'receivedPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('workedDaysCount')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Días Lab.</span>
+                                        {tdmSortField === 'workedDaysCount' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('totalVehicleUtilizations')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Veh. prom mes</span>
+                                        {tdmSortField === 'totalVehicleUtilizations' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('averageVehiclesPerDay')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>veh Prom. Día</span>
+                                        {tdmSortField === 'averageVehiclesPerDay' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                                  {filteredSummaryData.map((row, index) => (
+                                    <tr key={index} className="hover:bg-slate-50/40 transition-colors">
+                                      <td className="p-3.5 font-bold text-slate-800 uppercase tracking-tight">{row.clientName}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-900">
+                                        {row.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono text-slate-600">
+                                        {row.ingTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono text-indigo-600 font-bold">
+                                        {row.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-black">
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          <span className={`px-2 py-0.5 rounded text-[10px] ${row.int < 18 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
+                                            {row.int.toFixed(1)}%
+                                          </span>
+                                          <button 
+                                            onClick={() => setSelectedClientForVehiclesInt(row.clientName)}
+                                            title="Ver detalle de vehículos que afectaron el INT"
+                                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                          >
+                                            <Truck className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-700">{Math.round(row.participation)}%</td>
+                                      <td className="p-3.5 text-right font-mono text-slate-600 font-bold">
+                                        {row.invoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-black">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${row.invoicedSameMonthPct < 60 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
+                                          {row.invoicedSameMonthPct.toFixed(1)}%
+                                        </span>
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-700">{row.averagePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-indigo-600/85">{row.averageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-violet-600/85">{row.averageEgrDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-700">{row.averageManRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-slate-900">
+                                        {row.receivedValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono font-black">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] ${row.receivedPct < 60 ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
+                                          {row.receivedPct.toFixed(1)}%
+                                        </span>
+                                      </td>
+                                      <td className="p-3.5 text-right font-mono text-slate-600 font-bold">{row.workedDaysCount}</td>
+                                      <td className="p-3.5 text-right font-mono text-violet-600 font-bold">{row.totalVehicleUtilizations}</td>
+                                      <td className="p-3.5 text-right font-mono text-indigo-600 font-black">{row.averageVehiclesPerDay.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                    </tr>
+                                  ))}
+
+                                  {/* Grand Total Row */}
+                                  <tr className="bg-slate-100/50 border-t-2 border-slate-200 font-black text-slate-900">
+                                    <td className="p-3.5 text-[10px] uppercase tracking-wider">Total General</td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-950">
+                                      {totalSummaryVenta.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                     </td>
-                                    <td className="p-3.5 text-right font-mono font-bold text-slate-700">
-                                      {Math.round(row.participation)}%
+                                    <td className="p-3.5 text-right font-mono text-slate-800">
+                                      {totalSummaryIngTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                     </td>
-                                    <td className="p-3.5 text-right font-mono text-slate-600 font-bold">
-                                      {row.invoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    <td className="p-3.5 text-right font-mono text-indigo-700 font-bold">
+                                      {totalSummaryIngresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                     </td>
-                                    <td className="p-3.5 text-right font-mono font-black">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] ${
-                                        row.invoicedSameMonthPct < 60 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'
-                                      }`}>
-                                        {row.invoicedSameMonthPct.toFixed(1)}%
+                                    <td className="p-3.5 text-right font-mono text-indigo-700">
+                                      <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
+                                        {overallSummaryInt.toFixed(1)}%
                                       </span>
                                     </td>
-                                    <td className="p-3.5 text-right font-mono font-bold text-slate-700">
-                                      {row.averagePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">100%</td>
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                      {totalSummaryInvoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                     </td>
-                                    <td className="p-3.5 text-right font-mono font-bold text-indigo-600/85">
-                                      {row.averageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    <td className="p-3.5 text-right font-mono text-indigo-700 font-black">
+                                      {overallSummaryInvoicedSameMonthPct.toFixed(1)}%
                                     </td>
-                                    <td className="p-3.5 text-right font-mono font-bold text-violet-600/85">
-                                      {row.averageEgrDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                      {overallSummaryAveragePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                                     </td>
-                                    <td className="p-3.5 text-right font-mono font-bold text-slate-700">
-                                      {row.averageManRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    <td className="p-3.5 text-right font-mono text-indigo-700/90 font-black">
+                                      {overallSummaryAverageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                                     </td>
-                                    <td className="p-3.5 text-right font-mono font-bold text-slate-900">
-                                      {row.receivedValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    <td className="p-3.5 text-right font-mono text-violet-700/90 font-black">
+                                      {overallSummaryAverageEgrDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                                     </td>
-                                    <td className="p-3.5 text-right font-mono font-black">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] ${
-                                        row.receivedPct < 60 ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-emerald-50 text-emerald-600'
-                                      }`}>
-                                        {row.receivedPct.toFixed(1)}%
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                      {overallSummaryAverageManRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-slate-950 font-black">
+                                      {totalSummaryReceivedValueVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono text-slate-950 font-black">
+                                      <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
+                                        {overallSummaryReceivedPct.toFixed(1)}%
                                       </span>
                                     </td>
-                                    <td className="p-3.5 text-right font-mono text-slate-600 font-bold">
-                                      {row.workedDaysCount}
-                                    </td>
-                                    <td className="p-3.5 text-right font-mono text-violet-600 font-bold">
-                                      {row.totalVehicleUtilizations}
-                                    </td>
-                                    <td className="p-3.5 text-right font-mono text-indigo-600 font-black">
-                                      {row.averageVehiclesPerDay.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    <td className="p-3.5 text-right font-mono text-slate-800">{totalSummaryWorkedDaysCount}</td>
+                                    <td className="p-3.5 text-right font-mono text-violet-700">{totalSummaryVehicleUtilizationsCount}</td>
+                                    <td className="p-3.5 text-right font-mono text-indigo-700">
+                                      {overallSummaryAverageVehiclesPerDay.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                                     </td>
                                   </tr>
-                                ))}
+                                </tbody>
+                                </table>
+                              </div>
 
-                                {/* Grand Total Row */}
-                                <tr className="bg-slate-100/50 border-t-2 border-slate-200 font-black text-slate-900">
-                                  <td className="p-3.5 text-[10px] uppercase tracking-wider">Total General</td>
-                                  <td className="p-3.5 text-right font-mono font-bold text-slate-950">
-                                    {totalVenta.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-slate-800">
-                                    {totalIngTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-indigo-700 font-bold">
-                                    {totalIngresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-indigo-700">
-                                    <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
-                                      {overallInt.toFixed(1)}%
-                                    </span>
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
-                                    100%
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
-                                    {totalInvoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-indigo-700 font-black">
-                                    {overallInvoicedSameMonthPct.toFixed(1)}%
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
-                                    {overallAveragePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-indigo-700/90 font-black">
-                                    {overallAverageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-violet-700/90 font-black">
-                                    {overallAverageEgrDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
-                                    {overallAverageManRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono font-bold text-slate-950 font-black">
-                                    {totalReceivedValueVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-slate-950 font-black">
-                                    <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
-                                      {overallReceivedPct.toFixed(1)}%
-                                    </span>
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-slate-800">
-                                    {totalWorkedDaysCount}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-violet-700">
-                                    {totalVehicleUtilizationsCount}
-                                  </td>
-                                  <td className="p-3.5 text-right font-mono text-indigo-700">
-                                    {overallAverageVehiclesPerDay.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
+                              {/* Bottom Section: Pie Chart */}
+                              <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col items-center justify-center w-full shadow-xs mt-4">
+                                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-wider mb-2 text-center">Distribución y Participación de Venta</h4>
+                                <SalesPieChart data={filteredSummaryData.map(item => ({ client: item.clientName, ventaTotal: item.ventaTotal }))} />
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2806,6 +3467,7 @@ export const InformesGerenciales: React.FC = () => {
                         <th className="p-3 whitespace-nowrap">Fecha Manifiesto</th>
                         <th className="p-3 whitespace-nowrap">Placa</th>
                         <th className="p-3 whitespace-nowrap">Nombre Cliente</th>
+                        <th className="p-3 whitespace-nowrap">Documento Cliente</th>
                         <th className="p-3 whitespace-nowrap text-right">Valor CXC Final</th>
                         <th className="p-3 whitespace-nowrap text-right">Valor CXP Final</th>
                         <th className="p-3 whitespace-nowrap">Factura CXC</th>
@@ -2833,6 +3495,7 @@ export const InformesGerenciales: React.FC = () => {
                         const dtMan = row.manifestDate || row['Fecha Manifiesto'];
                         const placa = row.plate || row['Placa'];
                         const cliName = row.clientName || row['Nombre Cliente'];
+                        const cliDoc = row.clientDocument || row['Documento Cliente'] || row['NIT Cliente'] || row['Nit Cliente'] || row['NIT cliente'] || row['Documento cliente'];
                         const valCxcF = row.totalValueCxcFinal || row['Valor Total CXC final'];
                         const valCxpF = row.totalValueCxpFinal || row['Valor Tot CXP final'];
                         const invCxc = row.invoiceCxc || row['Factura CXC'];
@@ -2865,6 +3528,7 @@ export const InformesGerenciales: React.FC = () => {
                               <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-600">{placa || 'S/I'}</span>
                             </td>
                             <td className="p-3 truncate max-w-[150px] font-bold">{cliName || 'S/I'}</td>
+                            <td className="p-3 font-mono text-[10px] text-slate-500">{cliDoc || '—'}</td>
                             <td className="p-3 font-bold text-right text-indigo-600">{formatMoney(valCxcF)}</td>
                             <td className="p-3 font-bold text-right text-slate-800">{formatMoney(valCxpF)}</td>
                             <td className="p-3">{invCxc || 'S/I'}</td>

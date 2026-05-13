@@ -228,7 +228,7 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
                     type="text" 
                     value={formData.plate || ''} 
                     readOnly={!!editingItem}
-                    onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})} 
+                    onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase().replace(/\s+/g, '')})} 
                     className={`${commonInput} ${editingItem ? 'bg-slate-100 cursor-not-allowed opacity-60' : ''}`} 
                   />
                 </div>
@@ -302,7 +302,13 @@ const VehicleManager: React.FC<VehicleManagerProps> = ({ vehicles, user, masterD
 
               <div className="pt-8 flex flex-col md:flex-row gap-6">
                 <button onClick={() => setIsModalOpen(false)} className="flex-1 py-6 bg-red-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-red-700 transition-all active:scale-95">DESCARTAR</button>
-                <button onClick={() => { if (editingItem) onUpdate(editingItem.id, formData); else onAdd(formData); setIsModalOpen(false); }} className="flex-[2] py-6 bg-slate-900 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-emerald-600 transition-all active:scale-95">CONFIRMAR OPERACIÓN</button>
+                <button onClick={() => {
+                  const sanitized = { ...formData };
+                  if (sanitized.plate) sanitized.plate = sanitized.plate.toUpperCase().replace(/\s+/g, '');
+                  if (editingItem) onUpdate(editingItem.id, sanitized);
+                  else onAdd(sanitized);
+                  setIsModalOpen(false);
+                }} className="flex-[2] py-6 bg-slate-900 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-emerald-600 transition-all active:scale-95">CONFIRMAR OPERACIÓN</button>
               </div>
             </div>
           </div>

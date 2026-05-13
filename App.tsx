@@ -71,6 +71,7 @@ const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/Publ
 const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/PublicTraining'));
 const PublicVisitForm = lazyWithRetry(() => import('./components/GestionHumana/PublicVisitForm'));
 const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
+const ProvClientes = lazyWithRetry(() => import('./components/Configuracion/ProvClientes'));
 const GestionDocumental = lazyWithRetry(() => import('./components/documents/GestionDocumental'));
 const ValidacionConciliaciones = lazyWithRetry(() => import('./components/OperacionExito/ValidacionConciliaciones'));
 const FletesConciliacion = lazyWithRetry(() => import('./components/OperacionExito/FletesConciliacion'));
@@ -976,6 +977,8 @@ const App: React.FC = () => {
         return <GestionHumanaVisitas user={user!} />;
       case 'cfg-ciudades':
         return <CfgCiudades user={user!} />;
+      case 'prov-clientes':
+        return <ProvClientes user={user!} />;
       case 'informe-dashboard-drive':
         return <InformeDashboardDrive user={user!} />;
       case 'auditoria-factura':

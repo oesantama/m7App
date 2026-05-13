@@ -173,7 +173,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
             color: row.color || row.Color || row.color,
             vehicleTypeId: row.vehicleTypeId || row.Tipo || row.tipo,
             statusId: 'EST-01',
-            clientId: user.clientId || 'CLI-01'
+            clientId: row.clientId || row.selectedClientId || user.clientId || 'CLI-01'
           }));
           const res = await api.bulkSaveVehicles(mapped);
           if (!res.success) throw new Error(res.error);
@@ -361,6 +361,9 @@ const FleetManager: React.FC<FleetManagerProps> = ({
 
   const handleSave = async () => {
     try {
+      if (viewTab === 'vehicles' && formData?.plate) {
+        formData.plate = formData.plate.toUpperCase().replace(/\s+/g, '');
+      }
       // 1. VALIDACIÓN DE CAMPOS REQUERIDOS
       if (viewTab === 'vehicles') {
           if (!formData?.plate?.trim()) { setAiError("ERROR CAMPO: La PLACA es obligatoria."); return; }
@@ -781,7 +784,7 @@ const FleetManager: React.FC<FleetManagerProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-900 p-8 rounded-[3rem] shadow-xl border border-white/5">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-emerald-400 font-bold uppercase ml-2 tracking-widest">Placa de Vehículo</label>
-                        <input type="text" value={formData.plate || ''} onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase()})} className={`${commonInputClass} !bg-white/5 !text-white !border-white/10`} />
+                        <input type="text" value={formData.plate || ''} onChange={e => setFormData({...formData, plate: e.target.value.toUpperCase().replace(/\s+/g, '')})} className={`${commonInputClass} !bg-white/5 !text-white !border-white/10`} />
                       </div>
                       <SearchableSelect 
                         label="Marca Fabricante" 

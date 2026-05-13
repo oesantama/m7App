@@ -165,14 +165,20 @@ const GestionDocumental: React.FC = () => {
     const handleAddFiles = (newFiles: FileList | null) => {
         if (!newFiles) return;
         const array = Array.from(newFiles);
-        const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
-        const allowedMimes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+        const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.xlsx', '.xls', '.csv'];
+        const allowedMimes = [
+            'application/pdf', 
+            'image/png', 'image/jpeg', 'image/jpg', 'image/webp',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'text/csv'
+        ];
 
         const validFiles = array.filter(f => {
             const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
             const isValid = allowedExtensions.includes(ext) || allowedMimes.includes(f.type);
             if (!isValid) {
-                toast.error(`El archivo "${f.name}" no es un PDF ni una imagen válida y fue descartado.`);
+                toast.error(`El archivo "${f.name}" no es un formato válido (.pdf, .png, .jpg, .xlsx, .csv, .xls).`);
             }
             return isValid;
         });
@@ -644,15 +650,15 @@ const GestionDocumental: React.FC = () => {
                                         if (e.dataTransfer.files) handleAddFiles(e.dataTransfer.files);
                                     }}
                                 >
-                                    <input type="file" id="file-upload" className="hidden" accept=".pdf, .png, .jpg, .jpeg, .webp" multiple onChange={e => handleAddFiles(e.target.files)} />
+                                    <input type="file" id="file-upload" className="hidden" accept=".pdf, .png, .jpg, .jpeg, .webp, .xlsx, .xls, .csv" multiple onChange={e => handleAddFiles(e.target.files)} />
                                     <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-6">
                                         <div className={`w-24 h-24 rounded-[2.5rem] flex items-center justify-center transition-all shadow-2xl
                                             ${files.length > 0 ? 'bg-emerald-500 text-white scale-110' : 'bg-white text-slate-300 group-hover:text-indigo-500'}`}>
                                             <Upload size={40} />
                                         </div>
                                         <div className="space-y-2">
-                                            <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">Suelta tus PDFs o fotos aquí</h4>
-                                            <p className="text-sm text-slate-500 font-medium">Hasta 20 archivos simultáneos para procesamiento paralelo</p>
+                                            <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">Suelta tus PDFs, fotos o archivos Excel aquí</h4>
+                                            <p className="text-sm text-slate-500 font-medium">Soporta PDF, imágenes y planillas Excel / CSV (hasta 20 simultáneos)</p>
                                         </div>
                                     </label>
                                 </div>
@@ -664,6 +670,8 @@ const GestionDocumental: React.FC = () => {
                                                 <div className="flex items-center gap-3 overflow-hidden">
                                                     {f.name.toLowerCase().endsWith('.pdf') ? (
                                                         <div className="bg-rose-50 p-2 rounded-lg text-rose-500"><FileText size={16}/></div>
+                                                    ) : f.name.toLowerCase().endsWith('.xlsx') || f.name.toLowerCase().endsWith('.xls') || f.name.toLowerCase().endsWith('.csv') ? (
+                                                        <div className="bg-emerald-50 p-2 rounded-lg text-emerald-500"><FileText size={16}/></div>
                                                     ) : (
                                                         <div className="bg-indigo-50 p-2 rounded-lg text-indigo-500"><Image size={16}/></div>
                                                     )}

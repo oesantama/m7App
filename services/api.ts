@@ -407,6 +407,18 @@ export const api = {
   }),
   deleteCiudad: (id: number) => fetchJson(`${API_URL}/cfg-ciudades/ciudades/${id}`, { method: 'DELETE' }),
 
+  // Proveedores Cliente
+  getProvClientes: () => fetchJson(`${API_URL}/prov-clientes`),
+  saveProvCliente: (data: any) => fetchJson(`${API_URL}/prov-clientes`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  deleteProvCliente: (documento: string) => fetchJson(`${API_URL}/prov-clientes/${encodeURIComponent(documento)}`, { method: 'DELETE' }),
+  bulkSaveProvClientes: (data: { items: any[], usuarioControl: string }) => fetchJson(`${API_URL}/prov-clientes/bulk`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
   // Gestión Humana — Personal
   getPersonal: () => fetchJson(`${API_URL}/gh-personal`),
   savePersonal: (data: any) => fetchJson(`${API_URL}/gh-personal`, {

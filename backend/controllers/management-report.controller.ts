@@ -72,8 +72,8 @@ export const uploadReports = async (req: Request, res: Response) => {
         manifest_observations, manifest_status, manifest_date, plate, 
         client_name, total_value_cxc_final, total_value_cxp_final, 
         invoice_cxc, receipt, invoice_date, total_cxc, egress, 
-        cxp_date, total_cxp, created_by, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP)
+        cxp_date, total_cxp, created_by, updated_at, client_document
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP, $25)
       ON CONFLICT (oc_number) DO UPDATE SET
         oc_status = EXCLUDED.oc_status,
         oc_date = EXCLUDED.oc_date,
@@ -97,6 +97,7 @@ export const uploadReports = async (req: Request, res: Response) => {
         egress = EXCLUDED.egress,
         cxp_date = EXCLUDED.cxp_date,
         total_cxp = EXCLUDED.total_cxp,
+        client_document = EXCLUDED.client_document,
         updated_at = CURRENT_TIMESTAMP;
     `;
 
@@ -129,7 +130,8 @@ export const uploadReports = async (req: Request, res: Response) => {
         cleanStr(row.egress || row['Egreso']),
         parseDate(row.cxpDate || row['Fecha CXP']),
         parseNum(row.totalCxp || row['Total CXP']),
-        user
+        user,
+        cleanStr(row.clientDocument || row['Documento Cliente'] || row['NIT Cliente'] || row['Nit Cliente'] || row['NIT cliente'] || row['Documento cliente'])
       ];
 
       await client.query(insertQuery, values);
@@ -209,7 +211,7 @@ export const getReports = async (req: Request, res: Response) => {
       'manifest_status', 'manifest_date', 'plate', 'client_name', 
       'total_value_cxc_final', 'total_value_cxp_final', 'invoice_cxc', 
       'receipt', 'invoice_date', 'total_cxc', 'egress', 'cxp_date', 
-      'total_cxp', 'fecha_recibo', 'fecha_egreso', 'created_at', 'updated_at'
+      'total_cxp', 'fecha_recibo', 'fecha_egreso', 'created_at', 'updated_at', 'client_document'
     ];
 
     let orderByColumn = 'manifest_date';
@@ -255,7 +257,9 @@ export const getReports = async (req: Request, res: Response) => {
         fechaRecibo: 'fecha_recibo',
         fecha_recibo: 'fecha_recibo',
         fechaEgreso: 'fecha_egreso',
-        fecha_egreso: 'fecha_egreso'
+        fecha_egreso: 'fecha_egreso',
+        clientDocument: 'client_document',
+        client_document: 'client_document'
       };
 
       if (mapping[cleanSort]) {

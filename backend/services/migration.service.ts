@@ -223,12 +223,31 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'manifest_observations', 'manifest_status', 'manifest_date', 'plate', 
     'client_name', 'total_value_cxc_final', 'total_value_cxp_final', 
     'invoice_cxc', 'receipt', 'invoice_date', 'total_cxc', 'egress', 
-    'cxp_date', 'total_cxp', 'created_by', 'created_at', 'updated_at'
+    'cxp_date', 'total_cxp', 'created_by', 'created_at', 'updated_at', 'client_document'
   ]
 };
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
+  
+  // M7: Crear tabla prov_cliente de forma explícita si no existe
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS prov_cliente (
+        documento TEXT PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        contacto TEXT,
+        email TEXT,
+        representante TEXT,
+        estado TEXT DEFAULT 'EST-01',
+        usuario_creacion TEXT,
+        fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  } catch (err) {
+    console.error('[M7-DB] Error al crear la tabla prov_cliente:', err);
+  }
+
   const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'invoice_conciliation_reversal_logs', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades', 'gh_visitas', 'management_orders', 'return_approval_batches', 'return_approval_batch_items'];
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
@@ -981,6 +1000,7 @@ export const restoreSystem = async () => {
 
       -- Configuración Maestros extra (MOD-01)
       ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01'),
+      ('PAG-45', 'PROV CLIENTE', 'prov-clientes', 'MOD-01', 'MOD-01', 'EST-01'),
 
       -- Gestión Ajover (MOD-03)
       ('PAG-49', 'AUDITORÍA FACTURA',          'auditoria-factura',          'MOD-03', 'MOD-03', 'EST-01'),

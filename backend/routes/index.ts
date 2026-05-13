@@ -50,6 +50,7 @@ import ghVisitasRoutes from './gh-visitas.routes.js';
 import deliveryScheduleRoutes from './delivery-schedule.routes.js';
 import ajoverB36Routes from './ajover-b36.routes.js';
 import managementReportRoutes from './management-report.routes.js';
+import provClienteRoutes from './prov-cliente.routes.js';
 
 const router = Router();
 
@@ -103,6 +104,7 @@ router.use('/gh-visitas', ghVisitasRoutes);
 router.use('/delivery-schedules', deliveryScheduleRoutes);
 router.use('/ajover-b36', ajoverB36Routes);
 router.use('/management-reports', managementReportRoutes);
+router.use('/prov-clientes', provClienteRoutes);
 
 export default router;
 

@@ -24,7 +24,23 @@ const PWABanner: React.FC = () => {
         duration: Infinity,
         action: {
           label: 'Actualizar',
-          onClick: () => updateServiceWorker(true),
+          onClick: async () => {
+            if ('caches' in window) {
+              try {
+                const cacheNames = await caches.keys();
+                await Promise.all(
+                  cacheNames.map((cacheName) => caches.delete(cacheName))
+                );
+                console.log('CacheStorage cleared successfully.');
+              } catch (error) {
+                console.error('Error clearing caches:', error);
+              }
+            }
+            updateServiceWorker(true);
+            setTimeout(() => {
+              window.location.reload();
+            }, 600);
+          },
         },
         icon: <RefreshCw className="h-4 w-4 animate-spin" />,
       });

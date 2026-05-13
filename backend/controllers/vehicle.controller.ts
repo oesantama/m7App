@@ -102,27 +102,42 @@ export const bulkSaveVehicles = async (req: Request, res: Response) => {
         vehicleId = `VEH-${currentMax.toString().padStart(3, '0')}`;
       }
 
-      await pool.query(`
-        INSERT INTO vehicles (
-          id, plate, brand, owner, capacity_m3, client_id, 
-          soat_expiry, techno_expiry, status_id, model_year, color, vehicle_type
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        ON CONFLICT (plate) DO UPDATE SET
-          brand = EXCLUDED.brand, 
-          owner = EXCLUDED.owner, 
-          capacity_m3 = EXCLUDED.capacity_m3, 
-          soat_expiry = EXCLUDED.soat_expiry, 
-          techno_expiry = EXCLUDED.techno_expiry,
-          model_year = EXCLUDED.model_year,
-          color = EXCLUDED.color,
-          vehicle_type = EXCLUDED.vehicle_type,
-          status_id = EXCLUDED.status_id
-      `, [
-        vehicleId, v.plate, v.brand, v.owner || '', v.capacityM3 || 0, v.clientId || 'CLI-01',
-        v.soatExpiry || null, v.technoExpiry || null, v.statusId || 'EST-01',
-        v.modelYear || '', v.color || '', v.vehicleTypeId || ''
-      ]);
+      // Verificamos si la placa ya existe para decidir si insertar o actualizar
+      const existRes = await pool.query('SELECT id FROM vehicles WHERE plate = $1', [v.plate]);
+      if (existRes.rows.length > 0) {
+        const existingId = existRes.rows[0].id;
+        await pool.query(`
+          UPDATE vehicles SET
+            brand = $1, 
+            owner = $2, 
+            capacity_m3 = $3, 
+            client_id = $4,
+            soat_expiry = $5, 
+            techno_expiry = $6,
+            status_id = $7,
+            model_year = $8,
+            color = $9,
+            vehicle_type = $10
+          WHERE id = $11
+        `, [
+          v.brand, v.owner || '', v.capacityM3 || 0, v.clientId || 'CLI-01',
+          v.soatExpiry || null, v.technoExpiry || null, v.statusId || 'EST-01',
+          v.modelYear || '', v.color || '', v.vehicleTypeId || '',
+          existingId
+        ]);
+      } else {
+        await pool.query(`
+          INSERT INTO vehicles (
+            id, plate, brand, owner, capacity_m3, client_id, 
+            soat_expiry, techno_expiry, status_id, model_year, color, vehicle_type
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `, [
+          vehicleId, v.plate, v.brand, v.owner || '', v.capacityM3 || 0, v.clientId || 'CLI-01',
+          v.soatExpiry || null, v.technoExpiry || null, v.statusId || 'EST-01',
+          v.modelYear || '', v.color || '', v.vehicleTypeId || ''
+        ]);
+      }
     }
 
     await pool.query('COMMIT');

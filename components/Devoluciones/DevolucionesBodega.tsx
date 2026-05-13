@@ -2,6 +2,17 @@ import React from 'react';
 import { api } from '../../services/api';
 import { ReturnCard, RETURN_REASONS } from './ReturnCard';
 import { Icons } from '../../constants';
+import { Search } from 'lucide-react';
+
+const isReturnPartial = (ret: any) => {
+    const validItems = (ret.items || []).filter((i: any) => (i.sku || i.article_id));
+    return validItems.some((i: any) => {
+        const returned  = i.quantity_returned ?? i.qty ?? 0;
+        const expected  = i.expected_qty ?? (i.quantity_returned ?? i.qty ?? 0);
+        const delivered = i.quantity_delivered ?? 0;
+        return delivered > 0 || returned < expected;
+    });
+};
 
 interface Client { id: string; name: string; }
 type Tab = 'rutas' | 'legalizacion' | 'aprobacion';
@@ -60,6 +71,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     // Tab: Post-Legalización
     const [bodegaReturns, setBodegaReturns]   = React.useState<BodegaReturn[]>([]);
     const [processingId, setProcessingId]     = React.useState<string | null>(null);
+    const [searchLegalizacion, setSearchLegalizacion] = React.useState('');
 
     // Tab: De Rutas (flujo multi-step)
     const [routeStep, setRouteStep]           = React.useState<RouteStep>('plate');
@@ -464,21 +476,51 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                             {tab === 'legalizacion' && (
                                 bodegaReturns.length === 0
                                     ? <EmptyState msg="No hay devoluciones post-legalización pendientes" />
-                                    : <div className="grid gap-3 max-w-2xl">
-                                        {bodegaReturns.map(ret => (
-                                            <ReturnCard
-                                                key={ret.invoiceNumber}
-                                                type="legalizacion"
-                                                invoiceId={ret.invoiceNumber}
-                                                conductorName={ret.conductorName}
-                                                vehiclePlate={ret.vehiclePlate}
-                                                createdAt={ret.legalizadoAt}
-                                                externalDocId={ret.externalDocId}
-                                                items={ret.items ?? []}
-                                                isProcessing={processingId === `b-${ret.invoiceNumber}`}
-                                                onConfirm={(obs, reason) => handleConfirmBodega(ret, obs, reason)}
+                                    : <div className="space-y-4 max-w-2xl">
+                                        <div className="relative">
+                                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <input
+                                                value={searchLegalizacion}
+                                                onChange={e => setSearchLegalizacion(e.target.value)}
+                                                placeholder="Buscar por factura, placa, 'completa' o 'parcial'..."
+                                                className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-slate-100 rounded-2xl text-[11px] outline-none focus:border-rose-400 font-bold shadow-sm transition-all"
                                             />
-                                        ))}
+                                        </div>
+
+                                        <div className="grid gap-3">
+                                            {bodegaReturns
+                                                .filter(ret => {
+                                                    const q = searchLegalizacion.toLowerCase().trim();
+                                                    if (!q) return true;
+
+                                                    const isPart = isReturnPartial(ret);
+                                                    const statusStr = isPart ? 'parcial' : 'completa';
+                                                    const statusStrAlt = isPart ? 'parcial' : 'completo';
+
+                                                    return (
+                                                        ret.invoiceNumber?.toLowerCase().includes(q) ||
+                                                        ret.vehiclePlate?.toLowerCase().includes(q) ||
+                                                        ret.conductorName?.toLowerCase().includes(q) ||
+                                                        ret.externalDocId?.toLowerCase().includes(q) ||
+                                                        statusStr.includes(q) ||
+                                                        statusStrAlt.includes(q)
+                                                    );
+                                                })
+                                                .map(ret => (
+                                                    <ReturnCard
+                                                        key={ret.invoiceNumber}
+                                                        type="legalizacion"
+                                                        invoiceId={ret.invoiceNumber}
+                                                        conductorName={ret.conductorName}
+                                                        vehiclePlate={ret.vehiclePlate}
+                                                        createdAt={ret.legalizadoAt}
+                                                        externalDocId={ret.externalDocId}
+                                                        items={ret.items ?? []}
+                                                        isProcessing={processingId === `b-${ret.invoiceNumber}`}
+                                                        onConfirm={(obs, reason) => handleConfirmBodega(ret, obs, reason)}
+                                                    />
+                                                ))}
+                                        </div>
                                     </div>
                             )}
 
