@@ -20,6 +20,7 @@ import {
     reverseConciliation,
     getPlateMovementHistory,
     checkReferenceExists,
+    updateInvoiceValue,
 } from '../controllers/conciliation.controller.js';
 
 const router = Router();
@@ -47,5 +48,6 @@ router.post('/close-cycle',               closeConciliationCycle);
 router.post('/update-payment-method',    updatePaymentMethod);
 router.post('/update-remesa-tdm',         updateRemesaTDM);
 router.post('/reverse',                   reverseConciliation);
+router.patch('/invoice-value',            updateInvoiceValue);
 
 export default router;

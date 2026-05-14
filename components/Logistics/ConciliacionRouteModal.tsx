@@ -825,6 +825,11 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [savingSobrecosto, setSavingSobrecosto] = useState(false);
     const [surchargeSearch, setSurchargeSearch]   = useState<Record<string, string>>({});
 
+    // Modal para editar valor de factura
+    const [editValueModal, setEditValueModal] = useState<{ isOpen: boolean; invoice: InvoiceRow | null; inputValue: string; saving: boolean }>({
+        isOpen: false, invoice: null, inputValue: '', saving: false
+    });
+
     useEffect(() => {
         if (!isOpen) return;
         const m = new Map<string, InvoiceFormState>();
@@ -1154,6 +1159,27 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
     const pct = plateTotals.total > 0 ? Math.round((plateTotals.legalCount / plateTotals.total) * 100) : 0;
 
+    const submitEditValue = async () => {
+        const { invoice, inputValue } = editValueModal;
+        if (!invoice) return;
+        const num = Number(String(inputValue).replace(/[^0-9.]/g, ''));
+        if (isNaN(num) || num < 0) { toast.error('Ingrese un valor válido'); return; }
+        setEditValueModal(prev => ({ ...prev, saving: true }));
+        try {
+            await api.updateInvoiceValue({
+                documentId,
+                invoiceNumber: invoice.invoice_number,
+                value: num,
+            });
+            toast.success(`Factura ${invoice.invoice_number} actualizada a $${num.toLocaleString('es-CO')}`);
+            setEditValueModal({ isOpen: false, invoice: null, inputValue: '', saving: false });
+            onSaved();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Error al actualizar el valor');
+            setEditValueModal(prev => ({ ...prev, saving: false }));
+        }
+    };
+
     const handleSave = async (inv: InvoiceRow) => {
         const form = forms.get(inv.invoice_number);
         if (!form) return;
@@ -1408,6 +1434,13 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                             {inv.customer_name && <p className="text-[9px] text-slate-500 font-bold mt-0.5 truncate">{inv.customer_name}</p>}
                                             <div className="flex items-center gap-2 mt-0.5">
                                                 <span className="text-[9px] font-bold text-slate-600">Factura: {fmtCOP(invoiceVal)}</span>
+                                                <button
+                                                    title="Modificar valor de factura"
+                                                    onClick={() => setEditValueModal({ isOpen: true, invoice: inv, inputValue: String(invoiceVal || ''), saving: false })}
+                                                    className="w-4 h-4 rounded-full bg-slate-200 hover:bg-indigo-500 hover:text-white text-slate-500 flex items-center justify-center transition-all flex-shrink-0"
+                                                >
+                                                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                                </button>
                                                 {isLegalized && <span className="text-[9px] font-black text-emerald-600">Recaudado: {fmtCOP(inv.valor)}</span>}
                                                 {(() => {
                                                     const status = (inv.item_status || '').toUpperCase();
@@ -2030,6 +2063,67 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                 className="flex-[1.2] py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all"
                             >
                                 Sí, Continuar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Modal: Editar valor de factura ─────────────────────────── */}
+            {editValueModal.isOpen && editValueModal.invoice && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm border border-slate-100 overflow-hidden">
+                        <div className="p-7 space-y-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 flex-shrink-0">
+                                    <svg width="18" height="18" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Modificar Valor</p>
+                                    <p className="text-sm font-black text-slate-800">{editValueModal.invoice.invoice_number}</p>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                                    {Number(editValueModal.invoice.invoice_value) > 0 ? 'Editar valor existente' : 'Agregar valor (estaba en $0)'}
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        autoFocus
+                                        className="w-full pl-7 pr-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                                        value={editValueModal.inputValue}
+                                        onChange={e => setEditValueModal(prev => ({ ...prev, inputValue: e.target.value }))}
+                                        onKeyDown={e => e.key === 'Enter' && submitEditValue()}
+                                        disabled={editValueModal.saving}
+                                    />
+                                </div>
+                                {Number(editValueModal.invoice.invoice_value) > 0 && (
+                                    <p className="text-[9px] text-slate-400 font-bold mt-1 px-1">
+                                        Valor actual: {fmtCOP(Number(editValueModal.invoice.invoice_value))}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="px-7 pb-7 flex gap-3">
+                            <button
+                                onClick={() => setEditValueModal({ isOpen: false, invoice: null, inputValue: '', saving: false })}
+                                disabled={editValueModal.saving}
+                                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={submitEditValue}
+                                disabled={editValueModal.saving || editValueModal.inputValue === ''}
+                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                            >
+                                {editValueModal.saving
+                                    ? <><svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4" className="opacity-75"/></svg> Guardando</>
+                                    : 'Guardar'
+                                }
                             </button>
                         </div>
                     </div>

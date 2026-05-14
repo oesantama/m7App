@@ -224,6 +224,8 @@ export const api = {
     userName?: string;
     observations: string;
   }) => fetchJson(`${API_URL}/conciliation/reverse`, { method: 'POST', body: JSON.stringify(data) }),
+  updateInvoiceValue: (data: { documentId: string; invoiceNumber: string; value: number }) =>
+    fetchJson(`${API_URL}/conciliation/invoice-value`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   // ── Devoluciones Bodega ────────────────────────────────────────────────────
   getPendingRouteReturns: (clientId?: string) =>

@@ -1633,15 +1633,78 @@ export const checkReferenceExists = async (req: Request, res: Response) => {
 
         const result = await pool.query(query, [cleanRef]);
 
-        res.json({ 
-            success: true, 
-            exists: result.rows.length > 0, 
-            data: result.rows 
+        res.json({
+            success: true,
+            exists: result.rows.length > 0,
+            data: result.rows
         });
     } catch (err: any) {
         console.error('[CONCILIATION] checkReferenceExists error:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 };
+
+// ─── PATCH /conciliation/invoice-value ────────────────────────────────────────
+// UPSERT del valor de factura en document_l_payments.
+// Si ya existe un registro (document_id, invoice) → UPDATE vmetodo.
+// Si no existe → INSERT con el valor y conserva el metodo_pago existente o usa 'EFECTIVO'.
+export const updateInvoiceValue = async (req: Request, res: Response) => {
+    const { documentId, invoiceNumber, value } = req.body;
+    const user = (req as any).user;
+
+    if (!documentId || !invoiceNumber || value === undefined || value === null) {
+        return res.status(400).json({ success: false, error: 'Faltan parámetros: documentId, invoiceNumber, value' });
+    }
+
+    const numValue = Number(value);
+    if (isNaN(numValue) || numValue < 0) {
+        return res.status(400).json({ success: false, error: 'El valor debe ser un número mayor o igual a 0' });
+    }
+
+    const userId = user?.id || user?.userId || null;
+    const cleanInvoice = String(invoiceNumber).trim().toUpperCase();
+
+    try {
+        // Buscar registro existente en document_l_payments
+        const existing = await pool.query(
+            `SELECT id, vmetodo, metodo_pago FROM document_l_payments
+             WHERE document_id = $1 AND TRIM(UPPER(invoice)) = $2
+             LIMIT 1`,
+            [documentId, cleanInvoice]
+        );
+
+        let oldValue: number | null = null;
+
+        if (existing.rows.length > 0) {
+            oldValue = existing.rows[0].vmetodo;
+            await pool.query(
+                `UPDATE document_l_payments SET vmetodo = $1, user_id = $2
+                 WHERE document_id = $3 AND TRIM(UPPER(invoice)) = $4`,
+                [numValue, userId, documentId, cleanInvoice]
+            );
+        } else {
+            // No existe registro — insertar sin ON CONFLICT (no hay unique constraint en esta tabla)
+            await pool.query(
+                `INSERT INTO document_l_payments (document_id, invoice, vmetodo, metodo_pago, user_id)
+                 VALUES ($1, $2, $3, 'EFECTIVO', $4)`,
+                [documentId, cleanInvoice, numValue, userId]
+            );
+        }
+
+        // Registro de auditoría
+        await pool.query(
+            `INSERT INTO invoice_status_history (document_id, invoice_number, evento, estado_anterior, estado_nuevo, changed_by, changed_at)
+             VALUES ($1, $2, 'EDICION_VALOR_FACTURA', $3, $4, $5, NOW())
+             ON CONFLICT DO NOTHING`,
+            [documentId, cleanInvoice, String(oldValue ?? 0), String(numValue), userId]
+        ).catch(() => {/* tabla puede no tener esa columna; ignorar */});
+
+        res.json({ success: true, message: 'Valor de factura actualizado.', value: numValue, oldValue });
+    } catch (err: any) {
+        console.error('[CONCILIATION] updateInvoiceValue error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
 
 
