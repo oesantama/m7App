@@ -133,7 +133,7 @@ const GrupoInterView: React.FC = () => {
     placa: '',
     planilla: '',
     factura: '',
-    dateType: 'entrega'
+    dateType: 'cargue'
   });
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
@@ -354,7 +354,7 @@ const GrupoInterView: React.FC = () => {
       placa: '',
       planilla: '',
       factura: '',
-      dateType: 'entrega'
+      dateType: 'cargue'
     });
     setSearchTerm('');
     setCurrentPage(1);
@@ -362,7 +362,7 @@ const GrupoInterView: React.FC = () => {
     
     // Obtener órdenes de forma fresca e inmediata con filtros limpios
     setTimeout(() => {
-      api.getGrupoInterOrders({ dateType: 'entrega' }).then(data => {
+      api.getGrupoInterOrders({ dateType: 'cargue' }).then(data => {
         if (data) {
           setOrders(data);
         }
@@ -516,7 +516,12 @@ const GrupoInterView: React.FC = () => {
   let visibleOrders = orders.filter(o => {
     if (filters.placa && !(o.placa || '').toLowerCase().includes(filters.placa.toLowerCase().trim())) return false;
     if (filters.planilla && !(o.numero_planilla || '').toLowerCase().includes(filters.planilla.toLowerCase().trim())) return false;
-    if (filters.factura && !(o.no_factura_m7 || '').toLowerCase().includes(filters.factura.toLowerCase().trim())) return false;
+    if (filters.factura) {
+      const fac = filters.factura.toLowerCase().trim();
+      const matchFac = (o.no_factura_m7 || '').toLowerCase().includes(fac);
+      const matchDoc = (o.numero_documento || '').toLowerCase().includes(fac);
+      if (!matchFac && !matchDoc) return false;
+    }
 
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();

@@ -713,13 +713,36 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
 
     // Rutas filtradas por búsqueda de placa/conductor
     const filteredRoutes = useMemo(() => {
-        if (!searchRoute.trim()) return routes;
+        // Deduplicar por placa: la misma placa puede aparecer en múltiples rutas del mismo
+        // documento (e.g., JYO631 en ruta A con 21 facturas y ruta B con 1 factura).
+        // Mantenemos la primera entrada por placa y calculamos el invoice_count real
+        // sumando todas las facturas asignadas a esa placa desde el array de invoices.
+        const plateCount = new Map<string, number>();
+        invoices.forEach(inv => {
+            const p = inv.route_vehicle_plate || (inv as any).vehicle_plate || '';
+            if (p) plateCount.set(p, (plateCount.get(p) || 0) + 1);
+        });
+
+        const seen = new Set<string>();
+        const deduped = routes
+            .filter(r => {
+                const p = r.plate || '';
+                if (!p || seen.has(p)) return false;
+                seen.add(p);
+                return true;
+            })
+            .map(r => ({
+                ...r,
+                invoice_count: plateCount.get(r.plate || '') ?? r.invoice_count,
+            }));
+
+        if (!searchRoute.trim()) return deduped;
         const q = searchRoute.toLowerCase();
-        return routes.filter(r =>
+        return deduped.filter(r =>
             r.plate?.toLowerCase().includes(q) ||
             r.driver_name?.toLowerCase().includes(q)
         );
-    }, [routes, searchRoute]);
+    }, [routes, searchRoute, invoices]);
 
     // Lista inferior: solo facturas sin asignar, filtradas por búsqueda
     const visibleInvoices = useMemo(() => {
@@ -1433,7 +1456,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                                    Placas asignadas ({filteredRoutes.length}{searchRoute ? ` de ${routes.length}` : ''})
+                                                    Placas asignadas ({filteredRoutes.length}{searchRoute ? ` de ${new Set(routes.map(r => r.plate).filter(Boolean)).size}` : ''})
                                                 </p>
                                             </div>
                                             {/* Búsqueda por placa */}

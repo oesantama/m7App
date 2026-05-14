@@ -35,7 +35,7 @@ async function fix() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS grupo_inter_pedidos (
         id SERIAL PRIMARY KEY,
-        nro_documento TEXT,
+        numero_documento TEXT,
         cliente TEXT,
         ciudad_origen TEXT,
         ciudad_origen_cod TEXT,

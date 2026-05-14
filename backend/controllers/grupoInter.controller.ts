@@ -43,6 +43,10 @@ const ensureSchema = async () => {
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS acta_entrega_b64 TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS fecha_entregado TIMESTAMP WITH TIME ZONE;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS fecha_carge TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS nit TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS empresa TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS municipio_destino TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS cliente TEXT;
         `);
 
         // Crear índices para optimizar búsquedas por rango de fecha, placa, planilla y documento
@@ -129,8 +133,8 @@ const getVisionModel = (modelName?: string, forceApiKey?: string) => {
         console.error('[OCR-NUCLEAR] ❌ ERROR CRÍTICO: No se detectó ninguna API Key válida en el pool.');
     }
     
-    // M7-DYNAMIC-MODEL: Usar .env o fallback estable
-    const modelId = modelName || process.env.AI_MODEL || "gemini-1.5-flash"; 
+    // M7-DYNAMIC-MODEL: Forzar fallback estable porque gemini-1.5-flash simple da 404
+    const modelId = "gemini-flash-latest"; 
     
     const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
     console.log(`[OCR-NUCLEAR] 🧠 Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] | Modelo: ${modelId} | Key: ${keyForLog}`);
@@ -622,10 +626,10 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         
         sendProgress({ type: 'start', totalPages });
 
-        const ordersResult = await pool.query("SELECT numero_documento FROM grupo_inter_pedidos WHERE estado != 'Entregado'");
-        const pendingDocs = ordersResult.rows.map(r => r.numero_documento);
+        const ordersResult = await pool.query("SELECT numero_documento, no_factura_m7 FROM grupo_inter_pedidos WHERE estado != 'Entregado'");
+        const pendingRows = ordersResult.rows;
 
-        if (pendingDocs.length === 0) {
+        if (pendingRows.length === 0) {
             sendProgress({ type: 'log', message: 'No hay pedidos pendientes para cruzar.' });
             sendProgress({ type: 'end', message: 'Proceso finalizado sin registros pendientes.', matches: 0 });
             res.end();
@@ -635,10 +639,14 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         // M7-ATOMIC-OCR: Motor Atómico Numérico Exclusivo (v1.9.31)
         // Extraemos solo la parte numérica de los pedidos porque el PDF puede traerlos sin letras o con otras letras (ej. TR-GENI vs TI)
         const numericDocsMap = new Map<string, string>();
-        for (const doc of pendingDocs) {
-            const numPart = String(doc).replace(/\D/g, '');
-            if (numPart) {
-                numericDocsMap.set(numPart, doc);
+        for (const row of pendingRows) {
+            if (row.numero_documento) {
+                const numPartDoc = String(row.numero_documento).replace(/\D/g, '');
+                if (numPartDoc) numericDocsMap.set(numPartDoc, row.numero_documento);
+            }
+            if (row.no_factura_m7) {
+                const numPartFac = String(row.no_factura_m7).replace(/\D/g, '');
+                if (numPartFac) numericDocsMap.set(numPartFac, row.numero_documento);
             }
         }
         const numericList = Array.from(numericDocsMap.keys());
@@ -652,77 +660,90 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 
         const keys = getAPIKeysPool();
         const apiKey = keys[0]; 
-        const modelName = process.env.AI_MODEL || "gemini-1.5-flash";
+        const modelName = process.env.AI_MODEL || "gemini-flash-latest";
         let visionModel = getVisionModel(modelName, apiKey);
         
-        sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico para ${totalPages} páginas...` });
+        sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico PÁGINA POR PÁGINA para ${totalPages} páginas...` });
         
-        const fullPdfBase64 = fileContent.toString('base64');
-
-        const prompt = `Actúa como un motor OCR estadístico de logística. 
-        Analiza este documento PDF completo de ${totalPages} páginas.
-        Busca EXCLUSIVAMENTE estos NÚMEROS exactos (ignora cualquier palabra o letra alrededor de ellos):
-        [${numericList.join(', ')}]
-        
-        REGLAS:
-        1. Escanea visualmente todas las páginas.
-        2. Si encuentras uno de estos números impreso en la página, registra el NÚMERO y la PÁGINA (1-index).
-        3. Responde SOLO con un JSON estricto con esta estructura exacta:
-        {"matches": [{"doc": "SOLO_LOS_NUMEROS", "page": NUM_PAGINA}]}
-        4. Si no hay coincidencias, responde: {"matches": []}
-        5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
-
-        const result = await generateContentWithRetry(visionModel, [
-            { text: prompt },
-            { inlineData: { data: fullPdfBase64, mimeType: "application/pdf" } }
-        ], sendProgress, 3);
-
-        const response = await result.response;
-        const textResponse = response.text().trim();
-        
-        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("Gemini no devolvió un formato JSON válido.");
-        
-        const data = JSON.parse(jsonMatch[0]);
-        const foundMatches = data.matches || [];
-        
-        sendProgress({ type: 'log', message: `🔍 Inteligencia detectó ${foundMatches.length} números en el documento.` });
-
         let finalMatches = 0;
-        for (const item of foundMatches) {
-            // Limpiamos lo que traiga gemini por seguridad
-            const matchedNum = String(item.doc).replace(/\D/g, '');
-            const originalDocId = numericDocsMap.get(matchedNum);
-            const pageIndex = item.page - 1;
+        const username = req.body.username || 'System OCR';
 
-            if (pageIndex >= 0 && pageIndex < totalPages && originalDocId) {
-                sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${item.page}...` });
+        for (let i = 0; i < totalPages; i++) {
+            sendProgress({ type: 'log', message: `Analizando página ${i + 1} de ${totalPages}...` });
+            
+            const subPdf = await PDFDocument.create();
+            const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [i]);
+            subPdf.addPage(copiedPage);
+            const pageBase64 = await subPdf.saveAsBase64();
+
+            const prompt = `Actúa como un motor OCR de logística. 
+            Analiza esta página PDF.
+            Busca EXCLUSIVAMENTE las siguientes secuencias numéricas (ignora prefijos como 'FEV', 'FV', o cualquier otra letra alrededor):
+            [${numericList.join(', ')}]
+            
+            REGLAS:
+            1. Escanea la página.
+            2. Si encuentras un número que coincida EXACTAMENTE con uno de la lista (ignorando letras), inclúyelo en la lista "matches".
+            3. Responde SOLO con un JSON estricto con esta estructura exacta:
+            {"matches": ["NUMERO_1", "NUMERO_2"]}
+            4. Si no hay coincidencias, responde: {"matches": []}
+            5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
+
+            try {
+                const result = await generateContentWithRetry(visionModel, [
+                    { text: prompt },
+                    { inlineData: { data: pageBase64, mimeType: "application/pdf" } }
+                ], sendProgress, 3);
+
+                const response = await result.response;
+                const textResponse = response.text().trim();
                 
-                // Extraer solo la página específica para guardarla como acta
-                const subPdf = await PDFDocument.create();
-                const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [pageIndex]);
-                subPdf.addPage(copiedPage);
-                const rawBase64 = await subPdf.saveAsBase64();
-                const base64Page = `data:application/pdf;base64,${rawBase64}`;
-
-                const username = req.body.username || 'System OCR';
-
-                await pool.query(
-                    "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
-                    [base64Page, username, originalDocId]
-                );
-
-                // Registrar en histórico
-                const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
-                if (pedRes.rows.length > 0) {
-                    await pool.query(
-                        "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', 'PDF Procesado Automáticamente', 'System OCR')",
-                        [pedRes.rows[0].id]
-                    );
+                const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    sendProgress({ type: 'log', message: `⚠️ Página ${i + 1}: Respuesta inválida del modelo.` });
+                    continue;
                 }
-                finalMatches++;
-                sendProgress({ type: 'progress', page: item.page, percent: Math.round((finalMatches/foundMatches.length)*100) });
+                
+                const data = JSON.parse(jsonMatch[0]);
+                const foundMatchesInPage = data.matches || [];
+
+                for (const item of foundMatchesInPage) {
+                    const matchedNum = String(item).replace(/\D/g, '');
+                    const originalDocId = numericDocsMap.get(matchedNum);
+
+                    if (originalDocId) {
+                        sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${i + 1}...` });
+                        
+                        const base64PagePrefix = `data:application/pdf;base64,${pageBase64}`;
+
+                        await pool.query(
+                            "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
+                            [base64PagePrefix, username, originalDocId]
+                        );
+
+                        // Registrar en histórico
+                        const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
+                        if (pedRes.rows.length > 0) {
+                            await pool.query(
+                                "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', 'PDF Procesado Automáticamente', 'System OCR')",
+                                [pedRes.rows[0].id]
+                            );
+                        }
+                        
+                        // Remover de la lista pendiente para no volver a buscarlo y acelerar el proceso
+                        const idx = numericList.indexOf(matchedNum);
+                        if (idx > -1) numericList.splice(idx, 1);
+                        
+                        finalMatches++;
+                    }
+                }
+            } catch (pageError) {
+                sendProgress({ type: 'log', message: `❌ Error al procesar la página ${i + 1}. Omitiendo...` });
+                console.error(`Error en página ${i + 1}:`, pageError);
             }
+            
+            // Emit progress
+            sendProgress({ type: 'progress', page: i + 1, percent: Math.round(((i + 1) / totalPages) * 100) });
         }
 
         sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches });
@@ -746,6 +767,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 };
 
 export const getOrders = async (req: Request, res: Response): Promise<void> => {
+    await ensureSchema();
     const dbClient = await pool.connect();
     try {
         // [M7-PERF] Timeout de seguridad: si la query tarda más de 20s, devolvemos error controlado

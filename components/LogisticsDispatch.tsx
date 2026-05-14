@@ -2178,15 +2178,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* BOTÓN EDITAR PLACA - FLOTANTE (Solo disponible para rutas de hoy) */}
+                                        {/* BOTÓN EDITAR PLACA - FLOTANTE (disponible para rutas de hoy y ayer) */}
                                         {(() => {
                                             const rDate = new Date(route.createdAt || route.created_at || Date.now());
                                             const today = new Date();
-                                            const isToday = rDate.getDate() === today.getDate() && 
-                                                           rDate.getMonth() === today.getMonth() && 
-                                                           rDate.getFullYear() === today.getFullYear();
-                                            
-                                            if (!isToday) return null;
+                                            const yesterday = new Date(today);
+                                            yesterday.setDate(today.getDate() - 1);
+                                            const sameDay = (a: Date, b: Date) =>
+                                                a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+
+                                            if (!sameDay(rDate, today) && !sameDay(rDate, yesterday)) return null;
 
                                             return (
                                                 <button
