@@ -441,7 +441,181 @@ const healSchema = async (client: any) => {
         old_method TEXT, new_method TEXT, user_id TEXT, user_name TEXT,
         observations TEXT,
         changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS gh_tipos_elementos (
+        id SERIAL PRIMARY KEY, nombre TEXT NOT NULL UNIQUE, 
+        estado_id TEXT DEFAULT 'EST-01', 
+        usuario_control TEXT, 
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS gh_elementos (
+        id SERIAL PRIMARY KEY, nombre TEXT NOT NULL UNIQUE, 
+        tipo_id INTEGER REFERENCES gh_tipos_elementos(id) ON DELETE CASCADE, 
+        estado_id TEXT DEFAULT 'EST-01', 
+        usuario_control TEXT, 
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`
   ]) { try { await client.query(ddl); } catch (e) {} }
+
+  // New Inventario, Ordenes, Entradas, Salidas tables and columns
+  try {
+    await client.query(`ALTER TABLE gh_elementos ADD COLUMN IF NOT EXISTS es_serializado BOOLEAN DEFAULT FALSE;`);
+    
+    await client.query(`CREATE TABLE IF NOT EXISTS gh_inventario_elemento (
+        id SERIAL PRIMARY KEY,
+        elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE UNIQUE,
+        stock INTEGER NOT NULL DEFAULT 0,
+        fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS gh_ordenes_compra (
+        id SERIAL PRIMARY KEY,
+        numero_orden VARCHAR(50) NOT NULL UNIQUE,
+        proveedor VARCHAR(255) NOT NULL,
+        fecha DATE NOT NULL,
+        estado VARCHAR(50) DEFAULT 'PENDIENTE',
+        usuario_control TEXT,
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS gh_ordenes_compra_detalle (
+        id SERIAL PRIMARY KEY,
+        orden_id INTEGER REFERENCES gh_ordenes_compra(id) ON DELETE CASCADE,
+        elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE,
+        cantidad INTEGER NOT NULL,
+        valor_unitario NUMERIC(15,2) NOT NULL
+    );`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS gh_entradas_bodega (
+        id SERIAL PRIMARY KEY,
+        numero_factura VARCHAR(50) NOT NULL,
+        orden_id INTEGER REFERENCES gh_ordenes_compra(id) ON DELETE SET NULL,
+        fecha DATE NOT NULL,
+        observaciones TEXT,
+        usuario_control TEXT,
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS gh_entradas_bodega_detalle (
+        id SERIAL PRIMARY KEY,
+        entrada_id INTEGER REFERENCES gh_entradas_bodega(id) ON DELETE CASCADE,
+        elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE,
+        cantidad INTEGER NOT NULL,
+        valor_unitario NUMERIC(15,2) NOT NULL
+    );`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS gh_inventario_serial_elemento (
+        id SERIAL PRIMARY KEY,
+        elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE,
+        serial VARCHAR(100) NOT NULL UNIQUE,
+        estado_serial VARCHAR(50) DEFAULT 'DISPONIBLE',
+        entrada_id INTEGER REFERENCES gh_entradas_bodega(id) ON DELETE SET NULL,
+        fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS gh_salidas_proveedor (
+        id SERIAL PRIMARY KEY,
+        numero_salida VARCHAR(50) NOT NULL UNIQUE,
+        proveedor VARCHAR(255) NOT NULL,
+        fecha DATE NOT NULL,
+        observaciones TEXT,
+        usuario_control TEXT,
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS gh_salidas_proveedor_detalle (
+        id SERIAL PRIMARY KEY,
+        salida_id INTEGER REFERENCES gh_salidas_proveedor(id) ON DELETE CASCADE,
+        elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE,
+        cantidad INTEGER NOT NULL,
+        valor_unitario NUMERIC(15,2) NOT NULL
+    );`);
+  } catch (err) {
+    console.error('Error creating new GH inventory tables:', err);
+  }
+
+  // Add quien_recibio_id and proveedor columns to gh_entradas_bodega if not exists
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query(`
+        ALTER TABLE gh_entradas_bodega 
+        ADD COLUMN IF NOT EXISTS quien_recibio_id INTEGER REFERENCES gh_personal(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS proveedor VARCHAR(255);
+      `);
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.error('Error migrating gh_entradas_bodega columns:', e);
+  }
+
+  // Migrations for Asignaciones & Devoluciones Personal
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query(`
+        ALTER TABLE gh_inventario_serial_elemento 
+        ADD COLUMN IF NOT EXISTS personal_id INTEGER REFERENCES gh_personal(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS fecha_asignacion TIMESTAMP WITH TIME ZONE;
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS gh_inventario_personal (
+            id SERIAL PRIMARY KEY,
+            personal_id INTEGER NOT NULL REFERENCES gh_personal(id) ON DELETE CASCADE,
+            elemento_id INTEGER NOT NULL REFERENCES gh_elementos(id) ON DELETE CASCADE,
+            stock INTEGER NOT NULL DEFAULT 0,
+            fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (personal_id, elemento_id)
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS gh_asignaciones_personal (
+            id SERIAL PRIMARY KEY,
+            numero_asignacion VARCHAR(50) NOT NULL UNIQUE,
+            personal_id INTEGER NOT NULL REFERENCES gh_personal(id) ON DELETE CASCADE,
+            autorizado_por VARCHAR(255) NOT NULL,
+            fecha DATE NOT NULL,
+            observaciones TEXT,
+            usuario_control TEXT,
+            fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS gh_asignaciones_personal_detalle (
+            id SERIAL PRIMARY KEY,
+            asignacion_id INTEGER REFERENCES gh_asignaciones_personal(id) ON DELETE CASCADE,
+            elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE,
+            cantidad INTEGER NOT NULL
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS gh_devoluciones_personal (
+            id SERIAL PRIMARY KEY,
+            numero_devolucion VARCHAR(50) NOT NULL UNIQUE,
+            personal_id INTEGER NOT NULL REFERENCES gh_personal(id) ON DELETE CASCADE,
+            motivo TEXT NOT NULL,
+            fecha DATE NOT NULL,
+            usuario_control TEXT,
+            fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS gh_devoluciones_personal_detalle (
+            id SERIAL PRIMARY KEY,
+            devolucion_id INTEGER REFERENCES gh_devoluciones_personal(id) ON DELETE CASCADE,
+            elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE,
+            cantidad INTEGER NOT NULL
+        );
+      `);
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.error('Error running assignments and returns migrations:', e);
+  }
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -997,6 +1171,10 @@ export const restoreSystem = async () => {
       ('PAG-41', 'MISCELÁNEOS', 'gestion-humana-miscelaneos', 'MOD-09', 'MOD-09', 'EST-01'),
       ('PAG-43', 'PERSONAL', 'gestion-humana-personal', 'MOD-09', 'MOD-09', 'EST-01'),
       ('PAG-44', 'REGISTRO DE VISITAS', 'gestion-humana-visitas', 'MOD-09', 'MOD-09', 'EST-01'),
+      ('PAG-52', 'ENTREGAS Y SALIDAS', 'gestion-humana-entregas-salidas', 'MOD-09', 'MOD-09', 'EST-01'),
+      ('PAG-53', 'ASIGNACIÓN Y DEVOLUCIÓN', 'gestion-humana-asignacion-devolucion', 'MOD-09', 'MOD-09', 'EST-01'),
+      ('PAG-54', 'CONSULTAS INVENTARIO', 'gestion-humana-consultas-inventario', 'MOD-09', 'MOD-09', 'EST-01'),
+      ('PAG-55', 'MASTER INVENTARIO', 'gestion-humana-master-inventario', 'MOD-09', 'MOD-09', 'EST-01'),
 
       -- Configuración Maestros extra (MOD-01)
       ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01'),
@@ -1110,6 +1288,20 @@ export const restoreSystem = async () => {
     await client.query(`
         ALTER TABLE route_invoices DROP CONSTRAINT IF EXISTS unq_route_invoice;
         ALTER TABLE route_invoices ADD CONSTRAINT unq_route_invoice UNIQUE (route_id, invoice_id);
+    `);
+
+    // ── Firma digital en asignaciones y devoluciones de personal ──────
+    await client.query(`
+      ALTER TABLE gh_asignaciones_personal
+        ADD COLUMN IF NOT EXISTS firma_estado VARCHAR(20) DEFAULT 'PENDIENTE',
+        ADD COLUMN IF NOT EXISTS fecha_firma TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS firmado_por TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE gh_devoluciones_personal
+        ADD COLUMN IF NOT EXISTS firma_estado VARCHAR(20) DEFAULT 'PENDIENTE',
+        ADD COLUMN IF NOT EXISTS fecha_firma TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS firmado_por TEXT;
     `);
 
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas

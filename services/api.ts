@@ -521,6 +521,118 @@ export const api = {
     body: JSON.stringify({ hora: hora || null }),
   }),
 
+  // Gestión Humana — Master Inventario
+  getGhTiposElementos: () => fetchJson(`${API_URL}/gh-master-inventario/tipos`),
+  saveGhTipoElemento: (data: any, id?: number | string) => {
+    const url = id ? `${API_URL}/gh-master-inventario/tipos/${id}` : `${API_URL}/gh-master-inventario/tipos`;
+    return fetchJson(url, {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  deleteGhTipoElemento: (id: number | string) => fetchJson(`${API_URL}/gh-master-inventario/tipos/${id}`, { method: 'DELETE' }),
+
+  getGhElementos: () => fetchJson(`${API_URL}/gh-master-inventario/elementos`),
+  saveGhElemento: (data: any, id?: number | string) => {
+    const url = id ? `${API_URL}/gh-master-inventario/elementos/${id}` : `${API_URL}/gh-master-inventario/elementos`;
+    return fetchJson(url, {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  deleteGhElemento: (id: number | string) => fetchJson(`${API_URL}/gh-master-inventario/elementos/${id}`, { method: 'DELETE' }),
+
+  // Gestión Humana — Entradas y Salidas de Inventario
+  getGhDropdownElementos: () => fetchJson(`${API_URL}/gh-entradas-salidas/dropdown-elementos`),
+  getGhOrdenesCompra: (params?: { id?: string | number, fecha_inicio?: string, fecha_fin?: string, proveedor?: string }) => {
+    let url = `${API_URL}/gh-entradas-salidas/ordenes`;
+    if (params) {
+      const search = new URLSearchParams(params as any).toString();
+      if (search) url += `?${search}`;
+    }
+    return fetchJson(url);
+  },
+  saveGhOrdenCompra: (data: any) => fetchJson(`${API_URL}/gh-entradas-salidas/ordenes`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  getGhEntradasBodega: (params?: { id?: string | number, fecha_inicio?: string, fecha_fin?: string, proveedor?: string }) => {
+    let url = `${API_URL}/gh-entradas-salidas/entradas`;
+    if (params) {
+      const search = new URLSearchParams(params as any).toString();
+      if (search) url += `?${search}`;
+    }
+    return fetchJson(url);
+  },
+  saveGhEntradaBodega: (data: any) => fetchJson(`${API_URL}/gh-entradas-salidas/entradas`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  getGhSalidasProveedor: (params?: { id?: string | number, fecha_inicio?: string, fecha_fin?: string, proveedor?: string }) => {
+    let url = `${API_URL}/gh-entradas-salidas/salidas`;
+    if (params) {
+      const search = new URLSearchParams(params as any).toString();
+      if (search) url += `?${search}`;
+    }
+    return fetchJson(url);
+  },
+  saveGhSalidaProveedor: (data: any) => fetchJson(`${API_URL}/gh-entradas-salidas/salidas`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  getGhAvailableSerials: (elementoId: number | string) => fetchJson(`${API_URL}/gh-entradas-salidas/serials/${elementoId}`),
+
+  // Personal Assignments & Returns
+  getGhAsignaciones: (params?: { id?: string | number, fecha_inicio?: string, fecha_fin?: string, personal_id?: string | number }) => {
+    let url = `${API_URL}/gh-entradas-salidas/asignaciones`;
+    if (params) {
+      const search = new URLSearchParams(params as any).toString();
+      if (search) url += `?${search}`;
+    }
+    return fetchJson(url);
+  },
+  saveGhAsignacion: (data: any) => fetchJson(`${API_URL}/gh-entradas-salidas/asignaciones`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  getGhDevoluciones: (params?: { id?: string | number, fecha_inicio?: string, fecha_fin?: string, personal_id?: string | number }) => {
+    let url = `${API_URL}/gh-entradas-salidas/devoluciones`;
+    if (params) {
+      const search = new URLSearchParams(params as any).toString();
+      if (search) url += `?${search}`;
+    }
+    return fetchJson(url);
+  },
+  saveGhDevolucion: (data: any) => fetchJson(`${API_URL}/gh-entradas-salidas/devoluciones`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  getGhPersonalInventario: (personalId: number | string) => fetchJson(`${API_URL}/gh-entradas-salidas/personal-inventario/${personalId}`),
+  getGhPersonalSerials: (personalId: number | string, elementoId: number | string) => fetchJson(`${API_URL}/gh-entradas-salidas/personal-serials/${personalId}/${elementoId}`),
+  getGhInventarioBodega: (params?: { elemento_id?: string | number }) => {
+    const qs = params?.elemento_id ? `?elemento_id=${params.elemento_id}` : '';
+    return fetchJson(`${API_URL}/gh-entradas-salidas/inventario-bodega${qs}`);
+  },
+  getGhInventarioPersonal: (params?: { personal_id?: string | number; elemento_id?: string | number }) => {
+    const parts: string[] = [];
+    if (params?.personal_id) parts.push(`personal_id=${params.personal_id}`);
+    if (params?.elemento_id) parts.push(`elemento_id=${params.elemento_id}`);
+    const qs = parts.length ? `?${parts.join('&')}` : '';
+    return fetchJson(`${API_URL}/gh-entradas-salidas/inventario-personal${qs}`);
+  },
+  firmarAsignacion: (id: number | string, data: { clave_firma: string; firmado_por?: string }) =>
+    fetchJson(`${API_URL}/gh-entradas-salidas/asignaciones/${id}/firmar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  firmarDevolucion: (id: number | string, data: { clave_firma: string; firmado_por?: string }) =>
+    fetchJson(`${API_URL}/gh-entradas-salidas/devoluciones/${id}/firmar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
   saveMarca: (data: any) => fetchJson(`${API_URL}/marcas`, {

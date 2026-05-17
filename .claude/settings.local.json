@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(podman restart *)",
+      "Bash(podman logs *)"
     ]
   }
 }

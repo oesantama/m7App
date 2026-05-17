@@ -6,7 +6,7 @@ import multer from 'multer';
 import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 // PAG-13 = DESPACHO LOGÍSTICO (conductores)
 // PAG-15 = PLANIFICADOR DE RUTAS

@@ -52,8 +52,12 @@ import ajoverB36Routes from './ajover-b36.routes.js';
 import managementReportRoutes from './management-report.routes.js';
 import provClienteRoutes from './prov-cliente.routes.js';
 
+import ghMasterInventarioRoutes from './gh-master-inventario.routes.js';
+import ghEntradasSalidasRoutes from './gh-entradas-salidas.routes.js';
+
 const router = Router();
 
+// ... existing routes ...
 router.use('/masters', masterRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/training', trainingRoutes);
@@ -105,6 +109,8 @@ router.use('/delivery-schedules', deliveryScheduleRoutes);
 router.use('/ajover-b36', ajoverB36Routes);
 router.use('/management-reports', managementReportRoutes);
 router.use('/prov-clientes', provClienteRoutes);
+router.use('/gh-master-inventario', ghMasterInventarioRoutes);
+router.use('/gh-entradas-salidas', ghEntradasSalidasRoutes);
 
 export default router;
 
