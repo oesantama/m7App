@@ -29,7 +29,7 @@ export const getOrdenesCompra = async (req: Request, res: Response) => {
             FROM gh_ordenes_compra
         `;
         
-        let whereClause = [];
+        const whereClause: string[] = [];
         const params: any[] = [];
 
         if (id) {
@@ -57,7 +57,7 @@ export const getOrdenesCompra = async (req: Request, res: Response) => {
         const result = await pool.query(query, params);
 
         // Fetch details for each order
-        const orders = [];
+        const orders: any[] = [];
         for (const order of result.rows) {
             const detQuery = `
                 SELECT d.id, d.elemento_id, d.cantidad, d.valor_unitario, e.nombre as elemento_nombre 
@@ -136,7 +136,7 @@ export const getEntradasBodega = async (req: Request, res: Response) => {
             LEFT JOIN gh_personal p ON e.quien_recibio_id = p.id
         `;
         
-        let whereClause = [];
+        const whereClause: string[] = [];
         const params: any[] = [];
 
         if (id) {
@@ -164,7 +164,7 @@ export const getEntradasBodega = async (req: Request, res: Response) => {
         query += ` ORDER BY e.id DESC`;
         const result = await pool.query(query, params);
 
-        const entries = [];
+        const entries: any[] = [];
         for (const entry of result.rows) {
             const detQuery = `
                 SELECT d.id, d.elemento_id, d.cantidad, d.valor_unitario, e.nombre as elemento_nombre, e.es_serializado,
@@ -285,7 +285,7 @@ export const getSalidasProveedor = async (req: Request, res: Response) => {
             LEFT JOIN prov_cliente pc ON s.proveedor = pc.documento
         `;
         
-        let whereClause = [];
+        const whereClause: string[] = [];
         const params: any[] = [];
 
         if (id) {
@@ -312,7 +312,7 @@ export const getSalidasProveedor = async (req: Request, res: Response) => {
         query += ` ORDER BY s.id DESC`;
         const result = await pool.query(query, params);
 
-        const returns = [];
+        const returns: any[] = [];
         for (const ret of result.rows) {
             const detQuery = `
                 SELECT d.id, d.elemento_id, d.cantidad, d.valor_unitario, e.nombre as elemento_nombre, e.es_serializado
@@ -439,7 +439,7 @@ export const getAsignaciones = async (req: Request, res: Response) => {
             FROM gh_asignaciones_personal a
             LEFT JOIN gh_personal p ON a.personal_id = p.id
         `;
-        let whereClause = [];
+        const whereClause: string[] = [];
         const params: any[] = [];
 
         if (id) {
@@ -466,7 +466,7 @@ export const getAsignaciones = async (req: Request, res: Response) => {
         query += ` ORDER BY a.id DESC`;
         const result = await pool.query(query, params);
 
-        const assignments = [];
+        const assignments: any[] = [];
         for (const row of result.rows) {
             const detQuery = `
                 SELECT d.id, d.elemento_id, d.cantidad, e.nombre as elemento_nombre, e.es_serializado,
@@ -596,7 +596,7 @@ export const getDevoluciones = async (req: Request, res: Response) => {
             FROM gh_devoluciones_personal d
             LEFT JOIN gh_personal p ON d.personal_id = p.id
         `;
-        let whereClause = [];
+        const whereClause: string[] = [];
         const params: any[] = [];
 
         if (id) {
@@ -623,7 +623,7 @@ export const getDevoluciones = async (req: Request, res: Response) => {
         query += ` ORDER BY d.id DESC`;
         const result = await pool.query(query, params);
 
-        const returns = [];
+        const returns: any[] = [];
         for (const row of result.rows) {
             const detQuery = `
                 SELECT d.id, d.elemento_id, d.cantidad, e.nombre as elemento_nombre, e.es_serializado,
@@ -933,7 +933,7 @@ export const getInventarioBodega = async (req: Request, res: Response) => {
         const result = await pool.query(query, params);
 
         // For serialized elements, get serial list
-        const rows = [];
+        const rows: any[] = [];
         for (const row of result.rows) {
             let serials: any[] = [];
             if (row.es_serializado) {
@@ -984,7 +984,7 @@ export const getInventarioPersonal = async (req: Request, res: Response) => {
         const result = await pool.query(query, params);
 
         // For serialized elements, get assigned serials
-        const rows = [];
+        const rows: any[] = [];
         for (const row of result.rows) {
             let serials: any[] = [];
             if (row.es_serializado) {
