@@ -42,13 +42,24 @@ async function main() {
     `);
     sqlContent += `-- --- PERSONAL ---\n`;
     for (const row of personal.rows) {
+      const cargoExpr = row.cargo
+        ? `COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = ${escape(row.cargo.toUpperCase())}), ${escape(row.cargo)})`
+        : 'NULL';
+        
+      const operacionExpr = row.operacion
+        ? `COALESCE((SELECT id FROM clients WHERE UPPER(name) = ${escape(row.operacion.toUpperCase())} OR UPPER(name) LIKE ${escape(row.operacion.toUpperCase() + '%')} LIMIT 1), ${escape(row.operacion)})`
+        : 'NULL';
+        
+      const estadoExpr = row.estado?.toUpperCase() === 'ACTIVO' || row.estado === 'EST-01' ? "'EST-01'" : "'EST-02'";
+
       sqlContent += `INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) \n`;
-      sqlContent += `VALUES (${escape(row.nombre)}, ${escape(row.cedula)}, ${escape(row.cargo)}, ${escape(row.placa)}, ${escape(row.operacion)}, ${escape(row.estado)}, 'Migración', ${escapeDate(row.fecha_control)}) \n`;
+      sqlContent += `VALUES (${escape(row.nombre)}, ${escape(row.cedula)}, ${cargoExpr}, ${escape(row.placa)}, ${operacionExpr}, ${estadoExpr}, 'Migración', ${escapeDate(row.fecha_control)}) \n`;
       sqlContent += `ON CONFLICT (cedula) DO UPDATE SET \n`;
       sqlContent += `  nombre = EXCLUDED.nombre,\n`;
       sqlContent += `  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),\n`;
       sqlContent += `  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),\n`;
-      sqlContent += `  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);\n\n`;
+      sqlContent += `  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion),\n`;
+      sqlContent += `  estado = COALESCE(EXCLUDED.estado, gh_personal.estado);\n\n`;
     }
 
     // 3. Elementos
