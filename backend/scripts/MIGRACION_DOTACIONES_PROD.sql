@@ -1,9 +1,13 @@
 -- =========================================================
 -- SCRIPT DE MIGRACIÓN DE DATOS HISTÓRICOS DE DOTACIONES (PRODUCCIÓN)
--- Generado automáticamente: 2026-05-19T20:21:13.659Z
+-- Generado automáticamente: 2026-05-19T21:11:56.613Z
 -- =========================================================
 
 BEGIN;
+
+-- --- ADAPTAR ESTRUCTURA DE TABLA PERSONAL ---
+ALTER TABLE gh_personal ADD COLUMN IF NOT EXISTS placa VARCHAR(50);
+ALTER TABLE gh_personal ADD COLUMN IF NOT EXISTS operacion VARCHAR(255);
 
 -- --- CARGOS ---
 INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
@@ -225,7 +229,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MAURICIO RUIZ', '1035871906', 'AUXILIAR', 'WNQ032', 'GASEOSAS INN', 'EST-01', 'Migración', '2026-05-20T05:33:53.567Z') 
+VALUES ('CRISTIAN ALEXIS CEBALLOS VILLADA', '1017163428', 'ANALISTA DE CONTROL Y MONITOREO', NULL, 'TRANSPORTE', 'EST-01', 'Migración', '2026-05-20T05:33:53.507Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -234,7 +238,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CRISTIAN ALEXIS CEBALLOS VILLADA', '1017163428', 'ANALISTA DE CONTROL Y MONITOREO', NULL, 'TRANSPORTE', 'EST-01', 'Migración', '2026-05-20T05:33:53.507Z') 
+VALUES ('MAURICIO RUIZ', '1035871906', 'AUXILIAR', 'WNQ032', 'GASEOSAS INN', 'EST-01', 'Migración', '2026-05-20T05:33:53.567Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -423,7 +427,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RAMON MARIN', '70567895', 'AUXILIAR', 'WDX372', 'VARIAS', 'EST-01', 'Migración', '2026-05-20T05:33:53.398Z') 
+VALUES ('SANTIAGO  GOMEZ', '1041440515', 'CONDUCTOR', 'WOS372', 'AJOVER', 'EST-01', 'Migración', '2026-05-20T05:33:53.630Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -432,7 +436,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SANTIAGO  GOMEZ', '1041440515', 'CONDUCTOR', 'WOS372', 'AJOVER', 'EST-01', 'Migración', '2026-05-20T05:33:53.630Z') 
+VALUES ('RAMON MARIN', '70567895', 'AUXILIAR', 'WDX372', 'VARIAS', 'EST-01', 'Migración', '2026-05-20T05:33:53.398Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -747,7 +751,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIANA PATRICIA CANO VIVAS', '1036603227', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'EST-01', 'Migración', '2026-05-20T05:33:53.576Z') 
+VALUES ('JHON EDISON SANCHEZ GALLEGO', '1040737902', 'AUXILIAR LOGISTICO', NULL, 'AJOVER', 'EST-01', 'Migración', '2026-05-20T05:33:53.616Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -756,7 +760,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON EDISON SANCHEZ GALLEGO', '1040737902', 'AUXILIAR LOGISTICO', NULL, 'AJOVER', 'EST-01', 'Migración', '2026-05-20T05:33:53.616Z') 
+VALUES ('DIANA PATRICIA CANO VIVAS', '1036603227', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'EST-01', 'Migración', '2026-05-20T05:33:53.576Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1035,7 +1039,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN CARLOS CUERVO BURITICA', '1036601715', 'ANALISTA DE INVENTARIO', NULL, 'OPERACION BAJO TECHO', 'EST-01', 'Migración', '2026-05-20T05:33:53.575Z') 
+VALUES ('OSCAR HERNAN VALENCIA  AJOVER CALI', '16973164', 'CONDUCTOR', 'ZID283', 'AJOVER CALI', 'EST-01', 'Migración', '2026-05-20T05:33:53.361Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1044,7 +1048,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OSCAR HERNAN VALENCIA  AJOVER CALI', '16973164', 'CONDUCTOR', 'ZID283', 'AJOVER CALI', 'EST-01', 'Migración', '2026-05-20T05:33:53.361Z') 
+VALUES ('JUAN CARLOS CUERVO BURITICA', '1036601715', 'ANALISTA DE INVENTARIO', NULL, 'OPERACION BAJO TECHO', 'EST-01', 'Migración', '2026-05-20T05:33:53.575Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1539,7 +1543,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUCELLY MARGARITA SOTO GONZALEZ', '43878355', 'AUXILIAR LOGISTICO', 'N/A', 'AJOVER', 'EST-01', 'Migración', '2026-05-20T05:33:53.389Z') 
+VALUES ('DIEGO VELASCO', '1140929333', 'CONDUCTOR', 'WFD722', 'AJOVER CALI', 'EST-01', 'Migración', '2026-05-20T05:33:53.690Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1548,7 +1552,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO VELASCO', '1140929333', 'CONDUCTOR', 'WFD722', 'AJOVER CALI', 'EST-01', 'Migración', '2026-05-20T05:33:53.690Z') 
+VALUES ('LUCELLY MARGARITA SOTO GONZALEZ', '43878355', 'AUXILIAR LOGISTICO', 'N/A', 'AJOVER', 'EST-01', 'Migración', '2026-05-20T05:33:53.389Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2475,7 +2479,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('FABIAN ALONSO VELEZ QUIROZ', '1026148124', 'AUXILIAR', 'SNT443', 'EXITO', 'EST-01', 'Migración', '2026-05-20T05:33:53.541Z') 
+VALUES ('MANUEL VARGAS', '11111111', 'CONDUCTOR', 'SUL046', 'INN', 'EST-01', 'Migración', '2026-05-20T05:33:53.348Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2484,7 +2488,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MANUEL VARGAS', '11111111', 'CONDUCTOR', 'SUL046', 'INN', 'EST-01', 'Migración', '2026-05-20T05:33:53.348Z') 
+VALUES ('FABIAN ALONSO VELEZ QUIROZ', '1026148124', 'AUXILIAR', 'SNT443', 'EXITO', 'EST-01', 'Migración', '2026-05-20T05:33:53.541Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -3061,243 +3065,483 @@ ON CONFLICT (cedula) DO UPDATE SET
 
 -- --- ELEMENTOS ---
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO TURQUESA HOMBRE L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.834Z', false) 
+VALUES ('CAMISETA POLO TURQUESA HOMBRE L', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.834Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS  HOMBRE XXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.823Z', false) 
+VALUES ('CAMISETA POLO GRIS  HOMBRE XXL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.823Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO BLANCA DAMA  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.809Z', false) 
+VALUES ('CAMISETA POLO BLANCA DAMA  M', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.809Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO TURQUESA HOMBRE XXXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.839Z', false) 
+VALUES ('CAMISETA POLO TURQUESA HOMBRE XXXL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.839Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS  HOMBRE  XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.821Z', false) 
+VALUES ('CAMISETA POLO GRIS  HOMBRE  XL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.821Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 37', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.795Z', false) 
+VALUES ('BOTAS KONDOR 37', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.795Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('ANTIFLUIDO', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.866Z', false) 
+VALUES ('ANTIFLUIDO', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.866Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS HOMBRE  38', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.856Z', false) 
+VALUES ('JEANS HOMBRE  38', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.856Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS  FEMENINO 16', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.846Z', false) 
+VALUES ('JEANS  FEMENINO 16', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.846Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA T-SHIRT CONTRATISTAS XXXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.864Z', false) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS XXXL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.864Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO NEGRA HOMBRE  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.825Z', false) 
+VALUES ('CAMISETA POLO NEGRA HOMBRE  L', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.825Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO BLANCA HOMBRE  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.811Z', false) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE  L', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.811Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 44', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.802Z', false) 
+VALUES ('BOTAS KONDOR 44', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.802Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS HOMBRE  42', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.857Z', false) 
+VALUES ('JEANS HOMBRE  42', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.857Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS MASCULINO 40', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.867Z', false) 
+VALUES ('JEANS MASCULINO 40', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.867Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS HOMBRE  44', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.859Z', false) 
+VALUES ('JEANS HOMBRE  44', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.859Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS  FEMENINO 6', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.848Z', false) 
+VALUES ('JEANS  FEMENINO 6', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.848Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS  FEMENINO 14', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.844Z', false) 
+VALUES ('JEANS  FEMENINO 14', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.844Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS HOMBRE  34', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.853Z', false) 
+VALUES ('JEANS HOMBRE  34', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.853Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO TURQUESA HOMBRE M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.835Z', false) 
+VALUES ('CAMISETA POLO TURQUESA HOMBRE M', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.835Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO BLANCA HOMBRE XXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.814Z', false) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE XXL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.814Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA T-SHIRT CONTRATISTAS  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.804Z', false) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS  M', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.804Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS FEMENINO 10', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.842Z', false) 
+VALUES ('JEANS FEMENINO 10', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.842Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO BLANCA HOMBRE  XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.813Z', false) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE  XL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.813Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 42', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.861Z', false) 
+VALUES ('BOTAS KONDOR 42', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.861Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS FEMENINO 12', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.843Z', false) 
+VALUES ('JEANS FEMENINO 12', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.843Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 36', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.791Z', false) 
+VALUES ('BOTAS KONDOR 36', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.791Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS MASCULINO 42', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.868Z', false) 
+VALUES ('JEANS MASCULINO 42', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.868Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO BLANCA HOMBRE S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.865Z', false) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE S', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.865Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO BLANCA DAMA  S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.810Z', false) 
+VALUES ('CAMISETA POLO BLANCA DAMA  S', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.810Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS  FEMENINO 8', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.849Z', false) 
+VALUES ('JEANS  FEMENINO 8', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.849Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA T-SHIRT CONTRATISTAS XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.806Z', false) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS XL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.806Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS HOMBRE  S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.820Z', false) 
+VALUES ('CAMISETA POLO GRIS HOMBRE  S', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.820Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS  HOMBRE  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.819Z', false) 
+VALUES ('CAMISETA POLO GRIS  HOMBRE  M', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.819Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 43', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.863Z', false) 
+VALUES ('BOTAS KONDOR 43', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.863Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO TURQUESA  DAMA L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.828Z', false) 
+VALUES ('CAMISETA POLO TURQUESA  DAMA L', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.828Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS DAMA   S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.817Z', false) 
+VALUES ('CAMISETA POLO GRIS DAMA   S', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.817Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS HOMBRE  32', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.852Z', false) 
+VALUES ('JEANS HOMBRE  32', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.852Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS HOMBRE 30', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.851Z', false) 
+VALUES ('JEANS HOMBRE 30', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.851Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS HOMBRE  28', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.850Z', false) 
+VALUES ('JEANS HOMBRE  28', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.850Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA T-SHIRT CONTRATISTAS  XXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.807Z', false) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS  XXL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.807Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO BLANCA DAMA  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.808Z', false) 
+VALUES ('CAMISETA POLO BLANCA DAMA  L', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.808Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS  HOMBRE XXXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.824Z', false) 
+VALUES ('CAMISETA POLO GRIS  HOMBRE XXXL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.824Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO TURQUESA  DAMA M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.829Z', false) 
+VALUES ('CAMISETA POLO TURQUESA  DAMA M', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.829Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA T-SHIRT CONTRATISTAS  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.803Z', false) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS  L', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.803Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO TURQUESA  DAMA S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.832Z', false) 
+VALUES ('CAMISETA POLO TURQUESA  DAMA S', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.832Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO NEGRA HOMBRE  XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.827Z', false) 
+VALUES ('CAMISETA POLO NEGRA HOMBRE  XL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.827Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO BLANCA HOMBRE  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.812Z', false) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE  M', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.812Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO TURQUESA HOMBRE XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.838Z', false) 
+VALUES ('CAMISETA POLO TURQUESA HOMBRE XL', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.838Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS  FEMENINO 18', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.847Z', false) 
+VALUES ('JEANS  FEMENINO 18', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.847Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS DAMA  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.816Z', false) 
+VALUES ('CAMISETA POLO GRIS DAMA  M', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.816Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS DAMA  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.815Z', false) 
+VALUES ('CAMISETA POLO GRIS DAMA  L', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.815Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 35', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.869Z', false) 
+VALUES ('BOTAS KONDOR 35', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.869Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA POLO GRIS HOMBRE L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.818Z', false) 
+VALUES ('CAMISETA POLO GRIS HOMBRE L', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.818Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 41', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.801Z', false) 
+VALUES ('BOTAS KONDOR 41', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.801Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('JEANS HOMBRE  36', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.854Z', false) 
+VALUES ('JEANS HOMBRE  36', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.854Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 40', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.860Z', false) 
+VALUES ('BOTAS KONDOR 40', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.860Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('CAMISETA T-SHIRT CONTRATISTAS  S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.805Z', false) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS  S', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.805Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 39', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.799Z', false) 
+VALUES ('BOTAS KONDOR 39', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.799Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
-VALUES ('BOTAS KONDOR 38', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.797Z', false) 
+VALUES ('BOTAS KONDOR 38', COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = 'DOTACION' LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE '%DOTACION%' LIMIT 1),
+          3
+        ), 'EST-01', 'Migración', '2026-05-19T15:59:58.797Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
 
 -- --- ENTRADAS A BODEGA ---

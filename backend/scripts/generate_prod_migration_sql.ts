@@ -14,6 +14,10 @@ async function main() {
   sqlContent += `-- =========================================================\n\n`;
 
   sqlContent += `BEGIN;\n\n`;
+  
+  sqlContent += `-- --- ADAPTAR ESTRUCTURA DE TABLA PERSONAL ---\n`;
+  sqlContent += `ALTER TABLE gh_personal ADD COLUMN IF NOT EXISTS placa VARCHAR(50);\n`;
+  sqlContent += `ALTER TABLE gh_personal ADD COLUMN IF NOT EXISTS operacion VARCHAR(255);\n\n`;
 
   try {
     // 1. Cargos
@@ -79,8 +83,21 @@ async function main() {
     `);
     sqlContent += `-- --- ELEMENTOS ---\n`;
     for (const row of elementos.rows) {
+      // Get the type name from gh_tipos_elementos
+      const typeRes = await client.query("SELECT nombre FROM gh_tipos_elementos WHERE id = $1", [row.tipo_id]);
+      const typeName = typeRes.rows[0]?.nombre || '';
+      
+      let tipoIdExpr = String(row.tipo_id || 'NULL');
+      if (typeName) {
+        tipoIdExpr = `COALESCE(
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) = ${escape(typeName.toUpperCase())} LIMIT 1),
+          (SELECT id FROM gh_tipos_elementos WHERE UPPER(nombre) LIKE ${escape('%' + typeName.toUpperCase() + '%')} LIMIT 1),
+          ${row.tipo_id}
+        )`;
+      }
+
       sqlContent += `INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) \n`;
-      sqlContent += `VALUES (${escape(row.nombre)}, ${row.tipo_id}, ${escape(row.estado_id)}, 'Migración', ${escapeDate(row.fecha_control)}, ${row.es_serializado ? 'true' : 'false'}) \n`;
+      sqlContent += `VALUES (${escape(row.nombre)}, ${tipoIdExpr}, ${escape(row.estado_id)}, 'Migración', ${escapeDate(row.fecha_control)}, ${row.es_serializado ? 'true' : 'false'}) \n`;
       sqlContent += `ON CONFLICT (nombre) DO NOTHING;\n\n`;
     }
  

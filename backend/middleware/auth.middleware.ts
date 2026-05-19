@@ -44,6 +44,12 @@ const ID_MAP: Record<string, string> = {
     'PAG-35': 'PAG-35',
     'CONCILIACION': 'PAG-36',
     'PAG-36': 'PAG-36',
+    'PERSONAL_GH': 'PAG-43',
+    'MISCELANEOS_GH': 'PAG-41',
+    'ENTREGAS_SALIDAS_GH': 'PAG-52',
+    'ASIGNACION_DEVOLUCION_GH': 'PAG-53',
+    'CONSULTA_INVENTARIO_GH': 'PAG-54',
+    'MASTER_INVENTARIO_GH': 'PAG-55',
 };
 
 // Módulos que usuarios con permiso RUTAS (PAG-15) pueden leer (solo view)
