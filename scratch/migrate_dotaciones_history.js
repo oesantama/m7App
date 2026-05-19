@@ -76,13 +76,6 @@ async function runMigration() {
       cargosMap.set(c.nombre.trim().toUpperCase(), c.id);
     });
 
-    // Cache clients by name for operacion mapping
-    const pgClientsRes = await pgClient.query('SELECT id, name FROM clients');
-    const clientsMap = new Map(); // UPPER(name) -> id
-    pgClientsRes.rows.forEach(c => {
-      clientsMap.set(c.name.trim().toUpperCase(), c.id);
-    });
-
     // --- STEP 2: MIGRATE/UPDATE PERSONAL ---
     console.log('Fetching personal from SQL Server...');
     const legacyPersonal = runSqlServerQuery("USE Dotaciones; SELECT Nombre, Identificacion, Cargo, Placa, Operacion FROM Inventario_Empleados;");
@@ -97,33 +90,13 @@ async function runMigration() {
 
       if (!identificacion || !nombre || identificacion === 'NULL') continue;
 
-      // 1. Resolve cargo ID
-      let cargoIdStr = null;
+      // 1. Ensure the cargo exists in the master gh_cargos table
       if (cargoNameRaw) {
         let cargoId = cargosMap.get(cargoNameRaw);
         if (!cargoId) {
-          // Double safety: insert if missing
           const res = await pgClient.query("INSERT INTO gh_cargos (nombre, estado, usuario_control) VALUES ($1, 'EST-01', 'Migración') RETURNING id", [cargoNameRaw]);
           cargoId = res.rows[0].id;
           cargosMap.set(cargoNameRaw, cargoId);
-        }
-        cargoIdStr = String(cargoId);
-      }
-
-      // 2. Resolve client/operation ID
-      let operacionIdStr = operacionRaw;
-      if (operacionRaw) {
-        const opUpper = operacionRaw.trim().toUpperCase();
-        // Try exact/partial match in cache
-        let matchedClientId = null;
-        for (const [name, id] of clientsMap.entries()) {
-          if (name === opUpper || name.startsWith(opUpper) || opUpper.startsWith(name)) {
-            matchedClientId = id;
-            break;
-          }
-        }
-        if (matchedClientId) {
-          operacionIdStr = matchedClientId;
         }
       }
 
@@ -140,13 +113,13 @@ async function runMigration() {
               operacion = $4, 
               usuario_control = 'Migración' 
           WHERE id = $5
-        `, [nombre, cargoIdStr, placa, operacionIdStr, originalId]);
+        `, [nombre, cargoNameRaw, placa, operacionRaw, originalId]);
       } else {
         // Insert new personal
         await pgClient.query(`
           INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control)
           VALUES ($1, $2, $3, $4, $5, 'EST-01', 'Migración')
-        `, [nombre, identificacion, cargoIdStr, placa, operacionIdStr]);
+        `, [nombre, identificacion, cargoNameRaw, placa, operacionRaw]);
         console.log(`Inserted new personal: ${nombre} (${identificacion})`);
       }
     }
@@ -195,7 +168,7 @@ async function runMigration() {
       }
     });
 
-    // --- STEP 4: MIGRATE ENTRADAS A BODEGA (New Step!) ---
+    // --- STEP 4: MIGRATE ENTRADAS A BODEGA ---
     console.log('Fetching legacy warehouse inputs (entradas) headers...');
     const legacyEntradasE = runSqlServerQuery("USE Dotaciones; SELECT Entrada, Bodega, Usuario, Fecha FROM Inventario_EntradasE;");
     console.log(`Found ${legacyEntradasE.length} warehouse input headers in SQL Server.`);
@@ -429,7 +402,7 @@ async function runMigration() {
       }
     }
 
-    // --- STEP 7: REBUILD BODEGA & PERSONAL INVENTORIES (BALANCED & CONSISTENT) ---
+    // --- STEP 7: REBUILD BODEGA & PERSONAL INVENTORIES ---
     console.log('Clearing old gh_inventario_elemento records...');
     await pgClient.query('TRUNCATE TABLE gh_inventario_elemento CASCADE');
 

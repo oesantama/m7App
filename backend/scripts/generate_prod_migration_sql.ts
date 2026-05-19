@@ -42,13 +42,8 @@ async function main() {
     `);
     sqlContent += `-- --- PERSONAL ---\n`;
     for (const row of personal.rows) {
-      const cargoExpr = row.cargo
-        ? `COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = ${escape(row.cargo.toUpperCase())}), ${escape(row.cargo)})`
-        : 'NULL';
-        
-      const operacionExpr = row.operacion
-        ? `COALESCE((SELECT id FROM clients WHERE UPPER(name) = ${escape(row.operacion.toUpperCase())} OR UPPER(name) LIKE ${escape(row.operacion.toUpperCase() + '%')} LIMIT 1), ${escape(row.operacion)})`
-        : 'NULL';
+      const cargoExpr = escape(row.cargo);
+      const operacionExpr = escape(row.operacion);
         
       const estadoExpr = row.estado?.toUpperCase() === 'ACTIVO' || row.estado === 'EST-01' ? "'EST-01'" : "'EST-02'";
 
