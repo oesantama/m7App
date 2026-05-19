@@ -15,3 +15,24 @@ export const getFormatosTransportes = async (req: Request, res: Response) => {
         res.status(500).json({ success: false, error: 'Error del servidor' });
     }
 };
+
+export const updateFormatoTransporte = async (req: Request, res: Response) => {
+    const { oldId } = req.params;
+    const { newId, nombre, orden } = req.body;
+    try {
+        const query = `
+            UPDATE opt_formatos
+            SET id = $1, nombre = $2, orden = $3
+            WHERE id = $4
+            RETURNING *
+        `;
+        const result = await pool.query(query, [newId, nombre, Number(orden), oldId]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ success: false, error: 'Formato no encontrado' });
+        }
+        res.json({ success: true, data: result.rows[0] });
+    } catch (error: any) {
+        console.error('Error updating transport format:', error);
+        res.status(500).json({ success: false, error: 'Error del servidor' });
+    }
+};

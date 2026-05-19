@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api.js';
-import { FileText, Download, ExternalLink, RefreshCw, FolderOpen } from 'lucide-react';
+import { FileText, Download, ExternalLink, RefreshCw, FolderOpen, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Formato {
@@ -12,6 +12,13 @@ interface Formato {
 const FormatosTransportes: React.FC = () => {
   const [formatos, setFormatos] = useState<Formato[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // States for Edit Modal
+  const [editingFormato, setEditingFormato] = useState<Formato | null>(null);
+  const [editId, setEditId] = useState('');
+  const [editNombre, setEditNombre] = useState('');
+  const [editOrden, setEditOrden] = useState(1);
 
   const loadFormatos = async () => {
     setIsLoading(true);
@@ -26,6 +33,39 @@ const FormatosTransportes: React.FC = () => {
       toast.error('Error de conexión al cargar formatos.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const startEditing = (doc: Formato) => {
+    setEditingFormato(doc);
+    setEditId(doc.id);
+    setEditNombre(doc.nombre);
+    setEditOrden(doc.orden);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editId.trim() || !editNombre.trim()) {
+      toast.error('Todos los campos son obligatorios.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const res = await api.updateFormatoTransporte(editingFormato!.id, {
+        newId: editId.trim(),
+        nombre: editNombre.trim(),
+        orden: Number(editOrden)
+      });
+      if (res.success) {
+        toast.success('Formato actualizado correctamente.');
+        setEditingFormato(null);
+        loadFormatos();
+      } else {
+        toast.error(res.error || 'Error al actualizar el formato.');
+      }
+    } catch (err) {
+      toast.error('Error de conexión al guardar.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -97,8 +137,17 @@ const FormatosTransportes: React.FC = () => {
                 <div className="p-6 md:p-8 space-y-6">
                   {/* Icon & Badge */}
                   <div className="flex justify-between items-start">
-                    <div className="w-12 h-12 bg-indigo-50 group-hover:bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 transition-colors">
-                      <FileText size={24} />
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-indigo-50 group-hover:bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 transition-colors">
+                        <FileText size={24} />
+                      </div>
+                      <button
+                        onClick={() => startEditing(doc)}
+                        className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition-all"
+                        title="Configurar ID de Drive"
+                      >
+                        <Settings size={16} />
+                      </button>
                     </div>
                     <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-wider">
                       Orden {doc.orden}
@@ -139,6 +188,79 @@ const FormatosTransportes: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingFormato && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-slate-950 p-8 text-white relative">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 rounded-full blur-[50px] pointer-events-none" />
+              <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
+                <Settings className="text-indigo-400" />
+                Configurar Formato
+              </h3>
+              <p className="text-slate-400 text-xs font-bold mt-1">
+                Actualiza el ID de Google Drive y el nombre oficial de la plantilla.
+              </p>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Nombre del Formato</label>
+                <input
+                  type="text"
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-sm"
+                  placeholder="Ej: F-OPT-007 Inspección Preoperacional"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">ID de Google Drive</label>
+                <input
+                  type="text"
+                  value={editId}
+                  onChange={(e) => setEditId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-slate-800 text-xs"
+                  placeholder="ID de archivo en Google Drive (ej: 1aF-K05Jp...)"
+                />
+                <span className="text-[9px] text-slate-400 block leading-normal">
+                  Puedes extraer el ID desde el enlace de compartir de Google Drive (el bloque de caracteres después de <strong>/d/</strong> y antes de <strong>/view</strong>).
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Orden de Visualización</label>
+                <input
+                  type="number"
+                  value={editOrden}
+                  onChange={(e) => setEditOrden(Number(e.target.value))}
+                  className="w-32 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-sm"
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="p-8 pt-0 flex gap-3">
+              <button
+                onClick={() => setEditingFormato(null)}
+                disabled={isSaving}
+                className="flex-1 py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs uppercase tracking-wider transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={isSaving}
+                className="flex-1 py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+              >
+                {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

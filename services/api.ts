@@ -1457,4 +1457,9 @@ export const api = {
     }
   },
   getFormatosTransportes: () => fetchJson(`${API_URL}/admin-center/formatos`),
+  updateFormatoTransporte: (oldId: string, data: { newId: string, nombre: string, orden: number }) => fetchJson(`${API_URL}/admin-center/formatos/${encodeURIComponent(oldId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
 };
