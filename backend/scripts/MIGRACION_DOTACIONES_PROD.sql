@@ -1,6 +1,6 @@
 -- =========================================================
 -- SCRIPT DE MIGRACIÓN DE DATOS HISTÓRICOS DE DOTACIONES (PRODUCCIÓN)
--- Generado automáticamente: 2026-05-19T19:54:55.272Z
+-- Generado automáticamente: 2026-05-19T20:10:15.819Z
 -- =========================================================
 
 BEGIN;
@@ -180,7 +180,7 @@ ON CONFLICT (nombre) DO NOTHING;
 
 -- --- PERSONAL ---
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHORMAN ARLEY MALDONADO', '8434351', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WCO995', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ESNECTOR' OR UPPER(name) LIKE 'ESNECTOR%' LIMIT 1), 'ESNECTOR'), 'EST-01', 'Migración', '2026-05-20T05:33:53.347Z') 
+VALUES ('MARIA JULIANA QUINTANA ARANGO', '1023622980', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.530Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -189,7 +189,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS ARENAS CRUZ', '1028018100', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TRL629', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.551Z') 
+VALUES ('BERNARDO JOSE CONTRERAS', '1017180467', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'WCQ379', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.508Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -198,7 +198,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDWIN DAVID LEONEL GIRALDO', '1007530363', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'NNN610', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.497Z') 
+VALUES ('STIVEN LOPEZ', '1035871625', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYO074', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.565Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -207,7 +207,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('FREDDY OSPINA', '15337874', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'LKK942', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.353Z') 
+VALUES ('ANDRES MARIN', '1040751758', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'GDX508', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.626Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -216,7 +216,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('KEVIN VARELAS', '1002084834', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'ESP387', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.483Z') 
+VALUES ('SERGIO ANDRES RESTREPO GUTIERREZ', '1000746961', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.464Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -225,7 +225,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('Juan Pablo Uribe Franco', '1026152381', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.544Z') 
+VALUES ('VALENTINA ARBELAEZ ALVAREZ', '1001017519', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '16'), '16'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.471Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -234,7 +234,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MATHEW MUÑOZ DIEZ', '1035471851', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'JYN215', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.561Z') 
+VALUES ('KAROL XILENA URIBE VELEZ', '1040752488', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.627Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -243,7 +243,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN MANUEL MARTINEZ NISPERUZA', '1003059076', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.484Z') 
+VALUES ('SARA MEJIA', '1114001329', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TKD167', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.670Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -252,7 +252,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSEU DE JESUS HERNANDEZ MORENO', '71493872', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'LJS983', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.414Z') 
+VALUES ('ANDREI JIMENEZ ARANA', '1037545432', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WOS443', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.589Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -261,7 +261,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DEYNER MARTINEZ', '1045497657', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'TDZ425', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.637Z') 
+VALUES ('JORGE HUMBERTO PASTRANA ESTRADA', '71642450', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '30'), '30'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.417Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -270,7 +270,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES FELIPE CETRE MOSQUERA', '71292518', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.406Z') 
+VALUES ('JUAN MANUEL GOMEZ RAMIREZ', '1017922169', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.515Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -279,7 +279,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ENRIQUE DE JESUS SERNA GIL', '4551916', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.328Z') 
+VALUES ('DANIEL FERNANDO RAMIREZ', '8433512', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'LKN291', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.346Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -288,7 +288,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL ATEHORTUA VASCO', '1001248991', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.474Z') 
+VALUES ('ESTEBAN BOLIVAR', '1036637209', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'JYY259', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.579Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -297,7 +297,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SERGIO ANDRES RESTREPO GUTIERREZ', '1000746961', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.464Z') 
+VALUES ('JHON JAIRO SALAZAR', '71634613', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TMZ798', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.415Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -306,7 +306,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YEISON STIVEN ZAPATA', '1128476187', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TRN884', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.682Z') 
+VALUES ('EDIER DAVID BABILONIA', '1039088479', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'ESP387', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.604Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -315,7 +315,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE CRISTOBAL CASAS', '70192995', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'YAR044', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.396Z') 
+VALUES ('SANDRA MILENA VELEZ CANO', '43400943', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), 'n/a', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'linea directa'), 'EST-01', 'Migración', '2026-05-20T05:33:53.378Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -324,7 +324,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YEFERSON VERNAZA ANGULO', '1028184728', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.554Z') 
+VALUES ('ESAU VERA PARRA', '1128387195', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '33'), '33'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.680Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -333,7 +333,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DAYANA ALEXANDRA CALVO ARANGO', '1017137772', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.504Z') 
+VALUES ('CARLOS ESCOBAR', '1035855577', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WNQ032', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.562Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -342,7 +342,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LAURA VALENTINA SUAREZ MENDEZ', '1006128721', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.491Z') 
+VALUES ('DIEGO LUIS ZAPATA PULGARIN', '71697454', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'GTY793', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'DICORD' OR UPPER(name) LIKE 'DICORD%' LIMIT 1), 'DICORD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.418Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -351,7 +351,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LISANDRO JAVIER CASTIBLNACO GOMEZ', '71381534', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'NNM822', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.409Z') 
+VALUES ('ADELAIDA DE LA CRUZ ORTIZ BEDOYA', '43840726', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.387Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -360,7 +360,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES FELIPE ZAPATA JARAMILLO', '1037776836', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.599Z') 
+VALUES ('SIMON CARDONA ORTEGA', '1034991472', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.557Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -369,7 +369,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('FRANCIS GOMEZ', '1048067793', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'SVD999', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.638Z') 
+VALUES ('DANIELA LEDESMA RAMIREZ', '1035972220', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), 'n/a', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'linea directa'), 'EST-01', 'Migración', '2026-05-20T05:33:53.573Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -378,7 +378,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LILIANA MARCELA AGUDELO POSADA', '1039462228', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.608Z') 
+VALUES ('DANIEL TABARES USUGA', '71765975', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WPM227', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.424Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -387,7 +387,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MATHEW MUÑOZ DIEZ', '1035971851', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'JYN215', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.571Z') 
+VALUES ('ANDRES FELIPE RESTREPO CAICEDO', '1007643194', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.498Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -396,7 +396,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('VICTOR HUGO FERNANDEZ CORREA', '1035423881', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.559Z') 
+VALUES ('IMANOL ORDOÑEZ LABRADA', '1110040808', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.663Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -405,7 +405,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE NORBEY LOPEZ', '1007413522', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TDZ425', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.496Z') 
+VALUES ('VICTOR HUGO FERNANDEZ CORREA', '1035423881', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.559Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -414,7 +414,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUDITH SAMIRA ARIZA GONZALEZ', '52183491', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.391Z') 
+VALUES ('LILIANA MARCELA AGUDELO POSADA', '1039462228', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.608Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -423,7 +423,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('HOSMAN DAVID LOPEZ RUIZ', '1000922482', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.470Z') 
+VALUES ('JHON FREDY QUINTERO', '71748870', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SVO562', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.422Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -432,7 +432,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LEONARDO FORONDA CORREA', '1017248672', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'SUPERVISOR OPBT'), 'SUPERVISOR OPBT'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.514Z') 
+VALUES ('EDUAR FERNANDEZ', '14609998', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'ZNN749', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.351Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -441,7 +441,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO ALEXANDER AGUIRRE', '98696759', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WCX326', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.454Z') 
+VALUES ('MATHEW MUÑOZ DIEZ', '1035471851', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'JYN215', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.561Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -450,7 +450,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS MARIO MENDEZ ORTIZ', '1067907703', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.643Z') 
+VALUES ('MARCIAL DE JESUS CASTILLO ZULUAGA', '1088252459', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.656Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -459,7 +459,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('STIVEN LOPEZ', '1035871625', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYO074', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.565Z') 
+VALUES ('DIEGO ALEXANDER AGUIRRE', '98696759', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WCX326', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.454Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -468,7 +468,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES FELIPE SORA MANJARREZ', '1056783325', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXULIAR'), 'AUXULIAR'), 'EQS426', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.640Z') 
+VALUES ('EDWIN ARLEY BETANCUR MONTOYA', '1040745482', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '14'), '14'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.622Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -477,7 +477,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON SEBASTIAN BETANCUR MARULANDA', '1109115259', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'MONTA CARGUISTA'), 'MONTA CARGUISTA'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.662Z') 
+VALUES ('GUSTAVO ADOLFO OSORIO RAMIREZ', '1040755956', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.628Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -486,7 +486,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('BRAYAN DAVID CASTILLOMEJIA', '1073988710', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ALMACENAMIENTO' OR UPPER(name) LIKE 'ALMACENAMIENTO%' LIMIT 1), 'ALMACENAMIENTO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.647Z') 
+VALUES ('ARIEL INESTROZA', '16796131', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'ZNL629', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.359Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -495,7 +495,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS ALBERTO UPEGUI BOLAOS', '94061179', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.433Z') 
+VALUES ('JOSE MIGUL HOYOS FRABRA', '1003465260', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.486Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -504,7 +504,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('PEDRO EMILIO RINCON', '4053344', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SOE380', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PAPYSER' OR UPPER(name) LIKE 'PAPYSER%' LIMIT 1), 'PAPYSER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.326Z') 
+VALUES ('YENNIFER VELASQUEZ MUÑOZ', '1036604969', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.577Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -513,7 +513,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SERGIO MARTINEZ', '1113702254', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'SOP174', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PLAN R MILLA SIETE' OR UPPER(name) LIKE 'PLAN R MILLA SIETE%' LIMIT 1), 'PLAN R MILLA SIETE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.669Z') 
+VALUES ('LUIS CONTRERAS', '1017227949', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TKD564', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.513Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -522,7 +522,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALFREDO BUSTAMANTE MEJIA', '98572492', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'DIRECTOR T.I'), 'DIRECTOR T.I'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRACION' OR UPPER(name) LIKE 'ADMINISTRACION%' LIMIT 1), 'ADMINISTRACION'), 'EST-01', 'Migración', '2026-05-20T05:33:53.443Z') 
+VALUES ('JUAN DAVID ROMAN', '1000755246', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'NNN610', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.465Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -531,7 +531,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OSCAR EDUARDO OSPINA RAVE', '98586340', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'KER044', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.446Z') 
+VALUES ('DUVAN ANDRES QUINTERO PERTUZ', '1082874105', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.651Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -540,7 +540,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDUAR FERNANDEZ', '14609998', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'ZNN749', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.351Z') 
+VALUES ('JAMES SALGADO', '94252356', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'VEJ509', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.435Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -549,7 +549,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JORGE HUMBERTO PASTRANA ESTRADA', '71642450', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'GERENTE'), 'GERENTE'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.417Z') 
+VALUES ('JUAN DAVID GRISALES', '1025761930', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'NNN494', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.536Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -558,7 +558,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YELISON TEJADA', '1026149223', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WOS372', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.542Z') 
+VALUES ('ALEXANDER TEJADA MARIN', '71393476', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYX363', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.410Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -567,7 +567,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MARCIAL DE JESUS CASTILLO ZULUAGA', '1088252459', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.656Z') 
+VALUES ('JOSE DANIEL URREGO ZAPATA', '1035921665', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'TOQ606', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.570Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -576,7 +576,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('KEYNER MARQUEZ TAMAYO', '1037524189', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'JYX363', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.588Z') 
+VALUES ('JOEL TIVORCIO GAVIRIA', '15048987', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TOQ606', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.352Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -585,7 +585,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MILAGROS PEREZ', '71795023', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SNM323', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOASA INN' OR UPPER(name) LIKE 'GASEOASA INN%' LIMIT 1), 'GASEOASA INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.427Z') 
+VALUES ('LEIDY YHULIANA ROMAN CANO', '1017162359', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.505Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -594,7 +594,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RIGOBERTO SALAZAR', '1214718600', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'JYX456', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.706Z') 
+VALUES ('ALEXANDRA MARIA MUÑOZ CASTRILLON', '43845511', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.388Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -603,7 +603,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SANTIAGO CARDONA SALAZAR', '1088346231', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.657Z') 
+VALUES ('ONEI FLOREZ', '71940777', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYN215', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.428Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -612,7 +612,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN FERNANDO GARCIA MONTOYA', '1025880327', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.537Z') 
+VALUES ('CAMILO ANDRES PEREZ', '1040494197', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'WMQ019', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.614Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -621,7 +621,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL SUAREZ', '1039023796', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'ESQ398', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.604Z') 
+VALUES ('HOSMAN GARCIA ROCHA', '98763347', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WDI031', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.456Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -630,7 +630,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN MAURICIO SERNA GARCIA', '1023526126', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'PXK108', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.528Z') 
+VALUES ('YOJHAN MUJICA', '5051540', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'WFJ876', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.331Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -639,7 +639,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHONATHAN VALENCIA', '1036660698', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TDZ565', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.583Z') 
+VALUES ('LUIS FERNANDO GONZALEZ VELEZ', '98715267', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYX456', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.455Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -648,7 +648,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DUVAN CORTEZ', '1152216210', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'TLK297', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.698Z') 
+VALUES ('BRAYAN GRAJALES', '1000100560', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'NUV493', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.460Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -657,7 +657,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SEBASTIAN VELEZ', '1017217508', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYX540', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.512Z') 
+VALUES ('ANGEL DE LA CRUZ', '1336303', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'EQS426', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.323Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -666,7 +666,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS ESCOBAR', '1035855577', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WNQ032', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.562Z') 
+VALUES ('ANGELA MARIA  MEDINA HERRERA', '43253011', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OBT' OR UPPER(name) LIKE 'OBT%' LIMIT 1), 'OBT'), 'EST-01', 'Migración', '2026-05-20T05:33:53.375Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -675,7 +675,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUCELLY MARGARITA SOTO GONZALEZ', '43878355', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.389Z') 
+VALUES ('JOSE FERNANDO VERA', '1144204609', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '22'), '22'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.694Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -684,7 +684,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIELA CAROLINA MONTOYA HIDALGO', '1214740345', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.709Z') 
+VALUES ('JHON SEBASTIAN BETANCUR MARULANDA', '1109115259', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '35'), '35'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.662Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -693,7 +693,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS ALBERTO PINEDA OSSO', '1040374984', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'LKK194', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.613Z') 
+VALUES ('JUAN DANIEL USUGA', '1192732262', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WMQ019', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.703Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -702,7 +702,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ARLEX HUMBERTO CALLEJAS SALDARRIAGA', '71767352', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ANALISTA SST'), 'ANALISTA SST'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.425Z') 
+VALUES ('JOSE NORBEY LOPEZ', '1007413522', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TDZ425', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.496Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -711,7 +711,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YOVANY ACEVEDO LUJAN', '71725965', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'MENSAJERO'), 'MENSAJERO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.419Z') 
+VALUES ('DIEGO MUÑOZ MORELO', '71985543', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'ECQ159', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.430Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -720,7 +720,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE VANEGAS', '72204766', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SVD999', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.431Z') 
+VALUES ('EDWIN MARQUEZ PANTOJA', '1130661841', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.685Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -729,7 +729,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MILENA ANDREA BETANCUR TORRES', '43792820', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'SERVICIO AL CLIENTE'), 'SERVICIO AL CLIENTE'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.383Z') 
+VALUES ('MILAGROS PEREZ', '71795023', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SNM323', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOASA INN' OR UPPER(name) LIKE 'GASEOASA INN%' LIMIT 1), 'GASEOASA INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.427Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -738,7 +738,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JADER MOISES REYES MERCADO', '1063283514', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.642Z') 
+VALUES ('ALFREDO BUSTAMANTE MEJIA', '98572492', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '27'), '27'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRACION' OR UPPER(name) LIKE 'ADMINISTRACION%' LIMIT 1), 'ADMINISTRACION'), 'EST-01', 'Migración', '2026-05-20T05:33:53.443Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -747,7 +747,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JORGE ROLDAN', '98550136', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TRG354', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PAPYSER' OR UPPER(name) LIKE 'PAPYSER%' LIMIT 1), 'PAPYSER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.441Z') 
+VALUES ('CARL MARLON BRAND MARULANDA', '1118303067', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.676Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -756,7 +756,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN ESTEBAN MONCADA', '1000206476', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SVO488', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.461Z') 
+VALUES ('OSCAR DAVID PIEDRAHITA', '1037625490', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SZW000', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.596Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -765,7 +765,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIANA MARCELA CARDONA CARVAJAL', '1027882700', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.548Z') 
+VALUES ('JUAN CAMILO VARGAS', '71240858', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'STR429', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.402Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -774,7 +774,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MATEO RODRIGUEZ BERMUDEZ', '1023630801', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.531Z') 
+VALUES ('OSCAR EDUARDO OSPINA LOPEZ', '1088000833', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '33'), '33'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.655Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -783,7 +783,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('FABIAN ALONSO VELEZ QUIROZ', '1026148124', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'SNT443', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.541Z') 
+VALUES ('YECID MENDOZA ESTRADA', '1040751199', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.624Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -792,7 +792,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS MORALES', '94376749', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'KUL668', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.436Z') 
+VALUES ('MARIA EUGENIA CANO VIVAS', '43162718', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.373Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -801,7 +801,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CAMILO ANDRES TIRADO RENDON', '1001145577', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.473Z') 
+VALUES ('FRANCIS GOMEZ', '1048067793', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'SVD999', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.638Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -810,7 +810,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DAVID RUIZ', '1238938665', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'LKO525', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.710Z') 
+VALUES ('SANDRA ELENA ARROYAVE MONCADA', '32151233', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.370Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -819,7 +819,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('XIMENA DOMINGUEZ RAMOS', '29125299', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.367Z') 
+VALUES ('HERNAN DARIO JARAMILLO JARAMILLO', '1045424390', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.636Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -828,7 +828,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE JOAQUIN VILLA HERRERA', '71240188', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TLK137', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.401Z') 
+VALUES ('JOHAN SINITAVE', '1045416826', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'SZW000', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.634Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -837,7 +837,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MARIA ELENA VILA COLORADO', '43400981', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.379Z') 
+VALUES ('FRANCISCO ERASMO ORTIZ GIRALDO', '71293531', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.408Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -846,7 +846,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('HECTOR MUÑOZ', '98631515', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'EQS817', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.450Z') 
+VALUES ('OSCAR HERNAN VALENCIA  AJOVER CALI', '16973164', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'ZID283', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.361Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -855,7 +855,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('HERNADO CORTEZ', '70553645', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TLK297', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.397Z') 
+VALUES ('SEBASTIAN MORALES PEREZ', '1026162201', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'TLK137', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.547Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -864,7 +864,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JULIAN FERLEY VERGARA ASPRILLA', '1028161169', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.552Z') 
+VALUES ('KEVIN VARELAS', '1002084834', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'ESP387', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.483Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -873,7 +873,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOEL OREJUELA', '1104824687', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'KUN825', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.658Z') 
+VALUES ('DIEGO VELASCO', '1140929333', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WFD722', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.690Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -882,7 +882,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDIER DAVID BABILONIA', '1039088479', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'ESP387', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.604Z') 
+VALUES ('JUAN DAVID VALENCIA MONDRAGON', '1116376622', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.671Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -891,7 +891,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('GILDARDO BUITRAGO', '17315809', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SOP174', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PLAN R' OR UPPER(name) LIKE 'PLAN R%' LIMIT 1), 'PLAN R'), 'EST-01', 'Migración', '2026-05-20T05:33:53.362Z') 
+VALUES ('ENRIQUE DE JESUS SERNA GIL', '4551916', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.328Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -900,7 +900,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN PABLO MORENO FAJARDO', '1118293032', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.674Z') 
+VALUES ('REYNALDO QUERALES', '7119440', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'LPK798', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.343Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -909,7 +909,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIDIER ANDREY PINEDA CARDONA', '1037668748', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'STI894', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.597Z') 
+VALUES ('MIGUEL ANGEL CARDONA MOLINA', '98595039', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'LKN540', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.447Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -918,7 +918,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JAMES SALGADO', '94252356', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'VEJ509', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.435Z') 
+VALUES ('RUBEN ARIAS', '70003223', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '12'), '12'), 'TLK087', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.393Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -927,7 +927,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YEISON ALEJANDRO RUIZ MURILLO', '1035918305', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGÍSTICO'), 'ASESOR LOGÍSTICO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'SOCODA' OR UPPER(name) LIKE 'SOCODA%' LIMIT 1), 'SOCODA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.568Z') 
+VALUES ('JHON EDISON SANCHEZ GALLEGO', '1040737902', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.616Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -936,7 +936,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JORGE ANDRES TORO CAMPILLO', '71290694', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'MONTACARGUISTA'), 'MONTACARGUISTA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.405Z') 
+VALUES ('KEYNER MARQUEZ TAMAYO', '1037524189', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'JYX363', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.588Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -945,7 +945,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('BERNARDO JOSE CONTRERAS', '1017180467', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'WCQ379', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.508Z') 
+VALUES ('MANUEL VARGAS', '11111111', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SUL046', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.348Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -954,7 +954,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS MANUEL FLOREZ MUÑOZ', '1079912281', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'CTI894', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.649Z') 
+VALUES ('SANTIAGO  GOMEZ', '1041440515', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WOS372', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.630Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -963,7 +963,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('GILBERTO GUZMAN', '16772472', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.358Z') 
+VALUES ('ANDRES FELIPE ORDOÑEZ PULIDO', '1007161142', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SNU320', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.493Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -972,7 +972,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALEXANDER TEJADA MARIN', '71393476', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYX363', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.410Z') 
+VALUES ('JUAN ANDRES SALAZAR', '1108334950', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.661Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -981,7 +981,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CAMILO ANDRES PEREZ', '1040494197', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'WMQ019', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.614Z') 
+VALUES ('JHONATHAN BOLIVAR', '1036628051', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYY259', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.578Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -990,7 +990,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOHAN CASTILLO', '1023868483', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'NNN500', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.532Z') 
+VALUES ('DANIEL ESTEBAN BEDOYA', '1040743591', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.617Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -999,7 +999,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES FELIPE RESTREPO CAICEDO', '1007643194', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.498Z') 
+VALUES ('LEONARDO FORONDA CORREA', '1017248672', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '42'), '42'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.514Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1008,7 +1008,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SARA CORDERO ARANGO', '1038263151', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR GESTIÓN DOCUMENTAL'), 'AUXILIAR GESTIÓN DOCUMENTAL'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.602Z') 
+VALUES ('JUAN MAURICIO SERNA GARCIA', '1023526126', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'PXK108', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.528Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1017,7 +1017,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDGAR RONALDO RODRIGUEZ', '1005362857', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'JYO074', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.487Z') 
+VALUES ('CARLOS MARIN', '71731792', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'GDX508', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.420Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1026,7 +1026,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHORMAN ANDREY ALVAREZ MORALES', '1021924568', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.523Z') 
+VALUES ('DAVID MONSALVE OCHOA', '1001456161', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '9'), '9'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'DICORD' OR UPPER(name) LIKE 'DICORD%' LIMIT 1), 'DICORD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.479Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1035,7 +1035,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN ANDRES SALAZAR', '1108334950', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.661Z') 
+VALUES ('JHON ALEXANDERS GRANADOS BENITEZ', '1007386760', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'EQP170', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.495Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1044,7 +1044,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN CARLOS CUERVO BURITICA', '1036601715', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ANALISTA DE INVENTARIO'), 'ANALISTA DE INVENTARIO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.575Z') 
+VALUES ('DIEGO ALEJANDRO RUEDA  AGUDELO', '1001634186', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TDZ565', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.482Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1053,7 +1053,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JEAN PAUL CORREA GOEZ', '1035974914', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'WCO995', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'SNECTOR' OR UPPER(name) LIKE 'SNECTOR%' LIMIT 1), 'SNECTOR'), 'EST-01', 'Migración', '2026-05-20T05:33:53.574Z') 
+VALUES ('CAROLINA MALDONADO RESTREPO', '1001575864', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.481Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1062,7 +1062,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SANTIAGO VELEZ SEGURO', '1036682418', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE OPERACIONES'), 'AUXILIAR DE OPERACIONES'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.586Z') 
+VALUES ('VERONICA NATALY GUISAO ECHEVERRI', '1039452734', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.607Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1071,7 +1071,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOEL TIVORCIO GAVIRIA', '15048987', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TOQ606', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.352Z') 
+VALUES ('XIMENA DOMINGUEZ RAMOS', '29125299', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.367Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1080,7 +1080,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YESICA NATALIA JANER ACEVEDO', '1017200099', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ANALISTA DE INVENTARIO'), 'ANALISTA DE INVENTARIO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.511Z') 
+VALUES ('Juan Pablo Uribe Franco', '1026152381', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.544Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1089,7 +1089,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LEIDY JOHANA ALZATE CARDONA', '1037946394', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'NNM572', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.600Z') 
+VALUES ('RUBEN DARIO GARCIA HENAO', '16051419', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WLZ300', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.357Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1098,7 +1098,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANNY LENIS LAGUNA', '1005705743', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'BODEGA'), 'BODEGA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI   PLAN R' OR UPPER(name) LIKE 'AJOVER CALI   PLAN R%' LIMIT 1), 'AJOVER CALI   PLAN R'), 'EST-01', 'Migración', '2026-05-20T05:33:53.488Z') 
+VALUES ('CARLOS GUSTAVO ESCOBAR', '94399513', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TKH408', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.437Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1107,7 +1107,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO ALEJANDRO RUEDA  AGUDELO', '1001634186', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TDZ565', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.482Z') 
+VALUES ('OSCAR EDUARDO OSPINA RAVE', '98586340', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'KER044', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.446Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1116,7 +1116,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANGEL DE LA CRUZ', '1336303', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'EQS426', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.323Z') 
+VALUES ('YEFERSON VERNAZA ANGULO', '1028184728', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.554Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1125,7 +1125,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YEIFER SANCHEZ LOZANO', '1062430747', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.641Z') 
+VALUES ('ANDRES FELIPE OSSA GARCIA', '1214729139', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '12'), '12'), 'JYX456', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.707Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1134,7 +1134,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('BRAYAN ALEXIS DIAZ ARENAS', '1039466574', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR CONDUCTOR'), 'AUXILIAR CONDUCTOR'), 'TLK137', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.609Z') 
+VALUES ('RAMON ANTONIO MORENO MORENO', '98579515', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'LJS983', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.444Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1143,7 +1143,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN DANIEL USUGA', '1192732262', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WMQ019', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.703Z') 
+VALUES ('HERNADO CORTEZ', '70553645', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TLK297', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.397Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1152,7 +1152,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('HOSMAN GARCIA ROCHA', '98763347', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WDI031', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.456Z') 
+VALUES ('FREDDY OSPINA', '15337874', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'LKK942', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.353Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1161,7 +1161,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MAURICIO RUIZ', '1035871906', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'WNQ032', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.567Z') 
+VALUES ('OSCAR ANIBAL BERMUDEZ MENDOZA', '1143980115', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.691Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1170,7 +1170,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RICARIO HERNANDEZ', '8295011', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'STI894', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.345Z') 
+VALUES ('CRISTIAN ALEXIS CEBALLOS VILLADA', '1017163428', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '4'), '4'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.507Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1179,7 +1179,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JORGE LEON GALEANO SERNA', '98528497', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'SUPERVISOR DE TRANSPORTE'), 'SUPERVISOR DE TRANSPORTE'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.440Z') 
+VALUES ('JUAN FERNANDO GARCIA MONTOYA', '1025880327', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.537Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1188,7 +1188,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ELIZABETH ZUÑIGA PEREZ', '1118303397', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.677Z') 
+VALUES ('DIANA MARCELA CARDONA CARVAJAL', '1027882700', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.548Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1197,7 +1197,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SANTIAGO POSSO', '1001030721', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYN021', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.472Z') 
+VALUES ('JHORMAN ARLEY MALDONADO', '8434351', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WCO995', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ESNECTOR' OR UPPER(name) LIKE 'ESNECTOR%' LIMIT 1), 'ESNECTOR'), 'EST-01', 'Migración', '2026-05-20T05:33:53.347Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1206,7 +1206,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDGAR MARIN', '88271287', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.432Z') 
+VALUES ('SEBASTIAN GALEANO', '1018233082', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'SVO562', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.516Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1215,7 +1215,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALEXANDER GARCIA CANO', '1020396692', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'WLZ300', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.519Z') 
+VALUES ('LEIDY JOHANA ALZATE CARDONA', '1037946394', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'NNM572', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.600Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1224,7 +1224,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MELBA PIEDRAHITA FERNANDEZ', '31483718', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'SERVICIOS GENERALES'), 'SERVICIOS GENERALES'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.368Z') 
+VALUES ('IGUEL ANGEL OTALVARO', '1039681775', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'SMR448', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.611Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1233,7 +1233,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OSCAR EDUARDO OSPINA LOPEZ', '1088000833', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'INHOUSE'), 'INHOUSE'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.655Z') 
+VALUES ('HOSMAN DAVID LOPEZ RUIZ', '1000922482', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.470Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1242,7 +1242,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIANA PATRICIA CANO VIVAS', '1036603227', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.576Z') 
+VALUES ('Elkin Dario Uribe Villa', '1033342303', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'GDX859', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AGROSAN' OR UPPER(name) LIKE 'AGROSAN%' LIMIT 1), 'Agrosan'), 'EST-01', 'Migración', '2026-05-20T05:33:53.556Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1251,7 +1251,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS CONTRERAS', '1017227949', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TKD564', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.513Z') 
+VALUES ('EMANUEL VALENCIA CABEZAS', '1026137745', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '18'), '18'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LIENA DIRECTA' OR UPPER(name) LIKE 'LIENA DIRECTA%' LIMIT 1), 'LIENA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.539Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1260,7 +1260,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO FERNANDO MARIN SALAZAR', '98659009', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'GERENTE COMERCIAL'), 'GERENTE COMERCIAL'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.453Z') 
+VALUES ('DANIEL AGUDELO', '1020103395', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'WCX326', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.518Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1269,7 +1269,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RAMON MARIN', '70567895', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'WDX372', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'VARIAS' OR UPPER(name) LIKE 'VARIAS%' LIMIT 1), 'VARIAS'), 'EST-01', 'Migración', '2026-05-20T05:33:53.398Z') 
+VALUES ('YESICA NATALIA JANER ACEVEDO', '1017200099', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '5'), '5'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.511Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1278,7 +1278,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CIFUENTES BOLAÑOS JUAN DIEGO', '1005877611', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.490Z') 
+VALUES ('RANDY  XAVIER GARCIA  BOLIVAR', '6520587', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'NNM822', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.340Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1287,7 +1287,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CESAR GUERRA MONTES', '1003191664', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'STE355', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'RTD' OR UPPER(name) LIKE 'RTD%' LIMIT 1), 'RTD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.485Z') 
+VALUES ('MARCOS LASSO ROLDAN', '1006185517', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TCY392', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.492Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1296,7 +1296,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON JAIRO SALAZAR', '71634613', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TMZ798', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.415Z') 
+VALUES ('GABRIEL DURAN', '18189021', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'YAR044', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.364Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1305,7 +1305,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EMANUEL VALENCIA CABEZAS', '1026137745', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LGÍSTICO'), 'AUXILIAR LGÍSTICO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LIENA DIRECTA' OR UPPER(name) LIKE 'LIENA DIRECTA%' LIMIT 1), 'LIENA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.539Z') 
+VALUES ('CARLOS MARIO MENDEZ ORTIZ', '1067907703', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.643Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1314,7 +1314,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS MARIN', '71731792', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'GDX508', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.420Z') 
+VALUES ('DANNY LENIS LAGUNA', '1005705743', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '23'), '23'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI   PLAN R' OR UPPER(name) LIKE 'AJOVER CALI   PLAN R%' LIMIT 1), 'AJOVER CALI   PLAN R'), 'EST-01', 'Migración', '2026-05-20T05:33:53.488Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1323,7 +1323,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JESUS EMANUEL TEJADA MARIN', '71397558', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'GDY095', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.413Z') 
+VALUES ('JUAN PABLO MORENO FAJARDO', '1118293032', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.674Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1332,7 +1332,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO FERNANDO ECHEVERRY CASTAÑO', '97600354', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYX456', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.439Z') 
+VALUES ('DAVID RUIZ', '1238938665', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'LKO525', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.710Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1341,7 +1341,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES FELIPE ORDOÑEZ PULIDO', '1007161142', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SNU320', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.493Z') 
+VALUES ('SEBASTIAN VELEZ', '1017217508', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYX540', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.512Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1350,7 +1350,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LINA MARCELA OROZCO ARANGO', '1128406621', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.681Z') 
+VALUES ('LUISA FERNANDA HOLGUIN RAMIREZ', '1036639784', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.580Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1359,7 +1359,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CRISTIAN MERCADO RIOS', '1082897050', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.653Z') 
+VALUES ('MARTIN CASTRILLON', '1001450323', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'SNM323', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.477Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1368,7 +1368,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE DANIEL URREGO ZAPATA', '1035921665', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'TOQ606', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.570Z') 
+VALUES ('MATEO RODRIGUEZ BERMUDEZ', '1023630801', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.531Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1377,7 +1377,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('IMANOL ORDOÑEZ LABRADA', '1110040808', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.663Z') 
+VALUES ('LUIS ALEXANDER OSORIO', '98627573', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TYX363', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.448Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1386,7 +1386,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LINA MARIA ZAPATA ORTIZ', '1130661860', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.686Z') 
+VALUES ('JOSE CHAVARRIA', '71741158', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TRG822', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PAPYSER' OR UPPER(name) LIKE 'PAPYSER%' LIMIT 1), 'PAPYSER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.421Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1395,7 +1395,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ADELAIDA DE LA CRUZ ORTIZ BEDOYA', '43840726', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.387Z') 
+VALUES ('BRAYAN ALEXIS DIAZ ARENAS', '1039466574', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '12'), '12'), 'TLK137', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.609Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1404,7 +1404,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL FERNANDO RAMIREZ', '8433512', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'LKN291', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.346Z') 
+VALUES ('JESUS EMANUEL TEJADA MARIN', '71397558', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'GDY095', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.413Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1413,7 +1413,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ONEI FLOREZ', '71940777', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYN215', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.428Z') 
+VALUES ('FREDDY ALONSO AGUDELO RUEDA', '71790541', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WGV585', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.426Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1422,7 +1422,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON EDISON SANCHEZ GALLEGO', '1040737902', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.616Z') 
+VALUES ('LUIS FERNANDO GRISALES', '71264883', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'NNN494', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.403Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1431,7 +1431,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('FREDDY ALONSO AGUDELO RUEDA', '71790541', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WGV585', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.426Z') 
+VALUES ('ANDRES FELIPE SORA MANJARREZ', '1056783325', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '21'), '21'), 'EQS426', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.640Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1440,7 +1440,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHONATHAN VIERA PALACIOS', '1025761115', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'LKN291', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.535Z') 
+VALUES ('NEIDER VILLAMISAR', '1036690996', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'NNN500', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.587Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1449,7 +1449,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS FERNANDO GRISALES', '71264883', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'NNN494', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.403Z') 
+VALUES ('CARLOS ARENAS CRUZ', '1028018100', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TRL629', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.551Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1458,7 +1458,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDREI JIMENEZ ARANA', '1037545432', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WOS443', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.589Z') 
+VALUES ('OWEN URREGO BENITEZ', '1000307448', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '43'), '43'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LEONISA' OR UPPER(name) LIKE 'LEONISA%' LIMIT 1), 'LEONISA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.463Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1467,7 +1467,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JEFERSON ORTIZ', '16883551', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AJOVER CALI'), 'AJOVER CALI'), 'VMU325', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AUXILIAR' OR UPPER(name) LIKE 'AUXILIAR%' LIMIT 1), 'AUXILIAR'), 'EST-01', 'Migración', '2026-05-20T05:33:53.360Z') 
+VALUES ('ALEXANDER LOPEZ TOLA', '1118286764', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.672Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1476,7 +1476,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MAYRA ALEJANDRA MUÑOZ TAFUR', '1144150988', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.692Z') 
+VALUES ('JOSEU DE JESUS HERNANDEZ MORENO', '71493872', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'LJS983', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.414Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1485,7 +1485,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN CARLOS MARTINEZ', '71266316', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'UPB412', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.404Z') 
+VALUES ('CESAR GUERRA MONTES', '1003191664', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'STE355', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'RTD' OR UPPER(name) LIKE 'RTD%' LIMIT 1), 'RTD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.485Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1494,7 +1494,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS ALBEIRO LOPERA MAZO', '15508965', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'NUV493', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.356Z') 
+VALUES ('LIZETH YURANY IBARRA URREGO', '1037610725', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.594Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1503,7 +1503,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('BRAYAN DAVID GARCIA', '1000895464', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'WOX613', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.468Z') 
+VALUES ('ANDRES FELIPE ZAPATA JARAMILLO', '1037776836', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.599Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1512,7 +1512,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL AGUDELO', '1020103395', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'WCX326', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.518Z') 
+VALUES ('YELISON TEJADA', '1026149223', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WOS372', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.542Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1521,7 +1521,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUISA FERNANDA PUERTA BETANCUR', '1041610220', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.631Z') 
+VALUES ('JAVIER DAVID CASTILLO RODRIGUEZ', '5981155', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WFJ876', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.338Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1530,7 +1530,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOHAN SEBASTIAN HURTADO ACOSTA', '1130628467', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.683Z') 
+VALUES ('YEISON ALEJANDRO RUIZ MURILLO', '1035918305', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '9'), '9'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'SOCODA' OR UPPER(name) LIKE 'SOCODA%' LIMIT 1), 'SOCODA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.568Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1539,7 +1539,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIANA MARCELA LOBATON MICOLTA', '1118290929', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.673Z') 
+VALUES ('DUVAN CORTEZ', '1152216210', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'TLK297', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.698Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1548,7 +1548,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CRISTIAN JOHAO GOMEZ RODRIGUEZ', '1144201858', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.693Z') 
+VALUES ('GALLEGO SANCHEZ JEAN PAUL', '1144211121', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.695Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1557,7 +1557,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YECID MENDOZA ESTRADA', '1040751199', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.624Z') 
+VALUES ('YEISON VIVEROS CAICEDO', '1086047865', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.654Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1566,7 +1566,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SEBASTIAN MORALES PEREZ', '1026162201', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'TLK137', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.547Z') 
+VALUES ('CARLOS DAVID MERINO', '1036648093', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'GTY793', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'DICORD' OR UPPER(name) LIKE 'DICORD%' LIMIT 1), 'DICORD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.581Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1575,7 +1575,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS DAVID MERINO', '1036648093', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'GTY793', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'DICORD' OR UPPER(name) LIKE 'DICORD%' LIMIT 1), 'DICORD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.581Z') 
+VALUES ('CRISTIAN MERCADO RIOS', '1082897050', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.653Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1584,7 +1584,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN GOMEZ', '1036673031', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'LKK942', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.584Z') 
+VALUES ('JOAN MAFRAY CORDOBA MARTINEZ', '1079094093', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'linea directa'), 'EST-01', 'Migración', '2026-05-20T05:33:53.648Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1593,7 +1593,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MARIA ESTEFANIA LOAIZA VARGAS', '1000764450', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'COORDINADORA GESTION HUMANA'), 'COORDINADORA GESTION HUMANA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRACION' OR UPPER(name) LIKE 'ADMINISTRACION%' LIMIT 1), 'ADMINISTRACION'), 'EST-01', 'Migración', '2026-05-20T05:33:53.466Z') 
+VALUES ('OSCAR ESTIVEN GARCIA', '1007779091', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '14'), '14'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.499Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1602,7 +1602,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANA MARIA PALACIO SALAZAR', '43747633', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'GERENTE ADMINISTRATIVA'), 'GERENTE ADMINISTRATIVA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.382Z') 
+VALUES ('MARIA ELENA VILA COLORADO', '43400981', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.379Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1611,7 +1611,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MARTIN CASTRILLON', '1001450323', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'SNM323', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.477Z') 
+VALUES ('DIANA CAROLINA RAVE MONTOYA', '1026144020', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.540Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1620,7 +1620,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OSCAR HERNAN VALENCIA  AJOVER CALI', '16973164', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'ZID283', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.361Z') 
+VALUES ('DANIEL SUAREZ', '1039023796', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'ESQ398', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.604Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1629,7 +1629,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JADER AGUDELO', '71195097', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'TOQ781', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'POLIETILENO' OR UPPER(name) LIKE 'POLIETILENO%' LIMIT 1), 'POLIETILENO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.399Z') 
+VALUES ('JHON ARBEY ZULUAGA ESTRADA', '1001418286', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.476Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1638,7 +1638,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDURDO ALEJANDRO RODRIGUEZ LISTA', '28134017', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'LKN938', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.366Z') 
+VALUES ('YEFERSON GAVIRIA', '1035861214', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '12'), '12'), 'JYO275', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.564Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1647,7 +1647,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE CHAVARRIA', '71741158', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TRG822', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PAPYSER' OR UPPER(name) LIKE 'PAPYSER%' LIMIT 1), 'PAPYSER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.421Z') 
+VALUES ('RODRIGO MAZO', '1045077138', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'LKO525', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.632Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1656,7 +1656,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHOAN ANDRES BENITEZ ARANGO', '1021802341', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.522Z') 
+VALUES ('DIEGO POSSO', '1027955385', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '12'), '12'), 'JYN021', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.549Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1665,7 +1665,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('FABIO ALBEIRO GARCIA LEZCANO', '15429663', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.354Z') 
+VALUES ('RONAL FERNANDO NARVAEZ MAMBUSCAY', '1121825317', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.678Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1674,7 +1674,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('Cristian Mauricio Benavides', '1110284774', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE BODEGA'), 'AUXILIAR DE BODEGA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.664Z') 
+VALUES ('YESICA TORRES', '1111111111', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'STZ427', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.666Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1683,7 +1683,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('IGUEL ANGEL OTALVARO', '1039681775', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'SMR448', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.611Z') 
+VALUES ('GILBERTO GUZMAN', '16772472', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.358Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1692,7 +1692,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ISABELA GONZALEZ SILGADO', '1025649975', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'APRENDIZ SENA'), 'APRENDIZ SENA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.533Z') 
+VALUES ('LUIS FELIPE RUIZ MARIN', '1040756480', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'EDX508', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.629Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1701,7 +1701,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SANTIAGO  GOMEZ', '1041440515', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WOS372', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.630Z') 
+VALUES ('DIANA PATRICIA CANO VIVAS', '1036603227', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.576Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1710,7 +1710,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RICHARD ANDERSON BERRIO VILLAREAL', '1037576609', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'NLX578', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.590Z') 
+VALUES ('JHORMAN ANDREY ALVAREZ MORALES', '1021924568', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.523Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1719,7 +1719,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RONALDO CARDONA', '1039422713', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TLK087', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.605Z') 
+VALUES ('EDWIN DUVAN FRANCO', '1037598750', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WCQ379', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.593Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1728,7 +1728,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON ARBEY ZULUAGA ESTRADA', '1001418286', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.476Z') 
+VALUES ('MATHEW MUÑOZ DIEZ', '1035971851', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'JYN215', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.571Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1737,7 +1737,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('GALLEGO SANCHEZ JEAN PAUL', '1144211121', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.695Z') 
+VALUES ('PAOLA ANDREA CORREA TRUJILLO', '43103160', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.371Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1746,7 +1746,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JENNY CATALINA ISAZA OSORIO', '1152457795', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'COORDINADORA LOGÍSTICA'), 'COORDINADORA LOGÍSTICA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CAF' OR UPPER(name) LIKE 'CAF%' LIMIT 1), 'CAF'), 'EST-01', 'Migración', '2026-05-20T05:33:53.699Z') 
+VALUES ('KEVIN ANDRES COLMENARES', '1140427247', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'TKM408', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.688Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1755,7 +1755,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUISA FERNANDA HOLGUIN RAMIREZ', '1036639784', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.580Z') 
+VALUES ('JADER AGUDELO', '71195097', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'TOQ781', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'POLIETILENO' OR UPPER(name) LIKE 'POLIETILENO%' LIMIT 1), 'POLIETILENO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.399Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1764,7 +1764,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('BIBIANA MARIA RESTREPO RINCON', '43258579', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'PRACTICANTE GESTION HUMANA'), 'PRACTICANTE GESTION HUMANA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.377Z') 
+VALUES ('GUSTAVO ZAMIR ESCOBAR VALENCIA', '1140165970', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.687Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1773,7 +1773,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('VERONICA NATALY GUISAO ECHEVERRI', '1039452734', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.607Z') 
+VALUES ('JOHAN ALEXIS BARRERA', '1035235723', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'SVO488', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.558Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1782,7 +1782,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS DANIEL RUEDA AGUDELO', '1000211019', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SNT443', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.462Z') 
+VALUES ('DANIEL TANGARIFE VALENCIA', '1107102700', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.659Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1791,7 +1791,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DARWIN RICARDO', '1039706511', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'ESQ159', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.612Z') 
+VALUES ('NATALIA CRISTINA MAZO MAZO', '43927118', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'COMPRO', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.390Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1800,7 +1800,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE FERNANDO VERA', '1144204609', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AXILIAR'), 'AXILIAR'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.694Z') 
+VALUES ('LUIS ALBEIRO LOPERA MAZO', '15508965', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'NUV493', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.356Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1809,7 +1809,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO LUIS ZAPATA PULGARIN', '71697454', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'GTY793', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'DICORD' OR UPPER(name) LIKE 'DICORD%' LIMIT 1), 'DICORD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.418Z') 
+VALUES ('GILDARDO BUITRAGO', '17315809', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SOP174', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PLAN R' OR UPPER(name) LIKE 'PLAN R%' LIMIT 1), 'PLAN R'), 'EST-01', 'Migración', '2026-05-20T05:33:53.362Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1818,7 +1818,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALEXANDER CHIRINOS', '5964901', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'TOQ606', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.335Z') 
+VALUES ('EDWIN ANDRES GARCIA SILVA', '15444183', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'RIONEGRO' OR UPPER(name) LIKE 'RIONEGRO%' LIMIT 1), 'RIONEGRO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.355Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1827,7 +1827,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CATALINA MARIA GONZALEZ MONTOYA', '43180713', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'DIRECTORA DE CARTERA'), 'DIRECTORA DE CARTERA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.374Z') 
+VALUES ('JHOAN ANDRES BENITEZ ARANGO', '1021802341', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.522Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1836,7 +1836,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS FELIPE RUIZ MARIN', '1040756480', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'EDX508', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.629Z') 
+VALUES ('ISABELA GONZALEZ SILGADO', '1025649975', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '7'), '7'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.533Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1845,7 +1845,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RAMON ANTONIO MORENO MORENO', '98579515', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'LJS983', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.444Z') 
+VALUES ('DIEGO FERNANDO MARIN SALAZAR', '98659009', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '32'), '32'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.453Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1854,7 +1854,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ROSA ANGELICA RIVERA SEPULVEDA', '1214731310', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'DIRECTORA DE TESORERIA'), 'DIRECTORA DE TESORERIA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.708Z') 
+VALUES ('LUCELLY MARGARITA SOTO GONZALEZ', '43878355', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.389Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1863,7 +1863,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DUVAN ANDRES QUINTERO PERTUZ', '1082874105', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.651Z') 
+VALUES ('MATEO LOAIZA FRANCO', '1007895746', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'STY099', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.502Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1872,7 +1872,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SEBASTIAN MAURICIO PUERTA MONTOYA', '1193033290', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.705Z') 
+VALUES ('ROBERT GARAY', '7035899', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '13'), '13'), 'TRN884', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.342Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1881,7 +1881,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN MANUEL GOMEZ RAMIREZ', '1017922169', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.515Z') 
+VALUES ('EDILSA FUENTES OVIEDO', '43147520', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.372Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1890,7 +1890,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES FELIPE MOSQUERA', '1110377990', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'TKD167', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.665Z') 
+VALUES ('EDGAR RONALDO RODRIGUEZ', '1005362857', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'JYO074', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.487Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1899,7 +1899,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALEJANDRO VELASQUEZ CUARTAS', '1023522397', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.527Z') 
+VALUES ('ANA MARIA ALVAREZ CASTRILLON', '1038768241', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.603Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1908,7 +1908,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDILSA FUENTES OVIEDO', '43147520', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.372Z') 
+VALUES ('ALEJANDRO HERRERA LOPEZ', '1010079018', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.503Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1917,7 +1917,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ESTEBAN FUENTES', '1121960627', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'TKD564', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.679Z') 
+VALUES ('MARIA ESTEFANIA LOAIZA VARGAS', '1000764450', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '25'), '25'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRACION' OR UPPER(name) LIKE 'ADMINISTRACION%' LIMIT 1), 'ADMINISTRACION'), 'EST-01', 'Migración', '2026-05-20T05:33:53.466Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1926,7 +1926,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALEXANDRA MARIA MUÑOZ CASTRILLON', '43845511', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.388Z') 
+VALUES ('JUAN CARLOS CUERVO BURITICA', '1036601715', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '5'), '5'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.575Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1935,7 +1935,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL TABARES USUGA', '71765975', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WPM227', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.424Z') 
+VALUES ('JHON EDWIN ARISTIZABAL', '1112160663', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYX117', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.668Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1944,7 +1944,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YESICA TORRES', '1111111111', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'STZ427', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.666Z') 
+VALUES ('HERNAN ALVAREZ', '1020451381', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'STE355', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'RTD' OR UPPER(name) LIKE 'RTD%' LIMIT 1), 'RTD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.520Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1953,7 +1953,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN DAVID ROMAN', '1000755246', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'NNN610', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.465Z') 
+VALUES ('FABIO ALBEIRO GARCIA LEZCANO', '15429663', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.354Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1962,7 +1962,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('NEIDER VILLAMISAR', '1036690996', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'NNN500', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.587Z') 
+VALUES ('PEDRO EMILIO RINCON', '4053344', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SOE380', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PAPYSER' OR UPPER(name) LIKE 'PAPYSER%' LIMIT 1), 'PAPYSER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.326Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1971,7 +1971,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS MAURICIO BETACUR ORTIZ', '715252545', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'NNM572', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.459Z') 
+VALUES ('YEISON STIVEN ZAPATA', '1128476187', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TRN884', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.682Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1980,7 +1980,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHO EDUAR GARCIA', '98558444', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WOX613', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASOSAS INN' OR UPPER(name) LIKE 'GASOSAS INN%' LIMIT 1), 'GASOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.442Z') 
+VALUES ('BRAYAN DAVID CASTILLOMEJIA', '1073988710', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ALMACENAMIENTO' OR UPPER(name) LIKE 'ALMACENAMIENTO%' LIMIT 1), 'ALMACENAMIENTO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.647Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1989,7 +1989,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OSCAR ESTIVEN GARCIA', '1007779091', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE BODEGA'), 'AUXILIAR DE BODEGA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.499Z') 
+VALUES ('LEIDY VIVIANA GALEANO MONTOYA', '1037595006', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.591Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -1998,7 +1998,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('KEVIN ANDRES COLMENARES', '1140427247', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'TKM408', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.688Z') 
+VALUES ('ALEXANDER CHIRINOS', '5964901', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'TOQ606', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.335Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2007,7 +2007,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('KAROL XILENA URIBE VELEZ', '1040752488', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.627Z') 
+VALUES ('JORGE ROLDAN', '98550136', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TRG354', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PAPYSER' OR UPPER(name) LIKE 'PAPYSER%' LIMIT 1), 'PAPYSER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.441Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2016,7 +2016,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN DAVID VALENCIA MONDRAGON', '1116376622', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.671Z') 
+VALUES ('DIANA MARULANDA VELEZ', '43723793', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.380Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2025,7 +2025,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('FABIAN GALLEGO', '1022123846', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'JYX540', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.525Z') 
+VALUES ('JUAN ESTEBAN MONCADA', '1000206476', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SVO488', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.461Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2034,7 +2034,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('HERNAN ALVAREZ', '1020451381', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'STE355', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'RTD' OR UPPER(name) LIKE 'RTD%' LIMIT 1), 'RTD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.520Z') 
+VALUES ('EDWIN DAVID LEONEL GIRALDO', '1007530363', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'NNN610', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.497Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2043,7 +2043,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANGELA MARIA  MEDINA HERRERA', '43253011', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OBT' OR UPPER(name) LIKE 'OBT%' LIMIT 1), 'OBT'), 'EST-01', 'Migración', '2026-05-20T05:33:53.375Z') 
+VALUES ('ALBAN TEJADA MARIN', '71394056', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'STR429', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.412Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2052,7 +2052,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YENNY YULIETH TORRES COLORADO', '1033338949', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.555Z') 
+VALUES ('SARA CORDERO ARANGO', '1038263151', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '17'), '17'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.602Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2061,7 +2061,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JENIFFER ESTEFANS PEREZ GUZMAN', '1026137508', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ANALISTA CONTABLE'), 'ANALISTA CONTABLE'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.538Z') 
+VALUES ('LUDITH SAMIRA ARIZA GONZALEZ', '52183491', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.391Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2070,7 +2070,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES FELIPE OSSA GARCIA', '1214729139', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR CONDUCTOR'), 'AUXILIAR CONDUCTOR'), 'JYX456', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.707Z') 
+VALUES ('JOSE JOAQUIN VILLA HERRERA', '71240188', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TLK137', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.401Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2079,7 +2079,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DENILSON GARCIA', '1000895626', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TOQ781', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ESNECTOR' OR UPPER(name) LIKE 'ESNECTOR%' LIMIT 1), 'ESNECTOR'), 'EST-01', 'Migración', '2026-05-20T05:33:53.469Z') 
+VALUES ('ANDRES FELIPE MOSQUERA', '1110377990', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'TKD167', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.665Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2088,7 +2088,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CRISTIAN GIL VELEZ', '831181', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'ESQ398', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.319Z') 
+VALUES ('YAIR FRANCISCO VILLA ARANGO', '1022033708', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.524Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2097,7 +2097,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CRISTIAN ALEXIS CEBALLOS VILLADA', '1017163428', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ANALISTA DE CONTROL Y MONITOREO'), 'ANALISTA DE CONTROL Y MONITOREO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.507Z') 
+VALUES ('LUIS MANUEL FLOREZ MUÑOZ', '1079912281', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'CTI894', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.649Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2106,7 +2106,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARL MARLON BRAND MARULANDA', '1118303067', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.676Z') 
+VALUES ('JORGE ANDRES TORO CAMPILLO', '71290694', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '36'), '36'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.405Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2115,7 +2115,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MATEO LOAIZA FRANCO', '1007895746', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'STY099', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.502Z') 
+VALUES ('RAMON MARIN', '70567895', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'WDX372', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'VARIAS' OR UPPER(name) LIKE 'VARIAS%' LIMIT 1), 'VARIAS'), 'EST-01', 'Migración', '2026-05-20T05:33:53.398Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2124,7 +2124,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('GABRIEL DURAN', '18189021', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'YAR044', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.364Z') 
+VALUES ('SANTIAGO CARDONA SALAZAR', '1088346231', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.657Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2133,7 +2133,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ESAU VERA PARRA', '1128387195', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'INHOUSE'), 'INHOUSE'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.680Z') 
+VALUES ('DANIEL ATEHORTUA VASCO', '1001248991', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.474Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2142,7 +2142,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YEISON VIVEROS CAICEDO', '1086047865', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.654Z') 
+VALUES ('CARLOS NARVAEZ', '1017198051', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TRK715', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.510Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2151,7 +2151,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YEFERSON GAVIRIA', '1035861214', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR CONDUCTOR'), 'AUXILIAR CONDUCTOR'), 'JYO275', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.564Z') 
+VALUES ('MILENA ANDREA BETANCUR TORRES', '43792820', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '39'), '39'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.383Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2160,7 +2160,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CLAUDIO ANTONIO NISPERUZA BANDA', '1072251193', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.646Z') 
+VALUES ('JHO EDUAR GARCIA', '98558444', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'WOX613', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASOSAS INN' OR UPPER(name) LIKE 'GASOSAS INN%' LIMIT 1), 'GASOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.442Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2169,7 +2169,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RONAL FERNANDO NARVAEZ MAMBUSCAY', '1121825317', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.678Z') 
+VALUES ('JULIO CESAR VELANDIA', '6102333', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TMO983', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.339Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2178,7 +2178,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALEJANDRO HERRERA LOPEZ', '1010079018', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.503Z') 
+VALUES ('JOHAN SEBASTIAN HURTADO ACOSTA', '1130628467', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.683Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2187,7 +2187,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MARIA JULIANA QUINTANA ARANGO', '1023622980', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.530Z') 
+VALUES ('LUIS ANGEL RODRIGUEZ', '1152469188', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SNW541', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.701Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2196,7 +2196,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MARCOS LASSO ROLDAN', '1006185517', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TCY392', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.492Z') 
+VALUES ('DANIELA CAROLINA MONTOYA HIDALGO', '1214740345', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.709Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2205,7 +2205,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS ALBERTO GOMEZ', '18400377', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'UPT897', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.365Z') 
+VALUES ('CRISTIAN HERNANDEZ', '103862250', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'UPB412', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.458Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2214,7 +2214,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('BRAYAN GRAJALES', '1000100560', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'NUV493', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.460Z') 
+VALUES ('JOSE ROLANDO RAMIREZ MARIN', '8105737', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.344Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2223,7 +2223,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DAVID MONSALVE OCHOA', '1001456161', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGÍSTICO'), 'ASESOR LOGÍSTICO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'DICORD' OR UPPER(name) LIKE 'DICORD%' LIMIT 1), 'DICORD'), 'EST-01', 'Migración', '2026-05-20T05:33:53.479Z') 
+VALUES ('JEAN PAUL CORREA GOEZ', '1035974914', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'WCO995', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'SNECTOR' OR UPPER(name) LIKE 'SNECTOR%' LIMIT 1), 'SNECTOR'), 'EST-01', 'Migración', '2026-05-20T05:33:53.574Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2232,7 +2232,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MIGUEL ANGEL CARDONA MOLINA', '98595039', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'LKN540', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.447Z') 
+VALUES ('JUAN CARLOS MARTINEZ', '71266316', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'UPB412', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.404Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2241,7 +2241,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIANA CAROLINA RAVE MONTOYA', '1026144020', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.540Z') 
+VALUES ('DANIEL ALEJANDRO OSORIO GRISALES', '1039446142', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.606Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2250,7 +2250,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON EDWIN ARISTIZABAL', '1112160663', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYX117', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.668Z') 
+VALUES ('CARLOS ALBERTO UPEGUI BOLAOS', '94061179', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.433Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2259,7 +2259,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE ROLANDO RAMIREZ MARIN', '8105737', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.344Z') 
+VALUES ('LUIS ANGEL DE LA CRUZ MACHADO', '1309388', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'LKN938', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.322Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2268,7 +2268,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('FRANCISCO ERASMO ORTIZ GIRALDO', '71293531', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.408Z') 
+VALUES ('RICARIO HERNANDEZ', '8295011', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'STI894', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.345Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2277,7 +2277,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN DAVID GRISALES', '1025761930', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'NNN494', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.536Z') 
+VALUES ('TORO HURTADO JUSTIN', '1007370983', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.494Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2286,7 +2286,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL ROJAS RESTREPO', '1026159488', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.546Z') 
+VALUES ('RONALDO CARDONA', '1039422713', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TLK087', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.605Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2295,7 +2295,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RICHARD REYES CARREÑO', '4895949', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'SNT443', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.329Z') 
+VALUES ('DEYNER MARTINEZ', '1045497657', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'TDZ425', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.637Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2304,7 +2304,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CAROLINA MALDONADO RESTREPO', '1001575864', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.481Z') 
+VALUES ('DENILSON GARCIA', '1000895626', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TOQ781', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ESNECTOR' OR UPPER(name) LIKE 'ESNECTOR%' LIMIT 1), 'ESNECTOR'), 'EST-01', 'Migración', '2026-05-20T05:33:53.469Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2313,7 +2313,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOHAN SINITAVE', '1045416826', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'SZW000', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.634Z') 
+VALUES ('LUIS ALBERTO PINEDA OSSO', '1040374984', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'LKK194', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.613Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2322,7 +2322,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LIZETH YURANY IBARRA URREGO', '1037610725', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.594Z') 
+VALUES ('JHON BAYRON CHAVEZ', '1152717744', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'WGV585', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.702Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2331,7 +2331,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIANA MARULANDA VELEZ', '43723793', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.380Z') 
+VALUES ('JOEL OREJUELA', '1104824687', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'KUN825', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.658Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2340,7 +2340,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MARIA EUGENIA CANO VIVAS', '43162718', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.373Z') 
+VALUES ('JHONATAN JOSE SILVA ROJAS', '5370025', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'JYO275', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.334Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2349,7 +2349,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO VELASCO', '1140929333', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WFD722', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.690Z') 
+VALUES ('OMAR FERNANDO YENDA', '1005832836', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'KUN825', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PLAN R MILLA SIETE' OR UPPER(name) LIKE 'PLAN R MILLA SIETE%' LIMIT 1), 'PLAN R MILLA SIETE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.489Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2358,7 +2358,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALEXANDER CHIRINOS', '5964961', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'TOQ606', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.337Z') 
+VALUES ('DIEGO FERNANDO ECHEVERRY CASTAÑO', '97600354', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYX456', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.439Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2367,7 +2367,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ESTEBAN BOLIVAR', '1036637209', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'JYY259', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.579Z') 
+VALUES ('ARLEX HUMBERTO CALLEJAS SALDARRIAGA', '71767352', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '6'), '6'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.425Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2376,7 +2376,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RUBEN ARIAS', '70003223', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR CONDUCTOR'), 'AUXILIAR CONDUCTOR'), 'TLK087', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.393Z') 
+VALUES ('JENIFFER ESTEFANS PEREZ GUZMAN', '1026137508', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '3'), '3'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.538Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2385,7 +2385,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES RUIZ', '1001367879', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TRD882', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.475Z') 
+VALUES ('CARLOS MORALES', '94376749', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'KUL668', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.436Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2394,7 +2394,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS ANGEL RODRIGUEZ', '1152469188', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SNW541', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.701Z') 
+VALUES ('ANDRES MAURICIO MEJIA GAVIRIA', '1001505973', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.480Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2403,7 +2403,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL ALEJANDRO OSORIO GRISALES', '1039446142', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.606Z') 
+VALUES ('DIANA MARCELA LOBATON MICOLTA', '1118290929', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.673Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2412,7 +2412,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES MARIN', '1040751758', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'GDX508', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.626Z') 
+VALUES ('FABIAN ALONSO VELEZ QUIROZ', '1026148124', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'SNT443', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.541Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2421,7 +2421,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JUAN CAMILO VARGAS', '71240858', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'STR429', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.402Z') 
+VALUES ('DAYANA ALEXANDRA CALVO ARANGO', '1017137772', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.504Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2430,7 +2430,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('GLORIA STELLA FERNANDEZ TRUJILLO', '43799412', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASISTENTE FINANCIERA'), 'ASISTENTE FINANCIERA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.385Z') 
+VALUES ('MAURICIO RUIZ', '1035871906', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'WNQ032', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.567Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2439,7 +2439,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALBAN TEJADA MARIN', '71394056', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'STR429', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.412Z') 
+VALUES ('CARLOS MAURICIO BETACUR ORTIZ', '715252545', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'NNM572', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.459Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2448,7 +2448,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS FERNANDO GONZALEZ VELEZ', '98715267', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYX456', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.455Z') 
+VALUES ('CRISTIAN RUEDA AGUDELO', '1039596223', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'TDZ565', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.610Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2457,7 +2457,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('GUSTAVO ADOLFO OSORIO RAMIREZ', '1040755956', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.628Z') 
+VALUES ('HECTOR MUÑOZ', '98631515', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'EQS817', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.450Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2466,7 +2466,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS HERNANDO ALVAREZ BETANCUR', '98641739', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'NOVASEO' OR UPPER(name) LIKE 'NOVASEO%' LIMIT 1), 'NOVASEO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.451Z') 
+VALUES ('YENNY YULIETH TORRES COLORADO', '1033338949', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.555Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2475,7 +2475,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES MAURICIO MEJIA GAVIRIA', '1001505973', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.480Z') 
+VALUES ('CARLOS ALBERTO GOMEZ', '18400377', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'UPT897', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.365Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2484,7 +2484,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SANDRA ELENA ARROYAVE MONCADA', '32151233', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.370Z') 
+VALUES ('DIDIER ANDREY PINEDA CARDONA', '1037668748', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'STI894', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.597Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2493,7 +2493,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON BAYRON CHAVEZ', '1152717744', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'WGV585', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.702Z') 
+VALUES ('HECTOR MAURICIO YEPEZ LOAIZA', '1037598604', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '33'), '33'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.592Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2502,7 +2502,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANA MARIA ALVAREZ CASTRILLON', '1038768241', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.603Z') 
+VALUES ('FABIAN GALLEGO', '1022123846', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'JYX540', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.525Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2511,7 +2511,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('TORO HURTADO JUSTIN', '1007370983', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.494Z') 
+VALUES ('YEIFER SANCHEZ LOZANO', '1062430747', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.641Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2520,7 +2520,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LEIDY VIVIANA GALEANO MONTOYA', '1037595006', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.591Z') 
+VALUES ('JEFERSON ORTIZ', '16883551', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '2'), '2'), 'VMU325', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AUXILIAR' OR UPPER(name) LIKE 'AUXILIAR%' LIMIT 1), 'AUXILIAR'), 'EST-01', 'Migración', '2026-05-20T05:33:53.360Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2529,7 +2529,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS NARVAEZ', '1017198051', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TRK715', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.510Z') 
+VALUES ('JOHAN CASTILLO', '1023868483', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'NNN500', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.532Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2538,7 +2538,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CRISTIAN RUEDA AGUDELO', '1039596223', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'TDZ565', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.610Z') 
+VALUES ('RAFAEL DAVID CORREA HERAZO', '1068420489', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.644Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2547,7 +2547,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('MANUEL VARGAS', '11111111', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SUL046', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.348Z') 
+VALUES ('DANIEL ROJAS RESTREPO', '1026159488', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.546Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2556,7 +2556,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS ALEXANDER OSORIO', '98627573', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TYX363', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.448Z') 
+VALUES ('MELBA PIEDRAHITA FERNANDEZ', '31483718', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '40'), '40'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.368Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2565,7 +2565,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SARA MEJIA', '1114001329', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TKD167', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.670Z') 
+VALUES ('BIBIANA MARIA RESTREPO RINCON', '43258579', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '38'), '38'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.377Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2574,7 +2574,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LEIDY YHULIANA ROMAN CANO', '1017162359', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.505Z') 
+VALUES ('EDISON GOMEZ', '1148205622', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'TDZ565', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.696Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2583,7 +2583,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YENNIFER VELASQUEZ MUÑOZ', '1036604969', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'OPERARIA MAQUILA'), 'OPERARIA MAQUILA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.577Z') 
+VALUES ('JHONATHAN VIERA PALACIOS', '1025761115', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'LKN291', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.535Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2592,7 +2592,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RANDY  XAVIER GARCIA  BOLIVAR', '6520587', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'NNM822', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.340Z') 
+VALUES ('ANDRES FELIPE CETRE MOSQUERA', '71292518', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.406Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2601,7 +2601,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDGAR GAVIRIA', '71750546', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SAW828', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PAPYSER' OR UPPER(name) LIKE 'PAPYSER%' LIMIT 1), 'PAPYSER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.423Z') 
+VALUES ('CRISTIAN GIL VELEZ', '831181', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'ESQ398', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.319Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2610,7 +2610,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('NATALIA CRISTINA MAZO MAZO', '43927118', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'COMPRO', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.390Z') 
+VALUES ('LUIS HERNANDO ALVAREZ BETANCUR', '98641739', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'NOVASEO' OR UPPER(name) LIKE 'NOVASEO%' LIMIT 1), 'NOVASEO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.451Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2619,7 +2619,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RUBEN DARIO GARCIA HENAO', '16051419', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WLZ300', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.357Z') 
+VALUES ('CAMILO ANDRES TIRADO RENDON', '1001145577', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.473Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2628,7 +2628,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ANDRES QUICENO', '1007814097', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'PXK108', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.501Z') 
+VALUES ('JUAN GOMEZ', '1036673031', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'LKK942', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.584Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2637,7 +2637,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL ESTEBAN BEDOYA', '1040743591', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.617Z') 
+VALUES ('JHONATHAN VALENCIA', '1036660698', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TDZ565', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.583Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2646,7 +2646,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO MUÑOZ MORELO', '71985543', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'ECQ159', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.430Z') 
+VALUES ('ALEXANDER CHIRINOS', '5964961', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'TOQ606', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.337Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2655,7 +2655,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDWIN DUVAN FRANCO', '1037598750', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WCQ379', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.593Z') 
+VALUES ('ROSA ANGELICA RIVERA SEPULVEDA', '1214731310', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '29'), '29'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.708Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2664,7 +2664,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SANDRA MILENA VELEZ CANO', '43400943', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), 'n/a', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'linea directa'), 'EST-01', 'Migración', '2026-05-20T05:33:53.378Z') 
+VALUES ('ANDRES QUICENO', '1007814097', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'PXK108', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.501Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2673,7 +2673,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOSE MIGUL HOYOS FRABRA', '1003465260', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.486Z') 
+VALUES ('Cristian Mauricio Benavides', '1110284774', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '14'), '14'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.664Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2682,7 +2682,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('GUSTAVO ZAMIR ESCOBAR VALENCIA', '1140165970', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.687Z') 
+VALUES ('JADER MOISES REYES MERCADO', '1063283514', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.642Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2691,7 +2691,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YOJHAN MUJICA', '5051540', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'WFJ876', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.331Z') 
+VALUES ('JORGE LEON GALEANO SERNA', '98528497', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '41'), '41'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.440Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2700,7 +2700,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ROBERT GARAY', '7035899', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR CONTUCTOR'), 'AUXILIAR CONTUCTOR'), 'TRN884', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.342Z') 
+VALUES ('EDURDO ALEJANDRO RODRIGUEZ LISTA', '28134017', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'LKN938', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.366Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2709,7 +2709,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIEL TANGARIFE VALENCIA', '1107102700', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.659Z') 
+VALUES ('ANA MARIA PALACIO SALAZAR', '43747633', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '31'), '31'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.382Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2718,7 +2718,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS FERNANDO GONZALEZ', '14280317', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'LPK798', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.349Z') 
+VALUES ('LUIS DANIEL RUEDA AGUDELO', '1000211019', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SNT443', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.462Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2727,7 +2727,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ARIEL INESTROZA', '16796131', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'ZNL629', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.359Z') 
+VALUES ('LUIS FERNANDO HIGUITA LOPEZ', '3486592', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.325Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2736,7 +2736,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('VALENTINA ARBELAEZ ALVAREZ', '1001017519', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE OPERACIONES'), 'AUXILIAR DE OPERACIONES'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.471Z') 
+VALUES ('YOVANY ACEVEDO LUJAN', '71725965', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '34'), '34'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.419Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2745,7 +2745,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS FERNANDO HIGUITA LOPEZ', '3486592', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.325Z') 
+VALUES ('LUIS FERNANDO GONZALEZ', '14280317', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'LPK798', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.349Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2754,7 +2754,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOAN MAFRAY CORDOBA MARTINEZ', '1079094093', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'linea directa'), 'EST-01', 'Migración', '2026-05-20T05:33:53.648Z') 
+VALUES ('ESTEBAN FUENTES', '1121960627', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'TKD564', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.679Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2763,7 +2763,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SEBASTIAN GALEANO', '1018233082', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'SVO562', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.516Z') 
+VALUES ('SANTIAGO VELEZ SEGURO', '1036682418', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '16'), '16'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.586Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2772,7 +2772,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDISON GOMEZ', '1148205622', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'TDZ565', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.696Z') 
+VALUES ('JUAN MANUEL MARTINEZ NISPERUZA', '1003059076', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.484Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2781,7 +2781,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('HECTOR MAURICIO YEPEZ LOAIZA', '1037598604', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'INHOUSE'), 'INHOUSE'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.592Z') 
+VALUES ('JHONATHAN TEJADA', '1026158274', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '15'), '15'), 'JYX117', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.545Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2790,7 +2790,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHONATAN JOSE SILVA ROJAS', '5370025', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'JYO275', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.334Z') 
+VALUES ('BRAYAN DAVID GARCIA', '1000895464', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'WOX613', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'GASEOSAS INN' OR UPPER(name) LIKE 'GASEOSAS INN%' LIMIT 1), 'GASEOSAS INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.468Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2799,7 +2799,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('YAIR FRANCISCO VILLA ARANGO', '1022033708', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.524Z') 
+VALUES ('ANDRES RUIZ', '1001367879', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'TRD882', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.475Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2808,7 +2808,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RODRIGO MAZO', '1045077138', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'LKO525', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.632Z') 
+VALUES ('ELIZABETH ZUÑIGA PEREZ', '1118303397', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.677Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2817,7 +2817,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('ALEXANDER LOPEZ TOLA', '1118286764', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), 'NA', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.672Z') 
+VALUES ('MAYRA ALEJANDRA MUÑOZ TAFUR', '1144150988', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.692Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2826,7 +2826,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OWEN URREGO BENITEZ', '1000307448', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'UAXILIAR LOGISTICO'), 'UAXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LEONISA' OR UPPER(name) LIKE 'LEONISA%' LIMIT 1), 'LEONISA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.463Z') 
+VALUES ('RIGOBERTO SALAZAR', '1214718600', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'JYX456', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.706Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2835,7 +2835,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('SIMON CARDONA ORTEGA', '1034991472', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), 'N/A', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.557Z') 
+VALUES ('ALEJANDRO VELASQUEZ CUARTAS', '1023522397', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '20'), '20'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.527Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2844,7 +2844,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OMAR FERNANDO YENDA', '1005832836', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'KUN825', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PLAN R MILLA SIETE' OR UPPER(name) LIKE 'PLAN R MILLA SIETE%' LIMIT 1), 'PLAN R MILLA SIETE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.489Z') 
+VALUES ('JOSE CRISTOBAL CASAS', '70192995', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'YAR044', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.396Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2853,7 +2853,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CONRADO ANTONIO GUARIN GUARIN', '70162268', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'WDI031', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.394Z') 
+VALUES ('ALEXANDER GARCIA CANO', '1020396692', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'WLZ300', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.519Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2862,7 +2862,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDWIN MARQUEZ PANTOJA', '1130661841', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.685Z') 
+VALUES ('SERGIO MARTINEZ', '1113702254', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'SOP174', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PLAN R MILLA SIETE' OR UPPER(name) LIKE 'PLAN R MILLA SIETE%' LIMIT 1), 'PLAN R MILLA SIETE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.669Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2871,7 +2871,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('PAOLA ANDREA CORREA TRUJILLO', '43103160', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.371Z') 
+VALUES ('JOSE VANEGAS', '72204766', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SVD999', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.431Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2880,7 +2880,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JULIO CESAR VELANDIA', '6102333', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TMO983', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.339Z') 
+VALUES ('EDGAR GAVIRIA', '71750546', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'SAW828', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'PAPYSER' OR UPPER(name) LIKE 'PAPYSER%' LIMIT 1), 'PAPYSER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.423Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2889,7 +2889,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('HERNAN DARIO JARAMILLO JARAMILLO', '1045424390', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.636Z') 
+VALUES ('LINA MARIA ZAPATA ORTIZ', '1130661860', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.686Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2898,7 +2898,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DIEGO POSSO', '1027955385', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR CONDUCTOR'), 'AUXILIAR CONDUCTOR'), 'JYN021', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.549Z') 
+VALUES ('GLORIA STELLA FERNANDEZ TRUJILLO', '43799412', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '10'), '10'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.385Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2907,7 +2907,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CARLOS GUSTAVO ESCOBAR', '94399513', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'TKH408', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.437Z') 
+VALUES ('RICHARD ANDERSON BERRIO VILLAREAL', '1037576609', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'NLX578', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.590Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2916,7 +2916,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JAVIER DAVID CASTILLO RODRIGUEZ', '5981155', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'WFJ876', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.338Z') 
+VALUES ('CLAUDIO ANTONIO NISPERUZA BANDA', '1072251193', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.646Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2925,7 +2925,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON FREDY QUINTERO', '71748870', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SVO562', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.422Z') 
+VALUES ('CATALINA MARIA GONZALEZ MONTOYA', '43180713', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '28'), '28'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'ADMINISTRATIVA' OR UPPER(name) LIKE 'ADMINISTRATIVA%' LIMIT 1), 'ADMINISTRATIVA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.374Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2934,7 +2934,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('LUIS ANGEL DE LA CRUZ MACHADO', '1309388', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'LKN938', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'EXITO' OR UPPER(name) LIKE 'EXITO%' LIMIT 1), 'EXITO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.322Z') 
+VALUES ('JULIAN FERLEY VERGARA ASPRILLA', '1028161169', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.552Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2943,7 +2943,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHONATHAN TEJADA', '1026158274', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE CONDUCTOR'), 'AUXILIAR DE CONDUCTOR'), 'JYX117', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.545Z') 
+VALUES ('JENNY CATALINA ISAZA OSORIO', '1152457795', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '26'), '26'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CAF' OR UPPER(name) LIKE 'CAF%' LIMIT 1), 'CAF'), 'EST-01', 'Migración', '2026-05-20T05:33:53.699Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2952,7 +2952,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDWIN ANDRES GARCIA SILVA', '15444183', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'ASESOR LOGISTICO'), 'ASESOR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'RIONEGRO' OR UPPER(name) LIKE 'RIONEGRO%' LIMIT 1), 'RIONEGRO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.355Z') 
+VALUES ('LAURA VALENTINA SUAREZ MENDEZ', '1006128721', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.491Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2961,7 +2961,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JOHAN ALEXIS BARRERA', '1035235723', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'SVO488', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.558Z') 
+VALUES ('CIFUENTES BOLAÑOS JUAN DIEGO', '1005877611', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.490Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2970,7 +2970,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('RAFAEL DAVID CORREA HERAZO', '1068420489', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.644Z') 
+VALUES ('SANTIAGO POSSO', '1001030721', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'JYN021', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'COMODISIMO' OR UPPER(name) LIKE 'COMODISIMO%' LIMIT 1), 'COMODISIMO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.472Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2979,7 +2979,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHON ALEXANDERS GRANADOS BENITEZ', '1007386760', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'EQP170', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.495Z') 
+VALUES ('LISANDRO JAVIER CASTIBLNACO GOMEZ', '71381534', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'NNM822', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.409Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2988,7 +2988,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OSCAR DAVID PIEDRAHITA', '1037625490', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'SZW000', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.596Z') 
+VALUES ('CRISTIAN JOHAO GOMEZ RODRIGUEZ', '1144201858', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER CALI' OR UPPER(name) LIKE 'AJOVER CALI%' LIMIT 1), 'AJOVER CALI'), 'EST-01', 'Migración', '2026-05-20T05:33:53.693Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -2997,7 +2997,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('OSCAR ANIBAL BERMUDEZ MENDOZA', '1143980115', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGISTICO'), 'AUXILIAR LOGISTICO'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.691Z') 
+VALUES ('CONRADO ANTONIO GUARIN GUARIN', '70162268', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'WDI031', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'LINEA DIRECTA'), 'EST-01', 'Migración', '2026-05-20T05:33:53.394Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -3006,7 +3006,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('EDWIN ARLEY BETANCUR MONTOYA', '1040745482', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR DE BODEGA'), 'AUXILIAR DE BODEGA'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER MEDELLIN' OR UPPER(name) LIKE 'AJOVER MEDELLIN%' LIMIT 1), 'AJOVER MEDELLIN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.622Z') 
+VALUES ('DARWIN RICARDO', '1039706511', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '24'), '24'), 'ESQ159', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.612Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -3015,7 +3015,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('DANIELA LEDESMA RAMIREZ', '1035972220', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR LOGÍSTICO'), 'AUXILIAR LOGÍSTICO'), 'n/a', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'LINEA DIRECTA' OR UPPER(name) LIKE 'LINEA DIRECTA%' LIMIT 1), 'linea directa'), 'EST-01', 'Migración', '2026-05-20T05:33:53.573Z') 
+VALUES ('RICHARD REYES CARREÑO', '4895949', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '11'), '11'), 'SNT443', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'CLI-02' OR UPPER(name) LIKE 'CLI-02%' LIMIT 1), 'CLI-02'), 'EST-01', 'Migración', '2026-05-20T05:33:53.329Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -3024,7 +3024,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('JHONATHAN BOLIVAR', '1036628051', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'JYY259', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.578Z') 
+VALUES ('LINA MARCELA OROZCO ARANGO', '1128406621', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '8'), '8'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.681Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -3033,7 +3033,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('REYNALDO QUERALES', '7119440', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'LPK798', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AJOVER' OR UPPER(name) LIKE 'AJOVER%' LIMIT 1), 'AJOVER'), 'EST-01', 'Migración', '2026-05-20T05:33:53.343Z') 
+VALUES ('SEBASTIAN MAURICIO PUERTA MONTOYA', '1193033290', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'TRANSPORTE' OR UPPER(name) LIKE 'TRANSPORTE%' LIMIT 1), 'TRANSPORTE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.705Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -3042,7 +3042,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('Elkin Dario Uribe Villa', '1033342303', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'CONDUCTOR'), 'CONDUCTOR'), 'GDX859', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'AGROSAN' OR UPPER(name) LIKE 'AGROSAN%' LIMIT 1), 'Agrosan'), 'EST-01', 'Migración', '2026-05-20T05:33:53.556Z') 
+VALUES ('LUISA FERNANDA PUERTA BETANCUR', '1041610220', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '37'), '37'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'OPERACION BAJO TECHO' OR UPPER(name) LIKE 'OPERACION BAJO TECHO%' LIMIT 1), 'OPERACION BAJO TECHO'), 'EST-01', 'Migración', '2026-05-20T05:33:53.631Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -3051,7 +3051,7 @@ ON CONFLICT (cedula) DO UPDATE SET
   estado = COALESCE(EXCLUDED.estado, gh_personal.estado);
 
 INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
-VALUES ('CRISTIAN HERNANDEZ', '103862250', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = 'AUXILIAR'), 'AUXILIAR'), 'UPB412', COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'INN' OR UPPER(name) LIKE 'INN%' LIMIT 1), 'INN'), 'EST-01', 'Migración', '2026-05-20T05:33:53.458Z') 
+VALUES ('EDGAR MARIN', '88271287', COALESCE((SELECT CAST(id AS VARCHAR) FROM gh_cargos WHERE UPPER(nombre) = '19'), '19'), NULL, COALESCE((SELECT id FROM clients WHERE UPPER(name) = 'JHON URIBE' OR UPPER(name) LIKE 'JHON URIBE%' LIMIT 1), 'JHON URIBE'), 'EST-01', 'Migración', '2026-05-20T05:33:53.432Z') 
 ON CONFLICT (cedula) DO UPDATE SET 
   nombre = EXCLUDED.nombre,
   cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
@@ -3299,6 +3299,2755 @@ ON CONFLICT (nombre) DO NOTHING;
 INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
 VALUES ('BOTAS KONDOR 38', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.797Z', false) 
 ON CONFLICT (nombre) DO NOTHING;
+
+-- --- ENTRADAS A BODEGA ---
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-1',
+  '2025-04-16T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 1, Bodega: 00)',
+  'Alfredo',
+  '2025-04-16T13:57:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  0,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  S'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  15,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  7,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  18,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  8,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  16,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  3,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  33,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  14,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  8,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  18,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXXL'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXXL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  XL'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  XL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  13,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  13,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M'),
+  3,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE S'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XL'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XXXL'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XXXL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  32,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  15,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  11,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  13,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  20,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  22,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  28,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  28,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  7,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  44'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  44')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  46'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  46')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-2',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 2, Bodega: 00)',
+  'Estefania',
+  '2025-05-26T18:55:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-2'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-2'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-2')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-3',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 3, Bodega: 00)',
+  'Estefania',
+  '2025-05-26T18:55:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-3'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-3'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-3')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-10',
+  '2025-06-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 10, Bodega: 00)',
+  'Estefania',
+  '2025-06-09T12:34:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-10'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-10'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  3,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-10')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-11',
+  '2025-06-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 11, Bodega: 00)',
+  'Estefania',
+  '2025-06-09T12:35:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-11'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-11'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-11')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-12',
+  '2025-06-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 12, Bodega: 00)',
+  'Estefania',
+  '2025-06-09T12:35:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-12'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-12'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  3,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-12')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-13',
+  '2025-06-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 13, Bodega: 00)',
+  'Estefania',
+  '2025-06-09T12:36:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-13'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-13'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  0,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-13')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-13'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 44'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-13')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 44')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-14',
+  '2025-06-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 14, Bodega: 00)',
+  'Estefania',
+  '2025-06-09T12:37:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-14'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-14'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-14')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-15',
+  '2025-06-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 15, Bodega: 00)',
+  'Estefania',
+  '2025-06-09T12:38:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-15'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-15'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-15')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-15'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-15')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-15'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  8,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-15')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-16',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 16, Bodega: 00)',
+  'Estefania',
+  '2025-06-17T14:35:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-16'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-16'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-16')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-18',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 18, Bodega: 00)',
+  'Estefania',
+  '2025-06-18T12:38:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-18'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-18'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-18')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-19',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 19, Bodega: 00)',
+  'Estefania',
+  '2025-06-18T14:24:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-19'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-19'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-19')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-20',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 20, Bodega: 00)',
+  'Estefania',
+  '2025-06-18T14:24:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-20'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-20'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-20')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-21',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 21, Bodega: 00)',
+  'Estefania',
+  '2025-06-18T14:42:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-21'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-21'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-21')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-23',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 23, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T13:03:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-23'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-23'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-23')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-24',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 24, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T13:05:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-24'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-24'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-24')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-24'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-24')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-24'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-24')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-25',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 25, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T13:10:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  8,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  14,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  20,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  18,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXXL'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-25')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXXL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-26',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 26, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T13:11:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-26'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-26'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  30,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-26')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-27',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 27, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T13:15:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-27'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-27'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-27')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-27'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  XL'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-27')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-28',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 28, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T13:17:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-28'
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-29',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 29, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T13:19:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  3,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  3,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  3,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-29')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-30',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 30, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T13:23:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  10,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-31',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 31, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T14:07:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  12,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  40,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  8,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  24,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-31')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-33',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 33, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T20:00:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-33'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-33'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-33')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-34',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 34, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T20:01:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-34'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-34'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-34')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-35',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 35, Bodega: 00)',
+  'Estefania',
+  '2025-06-19T20:02:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-35'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-35'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-35')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-35'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-35')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-36',
+  '2025-07-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 36, Bodega: 00)',
+  'Estefania',
+  '2025-07-08T13:05:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-36'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-36'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-36')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-37',
+  '2025-07-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 37, Bodega: 00)',
+  'Estefania',
+  '2025-07-08T13:32:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-37'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-37'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-37')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-38',
+  '2025-08-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 38, Bodega: 00)',
+  'Estefania',
+  '2025-08-04T15:16:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-38'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-38'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-38')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-39',
+  '2025-09-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 39, Bodega: 00)',
+  'Estefania',
+  '2025-09-17T21:18:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-39'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-39'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-39')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-40',
+  '2025-09-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 40, Bodega: 00)',
+  'Estefania',
+  '2025-09-19T11:52:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-40'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-40'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-40')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-41',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 41, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:31:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 44'),
+  3,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 44')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-42',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 42, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:32:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  20,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  20,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  20,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  20,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  20,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-42')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-43',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 43, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:32:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-43'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-43'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  12,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-43')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-43'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-43')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-44',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 44, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:32:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-44'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-44'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  22,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-44')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-44'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-44')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-44'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE XXL'),
+  12,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-44')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE XXL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-45',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 45, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:34:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  15,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  11,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  41,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  24,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  12,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  34,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-46',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 46, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:35:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-46'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-46'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-46')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-47',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 47, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:36:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  7,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XL'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-48',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 48, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:36:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-48'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-48'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38'),
+  5,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-48')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-49',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 49, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:37:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-49'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-49'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'ANTIFLUIDO'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-49')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'ANTIFLUIDO')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-50',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 50, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:41:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 6'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 6')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  15,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  26,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  19,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  12,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  9,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  9,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  22,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  17,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  12,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  52,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  9,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-51',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 51, Bodega: 00)',
+  'Estefania',
+  '2025-09-25T14:42:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-51'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-51'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40'),
+  6,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-51')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-51'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 42'),
+  4,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-51')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 42')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-52',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 52, Bodega: 00)',
+  'Estefania',
+  '2025-09-26T19:07:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-52'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-52'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-52')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-53',
+  '2025-10-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 53, Bodega: 00)',
+  'Estefania',
+  '2025-10-01T17:31:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-53'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-53'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-53')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-57',
+  '2025-10-15T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 57, Bodega: 00)',
+  'Estefania',
+  '2025-10-15T18:56:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-57'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-57'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  25,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-57')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-58',
+  '2025-10-15T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 58, Bodega: 00)',
+  'Estefania',
+  '2025-10-15T18:57:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-58'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-58'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  25,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-58')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-59',
+  '2025-10-15T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 59, Bodega: 00)',
+  'Estefania',
+  '2025-10-15T18:58:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-59'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-59'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  25,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-59')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-60',
+  '2025-11-07T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 60, Bodega: 00)',
+  'Estefania',
+  '2025-11-07T16:56:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-60'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-60'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-60')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-61',
+  '2025-11-07T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 61, Bodega: 00)',
+  'Estefania',
+  '2025-11-07T16:57:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-61'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-61'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-61')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-62',
+  '2025-12-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 62, Bodega: 00)',
+  'Estefania',
+  '2025-12-11T15:01:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-62'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-62'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 40'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-62')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 40')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-63',
+  '2025-12-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 63, Bodega: 00)',
+  'Estefania',
+  '2025-12-19T14:14:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-63'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-63'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-63')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-4',
+  '2025-05-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 4, Bodega: 00)',
+  'Estefania',
+  '2025-05-28T17:47:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-4'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-4'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-4')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-5',
+  '2025-05-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 5, Bodega: 00)',
+  'Estefania',
+  '2025-05-28T17:47:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-5'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-5'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-5')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-6',
+  '2025-06-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 6, Bodega: 00)',
+  'Estefania',
+  '2025-06-03T16:25:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-6'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-6'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-6')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-8',
+  '2025-06-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 8, Bodega: 00)',
+  'Estefania',
+  '2025-06-09T12:29:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-8'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-8'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-8')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-9',
+  '2025-06-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 9, Bodega: 00)',
+  'Estefania',
+  '2025-06-09T12:30:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-9'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-9'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR34'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-9')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR34')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-7',
+  '2025-06-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 7, Bodega: 00)',
+  'Estefania',
+  '2025-06-03T16:47:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-7'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-7'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-7')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-17',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 17, Bodega: 00)',
+  'Estefania',
+  '2025-06-17T20:34:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-17'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-17'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  8,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-17')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-17'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  8,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-17')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-22',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 22, Bodega: 00)',
+  'Estefania',
+  '2025-06-18T15:14:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-22'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-22'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-22')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-32',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 32, Bodega: 00)',
+  'Bibiana',
+  '2025-06-19T19:33:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-32'
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-54',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 54, Bodega: 00)',
+  'Estefania',
+  '2025-10-02T19:37:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-54'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-54'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-54')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-55',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 55, Bodega: 00)',
+  'Estefania',
+  '2025-10-02T19:37:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-55'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-55'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-55')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37')
+);
+
+INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) 
+SELECT 
+  'ENT-56',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 56, Bodega: 00)',
+  'Estefania',
+  '2025-10-02T19:39:00.000Z',
+  'MIGRACIÓN HISTÓRICA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = 'ENT-56'
+);
+
+INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) 
+SELECT 
+  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-56'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 35'),
+  1,
+  0.00
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_entradas_bodega_detalle 
+  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = 'ENT-56')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 35')
+);
 
 -- --- ASIGNACIONES ---
 INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
@@ -19234,6 +21983,22 @@ WHERE NOT EXISTS (
   WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-61')
     AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
 );
+
+-- --- RECONSTRUCCIÓN DE INVENTARIO BODEGA ---
+DELETE FROM gh_inventario_elemento;
+
+INSERT INTO gh_inventario_elemento (elemento_id, stock, fecha_actualizacion)
+SELECT elemento_id, GREATEST(0, SUM(cantidad)) as stock, CURRENT_TIMESTAMP
+FROM (
+  SELECT elemento_id, cantidad FROM gh_entradas_bodega_detalle
+  UNION ALL
+  SELECT elemento_id, -cantidad FROM gh_asignaciones_personal_detalle
+  UNION ALL
+  SELECT elemento_id, cantidad FROM gh_devoluciones_personal_detalle
+  UNION ALL
+  SELECT elemento_id, -cantidad FROM gh_salidas_proveedor_detalle
+) t
+GROUP BY elemento_id;
 
 -- --- RECONSTRUCCIÓN DE INVENTARIO PERSONAL ---
 DELETE FROM gh_inventario_personal;

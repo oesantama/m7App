@@ -88,6 +88,44 @@ async function main() {
       sqlContent += `VALUES (${escape(row.nombre)}, ${row.tipo_id}, ${escape(row.estado_id)}, 'Migración', ${escapeDate(row.fecha_control)}, ${row.es_serializado ? 'true' : 'false'}) \n`;
       sqlContent += `ON CONFLICT (nombre) DO NOTHING;\n\n`;
     }
+ 
+    // 3.5 Entradas
+    console.log('Exporting entradas...');
+    const entradas = await client.query("SELECT * FROM gh_entradas_bodega WHERE observaciones LIKE 'Migrado%'");
+    sqlContent += `-- --- ENTRADAS A BODEGA ---\n`;
+    for (const row of entradas.rows) {
+      sqlContent += `INSERT INTO gh_entradas_bodega (numero_factura, fecha, observaciones, usuario_control, fecha_control, proveedor) \n`;
+      sqlContent += `SELECT \n`;
+      sqlContent += `  ${escape(row.numero_factura)},\n`;
+      sqlContent += `  ${escapeDate(row.fecha)},\n`;
+      sqlContent += `  ${escape(row.observaciones)},\n`;
+      sqlContent += `  ${escape(row.usuario_control)},\n`;
+      sqlContent += `  ${escapeDate(row.fecha_control)},\n`;
+      sqlContent += `  ${escape(row.proveedor)}\n`;
+      sqlContent += `WHERE NOT EXISTS (\n`;
+      sqlContent += `  SELECT 1 FROM gh_entradas_bodega WHERE numero_factura = ${escape(row.numero_factura)}\n`;
+      sqlContent += `);\n\n`;
+
+      // Details
+      const details = await client.query("SELECT * FROM gh_entradas_bodega_detalle WHERE entrada_id = $1", [row.id]);
+      for (const det of details.rows) {
+        const elemRes = await client.query("SELECT nombre FROM gh_elementos WHERE id = $1", [det.elemento_id]);
+        const elemNombre = elemRes.rows[0]?.nombre;
+        if (!elemNombre) continue;
+
+        sqlContent += `INSERT INTO gh_entradas_bodega_detalle (entrada_id, elemento_id, cantidad, valor_unitario) \n`;
+        sqlContent += `SELECT \n`;
+        sqlContent += `  (SELECT id FROM gh_entradas_bodega WHERE numero_factura = ${escape(row.numero_factura)}),\n`;
+        sqlContent += `  (SELECT id FROM gh_elementos WHERE nombre = ${escape(elemNombre)}),\n`;
+        sqlContent += `  ${det.cantidad},\n`;
+        sqlContent += `  ${det.valor_unitario}\n`;
+        sqlContent += `WHERE NOT EXISTS (\n`;
+        sqlContent += `  SELECT 1 FROM gh_entradas_bodega_detalle \n`;
+        sqlContent += `  WHERE entrada_id = (SELECT id FROM gh_entradas_bodega WHERE numero_factura = ${escape(row.numero_factura)})\n`;
+        sqlContent += `    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = ${escape(elemNombre)})\n`;
+        sqlContent += `);\n\n`;
+      }
+    }
 
     // Cache maps of personal (cedula -> select subquery) and elements (nombre -> select subquery)
     // to build ID-safe detail and header insertions.
@@ -173,7 +211,22 @@ async function main() {
       }
     }
 
-    // 6. Recalcular gh_inventario_personal al final para asegurar consistencia
+    // 6. Recalcular gh_inventario_elemento y gh_inventario_personal al final para asegurar consistencia
+    sqlContent += `-- --- RECONSTRUCCIÓN DE INVENTARIO BODEGA ---\n`;
+    sqlContent += `DELETE FROM gh_inventario_elemento;\n\n`;
+    sqlContent += `INSERT INTO gh_inventario_elemento (elemento_id, stock, fecha_actualizacion)\n`;
+    sqlContent += `SELECT elemento_id, GREATEST(0, SUM(cantidad)) as stock, CURRENT_TIMESTAMP\n`;
+    sqlContent += `FROM (\n`;
+    sqlContent += `  SELECT elemento_id, cantidad FROM gh_entradas_bodega_detalle\n`;
+    sqlContent += `  UNION ALL\n`;
+    sqlContent += `  SELECT elemento_id, -cantidad FROM gh_asignaciones_personal_detalle\n`;
+    sqlContent += `  UNION ALL\n`;
+    sqlContent += `  SELECT elemento_id, cantidad FROM gh_devoluciones_personal_detalle\n`;
+    sqlContent += `  UNION ALL\n`;
+    sqlContent += `  SELECT elemento_id, -cantidad FROM gh_salidas_proveedor_detalle\n`;
+    sqlContent += `) t\n`;
+    sqlContent += `GROUP BY elemento_id;\n\n`;
+
     sqlContent += `-- --- RECONSTRUCCIÓN DE INVENTARIO PERSONAL ---\n`;
     sqlContent += `DELETE FROM gh_inventario_personal;\n\n`;
     sqlContent += `INSERT INTO gh_inventario_personal (personal_id, elemento_id, stock, fecha_actualizacion)\n`;
